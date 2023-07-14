@@ -26,6 +26,9 @@ Arcanum is a collection of packages that work together to create a robust, scala
 ### Arcanum Gather
 [Gather](https://github.com/arcanum-org/framework/tree/main/src/Gather) is a package for collecting and managing configuration data, environment variables, and other collections of key/value pairs.
 
+### Arcanum Glitch
+[Glitch](https://github.com/arcanum-org/framework/tree/main/src/Glitch) is Arcanum's Exception handling package.
+
 ### Arcanum Hyper
 [Hyper](https://github.com/arcanum-org/framework/tree/main/src/Hyper) is a package for working with PSR-7 HTTP requests and responses in a nice, object-oriented way.
 

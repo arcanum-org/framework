@@ -21,4 +21,9 @@ interface Kernel extends Terminable, Bootstrapper
      * Get the configuration directory of the application.
      */
     public function configDirectory(): string;
+
+    /**
+     * Get the files directory of the application.
+     */
+    public function filesDirectory(): string;
 }
