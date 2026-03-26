@@ -8,25 +8,21 @@ use Arcanum\Hyper\StatusCode;
 use Arcanum\Hyper\Phrase;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(Phrase::class)]
+#[UsesClass(StatusCode::class)]
 final class PhraseTest extends TestCase
 {
-    public function testCode(): void
+    public function testCodeReturnsMatchingStatusCodeForAllCases(): void
     {
-        // Arrange
-        $ok = Phrase::OK;
-        $notFound = Phrase::NotFound;
-        $teapot = Phrase::ImATeapot;
-
-        // Act
-        $okReason = $ok->code();
-        $notFoundReason = $notFound->code();
-        $teapotReason = $teapot->code();
-
-        // Assert
-        $this->assertSame(StatusCode::OK, $okReason);
-        $this->assertSame(StatusCode::NotFound, $notFoundReason);
-        $this->assertSame(StatusCode::ImATeapot, $teapotReason);
+        foreach (Phrase::cases() as $phrase) {
+            $statusCode = $phrase->code();
+            $this->assertSame(
+                $phrase->value,
+                $statusCode->reason()->value,
+                "Phrase::{$phrase->name}->code()->reason() should round-trip back to the same phrase"
+            );
+        }
     }
 }
