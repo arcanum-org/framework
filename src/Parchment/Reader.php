@@ -36,17 +36,17 @@ class Reader
      */
     public function lines(string $path): array
     {
-        $contents = $this->read($path);
-
-        if ($contents === '') {
-            return [];
+        if (is_dir($path)) {
+            throw new \RuntimeException("Unable to read file: $path (is a directory)");
         }
 
-        // Normalize line endings and split
-        $contents = str_replace("\r\n", "\n", $contents);
-        $contents = rtrim($contents, "\n");
+        $lines = @file($path, \FILE_IGNORE_NEW_LINES);
 
-        return explode("\n", $contents);
+        if ($lines === false) {
+            throw new \RuntimeException("Unable to read file: $path");
+        }
+
+        return $lines;
     }
 
     /**

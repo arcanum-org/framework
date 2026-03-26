@@ -136,6 +136,19 @@ final class ReaderTest extends TestCase
         $reader->lines($this->tempDir . '/nonexistent.txt');
     }
 
+    public function testLinesThrowsForDirectory(): void
+    {
+        // Arrange
+        $reader = new Reader();
+
+        // Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('is a directory');
+
+        // Act
+        $reader->lines($this->tempDir);
+    }
+
     // -----------------------------------------------------------
     // json()
     // -----------------------------------------------------------
