@@ -213,7 +213,7 @@ final class UploadedFileTest extends TestCase
         $this->expectException(InvalidFile::class);
 
         // Act
-        $uploadedFile->moveTo(''); /** @phpstan-ignore-line */
+        $uploadedFile->moveTo(''); /** @phpstan-ignore argument.type */
     }
 
     public function testMoveToThrowsInvalidFileIfErrorIsNotOK(): void
@@ -320,7 +320,7 @@ final class UploadedFileTest extends TestCase
 
         // Act
         new UploadedFile(
-            file: 12345, /** @phpstan-ignore-line */
+            file: 12345, /** @phpstan-ignore argument.type */
             mode: 'r',
             error: Error::UPLOAD_ERR_OK,
         );
