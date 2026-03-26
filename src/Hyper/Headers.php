@@ -95,7 +95,7 @@ class Headers extends IgnoreCaseRegistry
 
             $values[$i] = trim($item, "\t ");
 
-            if (empty($values[$i])) {
+            if ($values[$i] === '') {
                 throw new \InvalidArgumentException('Header values must not be empty.');
             }
 

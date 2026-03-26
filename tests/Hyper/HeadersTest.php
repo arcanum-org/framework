@@ -143,6 +143,17 @@ final class HeadersTest extends TestCase
         $headers['Host'] = '';
     }
 
+    public function testHeaderAcceptsZeroStringValue(): void
+    {
+        // Arrange & Act
+        $headers = new Headers([
+            'Content-Length' => '0',
+        ]);
+
+        // Assert
+        $this->assertEquals(['0'], $headers->get('Content-Length'));
+    }
+
     public function testHeaderSetThrowsInvalidArgumentExceptionIfHeaderValueContainsInvalidCharacters(): void
     {
         // Arrange
