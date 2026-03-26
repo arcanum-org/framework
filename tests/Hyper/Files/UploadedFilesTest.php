@@ -155,6 +155,98 @@ final class UploadedFilesTest extends TestCase
         $this->assertInstanceOf(UploadedFile::class, $result['my-form']['details']['avatars'][2]);
     }
 
+    public function testNormalizePassesThroughUploadedFileInterface(): void
+    {
+        // Arrange
+        $uploadedFile = new UploadedFile(
+            file: null,
+            mode: 'r',
+            error: Error::UPLOAD_ERR_NO_FILE,
+        );
+
+        // Act
+        $result = UploadedFiles::fromArray(['avatar' => $uploadedFile])->toArray();
+
+        // Assert
+        $this->assertSame($uploadedFile, $result['avatar']);
+    }
+
+    public function testNormalizeThrowsForInvalidTmpName(): void
+    {
+        // Assert
+        $this->expectException(\InvalidArgumentException::class);
+
+        // Act
+        UploadedFiles::fromArray([
+            'avatar' => [
+                'tmp_name' => 12345,
+                'error' => 0,
+            ],
+        ])->toArray();
+    }
+
+    public function testNormalizeRecursesNestedArraysWithoutTmpName(): void
+    {
+        // Arrange
+        $uploadedFile = new UploadedFile(
+            file: null,
+            mode: 'r',
+            error: Error::UPLOAD_ERR_NO_FILE,
+        );
+
+        // Act
+        $result = UploadedFiles::fromArray([
+            'nested' => [
+                'inner' => $uploadedFile,
+            ],
+        ])->toArray();
+
+        // Assert
+        $this->assertIsArray($result['nested']);
+        $this->assertSame($uploadedFile, $result['nested']['inner']);
+    }
+
+    public function testNormalizeThrowsForInvalidValue(): void
+    {
+        // Assert
+        $this->expectException(\InvalidArgumentException::class);
+
+        // Act
+        UploadedFiles::fromArray([
+            'bad' => 'not-valid',
+        ])->toArray();
+    }
+
+    public function testNormalizeSpecReturnsEmptyWhenTmpNameIsStringButOtherParamIsArray(): void
+    {
+        // Arrange — tmp_name is a string, but size is an array, so containsArray
+        // returns true and normalizeSpec is called. Since tmp_name is not an array,
+        // normalizeSpec returns early with an empty array.
+        $result = Normalizer::fromSpec(
+            tmpName: 'phpUxcOty',
+            size: [90996],
+        );
+
+        // Assert
+        $this->assertIsArray($result);
+        $this->assertEmpty($result);
+    }
+
+    public function testNormalizeSpecSkipsNonStringNonArrayTmpNameValues(): void
+    {
+        // Arrange — tmp_name array contains an integer value, which should be skipped
+        $result = Normalizer::fromSpec(
+            tmpName: ['valid' => 'phpUxcOty', 'invalid' => 12345],
+            error: ['valid' => 0, 'invalid' => 0],
+        );
+
+        // Assert
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('valid', $result);
+        $this->assertInstanceOf(UploadedFile::class, $result['valid']);
+        $this->assertArrayNotHasKey('invalid', $result);
+    }
+
     public function testFromSuperGlobal(): void
     {
         // Arrange
