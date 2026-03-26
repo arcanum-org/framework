@@ -18,6 +18,10 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 - [x] Investigate PHPServerAdapter testability — not unit-testable: every method is a 1:1 wrapper around SAPI-dependent PHP built-ins (`header()`, `getallheaders()`, `ob_*`, etc.). The `ServerAdapter` interface exists so `Server` can be tested via mocks. Class is correctly marked `@codeCoverageIgnore`.
 - [x] Add tests for `Server::request()` cookie filtering — not unit-testable: `request()` directly accesses `$_COOKIE`, `$_GET`, `$_POST` superglobals. The filtering logic (is_string key/value check) is trivial. Refactoring to inject superglobals would add complexity for minimal value.
 - [x] Add tests for `Server::sendSetCookieHeaders()` (blocked by the `withoutHeader` mutation bug — unblocked once that bug is fixed)
+- [ ] Fix `Port` constructor not storing type-converted value — promoted property `$value` stays as string when passed a string because `$value = (int)$value` reassigns the local parameter, not `$this->value`
+- [ ] Fix `Port` validation error message — says "between 1 and 65535, or null" but validation allows 0 and constructor doesn't accept null
+- [ ] Fix `Request::getRequestTarget()` returning stale cached value after `withUri()` — the cloned request inherits the cached `$requestTarget` and never recalculates from the new URI
+- [ ] Add `ResponseTest` — Response has zero direct test coverage (only exercised indirectly via ServerTest)
 
 ---
 
