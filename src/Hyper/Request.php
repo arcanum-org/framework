@@ -9,11 +9,6 @@ use Psr\Http\Message\MessageInterface;
 use Psr\Http\Message\StreamInterface;
 use Psr\Http\Message\UriInterface;
 
-/**
- * @todo Prevent CRLF injection in headers.
- */
-
-
 class Request implements RequestInterface, \Stringable
 {
     /**
@@ -80,13 +75,57 @@ class Request implements RequestInterface, \Stringable
      */
     public function withRequestTarget(string $requestTarget): RequestInterface
     {
-        // @todo: validate request target forms against http://tools.ietf.org/html/rfc7230#section-5.3
-        if (preg_match('/\s/', $requestTarget)) {
-            throw new \InvalidArgumentException('Request target cannot contain whitespace');
+        if (!self::isValidRequestTarget($requestTarget)) {
+            throw new \InvalidArgumentException(
+                "Invalid request target: $requestTarget. "
+                . 'Must be origin-form, absolute-form, authority-form, or asterisk-form per RFC 7230 §5.3.'
+            );
         }
         $request = clone $this;
         $request->requestTarget = $requestTarget;
         return $request;
+    }
+
+    /**
+     * Validate request target per RFC 7230 §5.3.
+     *
+     * Accepts:
+     *   origin-form:    absolute-path [ "?" query ]  e.g. /path?query
+     *   absolute-form:  absolute-URI                 e.g. http://example.com/path
+     *   authority-form: host ":" port                e.g. example.com:443
+     *   asterisk-form:  "*"
+     */
+    private static function isValidRequestTarget(string $target): bool
+    {
+        if ($target === '') {
+            return false;
+        }
+
+        if (preg_match('/\s/', $target)) {
+            return false;
+        }
+
+        // asterisk-form
+        if ($target === '*') {
+            return true;
+        }
+
+        // origin-form: starts with /
+        if ($target[0] === '/') {
+            return true;
+        }
+
+        // absolute-form: starts with scheme
+        if (preg_match('#^https?://#i', $target)) {
+            return true;
+        }
+
+        // authority-form: host:port
+        if (preg_match('/^[^\s\/:]+:\d+$/', $target)) {
+            return true;
+        }
+
+        return false;
     }
 
 

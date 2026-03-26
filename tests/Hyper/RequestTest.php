@@ -108,12 +108,81 @@ final class RequestTest extends TestCase
         $this->assertSame('/test', $newRequest->getRequestTarget());
     }
 
-    public function testWithRequestTargetThrowsInvalidArgumentExceptionIfTargetContainsSpace(): void
+    public function testWithRequestTargetOriginForm(): void
     {
         // Arrange
         $message = $this->createStub(MessageInterface::class);
         $uri = $this->createStub(UriInterface::class);
+        $request = new Request($message, RequestMethod::GET, $uri);
 
+        // Act
+        $newRequest = $request->withRequestTarget('/orders?page=2');
+
+        // Assert
+        $this->assertSame('/orders?page=2', $newRequest->getRequestTarget());
+    }
+
+    public function testWithRequestTargetAbsoluteForm(): void
+    {
+        // Arrange
+        $message = $this->createStub(MessageInterface::class);
+        $uri = $this->createStub(UriInterface::class);
+        $request = new Request($message, RequestMethod::GET, $uri);
+
+        // Act
+        $newRequest = $request->withRequestTarget('http://example.com/path');
+
+        // Assert
+        $this->assertSame('http://example.com/path', $newRequest->getRequestTarget());
+    }
+
+    public function testWithRequestTargetAbsoluteFormHttps(): void
+    {
+        // Arrange
+        $message = $this->createStub(MessageInterface::class);
+        $uri = $this->createStub(UriInterface::class);
+        $request = new Request($message, RequestMethod::GET, $uri);
+
+        // Act
+        $newRequest = $request->withRequestTarget('https://example.com/secure');
+
+        // Assert
+        $this->assertSame('https://example.com/secure', $newRequest->getRequestTarget());
+    }
+
+    public function testWithRequestTargetAuthorityForm(): void
+    {
+        // Arrange
+        $message = $this->createStub(MessageInterface::class);
+        $uri = $this->createStub(UriInterface::class);
+        $request = new Request($message, RequestMethod::CONNECT, $uri);
+
+        // Act
+        $newRequest = $request->withRequestTarget('example.com:443');
+
+        // Assert
+        $this->assertSame('example.com:443', $newRequest->getRequestTarget());
+    }
+
+    public function testWithRequestTargetAsteriskForm(): void
+    {
+        // Arrange
+        $message = $this->createStub(MessageInterface::class);
+        $uri = $this->createStub(UriInterface::class);
+        $request = new Request($message, RequestMethod::OPTIONS, $uri);
+
+        // Act
+        $newRequest = $request->withRequestTarget('*');
+
+        // Assert
+        $this->assertSame('*', $newRequest->getRequestTarget());
+    }
+
+    public function testWithRequestTargetRejectsWhitespace(): void
+    {
+        // Arrange
+        $message = $this->createStub(MessageInterface::class);
+        $uri = $this->createStub(UriInterface::class);
         $request = new Request($message, RequestMethod::GET, $uri);
 
         // Assert
@@ -121,6 +190,34 @@ final class RequestTest extends TestCase
 
         // Act
         $request->withRequestTarget('/test test');
+    }
+
+    public function testWithRequestTargetRejectsEmptyString(): void
+    {
+        // Arrange
+        $message = $this->createStub(MessageInterface::class);
+        $uri = $this->createStub(UriInterface::class);
+        $request = new Request($message, RequestMethod::GET, $uri);
+
+        // Assert
+        $this->expectException(\InvalidArgumentException::class);
+
+        // Act
+        $request->withRequestTarget('');
+    }
+
+    public function testWithRequestTargetRejectsInvalidForm(): void
+    {
+        // Arrange
+        $message = $this->createStub(MessageInterface::class);
+        $uri = $this->createStub(UriInterface::class);
+        $request = new Request($message, RequestMethod::GET, $uri);
+
+        // Assert
+        $this->expectException(\InvalidArgumentException::class);
+
+        // Act
+        $request->withRequestTarget('not-a-valid-target');
     }
 
     public function testGetMethod(): void
