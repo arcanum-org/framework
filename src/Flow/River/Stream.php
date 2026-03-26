@@ -16,10 +16,10 @@ use Arcanum\Gather\Registry;
  *   unread_bytes: int,
  *   stream_type: string,
  *   wrapper_type: string,
- *   wrapper_data?: mixed,
+ *   wrapper_data: mixed,
  *   mode: string,
  *   seekable: bool,
- *   uri: string,
+ *   uri?: string,
  *   crypto?: array{
  *     protocol: string,
  *     cipher_name: string,
@@ -35,18 +35,22 @@ class Stream implements Copyable, \Stringable
      */
     protected Registry $properties;
 
+    protected ?ResourceWrapper $source = null;
+
     /**
      * Construct a Stream.
      */
     public function __construct(
-        protected ResourceWrapper $source,
+        ResourceWrapper $source,
         protected int|null $size = null,
     ) {
-        if (!$this->source->isResource()) {
+        $this->source = $source;
+
+        if (!$source->isResource()) {
             throw new InvalidSource('Stream source must be a live resource');
         }
 
-        $meta = $this->source->streamGetMetaData();
+        $meta = $source->streamGetMetaData();
         $this->setProperties(
             seekable: $meta['seekable'],
             readable: (bool) preg_match('/r|a\+|ab\+|w\+|wb\+|x\+|xb\+|c\+|cb\+/', $meta['mode']),
@@ -163,8 +167,8 @@ class Stream implements Copyable, \Stringable
      */
     public function close(): void
     {
-        // if $this->source is not set, the stream has already been closed
-        if (!isset($this->source)) {
+        // if $this->source is null, the stream has already been closed
+        if ($this->source === null) {
             return;
         }
 
@@ -185,12 +189,12 @@ class Stream implements Copyable, \Stringable
      */
     public function detach()
     {
-        if (!isset($this->source)) {
+        if ($this->source === null) {
             return null;
         }
 
         $source = $this->source;
-        unset($this->source);
+        $this->source = null;
         $this->size = 0;
         $this->setProperties(seekable: false, readable: false, writable: false);
         return $source->export();
@@ -250,10 +254,12 @@ class Stream implements Copyable, \Stringable
         }
 
         $meta = $this->source->streamGetMetaData();
-        $this->source->clearstatcache(true, $meta['uri']);
+        if (isset($meta['uri'])) {
+            $this->source->clearstatcache(true, $meta['uri']);
+        }
 
         $stats = $this->source->fstat();
-        if ($stats && $stats['size'] !== false) {
+        if ($stats !== false && $stats['size'] !== false) {
             $this->size = $stats['size'];
             return $this->size;
         }
@@ -307,16 +313,20 @@ class Stream implements Copyable, \Stringable
 
     /**
      * Throw an exception if the stream is detached.
+     *
+     * @phpstan-assert !null $this->source
      */
     protected function guardDetachedSource(): void
     {
-        if (!isset($this->source)) {
+        if ($this->source === null) {
             throw new DetachedSource('Cannot operate on a detached stream');
         }
     }
 
     /**
      * Throw an exception if the stream is not readable.
+     *
+     * @phpstan-assert !null $this->source
      */
     protected function guardReadable(): void
     {

@@ -131,7 +131,7 @@ final class ResolverTest extends TestCase
         $this->assertSame([], $resolved->getArray());
         $this->assertInstanceOf(\stdClass::class, $resolved->getObject());
         $this->assertInstanceOf(Fixture\SimpleDependency::class, $resolved->getMixed());
-        $this->assertNull($resolved->getNull());
+        $this->assertSame(null, $resolved->getNull());
     }
 
     public function testVariadicPrimitives(): void
@@ -640,7 +640,7 @@ final class ResolverTest extends TestCase
         $this->assertSame(['a', 'b', 'c'], $resolved->getArray());
         $this->assertInstanceOf(\stdClass::class, $resolved->getObject());
         $this->assertSame('foo two', $resolved->getMixed());
-        $this->assertNull($resolved->getNull());
+        $this->assertSame(null, $resolved->getNull());
     }
 
     public function testSpecifyInterfaceParameter(): void

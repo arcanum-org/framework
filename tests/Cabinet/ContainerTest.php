@@ -255,7 +255,7 @@ final class ContainerTest extends TestCase
         $this->expectException(InvalidKey::class);
 
         // Act
-        $container[0] = 'bar'; /** @phpstan-ignore-line */
+        $container[0] = 'bar';
     }
 
     public function testContainerCannotAccessNonStringKey(): void
@@ -302,7 +302,7 @@ final class ContainerTest extends TestCase
         $this->expectException(InvalidKey::class);
 
         // Act
-        $container[0]; /** @phpstan-ignore-line */
+        $container[0];
     }
 
     public function testContainerGetService(): void

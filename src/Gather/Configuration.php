@@ -118,6 +118,8 @@ class Configuration extends Registry
             $value = &$value[$part];
         }
 
-        unset($value[$last]);
+        if (is_array($value)) {
+            unset($value[$last]);
+        }
     }
 }

@@ -15,14 +15,14 @@ use Psr\Http\Message\UploadedFileInterface;
 class UploadedFile implements UploadedFileInterface
 {
     /**
-     * @var string|null The file path, if set.
+     * @var string The file path, if set.
      */
-    private string|null $file;
+    private string $file;
 
     /**
-     * @var StreamInterface|null The stream representation of the uploaded file, if set.
+     * @var StreamInterface The stream representation of the uploaded file, if set.
      */
-    private StreamInterface|null $stream;
+    private StreamInterface $stream;
 
     /**
      * @var bool Whether the uploaded file has already been moved.
@@ -59,7 +59,8 @@ class UploadedFile implements UploadedFileInterface
         $this->stream = match (true) {
             $file instanceof StreamInterface => $file,
             is_resource($file) => new Stream(StreamResource::wrap($file)),
-            $file instanceof ResourceWrapper => new Stream($file)
+            $file instanceof ResourceWrapper => new Stream($file),
+            default => throw new InvalidFile('Invalid file type'),
         };
     }
 

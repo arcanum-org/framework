@@ -23,7 +23,7 @@ interface System
     /**
      * Get a pipeline from the system.
      */
-    public function pipeline(string $key, Pipelayer $default = null): Pipelayer;
+    public function pipeline(string $key, ?Pipelayer $default = null): Pipelayer;
 
     /**
      * Remove a pipeline from the system.

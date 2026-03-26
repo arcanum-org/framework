@@ -13,7 +13,7 @@ use Psr\Log\LoggerInterface;
  * A Quill Logger is a PSR-3 compliant logger that sends logs to multiple
  * channels.
  */
-class Logger implements LoggerInterface
+class Logger implements LoggerInterface, ChannelLogger
 {
     /**
      * The channels that this logger will send logs to.

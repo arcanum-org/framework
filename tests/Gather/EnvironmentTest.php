@@ -73,6 +73,6 @@ final class EnvironmentTest extends TestCase
         $this->expectExceptionMessage('The environment cannot be cloned');
 
         // Act
-        clone $environment;
+        $_ = clone $environment;
     }
 }

@@ -77,7 +77,6 @@ final class UploadedFilesTest extends TestCase
         $result = UploadedFiles::fromArray($files)->toArray();
 
         // Assert
-        $this->assertIsArray($result);
         $this->assertArrayHasKey('my-form', $result);
         $this->assertIsArray($result['my-form']);
         $this->assertArrayHasKey('details', $result['my-form']);
@@ -144,7 +143,6 @@ final class UploadedFilesTest extends TestCase
         $result = UploadedFiles::fromArray($files)->toArray();
 
         // Assert
-        $this->assertIsArray($result);
         $this->assertArrayHasKey('my-form', $result);
         $this->assertIsArray($result['my-form']);
         $this->assertArrayHasKey('details', $result['my-form']);
@@ -171,7 +169,6 @@ final class UploadedFilesTest extends TestCase
         $result = UploadedFiles::fromSuperGlobal()->toArray();
 
         // Assert
-        $this->assertIsArray($result);
         $this->assertArrayHasKey('avatar', $result);
         $this->assertInstanceOf(UploadedFile::class, $result['avatar']);
 

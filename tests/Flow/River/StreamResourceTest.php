@@ -6,24 +6,12 @@ namespace Arcanum\Test\Flow\River;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\IgnoreMethodForCodeCoverage;
 use PHPUnit\Framework\Attributes\UsesClass;
 use Arcanum\Flow\River\StreamResource;
 use Arcanum\Flow\River\InvalidSource;
 
 #[CoversClass(StreamResource::class)]
 #[UsesClass(InvalidSource::class)]
-#[IgnoreMethodForCodeCoverage(StreamResource::class, 'isResource')]
-#[IgnoreMethodForCodeCoverage(StreamResource::class, 'feof')]
-#[IgnoreMethodForCodeCoverage(StreamResource::class, 'ftell')]
-#[IgnoreMethodForCodeCoverage(StreamResource::class, 'fseek')]
-#[IgnoreMethodForCodeCoverage(StreamResource::class, 'fclose')]
-#[IgnoreMethodForCodeCoverage(StreamResource::class, 'streamGetMetaData')]
-#[IgnoreMethodForCodeCoverage(StreamResource::class, 'clearstatcache')]
-#[IgnoreMethodForCodeCoverage(StreamResource::class, 'fstat')]
-#[IgnoreMethodForCodeCoverage(StreamResource::class, 'fread')]
-#[IgnoreMethodForCodeCoverage(StreamResource::class, 'fwrite')]
-#[IgnoreMethodForCodeCoverage(StreamResource::class, 'streamGetContents')]
 final class StreamResourceTest extends TestCase
 {
     public function testStreamResource(): void

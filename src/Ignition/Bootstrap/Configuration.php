@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Arcanum\Ignition\Bootstrap;
 
 use Arcanum\Cabinet\Application;
+use Arcanum\Gather\Configuration as GatherConfiguration;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Parchment\Searcher;
 use Arcanum\Gather\Registry;
@@ -20,10 +21,10 @@ class Configuration implements Bootstrapper
     public function bootstrap(Application $container): void
     {
         // Create a new configuration registry.
-        $config = new Registry();
+        $config = new GatherConfiguration();
 
         // Register the configuration registry in the container.
-        $container->instance('config', $config);
+        $container->instance(GatherConfiguration::class, $config);
 
         // Get the configuration directory from the kernel.
         // @todo cache this
@@ -37,7 +38,7 @@ class Configuration implements Bootstrapper
         foreach ($files as $file) {
             $config->set(
                 $file->getFilenameWithoutExtension(),
-                new Registry(require $file->getRealPath()),
+                require $file->getRealPath(),
             );
         }
     }

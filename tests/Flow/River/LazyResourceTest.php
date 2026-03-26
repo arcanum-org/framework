@@ -6,7 +6,6 @@ namespace Arcanum\Test\Flow\River;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\IgnoreMethodForCodeCoverage;
 use PHPUnit\Framework\Attributes\UsesClass;
 use Arcanum\Flow\River\LazyResource;
 use Arcanum\Flow\River\StreamResource;
@@ -15,17 +14,6 @@ use Arcanum\Flow\River\InvalidSource;
 #[CoversClass(LazyResource::class)]
 #[UsesClass(InvalidSource::class)]
 #[UsesClass(StreamResource::class)]
-#[IgnoreMethodForCodeCoverage(LazyResource::class, 'isResource')]
-#[IgnoreMethodForCodeCoverage(LazyResource::class, 'feof')]
-#[IgnoreMethodForCodeCoverage(LazyResource::class, 'ftell')]
-#[IgnoreMethodForCodeCoverage(LazyResource::class, 'fseek')]
-#[IgnoreMethodForCodeCoverage(LazyResource::class, 'fclose')]
-#[IgnoreMethodForCodeCoverage(LazyResource::class, 'streamGetMetaData')]
-#[IgnoreMethodForCodeCoverage(LazyResource::class, 'clearstatcache')]
-#[IgnoreMethodForCodeCoverage(LazyResource::class, 'fstat')]
-#[IgnoreMethodForCodeCoverage(LazyResource::class, 'fread')]
-#[IgnoreMethodForCodeCoverage(LazyResource::class, 'fwrite')]
-#[IgnoreMethodForCodeCoverage(LazyResource::class, 'streamGetContents')]
 final class LazyResourceTest extends TestCase
 {
     public function testLazyResource(): void
@@ -52,7 +40,7 @@ final class LazyResourceTest extends TestCase
         $exportedResource = $streamResource->export();
 
         // Assert
-        $this->assertIsResource($exportedResource);
+        $this->assertTrue(is_resource($exportedResource));
 
         // Cleanup
         fclose($exportedResource);

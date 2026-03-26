@@ -50,10 +50,10 @@ final class ServerRequestTest extends TestCase
     public function testGetUploadedFilesDefaultEmpty(): void
     {
         // Arrange
-        /** @var RequestInterface */
+        /** @var RequestInterface&\PHPUnit\Framework\MockObject\Stub */
         $request = $this->createStub(RequestInterface::class);
 
-        /** @var Registry */
+        /** @var Registry&\PHPUnit\Framework\MockObject\Stub */
         $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
@@ -68,10 +68,10 @@ final class ServerRequestTest extends TestCase
     public function testWithUploadedFiles(): void
     {
         // Arrange
-        /** @var RequestInterface */
+        /** @var RequestInterface&\PHPUnit\Framework\MockObject\Stub */
         $request = $this->createStub(RequestInterface::class);
 
-        /** @var Registry */
+        /** @var Registry&\PHPUnit\Framework\MockObject\Stub */
         $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
@@ -95,10 +95,10 @@ final class ServerRequestTest extends TestCase
     public function testGetCookieParams(): void
     {
         // Arrange
-        /** @var RequestInterface */
+        /** @var RequestInterface&\PHPUnit\Framework\MockObject\Stub */
         $request = $this->createStub(RequestInterface::class);
 
-        /** @var Registry */
+        /** @var Registry&\PHPUnit\Framework\MockObject\Stub */
         $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
@@ -113,10 +113,10 @@ final class ServerRequestTest extends TestCase
     public function testWithCookieParams(): void
     {
         // Arrange
-        /** @var RequestInterface */
+        /** @var RequestInterface&\PHPUnit\Framework\MockObject\Stub */
         $request = $this->createStub(RequestInterface::class);
 
-        /** @var Registry */
+        /** @var Registry&\PHPUnit\Framework\MockObject\Stub */
         $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
@@ -134,10 +134,10 @@ final class ServerRequestTest extends TestCase
     public function testGetQueryParams(): void
     {
         // Arrange
-        /** @var RequestInterface */
+        /** @var RequestInterface&\PHPUnit\Framework\MockObject\Stub */
         $request = $this->createStub(RequestInterface::class);
 
-        /** @var Registry */
+        /** @var Registry&\PHPUnit\Framework\MockObject\Stub */
         $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
@@ -152,10 +152,10 @@ final class ServerRequestTest extends TestCase
     public function testWithQueryParams(): void
     {
         // Arrange
-        /** @var RequestInterface */
+        /** @var RequestInterface&\PHPUnit\Framework\MockObject\Stub */
         $request = $this->createStub(RequestInterface::class);
 
-        /** @var Registry */
+        /** @var Registry&\PHPUnit\Framework\MockObject\Stub */
         $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
@@ -173,10 +173,10 @@ final class ServerRequestTest extends TestCase
     public function testGetAttributes(): void
     {
         // Arrange
-        /** @var RequestInterface */
+        /** @var RequestInterface&\PHPUnit\Framework\MockObject\Stub */
         $request = $this->createStub(RequestInterface::class);
 
-        /** @var Registry */
+        /** @var Registry&\PHPUnit\Framework\MockObject\Stub */
         $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
@@ -191,10 +191,10 @@ final class ServerRequestTest extends TestCase
     public function testGetAttribute(): void
     {
         // Arrange
-        /** @var RequestInterface */
+        /** @var RequestInterface&\PHPUnit\Framework\MockObject\Stub */
         $request = $this->createStub(RequestInterface::class);
 
-        /** @var Registry */
+        /** @var Registry&\PHPUnit\Framework\MockObject\Stub */
         $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
@@ -210,10 +210,10 @@ final class ServerRequestTest extends TestCase
     public function testWithAttribute(): void
     {
         // Arrange
-        /** @var RequestInterface */
+        /** @var RequestInterface&\PHPUnit\Framework\MockObject\Stub */
         $request = $this->createStub(RequestInterface::class);
 
-        /** @var Registry */
+        /** @var Registry&\PHPUnit\Framework\MockObject\Stub */
         $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
@@ -229,10 +229,10 @@ final class ServerRequestTest extends TestCase
     public function testWithoutAttribute(): void
     {
         // Arrange
-        /** @var RequestInterface */
+        /** @var RequestInterface&\PHPUnit\Framework\MockObject\Stub */
         $request = $this->createStub(RequestInterface::class);
 
-        /** @var Registry */
+        /** @var Registry&\PHPUnit\Framework\MockObject\Stub */
         $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
@@ -249,10 +249,10 @@ final class ServerRequestTest extends TestCase
     public function testGetParsedBody(): void
     {
         // Arrange
-        /** @var RequestInterface */
+        /** @var RequestInterface&\PHPUnit\Framework\MockObject\Stub */
         $request = $this->createStub(RequestInterface::class);
 
-        /** @var Registry */
+        /** @var Registry&\PHPUnit\Framework\MockObject\Stub */
         $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
@@ -267,7 +267,7 @@ final class ServerRequestTest extends TestCase
     public function testWithParsedBody(): void
     {
         // Arrange
-        /** @var RequestInterface */
+        /** @var RequestInterface&\PHPUnit\Framework\MockObject\Stub */
         $request = $this->createStub(RequestInterface::class);
 
         $serverParams = $this->createStub(Registry::class);

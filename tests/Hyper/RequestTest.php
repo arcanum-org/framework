@@ -431,7 +431,8 @@ final class RequestTest extends TestCase
         $newMessage = $this->getMockBuilder(MessageInterface::class)
             ->getMock();
 
-        $newMessage->method('getHeader')
+        $newMessage->expects($this->any())
+            ->method('getHeader')
             ->with('Content-Type')
             ->willReturn($newHeader);
 
@@ -467,7 +468,8 @@ final class RequestTest extends TestCase
         $newMessage = $this->getMockBuilder(MessageInterface::class)
             ->getMock();
 
-        $newMessage->method('getHeader')
+        $newMessage->expects($this->any())
+            ->method('getHeader')
             ->with('Content-Type')
             ->willReturn($header + $newHeader);
 
@@ -502,7 +504,8 @@ final class RequestTest extends TestCase
         $newMessage = $this->getMockBuilder(MessageInterface::class)
             ->getMock();
 
-        $newMessage->method('getHeader')
+        $newMessage->expects($this->any())
+            ->method('getHeader')
             ->with('Content-Type')
             ->willReturn([]);
 

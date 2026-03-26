@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Arcanum\Ignition;
 
-use Arcanum\Hyper\RequestMethod;
 use Arcanum\Flow\River\LazyResource;
 use Arcanum\Flow\River\Stream;
 use Arcanum\Cabinet\Application;
@@ -30,14 +29,24 @@ class HyperKernel implements Kernel, RequestHandlerInterface
     protected array $bootstrappers = [
         Bootstrap\Environment::class,
         Bootstrap\Configuration::class,
+        Bootstrap\Logger::class,
+        Bootstrap\Exceptions::class,
     ];
 
     public function __construct(
         private string $rootDirectory,
         private string $configDirectory = '',
+        private string $filesDirectory = '',
     ) {
+        // Trim trailing slashes from the root directory.
+        $this->rootDirectory = $rootDirectory = rtrim($rootDirectory, DIRECTORY_SEPARATOR);
+
+        // Set the config and files directories if they are not set.
         if ($configDirectory === '') {
             $this->configDirectory = $rootDirectory . DIRECTORY_SEPARATOR . 'config';
+        }
+        if ($filesDirectory === '') {
+            $this->filesDirectory = $rootDirectory . DIRECTORY_SEPARATOR . 'files';
         }
     }
 
@@ -55,6 +64,14 @@ class HyperKernel implements Kernel, RequestHandlerInterface
     public function configDirectory(): string
     {
         return $this->configDirectory;
+    }
+
+    /**
+     * Get the files directory of the application.
+     */
+    public function filesDirectory(): string
+    {
+        return $this->filesDirectory;
     }
 
     /**
@@ -78,6 +95,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
      */
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
+
         // TEMPORARY
         return new \Arcanum\Hyper\Response(
             new \Arcanum\Hyper\Message(

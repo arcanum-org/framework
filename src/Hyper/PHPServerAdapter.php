@@ -4,6 +4,16 @@ declare(strict_types=1);
 
 namespace Arcanum\Hyper;
 
+/**
+ * PHP Server Adapter
+ * ------------------
+ *
+ * This class is a wrapper around PHP's built-in functions for interacting with
+ * headers, output buffers, and the request/response cycle.
+ *
+ * Since these are just simple function wrappers, we don't need to test them.
+ * @codeCoverageIgnore
+ */
 class PHPServerAdapter implements ServerAdapter
 {
     /**

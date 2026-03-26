@@ -71,7 +71,7 @@ class URI implements UriInterface
 
         $this->composed = '';
 
-        if ($this->scheme !== '') {
+        if ((string)$this->scheme !== '') {
             $this->composed .= $this->scheme . ':';
         }
 

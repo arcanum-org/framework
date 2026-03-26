@@ -33,7 +33,7 @@ class CachingStream implements Copyable, \Stringable
      */
     protected function __construct(
         StreamInterface $remote,
-        StreamInterface $local = null,
+        ?StreamInterface $local = null,
     ) {
         $this->remote = $remote;
         $this->local = $local ?? TemporaryStream::getNew();

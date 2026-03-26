@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Arcanum\Flow\River;
 
-/** @phpstan-consistent-constructor */
 class StreamResource implements ResourceWrapper
 {
     /**
@@ -19,9 +18,9 @@ class StreamResource implements ResourceWrapper
      *
      * @param resource $resource
      */
-    public static function wrap($resource): static
+    public static function wrap($resource): self
     {
-        $wrapper = new static($resource);
+        $wrapper = new self($resource);
         if (!$wrapper->isResource()) {
             throw new InvalidSource('Stream source must be a live resource');
         }
@@ -71,10 +70,10 @@ class StreamResource implements ResourceWrapper
      *   unread_bytes: int,
      *   stream_type: string,
      *   wrapper_type: string,
-     *   wrapper_data?: mixed,
+     *   wrapper_data: mixed,
      *   mode: string,
      *   seekable: bool,
-     *   uri: string,
+     *   uri?: string,
      *   crypto?: array{
      *     protocol: string,
      *     cipher_name: string,
@@ -102,7 +101,7 @@ class StreamResource implements ResourceWrapper
      *   uid: int,
      *   gid: int,
      *   rdev: int,
-     *   size: int,
+     *   size: int|false,
      *   atime: int,
      *   mtime: int,
      *   ctime: int,
@@ -116,7 +115,7 @@ class StreamResource implements ResourceWrapper
     }
 
     /**
-     * @param int<0, max> $length
+     * @param int<1, max> $length
      */
     public function fread(int $length): string|false
     {

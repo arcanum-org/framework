@@ -38,7 +38,7 @@ class PipelayerSystem implements System
     /**
      * Get a pipeline from the system.
      */
-    public function pipeline(string $key, Pipelayer $default = null): Pipelayer
+    public function pipeline(string $key, ?Pipelayer $default = null): Pipelayer
     {
         if (!isset($this->pipelines[$key])) {
             $this->pipelines[$key] = $default ?? new Pipeline();
