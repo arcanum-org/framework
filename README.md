@@ -22,7 +22,7 @@ Arcanum is a collection of packages that work together to create a robust, scala
 
 ### Arcanum Echo
 
-[Echo](https://github.com/arcanum-org/framework/tree/main/src/Echo) is a PSR-14 compliant event dispatcher package. Arcanum packages use it to dispatch events internally, and it can be used independently to build any event-driven system.
+[Echo](https://github.com/arcanum-org/framework/tree/main/src/Echo) is a PSR-14 compliant event dispatcher. Register listeners for event classes, dispatch events, and Echo calls the right listeners in order. It walks the class hierarchy, so a listener for a base event class fires for all subclasses too. You can dispatch any object — non-Event objects get wrapped automatically. Under the hood, it uses Flow's Pipeline to chain listeners with propagation control.
 
 ### Arcanum Flow
 
@@ -35,7 +35,7 @@ Arcanum is a collection of packages that work together to create a robust, scala
 
 ### Arcanum Gather
 
-[Gather](https://github.com/arcanum-org/framework/tree/main/src/Gather) is a package for collecting and managing configuration data, environment variables, and other collections of key/value pairs.
+[Gather](https://github.com/arcanum-org/framework/tree/main/src/Gather) is a typed key-value collection system. The core `Registry` class wraps arrays with PSR-11 container compliance, type coercion (`asString`, `asInt`, `asBool`, etc.), and serialization support. Three specialized variants extend it: `Configuration` adds dot-notation access for nested settings, `Environment` locks down serialization and cloning to prevent leaking secrets, and `IgnoreCaseRegistry` provides case-insensitive key lookups (used by Hyper for HTTP headers).
 
 ### Arcanum Glitch
 
