@@ -130,8 +130,8 @@ final class HandlerTest extends TestCase
             ->method('__invoke')
             ->with($this->isInstanceOf(\ErrorException::class));
 
-        $container = $this->createStub(Application::class);
-        $container->method('get')->willReturn($reporter);
+        $container = $this->createMock(Application::class);
+        $container->expects($this->once())->method('get')->willReturn($reporter);
 
         $logger = $this->createStub(ChannelLogger::class);
         $logger->method('channel')->willThrowException(
@@ -181,8 +181,8 @@ final class HandlerTest extends TestCase
         $reporter->method('handles')->willReturn(false);
         $reporter->expects($this->never())->method('__invoke');
 
-        $container = $this->createStub(Application::class);
-        $container->method('get')->willReturn($reporter);
+        $container = $this->createMock(Application::class);
+        $container->expects($this->once())->method('get')->willReturn($reporter);
 
         $handler = $this->createHandler(container: $container);
         $handler->registerReporter(Reporter::class);
@@ -194,12 +194,13 @@ final class HandlerTest extends TestCase
     public function testHandleExceptionFallsBackToLoggerWhenReporterThrows(): void
     {
         // Arrange
-        $reporter = $this->createStub(Reporter::class);
-        $reporter->method('handles')->willReturn(true);
-        $reporter->method('__invoke')->willThrowException(new \RuntimeException('Reporter broke'));
+        $reporter = $this->createMock(Reporter::class);
+        $reporter->expects($this->once())->method('handles')->willReturn(true);
+        $reporter->expects($this->once())->method('__invoke')
+            ->willThrowException(new \RuntimeException('Reporter broke'));
 
-        $container = $this->createStub(Application::class);
-        $container->method('get')->willReturn($reporter);
+        $container = $this->createMock(Application::class);
+        $container->expects($this->once())->method('get')->willReturn($reporter);
 
         $channel = $this->createMock(Channel::class);
         $channel->expects($this->once())->method('critical')->with('Reporter broke', $this->anything());
@@ -217,15 +218,17 @@ final class HandlerTest extends TestCase
     public function testHandleExceptionFallsBackToErrorLogWhenLoggerAlsoThrows(): void
     {
         // Arrange
-        $reporter = $this->createStub(Reporter::class);
-        $reporter->method('handles')->willReturn(true);
-        $reporter->method('__invoke')->willThrowException(new \RuntimeException('Reporter broke'));
+        $reporter = $this->createMock(Reporter::class);
+        $reporter->expects($this->once())->method('handles')->willReturn(true);
+        $reporter->expects($this->once())->method('__invoke')
+            ->willThrowException(new \RuntimeException('Reporter broke'));
 
-        $container = $this->createStub(Application::class);
-        $container->method('get')->willReturn($reporter);
+        $container = $this->createMock(Application::class);
+        $container->expects($this->once())->method('get')->willReturn($reporter);
 
-        $logger = $this->createStub(ChannelLogger::class);
-        $logger->method('channel')->willThrowException(new \RuntimeException('Logger also broke'));
+        $logger = $this->createMock(ChannelLogger::class);
+        $logger->expects($this->once())->method('channel')
+            ->willThrowException(new \RuntimeException('Logger also broke'));
 
         $handler = $this->createHandler(logger: $logger, container: $container);
         $handler->registerReporter(Reporter::class);
@@ -268,14 +271,14 @@ final class HandlerTest extends TestCase
     {
         // Arrange — container returns non-Reporter, which triggers RuntimeException
         // in buildReporters, caught by handleException's fallback logger
-        $container = $this->createStub(Application::class);
-        $container->method('get')->willReturn(new \stdClass());
+        $container = $this->createMock(Application::class);
+        $container->expects($this->once())->method('get')->willReturn(new \stdClass());
 
         $channel = $this->createMock(Channel::class);
         $channel->expects($this->once())->method('critical');
 
-        $logger = $this->createStub(ChannelLogger::class);
-        $logger->method('channel')->willReturn($channel);
+        $logger = $this->createMock(ChannelLogger::class);
+        $logger->expects($this->once())->method('channel')->willReturn($channel);
 
         $handler = $this->createHandler(logger: $logger, container: $container);
         $handler->registerReporter(\stdClass::class); /** @phpstan-ignore argument.type */
@@ -295,8 +298,8 @@ final class HandlerTest extends TestCase
         $reporter->method('handles')->willReturn(true);
         $reporter->expects($this->once())->method('__invoke');
 
-        $container = $this->createStub(Application::class);
-        $container->method('get')->willReturn($reporter);
+        $container = $this->createMock(Application::class);
+        $container->expects($this->once())->method('get')->willReturn($reporter);
 
         $handler = $this->createHandler(container: $container);
         $handler->registerReporter(Reporter::class);
