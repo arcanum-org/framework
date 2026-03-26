@@ -63,7 +63,7 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 
 Parchment is the filesystem abstraction layer. It delegates to Symfony Finder and Symfony Filesystem under the hood rather than reimplementing their functionality.
 
-- [ ] Add `Reader` — read file contents (string, lines, JSON decode). Uses PHP file functions for reads
+- [x] Add `Reader` — read file contents (string, lines, JSON decode). Uses PHP file functions for reads
 - [ ] Add `Writer` — write file contents (string, JSON encode, append). Delegates to Symfony Filesystem's `dumpFile` for atomic writes
 - [ ] Add `FileSystem` — copy, move, delete files and directories. Delegates to Symfony Filesystem
 - [ ] Add `PathHelper` — normalize paths, resolve relative paths, extract extensions
