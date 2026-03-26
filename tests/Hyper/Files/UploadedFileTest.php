@@ -265,6 +265,67 @@ final class UploadedFileTest extends TestCase
         unlink($target);
     }
 
+    public function testMoveToWithFilePath(): void
+    {
+        // Arrange
+        $source = \tempnam(\sys_get_temp_dir(), 'phpunit-src');
+        $this->assertNotFalse($source);
+        file_put_contents($source, 'hello');
+        $target = \sys_get_temp_dir() . '/phpunit-native-move-target';
+
+        $uploadedFile = new UploadedFile(
+            file: $source,
+            mode: 'r',
+            error: Error::UPLOAD_ERR_OK,
+        );
+
+        // Act
+        $uploadedFile->moveTo($target);
+
+        // Assert
+        $this->assertFileExists($target);
+        $this->assertSame('hello', file_get_contents($target));
+
+        // Cleanup
+        unlink($target);
+    }
+
+    public function testMoveToThrowsInvalidFileIfAlreadyMoved(): void
+    {
+        // Arrange
+        $source = \tempnam(\sys_get_temp_dir(), 'phpunit-src');
+        $this->assertNotFalse($source);
+        file_put_contents($source, 'hello');
+        $target = \sys_get_temp_dir() . '/phpunit-already-moved-target';
+
+        $uploadedFile = new UploadedFile(
+            file: $source,
+            mode: 'r',
+            error: Error::UPLOAD_ERR_OK,
+        );
+
+        $uploadedFile->moveTo($target);
+
+        // Assert
+        $this->expectException(InvalidFile::class);
+
+        // Act
+        $uploadedFile->moveTo($target);
+    }
+
+    public function testMarshallFileThrowsInvalidFileForInvalidType(): void
+    {
+        // Assert
+        $this->expectException(InvalidFile::class);
+
+        // Act
+        new UploadedFile(
+            file: 12345, /** @phpstan-ignore-line */
+            mode: 'r',
+            error: Error::UPLOAD_ERR_OK,
+        );
+    }
+
     public function testMoveToThrowsRuntimeExceptionIfThingsGoHaywire(): void
     {
         // Arrange
