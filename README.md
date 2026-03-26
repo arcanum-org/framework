@@ -18,7 +18,7 @@ Arcanum is a collection of packages that work together to create a robust, scala
 
 ### Arcanum Codex
 
-[Codex](https://github.com/arcanum-org/framework/tree/main/src/Codex) is a practically magical Class Resolver. It's used by Arcanum Cabinet to automatically resolve classes and their dependencies. If you don't want to use Cabinet, Codex can be used independently to build pretty much anything you can throw at it.
+[Codex](https://github.com/arcanum-org/framework/tree/main/src/Codex) is an automatic class resolver. Give it a class name, and it uses PHP's Reflection API to inspect the constructor, resolve all dependencies recursively, and hand you a fully built instance. It supports manual overrides via specifications — you can tell it "when building X, use Y for this parameter" — and integrates with Echo's event system to fire events before and after resolution. It's used by Cabinet under the hood, but works independently too.
 
 ### Arcanum Echo
 
