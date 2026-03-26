@@ -15,7 +15,7 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 
 - [x] Add CRLF injection prevention in header values (reject or strip `\r\n` sequences)
 - [x] Add request target validation per RFC 7230 (origin-form, absolute-form, authority-form, asterisk-form)
-- [ ] Investigate PHPServerAdapter testability — if possible, add tests; if not, document why
+- [x] Investigate PHPServerAdapter testability — not unit-testable: every method is a 1:1 wrapper around SAPI-dependent PHP built-ins (`header()`, `getallheaders()`, `ob_*`, etc.). The `ServerAdapter` interface exists so `Server` can be tested via mocks. Class is correctly marked `@codeCoverageIgnore`.
 - [ ] Add tests for `Server::request()` cookie filtering (lines 60-61, currently untestable due to `$_COOKIE` superglobal)
 - [ ] Add tests for `Server::sendSetCookieHeaders()` (blocked by the `withoutHeader` mutation bug — unblocked once that bug is fixed)
 
