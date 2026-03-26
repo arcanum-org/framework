@@ -254,7 +254,7 @@ final class ServerTest extends TestCase
     public function testSendHeadersSendsStatusLineAndHeaders(): void
     {
         // Arrange
-        $adapter = $this->createAdapter();
+        $adapter = $this->createStub(ServerAdapter::class);
         $adapter->method('headersSent')->willReturn(false);
         $adapter->method('fastCGIFinishRequest')->willReturn(true);
 
@@ -305,7 +305,7 @@ final class ServerTest extends TestCase
     public function testComposeResponseStripsBodyForHEADRequest(): void
     {
         // Arrange
-        $adapter = $this->createAdapter();
+        $adapter = $this->createStub(ServerAdapter::class);
         $server = new Server($adapter);
         $request = $this->createRequest(method: RequestMethod::HEAD);
         $response = $this->createResponse(
@@ -324,7 +324,7 @@ final class ServerTest extends TestCase
     public function testComposeResponseStripsBodyAndHeadersForInformationalResponse(): void
     {
         // Arrange
-        $adapter = $this->createAdapter();
+        $adapter = $this->createStub(ServerAdapter::class);
         $server = new Server($adapter);
         $request = $this->createRequest();
         $response = $this->createResponse(
@@ -345,7 +345,7 @@ final class ServerTest extends TestCase
     public function testComposeResponseStripsContentLengthWhenTransferEncodingPresent(): void
     {
         // Arrange
-        $adapter = $this->createAdapter();
+        $adapter = $this->createStub(ServerAdapter::class);
         $server = new Server($adapter);
         $request = $this->createRequest();
         $response = $this->createResponse(
@@ -367,7 +367,7 @@ final class ServerTest extends TestCase
     public function testComposeResponseAddsCharsetToTextContentType(): void
     {
         // Arrange
-        $adapter = $this->createAdapter();
+        $adapter = $this->createStub(ServerAdapter::class);
         $server = new Server($adapter);
         $request = $this->createRequest();
         $response = $this->createResponse(
@@ -385,7 +385,7 @@ final class ServerTest extends TestCase
     public function testComposeResponseDoesNotAddCharsetIfAlreadyPresent(): void
     {
         // Arrange
-        $adapter = $this->createAdapter();
+        $adapter = $this->createStub(ServerAdapter::class);
         $server = new Server($adapter);
         $request = $this->createRequest();
         $response = $this->createResponse(
@@ -403,7 +403,7 @@ final class ServerTest extends TestCase
     public function testComposeResponseDoesNotAddCharsetToNonTextContentType(): void
     {
         // Arrange
-        $adapter = $this->createAdapter();
+        $adapter = $this->createStub(ServerAdapter::class);
         $server = new Server($adapter);
         $request = $this->createRequest();
         $response = $this->createResponse(
@@ -421,7 +421,7 @@ final class ServerTest extends TestCase
     public function testComposeResponseDoesNotAddCharsetWhenNoContentType(): void
     {
         // Arrange
-        $adapter = $this->createAdapter();
+        $adapter = $this->createStub(ServerAdapter::class);
         $server = new Server($adapter);
         $request = $this->createRequest();
         $response = $this->createResponse(body: 'no content type');
@@ -436,7 +436,7 @@ final class ServerTest extends TestCase
     public function testComposeResponseAddsPragmaAndExpiresForHttp10NoCache(): void
     {
         // Arrange
-        $adapter = $this->createAdapter();
+        $adapter = $this->createStub(ServerAdapter::class);
         $server = new Server($adapter);
         $request = $this->createRequest();
         $response = $this->createResponse(
@@ -455,7 +455,7 @@ final class ServerTest extends TestCase
     public function testComposeResponseDoesNotAddPragmaForHttp10WithoutNoCache(): void
     {
         // Arrange
-        $adapter = $this->createAdapter();
+        $adapter = $this->createStub(ServerAdapter::class);
         $server = new Server($adapter);
         $request = $this->createRequest();
         $response = $this->createResponse(
@@ -473,7 +473,7 @@ final class ServerTest extends TestCase
     public function testComposeResponseDoesNotAddPragmaForHttp11NoCache(): void
     {
         // Arrange
-        $adapter = $this->createAdapter();
+        $adapter = $this->createStub(ServerAdapter::class);
         $server = new Server($adapter);
         $request = $this->createRequest();
         $response = $this->createResponse(
@@ -491,7 +491,7 @@ final class ServerTest extends TestCase
     public function testComposeResponseDoesNotAddPragmaWhenNoCacheControlHeader(): void
     {
         // Arrange
-        $adapter = $this->createAdapter();
+        $adapter = $this->createStub(ServerAdapter::class);
         $server = new Server($adapter);
         $request = $this->createRequest();
         $response = $this->createResponse(protocolVersion: '1.0');
@@ -506,14 +506,14 @@ final class ServerTest extends TestCase
     public function testComposeResponseSkipsCharsetForNonHasCharacterSetResponse(): void
     {
         // Arrange — use a plain PSR-7 mock that doesn't implement HasCharacterSet
-        $adapter = $this->createAdapter();
+        $adapter = $this->createStub(ServerAdapter::class);
         $server = new Server($adapter);
         $request = $this->createRequest();
 
-        $body = $this->createMock(\Psr\Http\Message\StreamInterface::class);
+        $body = $this->createStub(\Psr\Http\Message\StreamInterface::class);
         $body->method('getSize')->willReturn(5);
 
-        $response = $this->createMock(ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
         $response->method('getProtocolVersion')->willReturn('1.1');
         $response->method('hasHeader')->willReturnCallback(fn(string $name) => $name === 'Content-Type');
@@ -539,7 +539,7 @@ final class ServerTest extends TestCase
     {
         // Arrange — send an informational response first, then a normal one.
         // The first call disables default_mimetype, the second should restore it.
-        $adapter = $this->createAdapter();
+        $adapter = $this->createStub(ServerAdapter::class);
         $server = new Server($adapter);
         $request = $this->createRequest();
 
@@ -560,7 +560,7 @@ final class ServerTest extends TestCase
     {
         // Arrange — just compose a normal response without prior informational.
         // restoreDefaultMimetypeINI should return early because defaultMimetypeINI is null.
-        $adapter = $this->createAdapter();
+        $adapter = $this->createStub(ServerAdapter::class);
         $server = new Server($adapter);
         $request = $this->createRequest();
         $response = $this->createResponse(body: 'OK');

@@ -26,12 +26,11 @@ final class ServerRequestTest extends TestCase
     public function testGetServerParams(): void
     {
         // Arrange
-        /** @var RequestInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $request = $this->getMockBuilder(RequestInterface::class)
-            ->getMock();
+        $request = $this->createStub(RequestInterface::class);
 
         /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
         $serverParams = $this->getMockBuilder(Registry::class)
+            ->disableOriginalConstructor()
             ->getMock();
 
         $serverParams->expects($this->once())
@@ -295,9 +294,7 @@ final class ServerRequestTest extends TestCase
             ->method('getRequestTarget')
             ->willReturn('/');
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -319,7 +316,7 @@ final class ServerRequestTest extends TestCase
         $newRequest = $this->getMockBuilder(RequestInterface::class)
             ->getMock();
 
-        $newRequest->expects($this->any())
+        $newRequest->expects($this->once())
             ->method('getRequestTarget')
             ->willReturn('/');
 
@@ -328,9 +325,7 @@ final class ServerRequestTest extends TestCase
             ->with('/')
             ->willReturn($newRequest);
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -353,9 +348,7 @@ final class ServerRequestTest extends TestCase
             ->method('getMethod')
             ->willReturn('POST');
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -377,7 +370,7 @@ final class ServerRequestTest extends TestCase
         $newRequest = $this->getMockBuilder(RequestInterface::class)
             ->getMock();
 
-        $newRequest->expects($this->any())
+        $newRequest->expects($this->once())
             ->method('getMethod')
             ->willReturn('DELETE');
 
@@ -386,9 +379,7 @@ final class ServerRequestTest extends TestCase
             ->with('DELETE')
             ->willReturn($newRequest);
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -407,17 +398,13 @@ final class ServerRequestTest extends TestCase
         $request = $this->getMockBuilder(RequestInterface::class)
             ->getMock();
 
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $uri = $this->getMockBuilder(UriInterface::class)
-            ->getMock();
+        $uri = $this->createStub(UriInterface::class);
 
         $request->expects($this->once())
             ->method('getUri')
             ->willReturn($uri);
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -439,11 +426,9 @@ final class ServerRequestTest extends TestCase
         $newRequest = $this->getMockBuilder(RequestInterface::class)
             ->getMock();
 
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $uri = $this->getMockBuilder(UriInterface::class)
-            ->getMock();
+        $uri = $this->createStub(UriInterface::class);
 
-        $newRequest->expects($this->any())
+        $newRequest->expects($this->once())
             ->method('getUri')
             ->willReturn($uri);
 
@@ -452,9 +437,7 @@ final class ServerRequestTest extends TestCase
             ->with($uri, true)
             ->willReturn($newRequest);
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -477,9 +460,7 @@ final class ServerRequestTest extends TestCase
             ->method('getProtocolVersion')
             ->willReturn('1.1');
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -501,7 +482,7 @@ final class ServerRequestTest extends TestCase
         $newRequest = $this->getMockBuilder(RequestInterface::class)
             ->getMock();
 
-        $newRequest->expects($this->any())
+        $newRequest->expects($this->once())
             ->method('getProtocolVersion')
             ->willReturn('1.0');
 
@@ -510,9 +491,7 @@ final class ServerRequestTest extends TestCase
             ->with('1.0')
             ->willReturn($newRequest);
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -540,9 +519,7 @@ final class ServerRequestTest extends TestCase
             ->method('getHeaders')
             ->willReturn($headers);
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -569,9 +546,7 @@ final class ServerRequestTest extends TestCase
             ->with('Content-Type')
             ->willReturn($headers['Content-Type']);
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -598,9 +573,7 @@ final class ServerRequestTest extends TestCase
             ->with('Content-Type')
             ->willReturn(implode(',', $headers['Content-Type']));
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -625,9 +598,7 @@ final class ServerRequestTest extends TestCase
                 false
             );
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -651,7 +622,7 @@ final class ServerRequestTest extends TestCase
         $newRequest = $this->getMockBuilder(RequestInterface::class)
             ->getMock();
 
-        $newRequest->expects($this->any())
+        $newRequest->expects($this->once())
             ->method('getHeaders')
             ->willReturn([
                 'Content-Type' => ['application/json'],
@@ -662,9 +633,7 @@ final class ServerRequestTest extends TestCase
             ->with('Content-Type', 'application/json')
             ->willReturn($newRequest);
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -691,7 +660,7 @@ final class ServerRequestTest extends TestCase
         $newRequest = $this->getMockBuilder(RequestInterface::class)
             ->getMock();
 
-        $newRequest->expects($this->any())
+        $newRequest->expects($this->once())
             ->method('getHeaders')
             ->willReturn($newHeaders);
 
@@ -700,9 +669,7 @@ final class ServerRequestTest extends TestCase
             ->with('Content-Type', 'application/xml')
             ->willReturn($newRequest);
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -725,7 +692,7 @@ final class ServerRequestTest extends TestCase
         $newRequest = $this->getMockBuilder(RequestInterface::class)
             ->getMock();
 
-        $newRequest->expects($this->any())
+        $newRequest->expects($this->once())
             ->method('getHeaders')
             ->willReturn([]);
 
@@ -734,9 +701,7 @@ final class ServerRequestTest extends TestCase
             ->with('Content-Type')
             ->willReturn($newRequest);
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -761,9 +726,7 @@ final class ServerRequestTest extends TestCase
             ->method('getBody')
             ->willReturn($body);
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -786,7 +749,7 @@ final class ServerRequestTest extends TestCase
         $newRequest = $this->getMockBuilder(RequestInterface::class)
             ->getMock();
 
-        $newRequest->expects($this->any())
+        $newRequest->expects($this->once())
             ->method('getBody')
             ->willReturn($body);
 
@@ -795,9 +758,7 @@ final class ServerRequestTest extends TestCase
             ->with($body)
             ->willReturn($newRequest);
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -827,9 +788,7 @@ final class ServerRequestTest extends TestCase
             ->method('getBody')
             ->willReturn($body);
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 
@@ -852,9 +811,7 @@ final class ServerRequestTest extends TestCase
             ->method('__toString')
             ->willReturn('body text');
 
-        /** @var Registry&\PHPUnit\Framework\MockObject\MockObject */
-        $serverParams = $this->getMockBuilder(Registry::class)
-            ->getMock();
+        $serverParams = $this->createStub(Registry::class);
 
         $serverRequest = new ServerRequest($request, $serverParams);
 

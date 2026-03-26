@@ -19,14 +19,9 @@ final class MessageTest extends TestCase
     public function testMessageGetProtocolVersion(): void
     {
         // Arrange
-        /** @var Headers&\PHPUnit\Framework\MockObject\MockObject */
-        $headers = $this->getMockBuilder(Headers::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $headers = $this->createStub(Headers::class);
 
-        /** @var StreamInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $body = $this->getMockBuilder(StreamInterface::class)
-            ->getMock();
+        $body = $this->createStub(StreamInterface::class);
 
         $message = new Message($headers, $body, Version::from('1.1'));
 
@@ -40,14 +35,9 @@ final class MessageTest extends TestCase
     public function testWithProtocolVersion(): void
     {
         // Arrange
-        /** @var Headers&\PHPUnit\Framework\MockObject\MockObject */
-        $headers = $this->getMockBuilder(Headers::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $headers = $this->createStub(Headers::class);
 
-        /** @var StreamInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $body = $this->getMockBuilder(StreamInterface::class)
-            ->getMock();
+        $body = $this->createStub(StreamInterface::class);
 
         $message = new Message($headers, $body, Version::from('1.1'));
 
@@ -67,9 +57,7 @@ final class MessageTest extends TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        /** @var StreamInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $body = $this->getMockBuilder(StreamInterface::class)
-            ->getMock();
+        $body = $this->createStub(StreamInterface::class);
 
         $headers->expects($this->once())
             ->method('toArray')
@@ -92,9 +80,7 @@ final class MessageTest extends TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        /** @var StreamInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $body = $this->getMockBuilder(StreamInterface::class)
-            ->getMock();
+        $body = $this->createStub(StreamInterface::class);
 
         $headers->expects($this->once())
             ->method('get')
@@ -118,9 +104,7 @@ final class MessageTest extends TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        /** @var StreamInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $body = $this->getMockBuilder(StreamInterface::class)
-            ->getMock();
+        $body = $this->createStub(StreamInterface::class);
 
         $headers->expects($this->once())
             ->method('get')
@@ -144,9 +128,7 @@ final class MessageTest extends TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        /** @var StreamInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $body = $this->getMockBuilder(StreamInterface::class)
-            ->getMock();
+        $body = $this->createStub(StreamInterface::class);
 
         $headers->expects($this->once())
             ->method('has')
@@ -170,9 +152,7 @@ final class MessageTest extends TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        /** @var StreamInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $body = $this->getMockBuilder(StreamInterface::class)
-            ->getMock();
+        $body = $this->createStub(StreamInterface::class);
 
         $headers->expects($this->once())
             ->method('offsetSet')
@@ -196,9 +176,7 @@ final class MessageTest extends TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        /** @var StreamInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $body = $this->getMockBuilder(StreamInterface::class)
-            ->getMock();
+        $body = $this->createStub(StreamInterface::class);
 
         $headers->expects($this->exactly(2))
             ->method('get')
@@ -239,9 +217,7 @@ final class MessageTest extends TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        /** @var StreamInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $body = $this->getMockBuilder(StreamInterface::class)
-            ->getMock();
+        $body = $this->createStub(StreamInterface::class);
 
         $headers->expects($this->once())
             ->method('offsetUnset')
@@ -260,14 +236,9 @@ final class MessageTest extends TestCase
     public function testGetBody(): void
     {
         // Arrange
-        /** @var Headers&\PHPUnit\Framework\MockObject\MockObject */
-        $headers = $this->getMockBuilder(Headers::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $headers = $this->createStub(Headers::class);
 
-        /** @var StreamInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $body = $this->getMockBuilder(StreamInterface::class)
-            ->getMock();
+        $body = $this->createStub(StreamInterface::class);
 
         $message = new Message($headers, $body, Version::from('1.1'));
 
@@ -281,20 +252,13 @@ final class MessageTest extends TestCase
     public function testWithBody(): void
     {
         // Arrange
-        /** @var Headers&\PHPUnit\Framework\MockObject\MockObject */
-        $headers = $this->getMockBuilder(Headers::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $headers = $this->createStub(Headers::class);
 
-        /** @var StreamInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $body = $this->getMockBuilder(StreamInterface::class)
-            ->getMock();
+        $body = $this->createStub(StreamInterface::class);
 
         $message = new Message($headers, $body, Version::from('1.1'));
 
-        /** @var StreamInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $newBody = $this->getMockBuilder(StreamInterface::class)
-            ->getMock();
+        $newBody = $this->createStub(StreamInterface::class);
 
         // Act
         $newMessage = $message->withBody($newBody);
@@ -308,14 +272,9 @@ final class MessageTest extends TestCase
     public function testWithBodyChangesNothingIfSameBodyPassedIn(): void
     {
         // Arrange
-        /** @var Headers&\PHPUnit\Framework\MockObject\MockObject */
-        $headers = $this->getMockBuilder(Headers::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $headers = $this->createStub(Headers::class);
 
-        /** @var StreamInterface&\PHPUnit\Framework\MockObject\MockObject */
-        $body = $this->getMockBuilder(StreamInterface::class)
-            ->getMock();
+        $body = $this->createStub(StreamInterface::class);
 
         $message = new Message($headers, $body, Version::from('1.1'));
 

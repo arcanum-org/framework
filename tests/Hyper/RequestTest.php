@@ -20,13 +20,8 @@ final class RequestTest extends TestCase
     public function testGetRequestTarget(): void
     {
         // Arrange
-        /** @var MessageInterface&\PHPUnit\Framework\MockObject\MockObject $message */
-        $message = $this->getMockBuilder(MessageInterface::class)
-            ->getMock();
-
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-            ->getMock();
+        $message = $this->createStub(MessageInterface::class);
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -78,9 +73,7 @@ final class RequestTest extends TestCase
     public function testGetRequestTargetIncludesQueryString(): void
     {
         // Arrange
-        /** @var MessageInterface&\PHPUnit\Framework\MockObject\MockObject $message */
-        $message = $this->getMockBuilder(MessageInterface::class)
-            ->getMock();
+        $message = $this->createStub(MessageInterface::class);
 
         /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
         $uri = $this->getMockBuilder(UriInterface::class)
@@ -102,13 +95,8 @@ final class RequestTest extends TestCase
     public function testWithRequestTarget(): void
     {
         // Arrange
-        /** @var MessageInterface&\PHPUnit\Framework\MockObject\MockObject $message */
-        $message = $this->getMockBuilder(MessageInterface::class)
-            ->getMock();
-
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-            ->getMock();
+        $message = $this->createStub(MessageInterface::class);
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -123,13 +111,8 @@ final class RequestTest extends TestCase
     public function testWithRequestTargetThrowsInvalidArgumentExceptionIfTargetContainsSpace(): void
     {
         // Arrange
-        /** @var MessageInterface&\PHPUnit\Framework\MockObject\MockObject $message */
-        $message = $this->getMockBuilder(MessageInterface::class)
-            ->getMock();
-
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-            ->getMock();
+        $message = $this->createStub(MessageInterface::class);
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -143,13 +126,8 @@ final class RequestTest extends TestCase
     public function testGetMethod(): void
     {
         // Arrange
-        /** @var MessageInterface&\PHPUnit\Framework\MockObject\MockObject $message */
-        $message = $this->getMockBuilder(MessageInterface::class)
-            ->getMock();
-
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-            ->getMock();
+        $message = $this->createStub(MessageInterface::class);
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -163,13 +141,8 @@ final class RequestTest extends TestCase
     public function testWithMethod(): void
     {
         // Arrange
-        /** @var MessageInterface&\PHPUnit\Framework\MockObject\MockObject $message */
-        $message = $this->getMockBuilder(MessageInterface::class)
-            ->getMock();
-
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-            ->getMock();
+        $message = $this->createStub(MessageInterface::class);
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -184,13 +157,8 @@ final class RequestTest extends TestCase
     public function testGetUri(): void
     {
         // Arrange
-        /** @var MessageInterface&\PHPUnit\Framework\MockObject\MockObject $message */
-        $message = $this->getMockBuilder(MessageInterface::class)
-            ->getMock();
-
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-            ->getMock();
+        $message = $this->createStub(MessageInterface::class);
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -204,17 +172,9 @@ final class RequestTest extends TestCase
     public function testWithUri(): void
     {
         // Arrange
-        /** @var MessageInterface&\PHPUnit\Framework\MockObject\MockObject $message */
-        $message = $this->getMockBuilder(MessageInterface::class)
-            ->getMock();
-
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-            ->getMock();
-
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $newUri */
-        $newUri = $this->getMockBuilder(UriInterface::class)
-            ->getMock();
+        $message = $this->createStub(MessageInterface::class);
+        $uri = $this->createStub(UriInterface::class);
+        $newUri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -229,13 +189,8 @@ final class RequestTest extends TestCase
     public function testWithUriChangesNothingIfUriIsTheSameInstance(): void
     {
         // Arrange
-        /** @var MessageInterface&\PHPUnit\Framework\MockObject\MockObject $message */
-        $message = $this->getMockBuilder(MessageInterface::class)
-            ->getMock();
-
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-            ->getMock();
+        $message = $this->createStub(MessageInterface::class);
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -259,9 +214,7 @@ final class RequestTest extends TestCase
                 ->method('getProtocolVersion')
                 ->willReturn($protocolVersion);
 
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-                    ->getMock();
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -281,8 +234,7 @@ final class RequestTest extends TestCase
         $message = $this->getMockBuilder(MessageInterface::class)
             ->getMock();
 
-        $newMessage = $this->getMockBuilder(MessageInterface::class)
-            ->getMock();
+        $newMessage = $this->createStub(MessageInterface::class);
 
         $newMessage->method('getProtocolVersion')
             ->willReturn($protocolVersion);
@@ -292,9 +244,7 @@ final class RequestTest extends TestCase
             ->with($protocolVersion)
             ->willReturn($newMessage);
 
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-                    ->getMock();
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -322,9 +272,7 @@ final class RequestTest extends TestCase
                 ->method('getHeaders')
                 ->willReturn($headers);
 
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-                    ->getMock();
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -351,9 +299,7 @@ final class RequestTest extends TestCase
             });
 
 
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-                    ->getMock();
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -378,9 +324,7 @@ final class RequestTest extends TestCase
                 ->with('Content-Type')
                 ->willReturn($header);
 
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-                    ->getMock();
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -405,9 +349,7 @@ final class RequestTest extends TestCase
                 ->with('Content-Type')
                 ->willReturn(implode(',', $header));
 
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-                    ->getMock();
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -428,12 +370,9 @@ final class RequestTest extends TestCase
         $message = $this->getMockBuilder(MessageInterface::class)
             ->getMock();
 
-        $newMessage = $this->getMockBuilder(MessageInterface::class)
-            ->getMock();
+        $newMessage = $this->createStub(MessageInterface::class);
 
-        $newMessage->expects($this->any())
-            ->method('getHeader')
-            ->with('Content-Type')
+        $newMessage->method('getHeader')
             ->willReturn($newHeader);
 
         $message->expects($this->once())
@@ -441,9 +380,7 @@ final class RequestTest extends TestCase
             ->with('Content-Type', $header)
             ->willReturn($newMessage);
 
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-            ->getMock();
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -465,12 +402,9 @@ final class RequestTest extends TestCase
         $message = $this->getMockBuilder(MessageInterface::class)
             ->getMock();
 
-        $newMessage = $this->getMockBuilder(MessageInterface::class)
-            ->getMock();
+        $newMessage = $this->createStub(MessageInterface::class);
 
-        $newMessage->expects($this->any())
-            ->method('getHeader')
-            ->with('Content-Type')
+        $newMessage->method('getHeader')
             ->willReturn($header + $newHeader);
 
         $message->expects($this->once())
@@ -478,9 +412,7 @@ final class RequestTest extends TestCase
             ->with('Content-Type', $newHeader)
             ->willReturn($newMessage);
 
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-            ->getMock();
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -501,12 +433,9 @@ final class RequestTest extends TestCase
         $message = $this->getMockBuilder(MessageInterface::class)
             ->getMock();
 
-        $newMessage = $this->getMockBuilder(MessageInterface::class)
-            ->getMock();
+        $newMessage = $this->createStub(MessageInterface::class);
 
-        $newMessage->expects($this->any())
-            ->method('getHeader')
-            ->with('Content-Type')
+        $newMessage->method('getHeader')
             ->willReturn([]);
 
         $message->expects($this->once())
@@ -514,9 +443,7 @@ final class RequestTest extends TestCase
             ->with('Content-Type')
             ->willReturn($newMessage);
 
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-            ->getMock();
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -541,9 +468,7 @@ final class RequestTest extends TestCase
                 ->method('getBody')
                 ->willReturn($body);
 
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-                    ->getMock();
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 
@@ -563,8 +488,7 @@ final class RequestTest extends TestCase
         $message = $this->getMockBuilder(MessageInterface::class)
             ->getMock();
 
-        $newMessage = $this->getMockBuilder(MessageInterface::class)
-            ->getMock();
+        $newMessage = $this->createStub(MessageInterface::class);
 
         $newMessage->method('getBody')
             ->willReturn($body);
@@ -574,9 +498,7 @@ final class RequestTest extends TestCase
             ->with($body)
             ->willReturn($newMessage);
 
-        /** @var UriInterface&\PHPUnit\Framework\MockObject\MockObject $uri */
-        $uri = $this->getMockBuilder(UriInterface::class)
-            ->getMock();
+        $uri = $this->createStub(UriInterface::class);
 
         $request = new Request($message, RequestMethod::GET, $uri);
 

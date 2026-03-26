@@ -387,29 +387,14 @@ final class LoggerTest extends TestCase
     public function testChannel(): void
     {
         // Arrange
-        /** @var \Monolog\Logger&\PHPUnit\Framework\MockObject\MockObject */
-        $defaultLogger = $this->createMock(\Monolog\Logger::class);
+        $defaultLogger = $this->createStub(\Monolog\Logger::class);
+        $defaultLogger->method('getName')->willReturn('default');
 
-        $defaultLogger->expects($this->once())
-            ->method('getName')
-            ->willReturn('default');
+        $otherLogger = $this->createStub(\Monolog\Logger::class);
+        $otherLogger->method('getName')->willReturn('other');
 
-        /** @var \Monolog\Logger&\PHPUnit\Framework\MockObject\MockObject */
-        $otherLogger = $this->createMock(\Monolog\Logger::class);
-
-        $otherLogger->expects($this->once())
-            ->method('getName')
-            ->willReturn('other');
-
-        /** @var Channel&\PHPUnit\Framework\MockObject\MockObject */
-        $defaultChannel = $this->getMockBuilder(Channel::class)
-            ->setConstructorArgs([$defaultLogger])
-            ->getMock();
-
-        /** @var Channel&\PHPUnit\Framework\MockObject\MockObject */
-        $channelB = $this->getMockBuilder(Channel::class)
-            ->setConstructorArgs([$otherLogger])
-            ->getMock();
+        $defaultChannel = new Channel($defaultLogger);
+        $channelB = new Channel($otherLogger);
 
         $logger = new Logger($defaultChannel, $channelB);
 
@@ -423,29 +408,14 @@ final class LoggerTest extends TestCase
     public function testAddChannel(): void
     {
         // Arrange
-        /** @var \Monolog\Logger&\PHPUnit\Framework\MockObject\MockObject */
-        $defaultLogger = $this->createMock(\Monolog\Logger::class);
+        $defaultLogger = $this->createStub(\Monolog\Logger::class);
+        $defaultLogger->method('getName')->willReturn('default');
 
-        $defaultLogger->expects($this->once())
-            ->method('getName')
-            ->willReturn('default');
+        $otherLogger = $this->createStub(\Monolog\Logger::class);
+        $otherLogger->method('getName')->willReturn('other');
 
-        /** @var \Monolog\Logger&\PHPUnit\Framework\MockObject\MockObject */
-        $otherLogger = $this->createMock(\Monolog\Logger::class);
-
-        $otherLogger->expects($this->once())
-            ->method('getName')
-            ->willReturn('other');
-
-        /** @var Channel&\PHPUnit\Framework\MockObject\MockObject */
-        $defaultChannel = $this->getMockBuilder(Channel::class)
-            ->setConstructorArgs([$defaultLogger])
-            ->getMock();
-
-        /** @var Channel&\PHPUnit\Framework\MockObject\MockObject */
-        $channelB = $this->getMockBuilder(Channel::class)
-            ->setConstructorArgs([$otherLogger])
-            ->getMock();
+        $defaultChannel = new Channel($defaultLogger);
+        $channelB = new Channel($otherLogger);
 
         $logger = new Logger($defaultChannel);
 

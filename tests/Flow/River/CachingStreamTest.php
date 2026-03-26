@@ -23,10 +23,7 @@ final class CachingStreamTest extends TestCase
     public function testFromStream(): void
     {
         // Arrange
-        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
-        $stream = $this->getMockBuilder(Stream::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $stream = $this->createStub(Stream::class);
 
         // Act
         $streamInterface = CachingStream::fromStream($stream);
@@ -38,15 +35,9 @@ final class CachingStreamTest extends TestCase
     public function testFromStreamWithCache(): void
     {
         // Arrange
-        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
-        $stream = $this->getMockBuilder(Stream::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $stream = $this->createStub(Stream::class);
 
-        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
-        $cache = $this->getMockBuilder(Stream::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $cache = $this->createStub(Stream::class);
 
         // Act
         $streamInterface = CachingStream::fromStreamWithCache($stream, $cache);
@@ -790,10 +781,7 @@ final class CachingStreamTest extends TestCase
     public function testSeekWithSeekCur(): void
     {
         // Arrange
-        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
-        $stream = $this->getMockBuilder(Stream::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $stream = $this->createStub(Stream::class);
 
         /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
         $cache = $this->getMockBuilder(Stream::class)
@@ -855,15 +843,9 @@ final class CachingStreamTest extends TestCase
     public function testSeekWithInvalidWhenceThrows(): void
     {
         // Arrange
-        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
-        $stream = $this->getMockBuilder(Stream::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $stream = $this->createStub(Stream::class);
 
-        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
-        $cache = $this->getMockBuilder(Stream::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $cache = $this->createStub(Stream::class);
 
         $streamInterface = CachingStream::fromStreamWithCache($stream, $cache);
 

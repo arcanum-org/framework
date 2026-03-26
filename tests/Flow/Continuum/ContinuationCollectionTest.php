@@ -28,9 +28,7 @@ final class ContinuationCollectionTest extends TestCase
         $continuationFoo = $this->getMockBuilder(Continuation::class)
             ->getMock();
 
-        /** @var Progression&\PHPUnit\Framework\MockObject\MockObject */
-        $progressionFoo = $this->getMockBuilder(Progression::class)
-            ->getMock();
+        $progressionFoo = $this->createStub(Progression::class);
 
         $continuationFoo->expects($this->once())
             ->method('add')
@@ -45,9 +43,7 @@ final class ContinuationCollectionTest extends TestCase
         $continuationBar = $this->getMockBuilder(Continuation::class)
             ->getMock();
 
-        /** @var Progression&\PHPUnit\Framework\MockObject\MockObject */
-        $progressionBar = $this->getMockBuilder(Progression::class)
-            ->getMock();
+        $progressionBar = $this->createStub(Progression::class);
 
         $continuationBar->expects($this->once())
             ->method('add')
@@ -62,9 +58,7 @@ final class ContinuationCollectionTest extends TestCase
         $continuationBaz = $this->getMockBuilder(Continuation::class)
             ->getMock();
 
-        /** @var Progression&\PHPUnit\Framework\MockObject\MockObject */
-        $progressionBaz = $this->getMockBuilder(Progression::class)
-            ->getMock();
+        $progressionBaz = $this->createStub(Progression::class);
 
         $continuationBaz->expects($this->once())
             ->method('add')
