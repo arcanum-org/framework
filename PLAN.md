@@ -40,7 +40,7 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 
 ## Ignition
 
-- [ ] Add configuration caching — cache parsed config arrays to avoid re-reading files on every request
+- [x] Add configuration caching — cache parsed config arrays to avoid re-reading files on every request
 - [ ] Add environment validation — verify required env vars are set during bootstrap, fail fast with clear errors
 - [ ] Add bootstrap lifecycle hooks — before/after events so the app can hook into the boot sequence
 - [ ] Add tests for `HyperKernel` (bootstrap sequence, directory accessors, terminate)
