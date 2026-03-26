@@ -114,17 +114,17 @@ The routing package maps incoming HTTP requests to Command/Query objects using c
 
 ## New Package: Shodo
 
-Shodo (書道, "the way of writing") is the rendering package. It transforms data into client-facing responses. Where Reporter (Glitch) is about internal recording — logging, alerting, tracking — Shodo is about producing output for the consumer: an HTTP response body, headers, and status code. Shodo implements Glitch's `ExceptionRenderer` interface for error responses, and will later support rendering query results and other response types.
+Shodo (書道, "the way of writing") is the output rendering package. It converts data into a consumable form — whether that's an HTTP response, CLI output, or any other output target. Where Reporter (Glitch) is about internal recording — logging, alerting, tracking — Shodo is about producing output for the end consumer. The output format (JSON, HTML, plain text) and the delivery target (HTTP response, stdout, stderr) are both Shodo's domain.
 
-### Exception rendering
+### Exception rendering (HTTP)
 
 - [ ] Implement `JsonRenderer` (`src/Shodo/JsonRenderer.php`) — implements `Glitch\ExceptionRenderer`, builds a `Hyper\Response` with `Content-Type: application/json`, proper HTTP status code from `HttpException` or exception code, and stack trace only in debug mode
 - [ ] Add tests for `JsonRenderer` — verify JSON structure, Content-Type header, status code mapping from `HttpException`, debug vs. production output, and that the returned object is a valid `ResponseInterface`
 
-### Foundation for future rendering
+### Foundation
 
-- [ ] Define `Renderer` interface (`src/Shodo/Renderer.php`) — base contract: takes data, returns `ResponseInterface`. `ExceptionRenderer` is the first specialization; query result rendering and other response types will follow
-- [ ] Implement `JsonResponse` helper (`src/Shodo/JsonResponse.php`) — factory or utility for building JSON responses with proper headers. Used by `JsonRenderer` and available for general use (e.g., rendering query results in the future)
+- [ ] Define `Renderer` interface (`src/Shodo/Renderer.php`) — base contract for converting data into output. The output type varies by context: `ResponseInterface` for HTTP, stream/string for CLI. `ExceptionRenderer` is the first specialization
+- [ ] Implement `JsonResponse` helper (`src/Shodo/JsonResponse.php`) — factory for building JSON HTTP responses with proper headers. Used by `JsonRenderer` and available for general use (e.g., rendering query results)
 
 ---
 
