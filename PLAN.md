@@ -28,9 +28,9 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 ## Glitch
 
 - [x] Add `JsonReporter` — formats exceptions as JSON (status code, message, stack trace in debug mode only)
-- [ ] Add tests for `Handler` class (error→exception conversion, shutdown handling, reporter dispatch)
-- [ ] Add tests for `LogReporter` (per-exception-type log levels and channel routing)
-- [ ] Add tests for `Level` enum (isDeprecation, isFatal helpers)
+- [x] Add tests for `Handler` class (error→exception conversion, shutdown handling, reporter dispatch)
+- [x] Add tests for `LogReporter` (per-exception-type log levels and channel routing)
+- [x] Add tests for `Level` enum (isDeprecation, isFatal helpers)
 
 ---
 
