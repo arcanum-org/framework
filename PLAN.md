@@ -31,6 +31,11 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 - [x] Add tests for `Handler` class (error→exception conversion, shutdown handling, reporter dispatch)
 - [x] Add tests for `LogReporter` (per-exception-type log levels and channel routing)
 - [x] Add tests for `Level` enum (isDeprecation, isFatal helpers)
+- [ ] Add `HttpException` class (`src/Glitch/HttpException.php`) — exception that carries an HTTP status code, used by renderers and the kernel to produce proper HTTP error responses
+- [ ] Define `ExceptionRenderer` interface (`src/Glitch/ExceptionRenderer.php`) — takes a `Throwable`, returns `ResponseInterface`. This is the client-facing output concern (separate from Reporter, which is internal recording)
+- [ ] Implement `JsonRenderer` (`src/Glitch/JsonRenderer.php`) — implements `ExceptionRenderer`, builds a JSON `Response` with `Content-Type: application/json`, proper HTTP status code, and stack trace only in debug mode. Replaces `JsonReporter`
+- [ ] Remove `JsonReporter` (`src/Glitch/JsonReporter.php`) — replaced by `JsonRenderer`. The echo-based approach conflated reporting (internal) with responding (client-facing)
+- [ ] Integrate `ExceptionRenderer` into `HyperKernel` (`src/Ignition/HyperKernel.php`) — on exception, dispatch to `Handler` for reporting (LogReporter, etc.), then use `ExceptionRenderer` to build and return a `ResponseInterface`
 
 ---
 
