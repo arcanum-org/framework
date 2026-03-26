@@ -99,6 +99,12 @@ class Headers extends IgnoreCaseRegistry
                 throw new \InvalidArgumentException('Header values must not be empty.');
             }
 
+            if (preg_match("/\r\n|\r|\n/", $values[$i])) {
+                throw new \InvalidArgumentException(
+                    'Header values must not contain CR or LF characters.'
+                );
+            }
+
             if (!preg_match('/^[\x20\x09\x21-\x7E\x80-\xFF]*$/D', $values[$i])) {
                 throw new \InvalidArgumentException("Invalid header value: $item");
             }

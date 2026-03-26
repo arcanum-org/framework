@@ -154,6 +154,40 @@ final class HeadersTest extends TestCase
         $this->assertEquals(['0'], $headers->get('Content-Length'));
     }
 
+    public function testHeaderRejectsCRLFInjectionInValue(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('must not contain CR or LF');
+
+        new Headers(['X-Test' => "value\r\nInjected-Header: evil"]);
+    }
+
+    public function testHeaderRejectsCRInValue(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('must not contain CR or LF');
+
+        new Headers(['X-Test' => "value\rinjected"]);
+    }
+
+    public function testHeaderRejectsLFInValue(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('must not contain CR or LF');
+
+        new Headers(['X-Test' => "value\ninjected"]);
+    }
+
+    public function testHeaderRejectsCRLFInjectionOnSet(): void
+    {
+        $headers = new Headers(['Host' => 'example.com']);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('must not contain CR or LF');
+
+        $headers['X-Injected'] = "value\r\nEvil-Header: injected";
+    }
+
     public function testHeaderSetThrowsInvalidArgumentExceptionIfHeaderValueContainsInvalidCharacters(): void
     {
         // Arrange
