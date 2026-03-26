@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Parchment;
 
+use Arcanum\Glitch\SafeCall;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Exception\IOException;
 
@@ -40,12 +41,15 @@ class Reader
             throw new \RuntimeException("Unable to read file: $path (is a directory)");
         }
 
-        $lines = @file($path, \FILE_IGNORE_NEW_LINES);
+        $lines = SafeCall::call('file', $path, \FILE_IGNORE_NEW_LINES);
 
         if ($lines === false) {
-            throw new \RuntimeException("Unable to read file: $path");
+            throw new \RuntimeException(
+                "Unable to read file: $path" . (SafeCall::lastError() ? ' — ' . SafeCall::lastError() : '')
+            );
         }
 
+        /** @var string[] */
         return $lines;
     }
 
