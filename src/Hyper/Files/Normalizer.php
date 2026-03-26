@@ -65,15 +65,38 @@ final class Normalizer
     {
         $normalized = [];
 
-        /** @var array<string,string|array<string|int,mixed>> $tmpName */
-        $tmpName = $spec['tmp_name'] ?? [];
-        foreach (array_keys($tmpName) as $key) {
+        $tmpNames = $spec['tmp_name'] ?? [];
+        if (!is_array($tmpNames)) {
+            return $normalized;
+        }
+
+        $sizeData = $spec['size'] ?? null;
+        $errorData = $spec['error'] ?? null;
+        $nameData = $spec['name'] ?? null;
+        $typeData = $spec['type'] ?? null;
+
+        $sizes = is_array($sizeData) ? $sizeData : [];
+        $errors = is_array($errorData) ? $errorData : [];
+        $names = is_array($nameData) ? $nameData : [];
+        $types = is_array($typeData) ? $typeData : [];
+
+        foreach (array_keys($tmpNames) as $key) {
+            $tmpNameVal = $tmpNames[$key];
+            if (!is_string($tmpNameVal) && !is_array($tmpNameVal)) {
+                continue;
+            }
+
+            $sizeVal = $sizes[$key] ?? null;
+            $errorVal = $errors[$key] ?? null;
+            $nameVal = $names[$key] ?? null;
+            $typeVal = $types[$key] ?? null;
+
             $normalized[$key] = static::fromSpec(
-                tmpName: $tmpName[$key] ?? '',
-                size: !is_array($spec['size']) ? null : ($spec['size'][$key] ?? null),
-                error: !is_array($spec['error']) ? null : ($spec['error'][$key] ?? null),
-                clientFilename: !is_array($spec['name']) ? null : ($spec['name'][$key] ?? null),
-                clientMediaType: !is_array($spec['type']) ? null : ($spec['type'][$key] ?? null),
+                tmpName: $tmpNameVal,
+                size: is_int($sizeVal) || is_array($sizeVal) ? $sizeVal : null,
+                error: is_int($errorVal) || is_array($errorVal) ? $errorVal : null,
+                clientFilename: is_string($nameVal) || is_array($nameVal) ? $nameVal : null,
+                clientMediaType: is_string($typeVal) || is_array($typeVal) ? $typeVal : null,
             );
         }
 

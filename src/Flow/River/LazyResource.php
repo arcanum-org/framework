@@ -6,7 +6,7 @@ namespace Arcanum\Flow\River;
 
 final class LazyResource implements ResourceWrapper
 {
-    private ResourceWrapper|null $resource;
+    private ?ResourceWrapper $resource = null;
 
     private function __construct(
         private \Closure $resourceFactory,
@@ -34,7 +34,7 @@ final class LazyResource implements ResourceWrapper
      */
     private function resource(): ResourceWrapper
     {
-        if (!isset($this->resource)) {
+        if ($this->resource === null) {
             $pointer = ($this->resourceFactory)();
             if (!is_resource($pointer)) {
                 throw new InvalidSource('Stream source must be a live resource');
@@ -87,10 +87,10 @@ final class LazyResource implements ResourceWrapper
      *   unread_bytes: int,
      *   stream_type: string,
      *   wrapper_type: string,
-     *   wrapper_data?: mixed,
+     *   wrapper_data: mixed,
      *   mode: string,
      *   seekable: bool,
-     *   uri: string,
+     *   uri?: string,
      *   crypto?: array{
      *     protocol: string,
      *     cipher_name: string,
@@ -118,7 +118,7 @@ final class LazyResource implements ResourceWrapper
      *   uid: int,
      *   gid: int,
      *   rdev: int,
-     *   size: int,
+     *   size: int|false,
      *   atime: int,
      *   mtime: int,
      *   ctime: int,
@@ -132,7 +132,7 @@ final class LazyResource implements ResourceWrapper
     }
 
     /**
-     * @param int<0, max> $length
+     * @param int<1, max> $length
      */
     public function fread(int $length): string|false
     {

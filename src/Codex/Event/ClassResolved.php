@@ -28,7 +28,7 @@ final class ClassResolved extends \Arcanum\Echo\Event implements CodexEvent
      *
      * Will return null if the class is not yet resolved.
      */
-    public function class(): object|null
+    public function class(): object
     {
         return $this->class;
     }

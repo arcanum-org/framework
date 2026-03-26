@@ -55,8 +55,15 @@ class Server
         $request = new Request($message, $method, $uri);
         $serverRequest = new ServerRequest($request, $serverParams);
 
+        $cookies = [];
+        foreach ($_COOKIE as $name => $value) {
+            if (is_string($name) && is_string($value)) {
+                $cookies[$name] = $value;
+            }
+        }
+
         return $serverRequest
-            ->withCookieParams($_COOKIE)
+            ->withCookieParams($cookies)
             ->withQueryParams($_GET)
             ->withParsedBody($_POST)
             ->withUploadedFiles(UploadedFiles::fromSuperGlobal()->toArray());

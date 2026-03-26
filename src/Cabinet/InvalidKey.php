@@ -15,7 +15,7 @@ use Psr\Container\ContainerExceptionInterface;
  */
 final class InvalidKey extends \InvalidArgumentException implements ContainerExceptionInterface
 {
-    public function __construct(string $message = '', int $code = 0, \Throwable $previous = null)
+    public function __construct(string $message = '', int $code = 0, ?\Throwable $previous = null)
     {
         parent::__construct("Invalid Key: $message", $code, $previous);
     }

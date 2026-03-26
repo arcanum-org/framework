@@ -147,7 +147,7 @@ class Logger implements Bootstrapper
      * Make a Quill channel from the configuration
      *
      * @param string[] $handlerNames
-     * @param array{string,HandlerInterface} $handlers
+     * @param array<string, HandlerInterface> $handlers
      */
     private function makeChannel(string $name, array $handlerNames, array $handlers): Channel
     {
@@ -168,7 +168,6 @@ class Logger implements Bootstrapper
      */
     private function makeQuillLogger(array $logConfig, string $filesDirectory): LoggerInterface
     {
-        /** @var array{string,HandlerInterface} $handlers */
         $handlers = [];
 
         // Build the configured handlers
@@ -179,7 +178,6 @@ class Logger implements Bootstrapper
         // Build the configured channels
         $channels = [];
         foreach ($logConfig['channels'] as $channelName => $channelHandlers) {
-            /** @var array{string,HandlerInterface} $handlers */
             $channels[] = $this->makeChannel($channelName, $channelHandlers, $handlers);
         }
 

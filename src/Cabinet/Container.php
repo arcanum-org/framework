@@ -50,9 +50,9 @@ class Container implements Application, Specifier
      * Container uses a resolver to instantiate services.
      */
     public function __construct(
-        ClassResolver&Specifier $resolver = null,
-        Collection $middleware = null,
-        System $decorators = null
+        (ClassResolver&Specifier)|null $resolver = null,
+        ?Collection $middleware = null,
+        ?System $decorators = null
     ) {
         $this->resolver = $resolver ?? Resolver::forContainer($this);
         $this->middleware = $middleware ?? new ContinuationCollection();
@@ -217,7 +217,7 @@ class Container implements Application, Specifier
     /**
      * offsetSet
      *
-     * @param string $offset
+     * @param mixed $offset
      */
     public function offsetSet($offset, $value): void
     {
@@ -252,7 +252,7 @@ class Container implements Application, Specifier
      *
      * This is where all the magic happens.
      *
-     * @param string $offset
+     * @param mixed $offset
      * @throws InvalidKey
      */
     public function offsetGet($offset): mixed

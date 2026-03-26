@@ -26,18 +26,19 @@ class Handler implements ErrorHandler, ExceptionHandler, ShutdownHandler, Report
      */
     public function __construct(private ChannelLogger $logger, Application $container)
     {
-        /** @var callable(): Reporter[] $callback */
-        $callback = function () use ($container): array {
+        $this->buildReporters = function () use ($container): array {
             $reporters = [];
 
             foreach ($this->reporters as $reporterName) {
-                $reporters[] = $container->get($reporterName);
+                $reporter = $container->get($reporterName);
+                if (!$reporter instanceof Reporter) {
+                    throw new \RuntimeException("$reporterName must implement " . Reporter::class);
+                }
+                $reporters[] = $reporter;
             }
 
             return $reporters;
         };
-
-        $this->buildReporters = $callback;
     }
 
     /**

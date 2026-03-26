@@ -19,5 +19,5 @@ interface Collection
     /**
      * Get a continuation from the collection.
      */
-    public function continuation(string $key, Continuation $default = null): Continuation;
+    public function continuation(string $key, ?Continuation $default = null): Continuation;
 }

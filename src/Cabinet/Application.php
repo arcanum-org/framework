@@ -15,7 +15,7 @@ use Psr\Container\ContainerInterface;
  * provides additional functionality for registering services, factories,
  * providers, decorators, prototypes, and middleware.
  *
- * @extends \ArrayAccess<class-string, mixed>
+ * @extends \ArrayAccess<string, mixed>
  */
 interface Application extends
     \ArrayAccess,

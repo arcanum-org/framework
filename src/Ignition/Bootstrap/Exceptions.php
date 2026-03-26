@@ -25,7 +25,7 @@ class Exceptions implements Bootstrapper, ErrorHandler, ExceptionHandler, Shutdo
     /**
      * A reference to the container for use in the exception handler.
      */
-    private static Application|null $container;
+    private static Application|null $container = null;
 
     public function bootstrap(Application $container): void
     {

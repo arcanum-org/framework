@@ -48,10 +48,10 @@ interface ResourceWrapper
      *   unread_bytes: int,
      *   stream_type: string,
      *   wrapper_type: string,
-     *   wrapper_data?: mixed,
+     *   wrapper_data: mixed,
      *   mode: string,
      *   seekable: bool,
-     *   uri: string,
+     *   uri?: string,
      *   crypto?: array{
      *     protocol: string,
      *     cipher_name: string,
@@ -78,7 +78,7 @@ interface ResourceWrapper
      *   uid: int,
      *   gid: int,
      *   rdev: int,
-     *   size: int,
+     *   size: int|false,
      *   atime: int,
      *   mtime: int,
      *   ctime: int,
@@ -91,7 +91,7 @@ interface ResourceWrapper
     /**
      * Proxy for fread().
      *
-     * @param int<0, max> $length
+     * @param int<1, max> $length
      */
     public function fread(int $length): string|false;
 

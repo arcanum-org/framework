@@ -180,7 +180,13 @@ class IgnoreCaseRegistry extends Registry
     {
         $this->data = $data;
         if (isset($data['@!*__keyMap']) && is_array($data['@!*__keyMap'])) {
-            $this->keyMap = $data['@!*__keyMap'];
+            $keyMap = [];
+            foreach ($data['@!*__keyMap'] as $k => $v) {
+                if (is_string($k) && is_string($v)) {
+                    $keyMap[$k] = $v;
+                }
+            }
+            $this->keyMap = $keyMap;
             unset($this->data['@!*__keyMap']);
         }
     }

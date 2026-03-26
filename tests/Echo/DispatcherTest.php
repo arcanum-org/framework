@@ -153,7 +153,6 @@ final class DispatcherTest extends TestCase
             $this->fail('Listener called after propagation was stopped.');
         });
 
-        /** @var Event&\PHPUnit\Framework\MockObject\MockObject */
         $event = new SomethingHappened();
 
         $dispatcher = new \Arcanum\Echo\Dispatcher($provider);

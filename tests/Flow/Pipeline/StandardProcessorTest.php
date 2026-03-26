@@ -117,7 +117,7 @@ final class StandardProcessorTest extends TestCase
             );
         } catch (Interrupted $e) {
             // Assert
-            $this->assertNull($result);
+            $this->assertSame(null, $result);
 
             // never added "d"
             $this->assertEquals('abc', (string)$concatenator);

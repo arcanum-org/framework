@@ -42,7 +42,9 @@ class Response implements ResponseInterface, HasCharacterSet
      */
     public function getReasonPhrase(): string
     {
-        return $this->reasonPhrase?->value ?? $this->statusCode->reason()->value;
+        return $this->reasonPhrase !== null
+            ? $this->reasonPhrase->value
+            : $this->statusCode->reason()->value;
     }
 
     /**

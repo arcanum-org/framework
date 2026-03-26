@@ -31,6 +31,7 @@ final class Bank
         if (
             is_array($meta) &&
             isset($meta['uri']) &&
+            is_string($meta['uri']) &&
             $meta['uri'] !== $targetPath &&
             file_exists($meta['uri'])
         ) {

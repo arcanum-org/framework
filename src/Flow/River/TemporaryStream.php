@@ -10,8 +10,8 @@ class TemporaryStream extends Stream
      * Create a new Temporary Stream.
      */
     public function __construct(
-        protected ResourceWrapper $source,
-        protected int|null $size = null,
+        ResourceWrapper $source,
+        int|null $size = null,
     ) {
         $meta = $source->streamGetMetaData();
         if ($meta['stream_type'] !== 'TEMP') {

@@ -34,7 +34,7 @@ class ContinuationCollection implements Collection
     /**
      * Get a continuation from the collection.
      */
-    public function continuation(string $key, Continuation $default = null): Continuation
+    public function continuation(string $key, ?Continuation $default = null): Continuation
     {
         if (!isset($this->continuations[$key])) {
             $this->continuations[$key] = $default ?? new Continuum();
