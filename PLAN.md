@@ -31,11 +31,10 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 - [x] Add tests for `Handler` class (error→exception conversion, shutdown handling, reporter dispatch)
 - [x] Add tests for `LogReporter` (per-exception-type log levels and channel routing)
 - [x] Add tests for `Level` enum (isDeprecation, isFatal helpers)
-- [ ] Add `HttpException` class (`src/Glitch/HttpException.php`) — exception that carries an HTTP status code, used by renderers and the kernel to produce proper HTTP error responses
-- [ ] Define `ExceptionRenderer` interface (`src/Glitch/ExceptionRenderer.php`) — takes a `Throwable`, returns `ResponseInterface`. This is the client-facing output concern (separate from Reporter, which is internal recording)
-- [ ] Implement `JsonRenderer` (`src/Glitch/JsonRenderer.php`) — implements `ExceptionRenderer`, builds a JSON `Response` with `Content-Type: application/json`, proper HTTP status code, and stack trace only in debug mode. Replaces `JsonReporter`
-- [ ] Remove `JsonReporter` (`src/Glitch/JsonReporter.php`) — replaced by `JsonRenderer`. The echo-based approach conflated reporting (internal) with responding (client-facing)
-- [ ] Integrate `ExceptionRenderer` into `HyperKernel` (`src/Ignition/HyperKernel.php`) — on exception, dispatch to `Handler` for reporting (LogReporter, etc.), then use `ExceptionRenderer` to build and return a `ResponseInterface`
+- [ ] Add `HttpException` class (`src/Glitch/HttpException.php`) — exception that carries an HTTP status code explicitly (e.g., `throw new HttpException(StatusCode::NotFound, 'Order not found')`). Used by Shodo renderers and the kernel to produce proper HTTP error responses
+- [ ] Define `ExceptionRenderer` interface (`src/Glitch/ExceptionRenderer.php`) — takes a `Throwable`, returns `ResponseInterface`. This is the contract between Glitch (error handling) and Shodo (rendering). Lives in Glitch because it's part of the error-handling lifecycle — Shodo implements it
+- [ ] Remove `JsonReporter` (`src/Glitch/JsonReporter.php`) — replaced by Shodo's `JsonRenderer`. The echo-based approach conflated reporting (internal recording) with responding (client-facing output)
+- [ ] Integrate `ExceptionRenderer` into `HyperKernel` (`src/Ignition/HyperKernel.php`) — on exception, dispatch to `Handler` for internal reporting (LogReporter, etc.), then use the container-resolved `ExceptionRenderer` to build and return a `ResponseInterface`
 
 ---
 
@@ -113,6 +112,22 @@ The routing package maps incoming HTTP requests to Command/Query objects using c
 
 ---
 
+## New Package: Shodo
+
+Shodo (書道, "the way of writing") is the rendering package. It transforms data into client-facing responses. Where Reporter (Glitch) is about internal recording — logging, alerting, tracking — Shodo is about producing output for the consumer: an HTTP response body, headers, and status code. Shodo implements Glitch's `ExceptionRenderer` interface for error responses, and will later support rendering query results and other response types.
+
+### Exception rendering
+
+- [ ] Implement `JsonRenderer` (`src/Shodo/JsonRenderer.php`) — implements `Glitch\ExceptionRenderer`, builds a `Hyper\Response` with `Content-Type: application/json`, proper HTTP status code from `HttpException` or exception code, and stack trace only in debug mode
+- [ ] Add tests for `JsonRenderer` — verify JSON structure, Content-Type header, status code mapping from `HttpException`, debug vs. production output, and that the returned object is a valid `ResponseInterface`
+
+### Foundation for future rendering
+
+- [ ] Define `Renderer` interface (`src/Shodo/Renderer.php`) — base contract: takes data, returns `ResponseInterface`. `ExceptionRenderer` is the first specialization; query result rendering and other response types will follow
+- [ ] Implement `JsonResponse` helper (`src/Shodo/JsonResponse.php`) — factory or utility for building JSON responses with proper headers. Used by `JsonRenderer` and available for general use (e.g., rendering query results in the future)
+
+---
+
 ## Documentation
 
 - [ ] Write `src/Toolkit/README.md` (once Toolkit has more than just Strings)
@@ -122,3 +137,4 @@ The routing package maps incoming HTTP requests to Command/Query objects using c
 - [ ] Write `src/Parchment/README.md`
 - [ ] Write `src/CQRS/README.md` (after package is built)
 - [ ] Write `src/Routing/README.md` (after package is built)
+- [ ] Write `src/Shodo/README.md` (after package is built)
