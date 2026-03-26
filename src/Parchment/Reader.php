@@ -4,8 +4,16 @@ declare(strict_types=1);
 
 namespace Arcanum\Parchment;
 
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Exception\IOException;
+
 class Reader
 {
+    public function __construct(
+        private Filesystem $filesystem = new Filesystem(),
+    ) {
+    }
+
     /**
      * Read the entire contents of a file as a string.
      *
@@ -13,13 +21,11 @@ class Reader
      */
     public function read(string $path): string
     {
-        $contents = @file_get_contents($path);
-
-        if ($contents === false) {
-            throw new \RuntimeException("Unable to read file: $path");
+        try {
+            return $this->filesystem->readFile($path);
+        } catch (IOException $e) {
+            throw new \RuntimeException("Unable to read file: $path", 0, $e);
         }
-
-        return $contents;
     }
 
     /**
@@ -30,13 +36,17 @@ class Reader
      */
     public function lines(string $path): array
     {
-        $lines = @file($path, \FILE_IGNORE_NEW_LINES);
+        $contents = $this->read($path);
 
-        if ($lines === false) {
-            throw new \RuntimeException("Unable to read file: $path");
+        if ($contents === '') {
+            return [];
         }
 
-        return $lines;
+        // Normalize line endings and split
+        $contents = str_replace("\r\n", "\n", $contents);
+        $contents = rtrim($contents, "\n");
+
+        return explode("\n", $contents);
     }
 
     /**
