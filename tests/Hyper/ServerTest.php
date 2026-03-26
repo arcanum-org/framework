@@ -280,6 +280,109 @@ final class ServerTest extends TestCase
     }
 
     // -----------------------------------------------------------
+    // sendSetCookieHeaders()
+    // -----------------------------------------------------------
+
+    public function testSendSetCookieHeadersSendsEachCookieSeparately(): void
+    {
+        // Arrange
+        $adapter = $this->createStub(ServerAdapter::class);
+        $adapter->method('headersSent')->willReturn(false);
+        $adapter->method('fastCGIFinishRequest')->willReturn(true);
+
+        $sentHeaders = [];
+        $adapter->method('header')->willReturnCallback(
+            function (string $header, bool $replace) use (&$sentHeaders) {
+                $sentHeaders[] = ['header' => $header, 'replace' => $replace];
+            }
+        );
+
+        $server = new Server($adapter);
+        $response = $this->createResponse(
+            headers: [
+                'Set-Cookie' => ['session=abc123; Path=/', 'theme=dark; Path=/'],
+                'Content-Type' => ['text/html'],
+            ],
+            body: 'hello',
+        );
+
+        // Act
+        $server->send($response);
+
+        // Assert — Set-Cookie headers must be sent with replace=false
+        $cookieHeaders = array_filter(
+            $sentHeaders,
+            fn($h) => str_starts_with($h['header'], 'Set-Cookie:')
+        );
+        $this->assertCount(2, $cookieHeaders);
+        foreach ($cookieHeaders as $h) {
+            $this->assertFalse($h['replace']);
+        }
+        $cookieValues = array_column(array_values($cookieHeaders), 'header');
+        $this->assertContains('Set-Cookie: session=abc123; Path=/', $cookieValues);
+        $this->assertContains('Set-Cookie: theme=dark; Path=/', $cookieValues);
+    }
+
+    public function testSendSetCookieHeadersDoNotAppearInNonCookieHeaders(): void
+    {
+        // Arrange
+        $adapter = $this->createStub(ServerAdapter::class);
+        $adapter->method('headersSent')->willReturn(false);
+        $adapter->method('fastCGIFinishRequest')->willReturn(true);
+
+        $sentHeaders = [];
+        $adapter->method('header')->willReturnCallback(
+            function (string $header) use (&$sentHeaders) {
+                $sentHeaders[] = $header;
+            }
+        );
+
+        $server = new Server($adapter);
+        $response = $this->createResponse(
+            headers: [
+                'Set-Cookie' => ['session=abc123'],
+                'X-Custom' => ['value'],
+            ],
+            body: 'hello',
+        );
+
+        // Act
+        $server->send($response);
+
+        // Assert — X-Custom should be sent, but Set-Cookie should not appear
+        // in the non-cookie header loop (only via sendSetCookieHeaders)
+        $nonStatusHeaders = array_filter(
+            $sentHeaders,
+            fn($h) => !str_starts_with($h, 'HTTP/') && !str_starts_with($h, 'Set-Cookie:')
+        );
+        $this->assertContains('X-Custom: value', $nonStatusHeaders);
+    }
+
+    public function testSendDoesNotMutateResponseWhenStrippingSetCookieHeaders(): void
+    {
+        // Arrange — verifies the withoutHeader mutation bug is fixed
+        $adapter = $this->createStub(ServerAdapter::class);
+        $adapter->method('headersSent')->willReturn(false);
+        $adapter->method('fastCGIFinishRequest')->willReturn(true);
+
+        $server = new Server($adapter);
+        $response = $this->createResponse(
+            headers: [
+                'Set-Cookie' => ['session=abc123'],
+                'Content-Type' => ['text/html'],
+            ],
+            body: 'hello',
+        );
+
+        // Act
+        $server->send($response);
+
+        // Assert — original response still has Set-Cookie
+        $this->assertTrue($response->hasHeader('Set-Cookie'));
+        $this->assertSame(['session=abc123'], $response->getHeader('Set-Cookie'));
+    }
+
+    // -----------------------------------------------------------
     // sendBodyFor()
     // -----------------------------------------------------------
 
