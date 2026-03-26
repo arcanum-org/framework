@@ -7,6 +7,8 @@ namespace Arcanum\Test\Hyper;
 use Arcanum\Hyper\Message;
 use Arcanum\Hyper\Headers;
 use Arcanum\Hyper\Version;
+use Arcanum\Gather\IgnoreCaseRegistry;
+use Arcanum\Gather\Registry;
 use Psr\Http\Message\StreamInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -14,6 +16,9 @@ use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(Message::class)]
 #[UsesClass(Version::class)]
+#[UsesClass(Headers::class)]
+#[UsesClass(IgnoreCaseRegistry::class)]
+#[UsesClass(Registry::class)]
 final class MessageTest extends TestCase
 {
     public function testMessageGetProtocolVersion(): void
@@ -267,6 +272,58 @@ final class MessageTest extends TestCase
         $this->assertNotSame($message, $newMessage);
         $this->assertNotSame($message->getBody(), $newMessage->getBody());
         $this->assertSame($newBody, $newMessage->getBody());
+    }
+
+    public function testWithoutHeaderDoesNotMutateOriginal(): void
+    {
+        // Arrange
+        $headers = new Headers([
+            'Content-Type' => 'text/html',
+            'Content-Length' => '100',
+        ]);
+        $body = $this->createStub(StreamInterface::class);
+        $message = new Message($headers, $body, Version::from('1.1'));
+
+        // Act
+        $newMessage = $message->withoutHeader('Content-Length');
+
+        // Assert
+        $this->assertTrue($message->hasHeader('Content-Length'));
+        $this->assertFalse($newMessage->hasHeader('Content-Length'));
+    }
+
+    public function testWithHeaderDoesNotMutateOriginal(): void
+    {
+        // Arrange
+        $headers = new Headers([
+            'Content-Type' => 'text/html',
+        ]);
+        $body = $this->createStub(StreamInterface::class);
+        $message = new Message($headers, $body, Version::from('1.1'));
+
+        // Act
+        $newMessage = $message->withHeader('Content-Type', 'application/json');
+
+        // Assert
+        $this->assertSame(['text/html'], $message->getHeader('Content-Type'));
+        $this->assertSame(['application/json'], $newMessage->getHeader('Content-Type'));
+    }
+
+    public function testWithAddedHeaderDoesNotMutateOriginal(): void
+    {
+        // Arrange
+        $headers = new Headers([
+            'Accept' => 'text/html',
+        ]);
+        $body = $this->createStub(StreamInterface::class);
+        $message = new Message($headers, $body, Version::from('1.1'));
+
+        // Act
+        $newMessage = $message->withAddedHeader('Accept', 'application/json');
+
+        // Assert
+        $this->assertSame(['text/html'], $message->getHeader('Accept'));
+        $this->assertSame(['text/html', 'application/json'], $newMessage->getHeader('Accept'));
     }
 
     public function testWithBodyChangesNothingIfSameBodyPassedIn(): void

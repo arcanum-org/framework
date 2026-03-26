@@ -16,6 +16,11 @@ class Message implements MessageInterface
     ) {
     }
 
+    public function __clone(): void
+    {
+        $this->headers = clone $this->headers;
+    }
+
     /**
      * Retrieves the HTTP protocol version as a string.
      */
