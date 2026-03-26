@@ -67,6 +67,8 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 - [ ] Add `PathHelper` — normalize paths, resolve relative paths, extract extensions
 - [ ] Add `TempFile` — create and auto-clean temporary files
 - [ ] Add `AtomicWriter` — write to temp file then rename, preventing partial writes
+- [ ] Migrate `ConfigurationCache` to use Parchment — replace raw `file_put_contents`, `is_file`, `unlink`, `mkdir` calls with Parchment's `Writer`, `FileSystem`, and `Reader` once those are built
+- [ ] Migrate `Searcher` to use Parchment's `FileSystem` or `Reader` — `Searcher::findAll()` currently wraps Symfony Finder directly; consolidate filesystem access through Parchment
 
 ---
 
