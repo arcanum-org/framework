@@ -5,11 +5,17 @@ declare(strict_types=1);
 namespace Arcanum\Ignition;
 
 use Arcanum\Gather\Configuration;
+use Arcanum\Parchment\Reader;
+use Arcanum\Parchment\Writer;
+use Arcanum\Parchment\FileSystem;
 
 class ConfigurationCache
 {
     public function __construct(
         private string $cachePath,
+        private Reader $reader = new Reader(),
+        private Writer $writer = new Writer(),
+        private FileSystem $fileSystem = new FileSystem(),
     ) {
     }
 
@@ -18,7 +24,7 @@ class ConfigurationCache
      */
     public function exists(): bool
     {
-        return is_file($this->cachePath);
+        return $this->reader->exists($this->cachePath);
     }
 
     /**
@@ -37,16 +43,9 @@ class ConfigurationCache
      */
     public function write(Configuration $config): void
     {
-        $directory = dirname($this->cachePath);
-
-        if (!is_dir($directory)) {
-            mkdir($directory, 0755, true);
-        }
-
-        file_put_contents(
+        $this->writer->write(
             $this->cachePath,
             '<?php return ' . var_export($config->toArray(), true) . ';' . \PHP_EOL,
-            \LOCK_EX,
         );
     }
 
@@ -56,7 +55,7 @@ class ConfigurationCache
     public function clear(): void
     {
         if ($this->exists()) {
-            unlink($this->cachePath);
+            $this->fileSystem->delete($this->cachePath);
         }
     }
 

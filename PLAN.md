@@ -69,7 +69,7 @@ Parchment is the filesystem abstraction layer. It delegates to Symfony Finder an
 - [x] ~~Add `PathHelper`~~ — removed; Symfony's `Path` class is already a clean static API. Use `Symfony\Component\Filesystem\Path` directly
 - [x] Add `TempFile` — create and auto-clean temporary files. Uses Symfony Filesystem's `tempnam`
 - [x] ~~Add `AtomicWriter`~~ — removed; `Writer::write()` already delegates to Symfony's `dumpFile()` which is atomic (temp file + rename)
-- [ ] Migrate `ConfigurationCache` to use Parchment — replace raw `file_put_contents`, `is_file`, `unlink`, `mkdir` calls with Parchment's `Writer`, `FileSystem`, and `Reader` once those are built
+- [x] Migrate `ConfigurationCache` to use Parchment — replace raw `file_put_contents`, `is_file`, `unlink`, `mkdir` calls with Parchment's `Writer`, `FileSystem`, and `Reader`
 
 ---
 

@@ -6,6 +6,9 @@ namespace Arcanum\Test\Ignition;
 
 use Arcanum\Ignition\ConfigurationCache;
 use Arcanum\Gather\Configuration;
+use Arcanum\Parchment\Reader;
+use Arcanum\Parchment\Writer;
+use Arcanum\Parchment\FileSystem;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -14,6 +17,9 @@ use Arcanum\Gather\Registry;
 #[CoversClass(ConfigurationCache::class)]
 #[UsesClass(Configuration::class)]
 #[UsesClass(Registry::class)]
+#[UsesClass(Reader::class)]
+#[UsesClass(Writer::class)]
+#[UsesClass(FileSystem::class)]
 final class ConfigurationCacheTest extends TestCase
 {
     private string $tempDir;
