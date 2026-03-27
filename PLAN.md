@@ -137,7 +137,7 @@ Shodo (書道, "the way of writing") is the output rendering package. It convert
 - [ ] Write `src/Glitch/README.md`
 - [ ] Write `src/Ignition/README.md`
 - [ ] Write `src/Quill/README.md`
-- [ ] Write `src/Parchment/README.md`
+- [x] Write `src/Parchment/README.md`
 - [ ] Write `src/CQRS/README.md` (after package is built)
 - [ ] Write `src/Routing/README.md` (after package is built)
 - [ ] Write `src/Shodo/README.md` (after package is built)
