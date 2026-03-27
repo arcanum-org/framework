@@ -204,16 +204,17 @@ GET /thing.json              → App\Pages\Thing         + ThingHandler         
 GET /docs/getting-started    → App\Pages\Docs\GettingStarted + GettingStartedHandler
 ```
 
-- [ ] Add Page registration — explicit path-to-class mappings stored in config or bootstrap, with path segments mapping to namespace levels under the Pages namespace
-- [ ] Add configurable Pages namespace — default `App\Pages`, follows same convention as root namespace
-- [ ] Add configurable default format for Pages — default `html`, overridable per-page or globally (e.g., to `json`)
-- [ ] Add root path `/` convention — maps to `Index` class within the Pages namespace
-- [ ] Add tests for root path `/` → Pages Index resolution
-- [ ] Add tests for single-segment page (e.g., `/thing` → `App\Pages\Thing`)
-- [ ] Add tests for nested page (e.g., `/docs/getting-started` → `App\Pages\Docs\GettingStarted`)
-- [ ] Add tests for page default format (html) and per-page format override
-- [ ] Add tests for page with context-aware format extension (e.g., `/thing.json`)
-- [ ] Add tests for unregistered page path returning 404
+- [x] Add `PageResolver` with page registration — `register()` stores path-to-format mappings, `resolve()` maps path segments to PascalCase classes under the Pages namespace, `has()` checks registration
+- [x] Add configurable Pages namespace — default `App\Pages`, set via constructor
+- [x] Add configurable default format for Pages — default `html`, overridable per-page via `register($path, format:)` or globally via constructor
+- [x] Add root path `/` convention — maps to `Index` class within the Pages namespace
+- [x] Integrate `PageResolver` into `HttpRouter` — pages checked before convention routing, extension format overrides page default, falls back to convention for unregistered paths
+- [x] Add tests for root path `/` → Pages Index resolution
+- [x] Add tests for single-segment page (e.g., `/thing` → `App\Pages\Thing`)
+- [x] Add tests for nested page (e.g., `/docs/getting-started` → `App\Pages\Docs\GettingStarted`)
+- [x] Add tests for page default format (html) and per-page format override
+- [x] Add tests for page with context-aware format extension (e.g., `/thing.json`)
+- [x] Add tests for unregistered page path returning 404
 
 ### Manual Route Overrides
 
