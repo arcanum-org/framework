@@ -242,37 +242,4 @@ final class ReaderTest extends TestCase
         // Act
         $reader->json($this->tempDir . '/nonexistent.json');
     }
-
-    // -----------------------------------------------------------
-    // exists()
-    // -----------------------------------------------------------
-
-    public function testExistsReturnsTrueForExistingFile(): void
-    {
-        // Arrange
-        $path = $this->tempDir . '/exists.txt';
-        file_put_contents($path, 'content');
-        $reader = new Reader();
-
-        // Assert
-        $this->assertTrue($reader->exists($path));
-    }
-
-    public function testExistsReturnsFalseForNonexistentFile(): void
-    {
-        // Arrange
-        $reader = new Reader();
-
-        // Assert
-        $this->assertFalse($reader->exists($this->tempDir . '/nope.txt'));
-    }
-
-    public function testExistsReturnsFalseForDirectory(): void
-    {
-        // Arrange
-        $reader = new Reader();
-
-        // Assert
-        $this->assertFalse($reader->exists($this->tempDir));
-    }
 }

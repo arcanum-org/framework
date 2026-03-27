@@ -24,7 +24,7 @@ class ConfigurationCache
      */
     public function exists(): bool
     {
-        return $this->reader->exists($this->cachePath);
+        return $this->fileSystem->isFile($this->cachePath);
     }
 
     /**

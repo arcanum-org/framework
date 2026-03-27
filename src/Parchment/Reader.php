@@ -83,12 +83,4 @@ class Reader
 
         return require $path;
     }
-
-    /**
-     * Check if a file exists and is a regular file.
-     */
-    public function exists(string $path): bool
-    {
-        return is_file($path);
-    }
 }
