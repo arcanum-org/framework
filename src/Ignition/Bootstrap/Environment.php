@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Arcanum\Ignition\Bootstrap;
 
 use Arcanum\Ignition\Bootstrapper;
-use Arcanum\Ignition\HyperKernel;
+use Arcanum\Ignition\Kernel;
 use Arcanum\Cabinet\Application;
 use Dotenv\Dotenv;
 
@@ -19,8 +19,8 @@ class Environment implements Bootstrapper
      */
     public function bootstrap(Application $container): void
     {
-        /** @var \Arcanum\Ignition\Kernel $kernel */
-        $kernel = $container->get(\Arcanum\Ignition\Kernel::class);
+        /** @var Kernel $kernel */
+        $kernel = $container->get(Kernel::class);
         $rootDirectory = $kernel->rootDirectory();
 
         // Load the environment variables from the .env file, if it exists.
@@ -28,11 +28,9 @@ class Environment implements Bootstrapper
         $dotenv->safeLoad();
 
         // Validate required environment variables.
-        if ($kernel instanceof HyperKernel) {
-            $required = $kernel->requiredEnvironmentVariables();
-            if ($required !== []) {
-                $dotenv->required($required);
-            }
+        $required = $kernel->requiredEnvironmentVariables();
+        if ($required !== []) {
+            $dotenv->required($required);
         }
 
         // Register the environment in the container.
