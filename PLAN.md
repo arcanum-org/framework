@@ -135,6 +135,17 @@ The routing package maps incoming HTTP requests to handlers using convention-bas
 - [ ] Add tests for manual route registration
 - [ ] Add tests for middleware integration
 
+### Context-Aware Routing
+
+The router strips file extensions from the URI path before matching, so `/shop/new-products.json`, `/shop/new-products.html`, and `/shop/new-products.csv` all resolve to the same Query handler. The extension is extracted and stored as the requested response format. After the handler returns data, the format determines which Shodo renderer produces the `ResponseInterface`.
+
+- [ ] Add extension parsing to route resolution — strip `.json`, `.html`, `.csv`, etc. from the URI path before matching, store the extracted format on the matched route
+- [ ] Default to a configurable fallback format when no extension is present (e.g., `json`)
+- [ ] Add tests for extension stripping during route matching — verify the same handler is resolved regardless of extension
+- [ ] Add tests for format extraction — verify the parsed format is available after matching
+- [ ] Add tests for missing extension — verify fallback format is applied
+- [ ] Add tests for unknown/unregistered extension — verify appropriate error (e.g., 406 Not Acceptable)
+
 ---
 
 ## CQRS Integration
@@ -161,9 +172,9 @@ These items bridge the gap between HTTP (Hyper) and command/query dispatch (Conv
 ### Response Serialization
 
 - [ ] Define a response serializer interface — converts a handler's return DTO into a `ResponseInterface`
-- [ ] Implement JSON response serializer using Shodo's `JsonRenderer` — wraps handler output in a JSON response with appropriate status code and headers
+- [ ] Implement format-aware response serializer — selects a Shodo renderer based on the route's parsed format, delegates rendering, and returns the `ResponseInterface` with format-appropriate headers
 - [ ] Add status code resolution — map handler results to HTTP status codes (e.g., created resource → 201, null result → 204)
-- [ ] Add tests for DTO → JSON response conversion
+- [ ] Add tests for format-aware renderer selection (format → renderer dispatch)
 - [ ] Add tests for status code resolution from handler results
 - [ ] Add tests for empty/null handler results
 
@@ -204,6 +215,32 @@ Shodo (書道, "the way of writing") is the output rendering package. It convert
 
 - [x] Implement `JsonExceptionRenderer` (`src/Shodo/JsonExceptionRenderer.php`) — implements `Glitch\ExceptionRenderer`, converts a `Throwable` into a data payload and delegates to `JsonRenderer`. Maps `HttpException` to its status code, includes stack trace only in debug mode
 - [x] Add tests for `JsonExceptionRenderer` — verify JSON structure, Content-Type header, status code mapping from `HttpException`, debug vs. production output, and that the returned object is a valid `ResponseInterface`
+
+### Format Registry
+
+The format registry maps file extensions to renderers and content types. It is the bridge between context-aware routing (which extracts the format) and response serialization (which needs the right renderer). Applications can enable/disable built-in formats, register custom formats, and override renderers for existing formats.
+
+- [ ] Define `Format` value object — holds extension string, content type, and renderer class/instance for a single format (e.g., `json` → `application/json` → `JsonRenderer`)
+- [ ] Define `FormatRegistry` interface — `register(Format $format): void`, `get(string $extension): Format`, `has(string $extension): bool`, `remove(string $extension): void`
+- [ ] Implement `FormatRegistry` — stores formats keyed by extension, resolves renderers from the Container when needed
+- [ ] Register built-in JSON format — extension `json`, content type `application/json`, uses `JsonRenderer`
+- [ ] Add built-in HTML renderer — renders data into an HTML response (template integration point for apps)
+- [ ] Register built-in HTML format — extension `html`, content type `text/html`, uses `HtmlRenderer`
+- [ ] Add built-in CSV renderer — renders iterable/array data as CSV with proper escaping
+- [ ] Register built-in CSV format — extension `csv`, content type `text/csv`, uses `CsvRenderer`
+- [ ] Add built-in plain text renderer — renders data as plain text
+- [ ] Register built-in plain text format — extension `txt`, content type `text/plain`, uses `PlainTextRenderer`
+- [ ] Add format configuration — allow apps to enable/disable formats and override renderer classes via config (e.g., `config/formats.php`)
+- [ ] Add format bootstrapper for Ignition — reads format config, registers enabled formats, applies renderer overrides
+- [ ] Add tests for `Format` value object
+- [ ] Add tests for `FormatRegistry` — register, get, has, remove
+- [ ] Add tests for built-in JSON format registration and rendering
+- [ ] Add tests for built-in HTML format registration and rendering
+- [ ] Add tests for built-in CSV format registration and rendering
+- [ ] Add tests for built-in plain text format registration and rendering
+- [ ] Add tests for app-defined custom format with custom renderer
+- [ ] Add tests for disabling a built-in format via config
+- [ ] Add tests for overriding a built-in format's renderer via config
 
 ---
 
