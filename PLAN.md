@@ -96,13 +96,15 @@ Shodo (書道, "the way of writing") is the output rendering package. It convert
 
 ### Exception rendering (HTTP)
 
-- [ ] Implement `JsonRenderer` (`src/Shodo/JsonRenderer.php`) — implements `Glitch\ExceptionRenderer`, builds a `Hyper\Response` with `Content-Type: application/json`, proper HTTP status code from `HttpException` or exception code, and stack trace only in debug mode
-- [ ] Add tests for `JsonRenderer` — verify JSON structure, Content-Type header, status code mapping from `HttpException`, debug vs. production output, and that the returned object is a valid `ResponseInterface`
-
 ### Foundation
 
-- [ ] Define `Renderer` interface (`src/Shodo/Renderer.php`) — base contract for converting data into output. The output type varies by context: `ResponseInterface` for HTTP, stream/string for CLI. `ExceptionRenderer` is the first specialization
-- [ ] Implement `JsonResponse` helper (`src/Shodo/JsonResponse.php`) — factory for building JSON HTTP responses with proper headers. Used by `JsonRenderer` and available for general use (e.g., rendering query results)
+- [x] Define `Renderer` interface (`src/Shodo/Renderer.php`) — base contract for converting data into output. The output type varies by context: `ResponseInterface` for HTTP, stream/string for CLI
+- [x] Implement `JsonRenderer` (`src/Shodo/JsonRenderer.php`) — general-purpose renderer that converts any data into a JSON `ResponseInterface` with proper headers. Used by `JsonExceptionRenderer` and available for general use (e.g., rendering query results)
+
+### Exception rendering (HTTP)
+
+- [x] Implement `JsonExceptionRenderer` (`src/Shodo/JsonExceptionRenderer.php`) — implements `Glitch\ExceptionRenderer`, converts a `Throwable` into a data payload and delegates to `JsonRenderer`. Maps `HttpException` to its status code, includes stack trace only in debug mode
+- [x] Add tests for `JsonExceptionRenderer` — verify JSON structure, Content-Type header, status code mapping from `HttpException`, debug vs. production output, and that the returned object is a valid `ResponseInterface`
 
 ---
 
