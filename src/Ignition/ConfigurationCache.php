@@ -35,7 +35,7 @@ class ConfigurationCache
     public function load(): array
     {
         /** @var array<string, mixed> */
-        return require $this->cachePath;
+        return $this->reader->require($this->cachePath);
     }
 
     /**

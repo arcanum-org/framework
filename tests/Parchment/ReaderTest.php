@@ -150,6 +150,37 @@ final class ReaderTest extends TestCase
     }
 
     // -----------------------------------------------------------
+    // require()
+    // -----------------------------------------------------------
+
+    public function testRequireReturnsFileResult(): void
+    {
+        // Arrange
+        $path = $this->tempDir . '/config.php';
+        file_put_contents($path, '<?php return ["key" => "value"];');
+        $reader = new Reader();
+
+        // Act
+        $result = $reader->require($path);
+
+        // Assert
+        $this->assertSame(['key' => 'value'], $result);
+    }
+
+    public function testRequireThrowsForNonexistentFile(): void
+    {
+        // Arrange
+        $reader = new Reader();
+
+        // Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Unable to require file');
+
+        // Act
+        $reader->require($this->tempDir . '/nonexistent.php');
+    }
+
+    // -----------------------------------------------------------
     // json()
     // -----------------------------------------------------------
 

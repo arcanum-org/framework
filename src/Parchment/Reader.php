@@ -71,6 +71,20 @@ class Reader
     }
 
     /**
+     * Require a PHP file and return its result.
+     *
+     * @throws \RuntimeException If the file does not exist.
+     */
+    public function require(string $path): mixed
+    {
+        if (!is_file($path)) {
+            throw new \RuntimeException("Unable to require file: $path");
+        }
+
+        return require $path;
+    }
+
+    /**
      * Check if a file exists and is a regular file.
      */
     public function exists(string $path): bool
