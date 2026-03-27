@@ -82,9 +82,25 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 
 ## Flow
 
+### Conveyor (Command Bus)
+
+- [ ] Add `prefix` parameter to `MiddlewareBus::dispatch()` — defaults to `''`, prepended to the handler class name (e.g., prefix `Delete` + `SubmitPayment` → `DeleteSubmitPaymentHandler`)
+- [ ] Add fallback logic to handler resolution — if the prefixed handler class does not exist, fall back to the unprefixed handler (e.g., `DeleteSubmitPaymentHandler` not found → `SubmitPaymentHandler`)
+- [ ] Add debug-mode warning log on fallback — when a prefixed handler is not found and Conveyor falls back, log a warning in debug/development mode only. Silent in production.
+- [ ] Add tests for dispatch with empty prefix (default behavior, no change from current)
+- [ ] Add tests for dispatch with prefix resolving to a prefixed handler
+- [ ] Add tests for dispatch with prefix falling back to unprefixed handler
+- [ ] Add tests for debug-mode warning log on fallback
+- [ ] Add tests for dispatch with prefix where neither prefixed nor unprefixed handler exists — verify exception
+
+### River (Streams)
+
 - [ ] Add test for `EmptyStream::getMetadata($key)` — verify it returns the correct value for valid metadata keys (currently always returns `null`)
 - [ ] Add test for `Stream::read(0)` edge case — verify reading zero bytes returns empty string
 - [ ] Add test for `CachingStream::seek()` with `SEEK_END` on an unseekable remote stream
+
+### General
+
 - [ ] Add test for `MiddlewareBus::dispatch()` when handler class is not found in container — verify exception behavior
 
 ---
@@ -122,29 +138,119 @@ Parchment is the filesystem abstraction layer. It delegates to Symfony Finder an
 
 ## New Package: Routing
 
-The routing package maps incoming HTTP requests to handlers using convention-based discovery, so users don't need to define routes manually.
+The routing package maps incoming HTTP requests to handlers using convention-based discovery, so users don't need to define routes manually. It enforces an opinionated CQRS split: GET requests are always Queries, all other mutating methods (PUT, POST, PATCH, DELETE) are always Commands.
 
-- [ ] Define `Router` interface — takes a ServerRequest, returns a matched route with handler
-- [ ] Implement convention-based route resolution — map HTTP method + path to handler classes (e.g., `POST /orders` → `PlaceOrderHandler`, `GET /orders/{id}` → `GetOrderHandler`)
-- [ ] Add path parameter extraction — parse `{id}`, `{slug}`, etc. from URI and inject into handler constructor
+### Convention System
+
+URL path segments map directly to PHP namespaces under a configurable root (default `App`). Kebab-case URL segments are converted to PascalCase class names. The last segment becomes the class name; all preceding segments become namespace levels. The HTTP method determines whether the `Query\` or `Command\` namespace is inserted.
+
+```
+GET    /catalog/products/featured.json  → App\Catalog\Query\Products\Featured + FeaturedHandler
+PUT    /checkout/submit-payment         → App\Checkout\Command\SubmitPayment  + SubmitPaymentHandler
+POST   /checkout/submit-payment         → App\Checkout\Command\SubmitPayment  + PostSubmitPaymentHandler (or fallback to SubmitPaymentHandler)
+DELETE /checkout/submit-payment         → App\Checkout\Command\SubmitPayment  + DeleteSubmitPaymentHandler (or fallback to SubmitPaymentHandler)
+PATCH  /checkout/submit-payment         → App\Checkout\Command\SubmitPayment  + PatchSubmitPaymentHandler (or fallback to SubmitPaymentHandler)
+```
+
+**HTTP method constraints:**
+
+| Method  | Type    | DTO namespace | Handler prefix | Default status                              |
+|---------|---------|---------------|----------------|---------------------------------------------|
+| GET     | Query   | `Query\`      | (none)         | 200 + rendered body                         |
+| PUT     | Command | `Command\`    | (none/`Put`)   | void→204, scalar/DTO→201, null→202          |
+| POST    | Command | `Command\`    | `Post`         | void→204, scalar/DTO→201, null→202          |
+| PATCH   | Command | `Command\`    | `Patch`        | void→204, scalar/DTO→201, null→202          |
+| DELETE  | Command | `Command\`    | `Delete`       | void→204, scalar/DTO→201, null→202          |
+| OPTIONS | —       | —             | —              | Handled by framework middleware, no handler |
+
+**Command handler return type conventions:**
+- `void` → 204 No Content (command completed, nothing to report)
+- scalar or DTO → 201 Created (something was created, return a reference)
+- `null` → 202 Accepted (command accepted, processing deferred)
+- Command responses have no body by default. An opt-in configuration escape hatch allows response bodies for users who need them, with documentation guiding against forcing REST/MVC patterns into CQRS defaults.
+
+**Method-specific handler resolution:** All mutating methods share the same Command DTO. PUT is the default — `SubmitPaymentHandler` handles PUT. POST, PATCH, and DELETE look for a prefixed handler first (`PostSubmitPaymentHandler`, etc.) and fall back to the default handler. Fallback resolution and the debug-mode warning log live in Conveyor, not the router. `PutSubmitPaymentHandler` is valid but redundant.
+
+### Router Interface
+
+- [ ] Define `Router` interface — takes a `ServerRequestInterface`, returns a matched route carrying: resolved DTO class, handler prefix (from HTTP method), extracted path parameters, and parsed response format
+- [ ] Define `Route` value object — holds the DTO class name, handler prefix, path parameters array, and response format string
+- [ ] Add tests for `Route` value object
+
+### Convention-Based Resolution
+
+- [ ] Implement URL-to-namespace mapping — convert kebab-case path segments to PascalCase, last segment becomes class name, preceding segments become namespace levels
+- [ ] Add configurable root namespace — default `App`, set via config (follows Composer autoloader convention)
+- [ ] Add HTTP method → namespace insertion — GET inserts `Query\`, PUT/POST/PATCH/DELETE insert `Command\`
+- [ ] Add HTTP method → handler prefix mapping — POST→`Post`, PATCH→`Patch`, DELETE→`Delete`, PUT/GET→empty string
+- [ ] Add tests for kebab-case to PascalCase conversion
+- [ ] Add tests for single-segment paths (e.g., `GET /dashboard` → `App\Query\Dashboard`)
+- [ ] Add tests for multi-segment paths (e.g., `GET /catalog/products/featured` → `App\Catalog\Query\Products\Featured`)
+- [ ] Add tests for GET → Query namespace insertion
+- [ ] Add tests for PUT → Command namespace insertion
+- [ ] Add tests for POST/PATCH/DELETE → Command namespace insertion with handler prefix
+- [ ] Add tests for configurable root namespace
+
+### Path Parameters
+
+- [ ] Add path parameter extraction — parse `{id}`, `{slug}`, etc. from URI segments and store on the matched `Route`
+- [ ] Add tests for single path parameter extraction
+- [ ] Add tests for multiple path parameters in one route
+
+### Pages
+
+Pages are explicitly registered Query routes that bypass convention-based URL-to-namespace mapping. They live under a dedicated namespace (`App\Pages\` by default, configurable) without a `Query\` sub-namespace since Pages are always Queries. The root path `/` maps to `Index` by convention.
+
+```
+GET /                        → App\Pages\Index         + IndexHandler           (default format: html)
+GET /thing.html              → App\Pages\Thing         + ThingHandler           (format: html)
+GET /thing.json              → App\Pages\Thing         + ThingHandler           (format: json)
+GET /docs/getting-started    → App\Pages\Docs\GettingStarted + GettingStartedHandler
+```
+
+- [ ] Add Page registration — explicit path-to-class mappings stored in config or bootstrap, with path segments mapping to namespace levels under the Pages namespace
+- [ ] Add configurable Pages namespace — default `App\Pages`, follows same convention as root namespace
+- [ ] Add configurable default format for Pages — default `html`, overridable per-page or globally (e.g., to `json`)
+- [ ] Add root path `/` convention — maps to `Index` class within the Pages namespace
+- [ ] Add tests for root path `/` → Pages Index resolution
+- [ ] Add tests for single-segment page (e.g., `/thing` → `App\Pages\Thing`)
+- [ ] Add tests for nested page (e.g., `/docs/getting-started` → `App\Pages\Docs\GettingStarted`)
+- [ ] Add tests for page default format (html) and per-page format override
+- [ ] Add tests for page with context-aware format extension (e.g., `/thing.json`)
+- [ ] Add tests for unregistered page path returning 404
+
+### Manual Route Overrides
+
 - [ ] Add route registration for manual overrides — allow explicit route→handler mappings when conventions don't fit
-- [ ] Add middleware support — integrate with Flow's Continuum for per-route or global HTTP middleware
-- [ ] Add routing bootstrapper for Ignition — auto-discovers handler classes and registers routes
-- [ ] Add tests for convention-based routing
-- [ ] Add tests for path parameter extraction
-- [ ] Add tests for manual route registration
-- [ ] Add tests for middleware integration
+- [ ] Add tests for manual route registration overriding convention
+
+### Route Middleware
+
+- [ ] Add per-route middleware support — integrate with Flow's Continuum for route-specific middleware
+- [ ] Add tests for per-route middleware execution
 
 ### Context-Aware Routing
 
-The router strips file extensions from the URI path before matching, so `/shop/new-products.json`, `/shop/new-products.html`, and `/shop/new-products.csv` all resolve to the same Query handler. The extension is extracted and stored as the requested response format. After the handler returns data, the format determines which Shodo renderer produces the `ResponseInterface`.
+The router strips file extensions from the URI path before matching, so `/shop/new-products.json`, `/shop/new-products.html`, and `/shop/new-products.csv` all resolve to the same Query handler. The extension is extracted and stored as the requested response format on the matched `Route`. After the handler returns data, the format determines which Shodo renderer produces the `ResponseInterface`.
 
-- [ ] Add extension parsing to route resolution — strip `.json`, `.html`, `.csv`, etc. from the URI path before matching, store the extracted format on the matched route
-- [ ] Default to a configurable fallback format when no extension is present (e.g., `json`)
+- [ ] Add extension parsing to route resolution — strip `.json`, `.html`, `.csv`, etc. from the URI path before matching, store the extracted format on the `Route`
+- [ ] Default to a configurable fallback format when no extension is present (e.g., `json` for convention routes, `html` for Pages)
 - [ ] Add tests for extension stripping during route matching — verify the same handler is resolved regardless of extension
-- [ ] Add tests for format extraction — verify the parsed format is available after matching
+- [ ] Add tests for format extraction — verify the parsed format is available on the `Route`
 - [ ] Add tests for missing extension — verify fallback format is applied
 - [ ] Add tests for unknown/unregistered extension — verify appropriate error (e.g., 406 Not Acceptable)
+
+### OPTIONS Handling
+
+- [ ] Add OPTIONS middleware — automatically responds with allowed methods for a given path and CORS headers, no application handler involved
+- [ ] Add tests for OPTIONS response listing allowed methods for a convention route
+- [ ] Add tests for OPTIONS CORS preflight headers
+
+### Routing Bootstrapper
+
+- [ ] Add routing bootstrapper for Ignition — loads route config (pages, manual overrides), registers the Router in the Container
+- [ ] Add tests for bootstrapper loading page registrations from config
+- [ ] Add tests for bootstrapper loading manual route overrides from config
 
 ---
 
@@ -169,14 +275,30 @@ These items bridge the gap between HTTP (Hyper) and command/query dispatch (Conv
 - [ ] Add tests for request body injection into DTOs
 - [ ] Add tests for type coercion (string → int, string → bool, etc.)
 
-### Response Serialization
+### Query Response Serialization
 
-- [ ] Define a response serializer interface — converts a handler's return DTO into a `ResponseInterface`
-- [ ] Implement format-aware response serializer — selects a Shodo renderer based on the route's parsed format, delegates rendering, and returns the `ResponseInterface` with format-appropriate headers
-- [ ] Add status code resolution — map handler results to HTTP status codes (e.g., created resource → 201, null result → 204)
+Query handlers always return data. The response is rendered by the format-aware serializer (JSON, HTML, CSV, etc.) based on the extension extracted by context-aware routing. Status code is always 200.
+
+- [ ] Define a response serializer interface — converts a handler's return value into a `ResponseInterface`
+- [ ] Implement format-aware response serializer — selects a Shodo renderer based on the `Route`'s parsed format, delegates rendering, returns the `ResponseInterface` with format-appropriate headers and 200 status
 - [ ] Add tests for format-aware renderer selection (format → renderer dispatch)
-- [ ] Add tests for status code resolution from handler results
-- [ ] Add tests for empty/null handler results
+- [ ] Add tests for Query response with JSON format
+- [ ] Add tests for Query response with HTML format
+- [ ] Add tests for Query response with CSV format
+
+### Command Response Serialization
+
+Command handlers signal intent through their return type. Commands have no response body by default — the status code communicates the outcome. An opt-in configuration escape hatch allows response bodies for users who need them, with documentation guiding against forcing REST/MVC patterns into CQRS defaults.
+
+- [ ] Implement command response builder — inspects handler return type to determine status code: `void`→204, scalar/DTO→201, `null`→202
+- [ ] Add `Location` header for 201 responses — set if the framework can resolve a URL from the returned identifier
+- [ ] Add opt-in configuration for command response bodies — disabled by default, allows commands to return rendered content when enabled
+- [ ] Add documentation guidance — explain CQRS command conventions and why response bodies are discouraged
+- [ ] Add tests for `void` handler → 204 No Content with empty body
+- [ ] Add tests for scalar return → 201 Created with empty body and Location header
+- [ ] Add tests for DTO return → 201 Created with empty body
+- [ ] Add tests for `null` return → 202 Accepted with empty body
+- [ ] Add tests for opt-in response body configuration
 
 ### Handler Discovery
 
@@ -194,9 +316,13 @@ Track updates to the starter app (`../arcanum/`) as framework features land.
 - [ ] Update `bootstrap/http.php` to register `MiddlewareBus` (Conveyor) in the Container
 - [ ] Update `bootstrap/http.php` to register the Router in the Container
 - [ ] Update `App\HTTP\Kernel::handleRequest()` to dispatch requests through the Router → Conveyor pipeline instead of throwing 404
-- [ ] Add example command handler (e.g., `GET /health` → `HealthCheckHandler`) to demonstrate the full CQRS lifecycle
-- [ ] Add route configuration or handler directory convention to the starter
+- [ ] Add `config/routes.php` — register Pages (at minimum, the root `/` → `App\Pages\Index`) and any manual route overrides
+- [ ] Add `config/formats.php` — configure enabled response formats and any renderer overrides
+- [ ] Add `App\Pages\Index` and `App\Pages\IndexHandler` — default homepage, serves as the root `/` page
+- [ ] Add example Query — e.g., `GET /health` → `App\Query\Health` + `HealthHandler`, demonstrating convention-based routing with context-aware rendering (`.json`, `.html`)
+- [ ] Add example Command — e.g., `PUT /health/ping` → `App\Command\Health\Ping` + `PingHandler`, demonstrating a simple Command returning void→204
 - [ ] Update `config/` with any new configuration files needed by routing or middleware
+- [ ] Set up directory structure conventions — `app/Pages/`, `app/Query/`, `app/Command/` directories in the starter
 
 ---
 
