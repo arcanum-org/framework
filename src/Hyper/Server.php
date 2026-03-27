@@ -211,7 +211,7 @@ class Server
         // Send all headers except for Set-Cookie
         $statusCode = $response->getStatusCode();
         foreach ($response->withoutHeader('Set-Cookie')->getHeaders() as $name => $values) {
-            $this->sendHeaders($name, $values, $statusCode);
+            $this->sendHeaders((string) $name, $values, $statusCode);
         }
     }
 

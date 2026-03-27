@@ -19,8 +19,7 @@ final class ProviderTest extends TestCase
     public function testListen(): void
     {
         // Arrange
-        $event = $this->getMockBuilder(Event::class)
-            ->getMock();
+        $event = $this->createStub(Event::class);
 
         $listener = fn (Event $event): Event => $event;
         $provider = new Provider();
@@ -41,8 +40,7 @@ final class ProviderTest extends TestCase
     public function testGetEmptyListeners(): void
     {
         // Arrange
-        $event = $this->getMockBuilder(Event::class)
-            ->getMock();
+        $event = $this->createStub(Event::class);
 
         $provider = new Provider();
 

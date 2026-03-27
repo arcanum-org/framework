@@ -8,46 +8,31 @@ use Arcanum\Hyper\StatusCode;
 use Arcanum\Hyper\Phrase;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(StatusCode::class)]
+#[UsesClass(Phrase::class)]
 final class StatusCodeTest extends TestCase
 {
-    public function testReason(): void
+    public function testReasonReturnsMatchingPhraseForAllCases(): void
     {
-        // Arrange
-        $ok = StatusCode::OK;
-        $notFound = StatusCode::NotFound;
-        $teapot = StatusCode::ImATeapot;
-
-        // Act
-        $okReason = $ok->reason();
-        $notFoundReason = $notFound->reason();
-        $teapotReason = $teapot->reason();
-
-        // Assert
-        $this->assertSame(Phrase::OK, $okReason);
-        $this->assertSame(Phrase::NotFound, $notFoundReason);
-        $this->assertSame(Phrase::ImATeapot, $teapotReason);
+        foreach (StatusCode::cases() as $statusCode) {
+            $phrase = $statusCode->reason();
+            $this->assertSame(
+                $statusCode->value,
+                $phrase->code()->value,
+                "StatusCode::{$statusCode->name}->reason()->code() should round-trip back to the same status code"
+            );
+        }
     }
 
     public function testIsInformational(): void
     {
-        // Arrange
-        $ok = StatusCode::OK;
-        $notFound = StatusCode::NotFound;
-        $teapot = StatusCode::ImATeapot;
-        $switchingProtocols = StatusCode::SwitchingProtocols;
-
-        // Act
-        $okIsInformational = $ok->isInformational();
-        $notFoundIsInformational = $notFound->isInformational();
-        $teapotIsInformational = $teapot->isInformational();
-        $switchingProtocolsIsInformational = $switchingProtocols->isInformational();
-
-        // Assert
-        $this->assertFalse($okIsInformational);
-        $this->assertFalse($notFoundIsInformational);
-        $this->assertFalse($teapotIsInformational);
-        $this->assertTrue($switchingProtocolsIsInformational);
+        $this->assertTrue(StatusCode::Continue->isInformational());
+        $this->assertTrue(StatusCode::SwitchingProtocols->isInformational());
+        $this->assertTrue(StatusCode::Processing->isInformational());
+        $this->assertFalse(StatusCode::OK->isInformational());
+        $this->assertFalse(StatusCode::NotFound->isInformational());
+        $this->assertFalse(StatusCode::InternalServerError->isInformational());
     }
 }

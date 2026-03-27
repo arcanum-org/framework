@@ -28,9 +28,7 @@ final class PipelayerSystemTest extends TestCase
         $pipelayerFoo = $this->getMockBuilder(Pipelayer::class)
             ->getMock();
 
-        /** @var Stage&\PHPUnit\Framework\MockObject\MockObject */
-        $stageFoo = $this->getMockBuilder(Stage::class)
-            ->getMock();
+        $stageFoo = $this->createStub(Stage::class);
 
         $pipelayerFoo->expects($this->once())
             ->method('pipe')
@@ -45,9 +43,7 @@ final class PipelayerSystemTest extends TestCase
         $pipelayerBar = $this->getMockBuilder(Pipelayer::class)
             ->getMock();
 
-        /** @var Stage&\PHPUnit\Framework\MockObject\MockObject */
-        $stageBar = $this->getMockBuilder(Stage::class)
-            ->getMock();
+        $stageBar = $this->createStub(Stage::class);
 
         $pipelayerBar->expects($this->once())
             ->method('pipe')
@@ -62,9 +58,7 @@ final class PipelayerSystemTest extends TestCase
         $pipelayerBaz = $this->getMockBuilder(Pipelayer::class)
             ->getMock();
 
-        /** @var Stage&\PHPUnit\Framework\MockObject\MockObject */
-        $stageBaz = $this->getMockBuilder(Stage::class)
-            ->getMock();
+        $stageBaz = $this->createStub(Stage::class);
 
         $pipelayerBaz->expects($this->once())
             ->method('pipe')

@@ -7,8 +7,8 @@ namespace Arcanum\Ignition\Bootstrap;
 use Arcanum\Cabinet\Application;
 use Arcanum\Gather\Configuration as GatherConfiguration;
 use Arcanum\Ignition\Bootstrapper;
+use Arcanum\Ignition\ConfigurationCache;
 use Arcanum\Parchment\Searcher;
-use Arcanum\Gather\Registry;
 
 /**
  * The configuration bootstrapper.
@@ -20,19 +20,25 @@ class Configuration implements Bootstrapper
      */
     public function bootstrap(Application $container): void
     {
-        // Create a new configuration registry.
-        $config = new GatherConfiguration();
-
-        // Register the configuration registry in the container.
-        $container->instance(GatherConfiguration::class, $config);
-
-        // Get the configuration directory from the kernel.
-        // @todo cache this
         /** @var \Arcanum\Ignition\Kernel $kernel */
         $kernel = $container->get(\Arcanum\Ignition\Kernel::class);
-        $configDirectory = $kernel->configDirectory();
 
-        // Load the configuration files from the config directory.
+        $cache = new ConfigurationCache(
+            $kernel->filesDirectory() . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'config.php'
+        );
+
+        $container->instance(ConfigurationCache::class, $cache);
+
+        if ($cache->exists()) {
+            $config = new GatherConfiguration($cache->load());
+            $container->instance(GatherConfiguration::class, $config);
+            return;
+        }
+
+        $config = new GatherConfiguration();
+        $container->instance(GatherConfiguration::class, $config);
+
+        $configDirectory = $kernel->configDirectory();
         $files = Searcher::findAll('*.php', $configDirectory);
 
         foreach ($files as $file) {

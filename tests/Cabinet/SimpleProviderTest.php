@@ -14,9 +14,7 @@ final class SimpleProviderTest extends TestCase
     {
         // Arrange
         $provider = \Arcanum\Cabinet\SimpleProvider::fromFactory(fn() => new \stdClass());
-        $container = $this->getMockBuilder(\Arcanum\Cabinet\Container::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $container = $this->createStub(\Arcanum\Cabinet\Container::class);
 
         // Act
         $result = $provider($container);

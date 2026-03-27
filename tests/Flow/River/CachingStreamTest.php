@@ -23,10 +23,7 @@ final class CachingStreamTest extends TestCase
     public function testFromStream(): void
     {
         // Arrange
-        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
-        $stream = $this->getMockBuilder(Stream::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $stream = $this->createStub(Stream::class);
 
         // Act
         $streamInterface = CachingStream::fromStream($stream);
@@ -38,15 +35,9 @@ final class CachingStreamTest extends TestCase
     public function testFromStreamWithCache(): void
     {
         // Arrange
-        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
-        $stream = $this->getMockBuilder(Stream::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $stream = $this->createStub(Stream::class);
 
-        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
-        $cache = $this->getMockBuilder(Stream::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $cache = $this->createStub(Stream::class);
 
         // Act
         $streamInterface = CachingStream::fromStreamWithCache($stream, $cache);
@@ -785,6 +776,84 @@ final class CachingStreamTest extends TestCase
 
         // Act
         $streamInterface->rewind();
+    }
+
+    public function testSeekWithSeekCur(): void
+    {
+        // Arrange
+        $stream = $this->createStub(Stream::class);
+
+        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
+        $cache = $this->getMockBuilder(Stream::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['tell', 'getSize', 'seek'])
+            ->getMock();
+
+        $cache->expects($this->once())
+            ->method('tell')
+            ->willReturn(10);
+
+        $cache->expects($this->once())
+            ->method('getSize')
+            ->willReturn(100);
+
+        $cache->expects($this->once())
+            ->method('seek')
+            ->with(15, SEEK_SET);
+
+        $streamInterface = CachingStream::fromStreamWithCache($stream, $cache);
+
+        // Act — seek 5 bytes forward from current position (10)
+        $streamInterface->seek(5, SEEK_CUR);
+    }
+
+    public function testSeekWithSeekEnd(): void
+    {
+        // Arrange
+        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
+        $stream = $this->getMockBuilder(Stream::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getSize'])
+            ->getMock();
+
+        $stream->expects($this->once())
+            ->method('getSize')
+            ->willReturn(100);
+
+        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
+        $cache = $this->getMockBuilder(Stream::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getSize', 'seek'])
+            ->getMock();
+
+        $cache->expects($this->once())
+            ->method('getSize')
+            ->willReturn(100);
+
+        $cache->expects($this->once())
+            ->method('seek')
+            ->with(90, SEEK_SET);
+
+        $streamInterface = CachingStream::fromStreamWithCache($stream, $cache);
+
+        // Act — seek 10 bytes back from end (size 100)
+        $streamInterface->seek(-10, SEEK_END);
+    }
+
+    public function testSeekWithInvalidWhenceThrows(): void
+    {
+        // Arrange
+        $stream = $this->createStub(Stream::class);
+
+        $cache = $this->createStub(Stream::class);
+
+        $streamInterface = CachingStream::fromStreamWithCache($stream, $cache);
+
+        // Assert
+        $this->expectException(\InvalidArgumentException::class);
+
+        // Act
+        $streamInterface->seek(0, 999);
     }
 
     public function testSeekFirstThenReadWillStillCacheFromStream(): void

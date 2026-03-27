@@ -18,24 +18,24 @@ Arcanum is a collection of packages that work together to create a robust, scala
 
 ### Arcanum Codex
 
-[Codex](https://github.com/arcanum-org/framework/tree/main/src/Codex) is a practically magical Class Resolver. It's used by Arcanum Cabinet to automatically resolve classes and their dependencies. If you don't want to use Cabinet, Codex can be used independently to build pretty much anything you can throw at it.
+[Codex](https://github.com/arcanum-org/framework/tree/main/src/Codex) is an automatic class resolver. Give it a class name, and it uses PHP's Reflection API to inspect the constructor, resolve all dependencies recursively, and hand you a fully built instance. It supports manual overrides via specifications — you can tell it "when building X, use Y for this parameter" — and integrates with Echo's event system to fire events before and after resolution. It's used by Cabinet under the hood, but works independently too.
 
 ### Arcanum Echo
 
-[Echo](https://github.com/arcanum-org/framework/tree/main/src/Echo) is a PSR-14 compliant event dispatcher package. Arcanum packages use it to dispatch events internally, and it can be used independently to build any event-driven system.
+[Echo](https://github.com/arcanum-org/framework/tree/main/src/Echo) is a PSR-14 compliant event dispatcher. Register listeners for event classes, dispatch events, and Echo calls the right listeners in order. It walks the class hierarchy, so a listener for a base event class fires for all subclasses too. You can dispatch any object — non-Event objects get wrapped automatically. Under the hood, it uses Flow's Pipeline to chain listeners with propagation control.
 
 ### Arcanum Flow
 
-[Flow](https://github.com/arcanum-org/framework/tree/main/src/Flow) is all about moving data through your application from point A to point B. It's composed of four related packages:
+[Flow](https://github.com/arcanum-org/framework/tree/main/src/Flow) is all about moving data through your application from point A to point B. Everything in Flow builds on the `Stage` interface — a callable that takes an object in and sends an object out. It's composed of four subpackages:
 
-1. [Continuum](https://github.com/arcanum-org/framework/tree/main/src/Flow/Continuum) is a package for creating and managing middleware pipelines.
-2. [Conveyor](https://github.com/arcanum-org/framework/tree/main/src/Flow/Conveyor) is Arcanum's Command Bus. It's all about dispatching Data Transfer Objects (DTOs) to their handlers, and managing the before and after middleware for those DTOs.
-3. [Pipeline](https://github.com/arcanum-org/framework/tree/main/src/Flow/Pipeline) is a package for creating and managing pipelines of operations. If you have a series of steps, Pipeline can wrap them up in a nice, neat system.
-4. [River](https://github.com/arcanum-org/framework/tree/main/src/Flow/River) is a PSR-7 Stream implementation. It's a simple but thorough package that makes working with streams a breeze.
+1. [Pipeline](https://github.com/arcanum-org/framework/tree/main/src/Flow/Pipeline) chains stages in a straight line — the output of one becomes the input of the next. If you have a series of steps, Pipeline wraps them up in a nice, neat system.
+2. [Continuum](https://github.com/arcanum-org/framework/tree/main/src/Flow/Continuum) is middleware. Each stage gets a `$next` callback it must call to continue the chain, just like middleware in Laravel or Express. This lets stages run logic both before and after the inner stages.
+3. [Conveyor](https://github.com/arcanum-org/framework/tree/main/src/Flow/Conveyor) is Arcanum's Command Bus. It combines Pipeline and Continuum to dispatch objects to handlers with before/after middleware. Handlers are resolved by convention — `PlaceOrder` dispatches to `PlaceOrderHandler`.
+4. [River](https://github.com/arcanum-org/framework/tree/main/src/Flow/River) is a PSR-7 Stream implementation. It wraps PHP's low-level stream resources into type-safe objects that auto-close, support caching for non-seekable streams, and generally make working with streams a breeze.
 
 ### Arcanum Gather
 
-[Gather](https://github.com/arcanum-org/framework/tree/main/src/Gather) is a package for collecting and managing configuration data, environment variables, and other collections of key/value pairs.
+[Gather](https://github.com/arcanum-org/framework/tree/main/src/Gather) is a typed key-value collection system. The core `Registry` class wraps arrays with PSR-11 container compliance, type coercion (`asString`, `asInt`, `asBool`, etc.), and serialization support. Three specialized variants extend it: `Configuration` adds dot-notation access for nested settings, `Environment` locks down serialization and cloning to prevent leaking secrets, and `IgnoreCaseRegistry` provides case-insensitive key lookups (used by Hyper for HTTP headers).
 
 ### Arcanum Glitch
 

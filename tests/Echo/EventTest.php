@@ -13,11 +13,8 @@ final class EventTest extends TestCase
     public function testStopPropagation(): void
     {
         // Arrange
-
-        /** @var \Arcanum\Echo\Event&\PHPUnit\Framework\MockObject\MockObject */
-        $event = $this->getMockBuilder(\Arcanum\Echo\Event::class)
-            ->onlyMethods([])
-            ->getMock();
+        $event = new class extends \Arcanum\Echo\Event {
+        };
 
         // Act
         $event->stopPropagation();

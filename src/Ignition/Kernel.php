@@ -26,4 +26,11 @@ interface Kernel extends Terminable, Bootstrapper
      * Get the files directory of the application.
      */
     public function filesDirectory(): string;
+
+    /**
+     * Get the list of environment variables required for the application to run.
+     *
+     * @return string[]
+     */
+    public function requiredEnvironmentVariables(): array;
 }
