@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Arcanum\Ignition;
 
-use Arcanum\Flow\River\LazyResource;
-use Arcanum\Flow\River\Stream;
 use Arcanum\Cabinet\Application;
+use Arcanum\Glitch\ExceptionHandler;
+use Arcanum\Glitch\ExceptionRenderer;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Server\RequestHandlerInterface;
@@ -20,6 +20,11 @@ class HyperKernel implements Kernel, RequestHandlerInterface
      * Whether the application has been bootstrapped yet.
      */
     private bool $isBootstrapped = false;
+
+    /**
+     * The application container, set during bootstrap.
+     */
+    private Application|null $container = null;
 
     /**
      * Environment variables that must be set for the application to run.
@@ -101,11 +106,15 @@ class HyperKernel implements Kernel, RequestHandlerInterface
             return;
         }
 
+        $this->container = $container;
+
         foreach ($this->bootstrappers as $name) {
             /** @var Bootstrapper $bootstrapper */
             $bootstrapper = $container->get($name);
             $bootstrapper->bootstrap($container);
         }
+
+        $this->isBootstrapped = true;
     }
 
     /**
@@ -113,19 +122,47 @@ class HyperKernel implements Kernel, RequestHandlerInterface
      */
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
+        try {
+            return $this->handleRequest($request);
+        } catch (\Throwable $e) {
+            return $this->handleException($e);
+        }
+    }
 
-        // TEMPORARY
-        return new \Arcanum\Hyper\Response(
-            new \Arcanum\Hyper\Message(
-                new \Arcanum\Hyper\Headers([
-                    'Content-Type' => 'text/plain'
-                ]),
-                new Stream(LazyResource::for('php://memory', 'w+')),
-                \Arcanum\Hyper\Version::v11,
-            ),
-            \Arcanum\Hyper\StatusCode::OK,
-            \Arcanum\Hyper\Phrase::OK,
+    /**
+     * Handle the request through the application.
+     *
+     * Override this method in your application kernel to dispatch
+     * the request to your router or command bus.
+     */
+    protected function handleRequest(ServerRequestInterface $request): ResponseInterface
+    {
+        throw new \Arcanum\Glitch\HttpException(
+            \Arcanum\Hyper\StatusCode::NotFound,
         );
+    }
+
+    /**
+     * Handle an exception that occurred during request handling.
+     *
+     * Reports the exception via the ExceptionHandler, then renders
+     * it into a ResponseInterface via the ExceptionRenderer.
+     */
+    protected function handleException(\Throwable $e): ResponseInterface
+    {
+        if ($this->container?->has(ExceptionHandler::class)) {
+            /** @var ExceptionHandler $handler */
+            $handler = $this->container->get(ExceptionHandler::class);
+            $handler->handleException($e);
+        }
+
+        if ($this->container?->has(ExceptionRenderer::class)) {
+            /** @var ExceptionRenderer $renderer */
+            $renderer = $this->container->get(ExceptionRenderer::class);
+            return $renderer->render($e);
+        }
+
+        throw $e;
     }
 
     /**

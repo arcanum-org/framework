@@ -31,10 +31,10 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 - [x] Add tests for `Handler` class (error→exception conversion, shutdown handling, reporter dispatch)
 - [x] Add tests for `LogReporter` (per-exception-type log levels and channel routing)
 - [x] Add tests for `Level` enum (isDeprecation, isFatal helpers)
-- [ ] Add `HttpException` class (`src/Glitch/HttpException.php`) — exception that carries an HTTP status code explicitly (e.g., `throw new HttpException(StatusCode::NotFound, 'Order not found')`). Used by Shodo renderers and the kernel to produce proper HTTP error responses
-- [ ] Define `ExceptionRenderer` interface (`src/Glitch/ExceptionRenderer.php`) — takes a `Throwable`, returns `ResponseInterface`. This is the contract between Glitch (error handling) and Shodo (rendering). Lives in Glitch because it's part of the error-handling lifecycle — Shodo implements it
+- [x] Add `HttpException` class (`src/Glitch/HttpException.php`) — exception that carries an HTTP status code explicitly (e.g., `throw new HttpException(StatusCode::NotFound, 'Order not found')`). Used by Shodo renderers and the kernel to produce proper HTTP error responses
+- [x] Define `ExceptionRenderer` interface (`src/Glitch/ExceptionRenderer.php`) — takes a `Throwable`, returns `ResponseInterface`. This is the contract between Glitch (error handling) and Shodo (rendering). Lives in Glitch because it's part of the error-handling lifecycle — Shodo implements it
 - [ ] Remove `JsonReporter` (`src/Glitch/JsonReporter.php`) — replaced by Shodo's `JsonRenderer`. The echo-based approach conflated reporting (internal recording) with responding (client-facing output)
-- [ ] Integrate `ExceptionRenderer` into `HyperKernel` (`src/Ignition/HyperKernel.php`) — on exception, dispatch to `Handler` for internal reporting (LogReporter, etc.), then use the container-resolved `ExceptionRenderer` to build and return a `ResponseInterface`
+- [x] Integrate `ExceptionRenderer` into `HyperKernel` (`src/Ignition/HyperKernel.php`) — on exception, dispatch to `Handler` for internal reporting (LogReporter, etc.), then use the container-resolved `ExceptionRenderer` to build and return a `ResponseInterface`
 
 ---
 
@@ -43,7 +43,7 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 - [x] Add configuration caching — cache parsed config arrays to avoid re-reading files on every request
 - [x] Add environment validation — verify required env vars are set during bootstrap, fail fast with clear errors
 - [ ] Add bootstrap lifecycle hooks — before/after events so the app can hook into the boot sequence
-- [ ] Add tests for `HyperKernel` (bootstrap sequence, directory accessors, terminate)
+- [x] Add tests for `HyperKernel` (bootstrap sequence, directory accessors, terminate)
 - [ ] Add tests for `Bootstrap\Environment` (.env loading, Environment service registration)
 - [ ] Add tests for `Bootstrap\Configuration` (config file loading from directory)
 - [ ] Add tests for `Bootstrap\Logger` (handler/channel creation from config)
