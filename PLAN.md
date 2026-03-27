@@ -138,7 +138,7 @@ Parchment is the filesystem abstraction layer. It delegates to Symfony Finder an
 
 ## New Package: Atlas
 
-Atlas is the routing package. It maps incoming HTTP requests to handlers using convention-based discovery, so users don't need to define routes manually. It enforces an opinionated CQRS split: GET requests are always Queries, all other mutating methods (PUT, POST, PATCH, DELETE) are always Commands.
+Atlas is the routing package. It maps inputs to Query and Command handlers using convention-based discovery, so users don't need to define routes manually. The core mapping — path segments to PascalCase namespaces, Query vs Command split — is transport-agnostic. HTTP is the first input source; CLI routing is a future input source that will reuse the same convention system. Atlas enforces an opinionated CQRS split: reads are always Queries, writes are always Commands.
 
 ### Convention System
 
@@ -173,7 +173,7 @@ PATCH  /checkout/submit-payment         → App\Checkout\Command\SubmitPayment  
 
 ### Router Interface
 
-- [ ] Define `Router` interface — takes a `ServerRequestInterface`, returns a matched route carrying: resolved DTO class, handler prefix (from HTTP method), extracted path parameters, and parsed response format
+- [ ] Define `Router` interface — takes an input source (e.g., `ServerRequestInterface` for HTTP), returns a matched `Route` carrying: resolved DTO class, handler prefix, extracted parameters, and parsed response format. The interface should not be coupled to HTTP — concrete implementations adapt specific input sources
 - [x] Define `Route` value object — holds the DTO class name, handler prefix, path parameters array, and response format string. Immutable with `withFormat()` and `withPathParameters()` methods. `isQuery()` and `isCommand()` derived from the DTO namespace.
 - [x] Add tests for `Route` value object
 
