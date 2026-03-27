@@ -31,7 +31,9 @@ Arcanum is a CQRS PHP framework (not MVC). It's a monorepo with packages under `
 - **Hyper** — PSR-7 HTTP messages and PSR-15 server handler.
 - **Glitch** — Error/exception/shutdown handling with reporter system.
 - **Quill** — Multi-channel PSR-3 logger over Monolog.
-- **Parchment** — File utilities (WIP).
+- **Atlas** — Convention-based CQRS router. Maps URL paths to Query/Command namespaces, extracts response format from file extensions.
+- **Shodo** — Output rendering. `JsonRenderer`, `JsonExceptionRenderer`, format registry (WIP).
+- **Parchment** — File utilities.
 - **Toolkit** — String utilities.
 
 ### Testing patterns

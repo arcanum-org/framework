@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Test\Routing;
+namespace Arcanum\Test\Atlas;
 
-use Arcanum\Routing\Route;
+use Arcanum\Atlas\Route;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 

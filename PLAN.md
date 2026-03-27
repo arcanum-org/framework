@@ -136,9 +136,9 @@ Parchment is the filesystem abstraction layer. It delegates to Symfony Finder an
 
 ---
 
-## New Package: Routing
+## New Package: Atlas
 
-The routing package maps incoming HTTP requests to handlers using convention-based discovery, so users don't need to define routes manually. It enforces an opinionated CQRS split: GET requests are always Queries, all other mutating methods (PUT, POST, PATCH, DELETE) are always Commands.
+Atlas is the routing package. It maps incoming HTTP requests to handlers using convention-based discovery, so users don't need to define routes manually. It enforces an opinionated CQRS split: GET requests are always Queries, all other mutating methods (PUT, POST, PATCH, DELETE) are always Commands.
 
 ### Convention System
 
@@ -377,5 +377,5 @@ The format registry maps file extensions to renderers and content types. It is t
 - [ ] Write `src/Ignition/README.md`
 - [ ] Write `src/Quill/README.md`
 - [x] Write `src/Parchment/README.md`
-- [ ] Write `src/Routing/README.md` (after package is built)
+- [ ] Write `src/Atlas/README.md` (after package is built)
 - [ ] Write `src/Shodo/README.md` (after package is built)

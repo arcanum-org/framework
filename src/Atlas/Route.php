@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Routing;
+namespace Arcanum\Atlas;
 
 final class Route
 {
