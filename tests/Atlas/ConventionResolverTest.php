@@ -329,18 +329,6 @@ final class ConventionResolverTest extends TestCase
         $this->assertSame('json', $route->format);
     }
 
-    public function testPathParametersArePassedThrough(): void
-    {
-        // Arrange
-        $resolver = new ConventionResolver();
-
-        // Act
-        $route = $resolver->resolve('/orders/details', 'GET', pathParameters: ['id' => '42']);
-
-        // Assert
-        $this->assertSame(['id' => '42'], $route->pathParameters);
-    }
-
     // ---------------------------------------------------------------
     // Edge cases
     // ---------------------------------------------------------------

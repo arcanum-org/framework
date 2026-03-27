@@ -175,7 +175,7 @@ PATCH  /checkout/submit-payment         → App\Checkout\Command\SubmitPayment  
 
 - [x] Define `Router` interface — takes an `object` input source, returns a `Route`. Transport-agnostic — concrete implementations adapt specific input sources (e.g., `HttpRouter` adapts `ServerRequestInterface`)
 - [x] Implement `HttpRouter` — adapts `ServerRequestInterface` for the `Router` interface. Extracts path and method from the request, parses file extension for format, delegates to `ConventionResolver`
-- [x] Define `Route` value object — holds the DTO class name, handler prefix, path parameters array, and response format string. Immutable with `withFormat()` and `withPathParameters()` methods. `isQuery()` and `isCommand()` derived from the DTO namespace.
+- [x] Define `Route` value object — holds the DTO class name, handler prefix, and response format string. Immutable with `withFormat()`. `isQuery()` and `isCommand()` derived from the DTO namespace.
 - [x] Add tests for `Route` value object
 
 ### Convention-Based Resolution
@@ -192,12 +192,6 @@ PATCH  /checkout/submit-payment         → App\Checkout\Command\SubmitPayment  
 - [x] Add tests for PUT → Command namespace insertion
 - [x] Add tests for POST/PATCH/DELETE → Command namespace insertion with handler prefix
 - [x] Add tests for configurable root namespace
-
-### Path Parameters
-
-- [ ] Add path parameter extraction — parse `{id}`, `{slug}`, etc. from URI segments and store on the matched `Route`
-- [ ] Add tests for single path parameter extraction
-- [ ] Add tests for multiple path parameters in one route
 
 ### Pages
 
@@ -269,10 +263,9 @@ These items bridge the gap between HTTP (Hyper) and command/query dispatch (Conv
 
 ### Request → DTO Mapping
 
-- [ ] Define a request deserializer interface — extracts path params, query params, and body from `ServerRequestInterface` into a keyed array
+- [ ] Define a request deserializer interface — extracts query params and body from `ServerRequestInterface` into a keyed array
 - [ ] Implement DTO hydrator — populates a command/query object's constructor or public properties from extracted request data
 - [ ] Add type coercion for scalar DTO properties — cast string request values to int, float, bool as needed by the DTO constructor
-- [ ] Add tests for path parameter injection into DTOs
 - [ ] Add tests for query parameter injection into DTOs
 - [ ] Add tests for request body injection into DTOs
 - [ ] Add tests for type coercion (string → int, string → bool, etc.)

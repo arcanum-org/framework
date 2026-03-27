@@ -29,13 +29,11 @@ final class ConventionResolver
      * @param string $path The URL path (e.g., '/catalog/products/featured').
      * @param string $method The HTTP method (e.g., 'GET', 'PUT', 'POST').
      * @param string $format The response format (e.g., 'json', 'html').
-     * @param array<string, string> $pathParameters Extracted path parameters.
      */
     public function resolve(
         string $path,
         string $method = 'GET',
         string $format = 'json',
-        array $pathParameters = [],
     ): Route {
         $method = strtoupper($method);
         $segments = $this->parseSegments($path);
@@ -50,7 +48,6 @@ final class ConventionResolver
         return new Route(
             dtoClass: $className,
             handlerPrefix: $handlerPrefix,
-            pathParameters: $pathParameters,
             format: $format,
         );
     }
