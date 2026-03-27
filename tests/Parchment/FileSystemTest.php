@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Arcanum\Test\Parchment;
 
 use Arcanum\Parchment\FileSystem;
+use Symfony\Component\Filesystem\Filesystem as SymfonyFilesystem;
+use Symfony\Component\Filesystem\Exception\IOException;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 
@@ -300,5 +302,81 @@ final class FileSystemTest extends TestCase
 
         // Assert
         $this->assertFalse($fs->isFile($this->tempDir));
+    }
+
+    // -----------------------------------------------------------
+    // IOException error paths
+    // -----------------------------------------------------------
+
+    public function testCopyThrowsRuntimeExceptionOnIOException(): void
+    {
+        // Arrange
+        $symfony = $this->createMock(SymfonyFilesystem::class);
+        $symfony->expects($this->once())
+            ->method('copy')
+            ->willThrowException(new IOException('copy failed'));
+
+        $fs = new FileSystem($symfony);
+
+        // Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Unable to copy '/a' to '/b'");
+
+        // Act
+        $fs->copy('/a', '/b');
+    }
+
+    public function testMoveThrowsRuntimeExceptionOnIOException(): void
+    {
+        // Arrange
+        $symfony = $this->createMock(SymfonyFilesystem::class);
+        $symfony->expects($this->once())
+            ->method('rename')
+            ->willThrowException(new IOException('rename failed'));
+
+        $fs = new FileSystem($symfony);
+
+        // Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Unable to move '/a' to '/b'");
+
+        // Act
+        $fs->move('/a', '/b');
+    }
+
+    public function testDeleteThrowsRuntimeExceptionOnIOException(): void
+    {
+        // Arrange
+        $symfony = $this->createMock(SymfonyFilesystem::class);
+        $symfony->expects($this->once())
+            ->method('remove')
+            ->willThrowException(new IOException('delete failed'));
+
+        $fs = new FileSystem($symfony);
+
+        // Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Unable to delete: /some/path');
+
+        // Act
+        $fs->delete('/some/path');
+    }
+
+    public function testMkdirThrowsRuntimeExceptionOnIOException(): void
+    {
+        // Arrange
+        $symfony = $this->createMock(SymfonyFilesystem::class);
+        $symfony->expects($this->once())
+            ->method('mkdir')
+            ->willThrowException(new IOException('mkdir failed'));
+
+        $fs = new FileSystem($symfony);
+
+        // Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Unable to create directory: /some/path');
+
+        // Act
+        $fs->mkdir('/some/path');
     }
 }

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Arcanum\Test\Parchment;
 
 use Arcanum\Parchment\Writer;
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Exception\IOException;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 
@@ -263,5 +265,45 @@ final class WriterTest extends TestCase
         $contents = file_get_contents($path);
         $this->assertIsString($contents);
         $this->assertStringEndsWith(\PHP_EOL, $contents);
+    }
+
+    // -----------------------------------------------------------
+    // IOException error paths
+    // -----------------------------------------------------------
+
+    public function testWriteThrowsRuntimeExceptionOnIOException(): void
+    {
+        // Arrange
+        $fs = $this->createMock(Filesystem::class);
+        $fs->expects($this->once())
+            ->method('dumpFile')
+            ->willThrowException(new IOException('disk full'));
+
+        $writer = new Writer($fs);
+
+        // Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Unable to write file: /some/path');
+
+        // Act
+        $writer->write('/some/path', 'content');
+    }
+
+    public function testAppendThrowsRuntimeExceptionOnIOException(): void
+    {
+        // Arrange
+        $fs = $this->createMock(Filesystem::class);
+        $fs->expects($this->once())
+            ->method('appendToFile')
+            ->willThrowException(new IOException('permission denied'));
+
+        $writer = new Writer($fs);
+
+        // Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Unable to append to file: /some/path');
+
+        // Act
+        $writer->append('/some/path', 'content');
     }
 }

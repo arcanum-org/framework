@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Arcanum\Test\Parchment;
 
 use Arcanum\Parchment\TempFile;
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Exception\IOException;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 
@@ -132,5 +134,81 @@ final class TempFileTest extends TestCase
 
         // Assert
         $this->assertStringStartsWith($sysTmp, realpath($temp->path()) ?: $temp->path());
+    }
+
+    // -----------------------------------------------------------
+    // IOException error paths
+    // -----------------------------------------------------------
+
+    public function testConstructorThrowsRuntimeExceptionOnIOException(): void
+    {
+        // Arrange
+        $fs = $this->createMock(Filesystem::class);
+        $fs->expects($this->once())
+            ->method('tempnam')
+            ->willThrowException(new IOException('tempnam failed'));
+
+        // Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Unable to create temporary file');
+
+        // Act
+        new TempFile(filesystem: $fs);
+    }
+
+    public function testWriteThrowsRuntimeExceptionOnIOException(): void
+    {
+        // Arrange
+        $fs = $this->createMock(Filesystem::class);
+        $fs->method('tempnam')->willReturn('/tmp/fake_temp_file');
+        $fs->expects($this->once())
+            ->method('dumpFile')
+            ->willThrowException(new IOException('write failed'));
+
+        $temp = new TempFile(filesystem: $fs);
+
+        // Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Unable to write to temporary file');
+
+        // Act
+        $temp->write('content');
+    }
+
+    public function testReadThrowsRuntimeExceptionOnIOException(): void
+    {
+        // Arrange
+        $fs = $this->createMock(Filesystem::class);
+        $fs->method('tempnam')->willReturn('/tmp/fake_temp_file');
+        $fs->expects($this->once())
+            ->method('readFile')
+            ->willThrowException(new IOException('read failed'));
+
+        $temp = new TempFile(filesystem: $fs);
+
+        // Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Unable to read temporary file');
+
+        // Act
+        $temp->read();
+    }
+
+    public function testDeleteSilentlyCatchesIOException(): void
+    {
+        // Arrange
+        $fs = $this->createMock(Filesystem::class);
+        $fs->method('tempnam')->willReturn('/tmp/fake_temp_file');
+        $fs->expects($this->once())
+            ->method('remove')
+            ->willThrowException(new IOException('remove failed'));
+
+        $temp = new TempFile(filesystem: $fs);
+
+        // Act — should not throw
+        $temp->delete();
+
+        // Assert — delete marked as done despite IOException
+        $this->addToAssertionCount(1);
     }
 }

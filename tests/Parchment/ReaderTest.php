@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Arcanum\Test\Parchment;
 
 use Arcanum\Parchment\Reader;
+use Arcanum\Glitch\SafeCall;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(Reader::class)]
+#[UsesClass(SafeCall::class)]
 final class ReaderTest extends TestCase
 {
     private string $tempDir;
