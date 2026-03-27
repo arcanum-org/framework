@@ -73,41 +73,16 @@ Parchment is the filesystem abstraction layer. It delegates to Symfony Finder an
 
 ---
 
-## New Package: CQRS
-
-The CQRS package provides the high-level Command/Query separation pattern, built on top of Flow's Conveyor (MiddlewareBus) for dispatch and handler resolution.
-
-### Commands (write operations)
-
-- [ ] Define `Command` interface or base class — marks an object as a command (state mutation)
-- [ ] Define `CommandHandler` interface — handles a command, returns void or result
-- [ ] Define `CommandBus` — wraps MiddlewareBus, dispatches commands to handlers by convention (`PlaceOrder` → `PlaceOrderHandler`)
-- [ ] Add default validation middleware for commands (e.g., FinalFilter, ReadOnlyPropertyFilter from Conveyor)
-- [ ] Add tests for full command dispatch lifecycle
-
-### Queries (read operations)
-
-- [ ] Define `Query` interface or base class — marks an object as a query (read-only)
-- [ ] Define `QueryHandler` interface — handles a query, returns a result
-- [ ] Define `QueryBus` — wraps MiddlewareBus, dispatches queries to handlers by convention
-- [ ] Add tests for full query dispatch lifecycle
-
-### Integration
-
-- [ ] Add CQRS bootstrapper for Ignition — auto-registers CommandBus and QueryBus in the container
-
----
-
 ## New Package: Routing
 
-The routing package maps incoming HTTP requests to Command/Query objects using convention-based discovery, so users don't need to define routes manually.
+The routing package maps incoming HTTP requests to handlers using convention-based discovery, so users don't need to define routes manually.
 
-- [ ] Define `Router` interface — takes a ServerRequest, returns a Command or Query object
-- [ ] Implement convention-based route resolution — map HTTP method + path to Command/Query classes (e.g., `POST /orders` → `PlaceOrderCommand`, `GET /orders/{id}` → `GetOrderQuery`)
-- [ ] Add path parameter extraction — parse `{id}`, `{slug}`, etc. from URI and inject into Command/Query constructor
+- [ ] Define `Router` interface — takes a ServerRequest, returns a matched route with handler
+- [ ] Implement convention-based route resolution — map HTTP method + path to handler classes (e.g., `POST /orders` → `PlaceOrderHandler`, `GET /orders/{id}` → `GetOrderHandler`)
+- [ ] Add path parameter extraction — parse `{id}`, `{slug}`, etc. from URI and inject into handler constructor
 - [ ] Add route registration for manual overrides — allow explicit route→handler mappings when conventions don't fit
 - [ ] Add middleware support — integrate with Flow's Continuum for per-route or global HTTP middleware
-- [ ] Add routing bootstrapper for Ignition — auto-discovers Command/Query classes and registers routes
+- [ ] Add routing bootstrapper for Ignition — auto-discovers handler classes and registers routes
 - [ ] Add tests for convention-based routing
 - [ ] Add tests for path parameter extraction
 - [ ] Add tests for manual route registration
@@ -138,6 +113,5 @@ Shodo (書道, "the way of writing") is the output rendering package. It convert
 - [ ] Write `src/Ignition/README.md`
 - [ ] Write `src/Quill/README.md`
 - [x] Write `src/Parchment/README.md`
-- [ ] Write `src/CQRS/README.md` (after package is built)
 - [ ] Write `src/Routing/README.md` (after package is built)
 - [ ] Write `src/Shodo/README.md` (after package is built)
