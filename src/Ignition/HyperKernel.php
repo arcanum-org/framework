@@ -22,6 +22,14 @@ class HyperKernel implements Kernel, RequestHandlerInterface
     private bool $isBootstrapped = false;
 
     /**
+     * Environment variables that must be set for the application to run.
+     * Override this in your app's Kernel to enforce required env vars.
+     *
+     * @var string[]
+     */
+    protected array $requiredEnvironmentVariables = [];
+
+    /**
      * The bootstrappers to run before handling a request.
      *
      * @var class-string<Bootstrapper>[]
@@ -48,6 +56,16 @@ class HyperKernel implements Kernel, RequestHandlerInterface
         if ($filesDirectory === '') {
             $this->filesDirectory = $rootDirectory . DIRECTORY_SEPARATOR . 'files';
         }
+    }
+
+    /**
+     * Get the list of required environment variables.
+     *
+     * @return string[]
+     */
+    public function requiredEnvironmentVariables(): array
+    {
+        return $this->requiredEnvironmentVariables;
     }
 
     /**
