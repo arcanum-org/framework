@@ -8,6 +8,13 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 
 - [x] Fix `Headers::cleanValues()` rejecting `'0'` as a header value — PHP's `empty('0')` returns true, so `Content-Length: 0` is rejected. Replace `empty()` with a strict check.
 - [x] Fix `Response::withoutHeader()` mutating the original object — it should return an immutable copy per PSR-7. This also breaks `Server::sendSetCookieHeaders()`.
+- [ ] Fix `EmptyStream::getMetadata($key)` returning `null` for any key — the no-arg path returns a metadata array with values, but passing a key always returns `null` instead of looking up the key in that array
+- [ ] Fix `PrimitiveResolver` calling `implode(",", $type->getTypes())` on `ReflectionType` objects — should map to `getName()` first: `implode(",", array_map(fn($t) => $t->getName(), $type->getTypes()))`
+- [ ] Fix `StandardProcessor` using loose `!$payload` check — should be `$payload === null` to avoid false positives on valid falsy objects
+- [ ] Fix `RegistryTest::assertGetSetViaArrayAccess()` method name — missing `test` prefix so PHPUnit never runs it, leaving `Registry` array access silently untested
+- [ ] Fix `ProviderRegistry` interface accepting only `Provider` while `Container::provider()` accepts `string|Provider` — update the interface to match the implementation
+- [ ] Fix typo `testSimnpleProvider` → `testSimpleProvider` in `SimpleProviderTest`
+- [ ] Fix typo `testSimnpleProvider` → `testSimpleProvider` in `PrototypeProviderTest`
 
 ---
 
@@ -51,6 +58,46 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 
 ---
 
+## Cabinet
+
+- [ ] Add test for `Container::specify()` with array `when` parameter — only the string form is tested, the `string|array` union's array path has no coverage
+- [ ] Add test for `Container` default constructor — no test creates a Container with `null` parameters to verify default `Resolver::forContainer`, `ContinuationCollection`, and `PipelayerSystem` initialization
+
+---
+
+## Codex
+
+- [ ] Add test for `Resolver::resolve()` with callable that returns non-object — currently only valid closures are tested, no test for callable returning a primitive or null
+- [ ] Add test for `Resolver::resolveWith()` with variadic constructor parameters — `resolveWith()` doesn't handle variadics like `resolveParameters()` does
+
+---
+
+## Echo
+
+- [ ] Add test for listener that throws a non-`Interrupted` exception during dispatch — verify it propagates to the caller
+- [ ] Add test for `Interrupted` exception during dispatch — verify the event is returned and propagation stops gracefully
+- [ ] Add test for event mutation propagation through listener chain — verify listener 2 sees modifications made by listener 1
+
+---
+
+## Flow
+
+- [ ] Add test for `EmptyStream::getMetadata($key)` — verify it returns the correct value for valid metadata keys (currently always returns `null`)
+- [ ] Add test for `Stream::read(0)` edge case — verify reading zero bytes returns empty string
+- [ ] Add test for `CachingStream::seek()` with `SEEK_END` on an unseekable remote stream
+- [ ] Add test for `MiddlewareBus::dispatch()` when handler class is not found in container — verify exception behavior
+
+---
+
+## Gather
+
+- [ ] Add tests for `Configuration::asAlpha()`, `asAlnum()`, `asDigits()` with dot-notation keys
+- [ ] Add tests for `IgnoreCaseRegistry::asAlpha()`, `asAlnum()`, `asDigits()` — verify case-insensitive coercion
+- [ ] Add tests for `Environment` inherited methods (`get()`, `has()`, `set()`, `count()`) — verify they work alongside the security overrides
+- [ ] Add test for `Configuration::set()` where an intermediate path value is a scalar, not an array — verify scalar is overwritten with nested structure
+
+---
+
 ## Quill
 
 - [ ] Review PSR-3 compliance and confirm complete — if gaps exist, address them
@@ -87,6 +134,58 @@ The routing package maps incoming HTTP requests to handlers using convention-bas
 - [ ] Add tests for path parameter extraction
 - [ ] Add tests for manual route registration
 - [ ] Add tests for middleware integration
+
+---
+
+## CQRS Integration
+
+These items bridge the gap between HTTP (Hyper) and command/query dispatch (Conveyor), completing the end-to-end CQRS request lifecycle.
+
+### HTTP Middleware Pipeline
+
+- [ ] Add global HTTP middleware stack to `HyperKernel` — a Continuum pipeline that processes every request before routing (for CORS, auth, content negotiation, etc.)
+- [ ] Add configuration for global middleware registration — allow apps to declare ordered middleware in config or bootstrap
+- [ ] Add tests for global middleware execution order
+- [ ] Add tests for middleware short-circuiting (returning a response without hitting the router)
+
+### Request → DTO Mapping
+
+- [ ] Define a request deserializer interface — extracts path params, query params, and body from `ServerRequestInterface` into a keyed array
+- [ ] Implement DTO hydrator — populates a command/query object's constructor or public properties from extracted request data
+- [ ] Add type coercion for scalar DTO properties — cast string request values to int, float, bool as needed by the DTO constructor
+- [ ] Add tests for path parameter injection into DTOs
+- [ ] Add tests for query parameter injection into DTOs
+- [ ] Add tests for request body injection into DTOs
+- [ ] Add tests for type coercion (string → int, string → bool, etc.)
+
+### Response Serialization
+
+- [ ] Define a response serializer interface — converts a handler's return DTO into a `ResponseInterface`
+- [ ] Implement JSON response serializer using Shodo's `JsonRenderer` — wraps handler output in a JSON response with appropriate status code and headers
+- [ ] Add status code resolution — map handler results to HTTP status codes (e.g., created resource → 201, null result → 204)
+- [ ] Add tests for DTO → JSON response conversion
+- [ ] Add tests for status code resolution from handler results
+- [ ] Add tests for empty/null handler results
+
+### Handler Discovery
+
+- [ ] Add handler auto-discovery — scan a configured namespace/directory for handler classes and register them in the Container
+- [ ] Add handler registration in bootstrap — wire discovered handlers into the Container so Conveyor can resolve them
+- [ ] Add tests for handler discovery from a namespace
+- [ ] Add tests for handler resolution through Container → Conveyor pipeline
+
+---
+
+## Starter Project
+
+Track updates to the starter app (`../arcanum/`) as framework features land.
+
+- [ ] Update `bootstrap/http.php` to register `MiddlewareBus` (Conveyor) in the Container
+- [ ] Update `bootstrap/http.php` to register the Router in the Container
+- [ ] Update `App\HTTP\Kernel::handleRequest()` to dispatch requests through the Router → Conveyor pipeline instead of throwing 404
+- [ ] Add example command handler (e.g., `GET /health` → `HealthCheckHandler`) to demonstrate the full CQRS lifecycle
+- [ ] Add route configuration or handler directory convention to the starter
+- [ ] Update `config/` with any new configuration files needed by routing or middleware
 
 ---
 
