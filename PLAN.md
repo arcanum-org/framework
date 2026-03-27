@@ -173,7 +173,8 @@ PATCH  /checkout/submit-payment         → App\Checkout\Command\SubmitPayment  
 
 ### Router Interface
 
-- [ ] Define `Router` interface — takes an input source (e.g., `ServerRequestInterface` for HTTP), returns a matched `Route` carrying: resolved DTO class, handler prefix, extracted parameters, and parsed response format. The interface should not be coupled to HTTP — concrete implementations adapt specific input sources
+- [x] Define `Router` interface — takes an `object` input source, returns a `Route`. Transport-agnostic — concrete implementations adapt specific input sources (e.g., `HttpRouter` adapts `ServerRequestInterface`)
+- [x] Implement `HttpRouter` — adapts `ServerRequestInterface` for the `Router` interface. Extracts path and method from the request, parses file extension for format, delegates to `ConventionResolver`
 - [x] Define `Route` value object — holds the DTO class name, handler prefix, path parameters array, and response format string. Immutable with `withFormat()` and `withPathParameters()` methods. `isQuery()` and `isCommand()` derived from the DTO namespace.
 - [x] Add tests for `Route` value object
 
@@ -234,12 +235,12 @@ GET /docs/getting-started    → App\Pages\Docs\GettingStarted + GettingStartedH
 
 The router strips file extensions from the URI path before matching, so `/shop/new-products.json`, `/shop/new-products.html`, and `/shop/new-products.csv` all resolve to the same Query handler. The extension is extracted and stored as the requested response format on the matched `Route`. After the handler returns data, the format determines which Shodo renderer produces the `ResponseInterface`.
 
-- [ ] Add extension parsing to route resolution — strip `.json`, `.html`, `.csv`, etc. from the URI path before matching, store the extracted format on the `Route`
-- [ ] Default to a configurable fallback format when no extension is present (e.g., `json` for convention routes, `html` for Pages)
-- [ ] Add tests for extension stripping during route matching — verify the same handler is resolved regardless of extension
-- [ ] Add tests for format extraction — verify the parsed format is available on the `Route`
-- [ ] Add tests for missing extension — verify fallback format is applied
-- [ ] Add tests for unknown/unregistered extension — verify appropriate error (e.g., 406 Not Acceptable)
+- [x] Add extension parsing to route resolution — `HttpRouter::parseExtension()` strips `.json`, `.html`, `.csv`, etc. from the URI path before matching, stores the extracted format on the `Route`
+- [x] Default to a configurable fallback format when no extension is present — `HttpRouter` constructor accepts `defaultFormat` (default `json`, overridable e.g., to `html` for Pages)
+- [x] Add tests for extension stripping during route matching — verify the same handler is resolved regardless of extension
+- [x] Add tests for format extraction — verify the parsed format is available on the `Route`
+- [x] Add tests for missing extension — verify fallback format is applied
+- [ ] Add tests for unknown/unregistered extension — verify appropriate error (e.g., 406 Not Acceptable). Requires FormatRegistry integration — currently any extension is accepted
 
 ### OPTIONS Handling
 
