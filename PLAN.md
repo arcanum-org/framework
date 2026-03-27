@@ -174,8 +174,8 @@ PATCH  /checkout/submit-payment         → App\Checkout\Command\SubmitPayment  
 ### Router Interface
 
 - [ ] Define `Router` interface — takes a `ServerRequestInterface`, returns a matched route carrying: resolved DTO class, handler prefix (from HTTP method), extracted path parameters, and parsed response format
-- [ ] Define `Route` value object — holds the DTO class name, handler prefix, path parameters array, and response format string
-- [ ] Add tests for `Route` value object
+- [x] Define `Route` value object — holds the DTO class name, handler prefix, path parameters array, and response format string. Immutable with `withFormat()` and `withPathParameters()` methods. `isQuery()` and `isCommand()` derived from the DTO namespace.
+- [x] Add tests for `Route` value object
 
 ### Convention-Based Resolution
 
