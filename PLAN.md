@@ -179,17 +179,18 @@ PATCH  /checkout/submit-payment         → App\Checkout\Command\SubmitPayment  
 
 ### Convention-Based Resolution
 
-- [ ] Implement URL-to-namespace mapping — convert kebab-case path segments to PascalCase, last segment becomes class name, preceding segments become namespace levels
-- [ ] Add configurable root namespace — default `App`, set via config (follows Composer autoloader convention)
-- [ ] Add HTTP method → namespace insertion — GET inserts `Query\`, PUT/POST/PATCH/DELETE insert `Command\`
-- [ ] Add HTTP method → handler prefix mapping — POST→`Post`, PATCH→`Patch`, DELETE→`Delete`, PUT/GET→empty string
-- [ ] Add tests for kebab-case to PascalCase conversion
-- [ ] Add tests for single-segment paths (e.g., `GET /dashboard` → `App\Query\Dashboard`)
-- [ ] Add tests for multi-segment paths (e.g., `GET /catalog/products/featured` → `App\Catalog\Query\Products\Featured`)
-- [ ] Add tests for GET → Query namespace insertion
-- [ ] Add tests for PUT → Command namespace insertion
-- [ ] Add tests for POST/PATCH/DELETE → Command namespace insertion with handler prefix
-- [ ] Add tests for configurable root namespace
+- [x] Implement URL-to-namespace mapping via `ConventionResolver` — convert kebab-case path segments to PascalCase (uses Toolkit's `Strings::pascal()`), last segment becomes class name, preceding segments become namespace levels
+- [x] Add configurable root namespace — default `App`, set via constructor (follows Composer autoloader convention)
+- [x] Add HTTP method → namespace insertion — GET inserts `Query\`, PUT/POST/PATCH/DELETE insert `Command\`
+- [x] Add HTTP method → handler prefix mapping — POST→`Post`, PATCH→`Patch`, DELETE→`Delete`, PUT/GET→empty string
+- [x] Add `UnresolvableRoute` exception — thrown when path resolves to empty segments (e.g., `/`)
+- [x] Add tests for kebab-case to PascalCase conversion
+- [x] Add tests for single-segment paths (e.g., `GET /dashboard` → `App\Query\Dashboard`)
+- [x] Add tests for multi-segment paths (e.g., `GET /catalog/products/featured` → `App\Catalog\Query\Products\Featured`)
+- [x] Add tests for GET → Query namespace insertion
+- [x] Add tests for PUT → Command namespace insertion
+- [x] Add tests for POST/PATCH/DELETE → Command namespace insertion with handler prefix
+- [x] Add tests for configurable root namespace
 
 ### Path Parameters
 
