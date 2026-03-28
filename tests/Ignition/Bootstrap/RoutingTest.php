@@ -321,14 +321,18 @@ final class RoutingTest extends TestCase
 
     public function testDefaultFormatFromConfig(): void
     {
-        // Arrange
+        // Arrange — use Arcanum\Test\Fixture namespace so the DTO class exists
         $formats = [
             'default' => 'txt',
             'formats' => [
                 'txt' => ['content_type' => 'text/plain', 'renderer' => 'App\\Shodo\\PlainTextRenderer'],
             ],
         ];
-        $container = $this->buildContainer($this->defaultApp(), ['pages' => []], $formats);
+        $app = [
+            'namespace' => 'Arcanum\\Test\\Fixture',
+            'pages_namespace' => 'Arcanum\\Test\\Fixture\\Pages',
+        ];
+        $container = $this->buildContainer($app, ['pages' => []], $formats);
         $bootstrapper = new Routing();
 
         // Act

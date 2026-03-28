@@ -6,10 +6,13 @@ namespace Arcanum\Test\Atlas;
 
 use Arcanum\Atlas\ConventionResolver;
 use Arcanum\Atlas\HttpRouter;
+use Arcanum\Atlas\MethodNotAllowed;
 use Arcanum\Atlas\PageResolver;
 use Arcanum\Atlas\Route;
 use Arcanum\Atlas\Router;
 use Arcanum\Atlas\UnresolvableRoute;
+use Arcanum\Glitch\HttpException;
+use Arcanum\Hyper\StatusCode;
 use Arcanum\Toolkit\Strings;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -19,8 +22,11 @@ use Psr\Http\Message\UriInterface;
 
 #[CoversClass(HttpRouter::class)]
 #[UsesClass(ConventionResolver::class)]
+#[UsesClass(HttpException::class)]
+#[UsesClass(MethodNotAllowed::class)]
 #[UsesClass(PageResolver::class)]
 #[UsesClass(Route::class)]
+#[UsesClass(StatusCode::class)]
 #[UsesClass(Strings::class)]
 #[UsesClass(UnresolvableRoute::class)]
 final class HttpRouterTest extends TestCase
@@ -44,7 +50,7 @@ final class HttpRouterTest extends TestCase
     public function testResolvesGetRequestToQuery(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('GET', '/shop/new-products');
 
         // Act
@@ -59,7 +65,7 @@ final class HttpRouterTest extends TestCase
     public function testResolvesPutRequestToCommand(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('PUT', '/checkout/submit-payment');
 
         // Act
@@ -74,7 +80,7 @@ final class HttpRouterTest extends TestCase
     public function testResolvesPostRequestWithPrefix(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('POST', '/checkout/submit-payment');
 
         // Act
@@ -88,7 +94,7 @@ final class HttpRouterTest extends TestCase
     public function testResolvesDeleteRequestWithPrefix(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('DELETE', '/orders/cancel');
 
         // Act
@@ -102,7 +108,7 @@ final class HttpRouterTest extends TestCase
     public function testResolvesPatchRequestWithPrefix(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('PATCH', '/orders/update-address');
 
         // Act
@@ -120,7 +126,7 @@ final class HttpRouterTest extends TestCase
     public function testJsonExtensionStrippedAndFormatSet(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('GET', '/shop/new-products.json');
 
         // Act
@@ -134,7 +140,7 @@ final class HttpRouterTest extends TestCase
     public function testHtmlExtensionStrippedAndFormatSet(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('GET', '/shop/new-products.html');
 
         // Act
@@ -148,7 +154,7 @@ final class HttpRouterTest extends TestCase
     public function testCsvExtensionStrippedAndFormatSet(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('GET', '/shop/new-products.csv');
 
         // Act
@@ -162,7 +168,7 @@ final class HttpRouterTest extends TestCase
     public function testSameHandlerResolvedRegardlessOfExtension(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
 
         // Act
         $json = $router->resolve($this->stubRequest('GET', '/shop/new-products.json'));
@@ -183,7 +189,7 @@ final class HttpRouterTest extends TestCase
     public function testFormatIsAvailableOnRoute(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('GET', '/catalog/products.csv');
 
         // Act
@@ -196,7 +202,7 @@ final class HttpRouterTest extends TestCase
     public function testExtensionIsLowercased(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('GET', '/shop/products.JSON');
 
         // Act
@@ -213,7 +219,7 @@ final class HttpRouterTest extends TestCase
     public function testMissingExtensionUsesDefaultFormat(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('GET', '/shop/products');
 
         // Act
@@ -226,7 +232,7 @@ final class HttpRouterTest extends TestCase
     public function testDefaultFormatIsConfigurable(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver(), defaultFormat: 'html');
+        $router = new HttpRouter(new ConventionResolver(), defaultFormat: 'html', validateClasses: false);
         $request = $this->stubRequest('GET', '/shop/products');
 
         // Act
@@ -239,7 +245,7 @@ final class HttpRouterTest extends TestCase
     public function testConfiguredDefaultDoesNotOverrideExplicitExtension(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver(), defaultFormat: 'html');
+        $router = new HttpRouter(new ConventionResolver(), defaultFormat: 'html', validateClasses: false);
         $request = $this->stubRequest('GET', '/shop/products.csv');
 
         // Act
@@ -256,7 +262,7 @@ final class HttpRouterTest extends TestCase
     public function testPathWithTrailingSlashAndNoExtension(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('GET', '/shop/products/');
 
         // Act
@@ -270,7 +276,7 @@ final class HttpRouterTest extends TestCase
     public function testExtensionOnlyAppliedToLastSegment(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('GET', '/my.store/products.html');
 
         // Act
@@ -285,7 +291,7 @@ final class HttpRouterTest extends TestCase
     public function testDotfileSegmentIsNotTreatedAsExtension(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('GET', '/shop/.hidden');
 
         // Act
@@ -302,7 +308,7 @@ final class HttpRouterTest extends TestCase
     public function testNonServerRequestThrowsUnresolvableRoute(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
 
         // Act & Assert
         $this->expectException(UnresolvableRoute::class);
@@ -317,7 +323,7 @@ final class HttpRouterTest extends TestCase
     public function testRootPathThrowsUnresolvableRoute(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('GET', '/');
 
         // Act & Assert
@@ -332,7 +338,7 @@ final class HttpRouterTest extends TestCase
     public function testPlanExampleGetCatalogFeaturedJson(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('GET', '/catalog/products/featured.json');
 
         // Act
@@ -347,7 +353,7 @@ final class HttpRouterTest extends TestCase
     public function testPlanExamplePutCheckoutSubmitPayment(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('PUT', '/checkout/submit-payment');
 
         // Act
@@ -361,7 +367,7 @@ final class HttpRouterTest extends TestCase
     public function testPlanExampleDeleteCheckoutSubmitPayment(): void
     {
         // Arrange
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('DELETE', '/checkout/submit-payment');
 
         // Act
@@ -381,7 +387,7 @@ final class HttpRouterTest extends TestCase
         // Arrange
         $pages = new PageResolver();
         $pages->register('/');
-        $router = new HttpRouter(new ConventionResolver(), $pages);
+        $router = new HttpRouter(new ConventionResolver(), $pages, validateClasses: false);
         $request = $this->stubRequest('GET', '/');
 
         // Act
@@ -398,7 +404,7 @@ final class HttpRouterTest extends TestCase
         // to App\Pages\Thing, not App\Query\Thing
         $pages = new PageResolver();
         $pages->register('/thing');
-        $router = new HttpRouter(new ConventionResolver(), $pages);
+        $router = new HttpRouter(new ConventionResolver(), $pages, validateClasses: false);
         $request = $this->stubRequest('GET', '/thing');
 
         // Act
@@ -413,7 +419,7 @@ final class HttpRouterTest extends TestCase
         // Arrange
         $pages = new PageResolver();
         $pages->register('/thing');
-        $router = new HttpRouter(new ConventionResolver(), $pages);
+        $router = new HttpRouter(new ConventionResolver(), $pages, validateClasses: false);
         $request = $this->stubRequest('GET', '/thing.json');
 
         // Act
@@ -429,7 +435,7 @@ final class HttpRouterTest extends TestCase
         // Arrange
         $pages = new PageResolver();
         $pages->register('/thing');
-        $router = new HttpRouter(new ConventionResolver(), $pages);
+        $router = new HttpRouter(new ConventionResolver(), $pages, validateClasses: false);
         $request = $this->stubRequest('GET', '/thing');
 
         // Act
@@ -444,7 +450,7 @@ final class HttpRouterTest extends TestCase
         // Arrange — '/shop/products' is not a page, so convention routing kicks in
         $pages = new PageResolver();
         $pages->register('/');
-        $router = new HttpRouter(new ConventionResolver(), $pages);
+        $router = new HttpRouter(new ConventionResolver(), $pages, validateClasses: false);
         $request = $this->stubRequest('GET', '/shop/products');
 
         // Act
@@ -457,7 +463,7 @@ final class HttpRouterTest extends TestCase
     public function testRootPathWithoutPagesThrowsUnresolvableRoute(): void
     {
         // Arrange — no pages registered, root path has no convention mapping
-        $router = new HttpRouter(new ConventionResolver());
+        $router = new HttpRouter(new ConventionResolver(), validateClasses: false);
         $request = $this->stubRequest('GET', '/');
 
         // Act & Assert
@@ -470,7 +476,7 @@ final class HttpRouterTest extends TestCase
         // Arrange
         $pages = new PageResolver();
         $pages->register('/docs/getting-started');
-        $router = new HttpRouter(new ConventionResolver(), $pages);
+        $router = new HttpRouter(new ConventionResolver(), $pages, validateClasses: false);
         $request = $this->stubRequest('GET', '/docs/getting-started');
 
         // Act
@@ -478,5 +484,215 @@ final class HttpRouterTest extends TestCase
 
         // Assert
         $this->assertSame('App\\Pages\\Docs\\GettingStarted', $route->dtoClass);
+    }
+
+    // ---------------------------------------------------------------
+    // HTTP method enforcement — pages are GET-only
+    // ---------------------------------------------------------------
+
+    public function testPostToPageThrowsMethodNotAllowed(): void
+    {
+        // Arrange
+        $pages = new PageResolver(namespace: 'Arcanum\\Test\\Fixture\\Pages');
+        $pages->register('/');
+        $router = new HttpRouter(new ConventionResolver('Arcanum\\Test\\Fixture'), $pages);
+        $request = $this->stubRequest('POST', '/');
+
+        // Act & Assert
+        $this->expectException(MethodNotAllowed::class);
+        $router->resolve($request);
+    }
+
+    public function testPutToPageThrowsMethodNotAllowed(): void
+    {
+        // Arrange
+        $pages = new PageResolver(namespace: 'Arcanum\\Test\\Fixture\\Pages');
+        $pages->register('/');
+        $router = new HttpRouter(new ConventionResolver('Arcanum\\Test\\Fixture'), $pages);
+        $request = $this->stubRequest('PUT', '/');
+
+        // Act & Assert
+        $this->expectException(MethodNotAllowed::class);
+        $router->resolve($request);
+    }
+
+    public function testDeleteToPageThrowsMethodNotAllowed(): void
+    {
+        // Arrange
+        $pages = new PageResolver(namespace: 'Arcanum\\Test\\Fixture\\Pages');
+        $pages->register('/');
+        $router = new HttpRouter(new ConventionResolver('Arcanum\\Test\\Fixture'), $pages);
+        $request = $this->stubRequest('DELETE', '/');
+
+        // Act & Assert
+        $this->expectException(MethodNotAllowed::class);
+        $router->resolve($request);
+    }
+
+    public function testPageMethodNotAllowedListsGetAsAllowed(): void
+    {
+        // Arrange
+        $pages = new PageResolver(namespace: 'Arcanum\\Test\\Fixture\\Pages');
+        $pages->register('/');
+        $router = new HttpRouter(new ConventionResolver('Arcanum\\Test\\Fixture'), $pages);
+        $request = $this->stubRequest('POST', '/');
+
+        // Act
+        try {
+            $router->resolve($request);
+            $this->fail('Expected MethodNotAllowed exception');
+        } catch (MethodNotAllowed $e) {
+            // Assert
+            $this->assertSame(['GET'], $e->getAllowedMethods());
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // HTTP method enforcement — convention routes
+    // ---------------------------------------------------------------
+
+    public function testGetToCommandOnlyPathThrowsMethodNotAllowed(): void
+    {
+        // Arrange — Contact\Command\Submit exists, Contact\Query\Submit does not
+        $router = new HttpRouter(new ConventionResolver('Arcanum\\Test\\Fixture'));
+        $request = $this->stubRequest('GET', '/contact/submit');
+
+        // Act & Assert
+        $this->expectException(MethodNotAllowed::class);
+        $router->resolve($request);
+    }
+
+    public function testGetToCommandOnlyPathListsCommandMethodsAsAllowed(): void
+    {
+        // Arrange
+        $router = new HttpRouter(new ConventionResolver('Arcanum\\Test\\Fixture'));
+        $request = $this->stubRequest('GET', '/contact/submit');
+
+        // Act
+        try {
+            $router->resolve($request);
+            $this->fail('Expected MethodNotAllowed exception');
+        } catch (MethodNotAllowed $e) {
+            // Assert
+            $this->assertSame(['PUT', 'POST', 'PATCH', 'DELETE'], $e->getAllowedMethods());
+        }
+    }
+
+    public function testGetToPathWithBothQueryAndCommandResolvesQuery(): void
+    {
+        // Arrange — Shop\Query\Products and Shop\Command\Products both exist
+        $router = new HttpRouter(new ConventionResolver('Arcanum\\Test\\Fixture'));
+        $request = $this->stubRequest('GET', '/shop/products');
+
+        // Act
+        $route = $router->resolve($request);
+
+        // Assert
+        $this->assertSame('Arcanum\\Test\\Fixture\\Shop\\Query\\Products', $route->dtoClass);
+        $this->assertTrue($route->isQuery());
+    }
+
+    public function testPutToPathWithBothQueryAndCommandResolvesCommand(): void
+    {
+        // Arrange — Shop\Query\Products and Shop\Command\Products both exist
+        $router = new HttpRouter(new ConventionResolver('Arcanum\\Test\\Fixture'));
+        $request = $this->stubRequest('PUT', '/shop/products');
+
+        // Act
+        $route = $router->resolve($request);
+
+        // Assert
+        $this->assertSame('Arcanum\\Test\\Fixture\\Shop\\Command\\Products', $route->dtoClass);
+        $this->assertTrue($route->isCommand());
+    }
+
+    // ---------------------------------------------------------------
+    // 404 — neither Query nor Command class exists
+    // ---------------------------------------------------------------
+
+    public function testNonExistentPathThrows404(): void
+    {
+        // Arrange — no fixtures exist for /nowhere/nothing
+        $router = new HttpRouter(new ConventionResolver('Arcanum\\Test\\Fixture'));
+        $request = $this->stubRequest('GET', '/nowhere/nothing');
+
+        // Act & Assert
+        $this->expectException(HttpException::class);
+        $router->resolve($request);
+    }
+
+    public function testNonExistentPathThrowsNotFoundStatusCode(): void
+    {
+        // Arrange
+        $router = new HttpRouter(new ConventionResolver('Arcanum\\Test\\Fixture'));
+        $request = $this->stubRequest('GET', '/nowhere/nothing');
+
+        // Act
+        try {
+            $router->resolve($request);
+            $this->fail('Expected HttpException');
+        } catch (HttpException $e) {
+            // Assert
+            $this->assertSame(StatusCode::NotFound, $e->getStatusCode());
+        }
+    }
+
+    public function testNonExistentPathWithCommandMethodThrows404(): void
+    {
+        // Arrange — no fixtures for /nowhere/nothing in either namespace
+        $router = new HttpRouter(new ConventionResolver('Arcanum\\Test\\Fixture'));
+        $request = $this->stubRequest('PUT', '/nowhere/nothing');
+
+        // Act
+        try {
+            $router->resolve($request);
+            $this->fail('Expected HttpException');
+        } catch (HttpException $e) {
+            // Assert
+            $this->assertSame(StatusCode::NotFound, $e->getStatusCode());
+        }
+    }
+
+    public function testPutToQueryOnlyPathThrowsMethodNotAllowed(): void
+    {
+        // Arrange — Reports\Query\Summary exists, Reports\Command\Summary does not
+        $router = new HttpRouter(new ConventionResolver('Arcanum\\Test\\Fixture'));
+        $request = $this->stubRequest('PUT', '/reports/summary');
+
+        // Act & Assert
+        $this->expectException(MethodNotAllowed::class);
+        $router->resolve($request);
+    }
+
+    public function testPutToQueryOnlyPathListsGetAsAllowed(): void
+    {
+        // Arrange
+        $router = new HttpRouter(new ConventionResolver('Arcanum\\Test\\Fixture'));
+        $request = $this->stubRequest('PUT', '/reports/summary');
+
+        // Act
+        try {
+            $router->resolve($request);
+            $this->fail('Expected MethodNotAllowed exception');
+        } catch (MethodNotAllowed $e) {
+            // Assert
+            $this->assertSame(['GET'], $e->getAllowedMethods());
+        }
+    }
+
+    public function testMethodNotAllowedIs405NotGenericHttpException(): void
+    {
+        // Arrange
+        $router = new HttpRouter(new ConventionResolver('Arcanum\\Test\\Fixture'));
+        $request = $this->stubRequest('GET', '/contact/submit');
+
+        // Act
+        try {
+            $router->resolve($request);
+            $this->fail('Expected MethodNotAllowed exception');
+        } catch (MethodNotAllowed $e) {
+            // Assert — verify it's specifically a 405, not a generic HttpException
+            $this->assertSame(StatusCode::MethodNotAllowed, $e->getStatusCode());
+        }
     }
 }

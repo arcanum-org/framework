@@ -4,19 +4,27 @@ declare(strict_types=1);
 
 namespace Arcanum\Atlas;
 
+use Arcanum\Glitch\HttpException;
+use Arcanum\Hyper\StatusCode;
 use Psr\Http\Message\ServerRequestInterface;
 
 final class HttpRouter implements Router
 {
+    private const QUERY_METHODS = ['GET'];
+    private const COMMAND_METHODS = ['PUT', 'POST', 'PATCH', 'DELETE'];
+
     /**
      * @param ConventionResolver $resolver The convention-based path-to-namespace resolver.
      * @param PageResolver|null $pages The page resolver, or null if no pages are registered.
      * @param string $defaultFormat Fallback format when no file extension is present.
+     * @param bool $validateClasses Whether to verify DTO classes exist and enforce
+     *                              HTTP method constraints (405/404). Enabled by default.
      */
     public function __construct(
         private readonly ConventionResolver $resolver,
         private readonly PageResolver|null $pages = null,
         private readonly string $defaultFormat = 'json',
+        private readonly bool $validateClasses = true,
     ) {
     }
 
@@ -30,21 +38,63 @@ final class HttpRouter implements Router
         }
 
         $path = $input->getUri()->getPath();
-        $method = $input->getMethod();
+        $method = strtoupper($input->getMethod());
 
         [$cleanPath, $extensionFormat, $hasExtension] = $this->parseExtension($path);
 
         if ($this->pages !== null && $this->pages->has($cleanPath)) {
+            if ($this->validateClasses && $method !== 'GET') {
+                throw new MethodNotAllowed(self::QUERY_METHODS);
+            }
+
             return $this->pages->resolve(
                 $cleanPath,
                 $hasExtension ? $extensionFormat : null,
             );
         }
 
-        return $this->resolver->resolve(
+        $route = $this->resolver->resolve(
             path: $cleanPath,
             method: $method,
             format: $extensionFormat,
+        );
+
+        if (!$this->validateClasses || class_exists($route->dtoClass)) {
+            return $route;
+        }
+
+        $this->throwForMissingClass($route, $cleanPath, $method, $extensionFormat);
+    }
+
+    /**
+     * When the resolved DTO class doesn't exist, determine whether this is a
+     * 405 (right path, wrong method) or 404 (nothing at this path).
+     *
+     * @return never
+     */
+    private function throwForMissingClass(
+        Route $route,
+        string $path,
+        string $method,
+        string $format,
+    ): void {
+        $isQuery = $method === 'GET';
+        $alternateMethods = $isQuery ? self::COMMAND_METHODS : self::QUERY_METHODS;
+        $alternateMethod = $isQuery ? 'PUT' : 'GET';
+
+        $alternateRoute = $this->resolver->resolve(
+            path: $path,
+            method: $alternateMethod,
+            format: $format,
+        );
+
+        if (class_exists($alternateRoute->dtoClass)) {
+            throw new MethodNotAllowed($alternateMethods);
+        }
+
+        throw new HttpException(
+            StatusCode::NotFound,
+            sprintf('No route found for path "%s".', $path),
         );
     }
 

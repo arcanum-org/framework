@@ -377,9 +377,9 @@ The format registry maps file extensions to renderers and content types. It is t
 Items built during the session that need tests or plan tracking:
 
 - [ ] Add tests for `Flow\Conveyor\QueryResult` — wrapper for non-object handler returns. No dedicated tests exist; only exercised indirectly via the starter app.
-- [ ] Add 404 handling for non-existent convention routes — `GET /nonexistent` currently returns 500 ("class does not exist"). The router or kernel should catch unresolvable classes and throw `HttpException(NotFound)`.
+- [x] Add 404 handling for non-existent convention routes — `HttpRouter` now throws `HttpException(NotFound)` when neither Query nor Command DTO class exists for a path, instead of letting the container blow up with a 500.
 - [ ] Add JSON body parsing to `Hyper\Server` or as middleware — the starter kernel manually decodes `application/json` request bodies because `Server::request()` only populates `parsedBody` from `$_POST`. This should be handled by the framework, not every app's kernel.
-- [ ] Add HTTP method enforcement — nothing prevents `GET /contact/submit` (resolves to `App\Contact\Query\Submit` instead of Command) or `PUT /health` (resolves to `App\Command\Health` instead of Query). The router should reject cross-type requests or the convention system should enforce method constraints.
+- [x] Add HTTP method enforcement — `HttpRouter` now validates that the resolved DTO class exists. Pages reject non-GET with 405. Convention routes check the alternate namespace (Query↔Command) to distinguish 405 Method Not Allowed from 404 Not Found. Added `MethodNotAllowed` exception extending `HttpException` with allowed methods list for RFC 7231 `Allow` header.
 - [ ] Revisit `Renderer` interface return type — currently uses `mixed`. Consider whether a typed alternative (e.g., `ResponseInterface` for HTTP renderers) is feasible without breaking the transport-agnostic design.
 
 ---
