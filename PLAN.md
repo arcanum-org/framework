@@ -318,7 +318,7 @@ Track updates to the starter app (`../arcanum/`) as framework features land.
 - [x] Add `App\Pages\Index`, `App\Pages\IndexHandler`, and `App\Pages\IndexResult` — default homepage at root `/`
 - [x] Add `App\Query\Health`, `App\Query\HealthHandler`, and `App\Query\HealthResult` — example convention-routed Query
 - [x] Set up directory structure conventions — `app/Pages/`, `app/Query/` directories in the starter
-- [ ] Add `config/routes.php` — move page registration out of bootstrap into config file
+- [x] Add `config/routes.php` — page registration moved from bootstrap to config file, bootstrap reads `$routes['pages']` and registers each path/format pair
 - [ ] Add `config/formats.php` — configure enabled response formats and any renderer overrides
 - [ ] Add example Command — e.g., `PUT /health/ping` → `App\Command\Health\Ping` + `PingHandler`, demonstrating a simple Command returning void→204
 - [ ] Update `config/` with any new configuration files needed by routing or middleware
