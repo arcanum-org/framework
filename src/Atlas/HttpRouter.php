@@ -17,14 +17,11 @@ final class HttpRouter implements Router
      * @param ConventionResolver $resolver The convention-based path-to-namespace resolver.
      * @param PageResolver|null $pages The page resolver, or null if no pages are registered.
      * @param string $defaultFormat Fallback format when no file extension is present.
-     * @param bool $validateClasses Whether to verify DTO classes exist and enforce
-     *                              HTTP method constraints (405/404). Enabled by default.
      */
     public function __construct(
         private readonly ConventionResolver $resolver,
         private readonly PageResolver|null $pages = null,
         private readonly string $defaultFormat = 'json',
-        private readonly bool $validateClasses = true,
     ) {
     }
 
@@ -43,7 +40,7 @@ final class HttpRouter implements Router
         [$cleanPath, $extensionFormat, $hasExtension] = $this->parseExtension($path);
 
         if ($this->pages !== null && $this->pages->has($cleanPath)) {
-            if ($this->validateClasses && $method !== 'GET') {
+            if ($method !== 'GET') {
                 throw new MethodNotAllowed(self::QUERY_METHODS);
             }
 
@@ -59,7 +56,7 @@ final class HttpRouter implements Router
             format: $extensionFormat,
         );
 
-        if (!$this->validateClasses || class_exists($route->dtoClass)) {
+        if (class_exists($route->dtoClass)) {
             return $route;
         }
 
