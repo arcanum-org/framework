@@ -131,7 +131,7 @@ final class RegistryTest extends TestCase
         $this->assertSame('baz', $get);
     }
 
-    public function assertGetSetViaArrayAccess(): void
+    public function testGetSetViaArrayAccess(): void
     {
         // Arrange
         $registry = new Registry(['foo' => 'bar']);

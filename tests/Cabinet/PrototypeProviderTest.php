@@ -10,7 +10,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 #[CoversClass(\Arcanum\Cabinet\PrototypeProvider::class)]
 final class PrototypeProviderTest extends TestCase
 {
-    public function testSimnpleProvider(): void
+    public function testPrototypeProvider(): void
     {
         // Arrange
         $provider = \Arcanum\Cabinet\PrototypeProvider::fromFactory(fn() => new \stdClass());

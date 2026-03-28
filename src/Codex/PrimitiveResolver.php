@@ -21,7 +21,12 @@ final class PrimitiveResolver
 
         $type = $parameter->getType();
         if ($type !== null && $type instanceof \ReflectionUnionType) {
-            throw new Error\UnresolvableUnionType(implode(",", $type->getTypes()));
+            $typeNames = array_map(
+                static fn(\ReflectionType $t): string =>
+                    ($t instanceof \ReflectionNamedType) ? $t->getName() : (string) $t,
+                $type->getTypes(),
+            );
+            throw new Error\UnresolvableUnionType(implode(",", $typeNames));
         }
 
         throw new Error\UnresolvablePrimitive(message: $parameter->getName());

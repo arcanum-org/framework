@@ -8,13 +8,13 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 
 - [x] Fix `Headers::cleanValues()` rejecting `'0'` as a header value — PHP's `empty('0')` returns true, so `Content-Length: 0` is rejected. Replace `empty()` with a strict check.
 - [x] Fix `Response::withoutHeader()` mutating the original object — it should return an immutable copy per PSR-7. This also breaks `Server::sendSetCookieHeaders()`.
-- [ ] Fix `EmptyStream::getMetadata($key)` returning `null` for any key — the no-arg path returns a metadata array with values, but passing a key always returns `null` instead of looking up the key in that array
-- [ ] Fix `PrimitiveResolver` calling `implode(",", $type->getTypes())` on `ReflectionType` objects — should map to `getName()` first: `implode(",", array_map(fn($t) => $t->getName(), $type->getTypes()))`
-- [ ] Fix `StandardProcessor` using loose `!$payload` check — should be `$payload === null` to avoid false positives on valid falsy objects
-- [ ] Fix `RegistryTest::assertGetSetViaArrayAccess()` method name — missing `test` prefix so PHPUnit never runs it, leaving `Registry` array access silently untested
-- [ ] Fix `ProviderRegistry` interface accepting only `Provider` while `Container::provider()` accepts `string|Provider` — update the interface to match the implementation
-- [ ] Fix typo `testSimnpleProvider` → `testSimpleProvider` in `SimpleProviderTest`
-- [ ] Fix typo `testSimnpleProvider` → `testSimpleProvider` in `PrototypeProviderTest`
+- [x] Fix `EmptyStream::getMetadata($key)` returning `null` for any key — now looks up the key in the metadata array, returns `null` only for absent keys
+- [x] Fix `PrimitiveResolver` calling `implode(",", $type->getTypes())` on `ReflectionType` objects — now maps to `getName()` via `ReflectionNamedType` check
+- [x] Fix `StandardProcessor` using loose `!$payload` check — changed to `$payload === null`
+- [x] Fix `RegistryTest::assertGetSetViaArrayAccess()` method name — renamed to `testGetSetViaArrayAccess()` so PHPUnit runs it
+- [x] Fix `ProviderRegistry` interface accepting only `Provider` while `Container::provider()` accepts `string|Provider` — updated interface to `string|Provider`
+- [x] Fix typo `testSimnpleProvider` → `testSimpleProvider` in `SimpleProviderTest`
+- [x] Fix typo `testSimnpleProvider` → `testPrototypeProvider` in `PrototypeProviderTest`
 
 ---
 
