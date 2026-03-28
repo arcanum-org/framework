@@ -238,7 +238,7 @@ The router strips file extensions from the URI path before matching, so `/shop/n
 - [x] Add tests for extension stripping during route matching — verify the same handler is resolved regardless of extension
 - [x] Add tests for format extraction — verify the parsed format is available on the `Route`
 - [x] Add tests for missing extension — verify fallback format is applied
-- [ ] Add tests for unknown/unregistered extension — verify appropriate error (e.g., 406 Not Acceptable). Requires FormatRegistry integration — currently any extension is accepted
+- [x] Add tests for unknown/unregistered extension — `UnsupportedFormat` exception (406 Not Acceptable) thrown by `FormatRegistry::get()` and `renderer()`
 
 ### OPTIONS Handling
 
@@ -346,10 +346,10 @@ Shodo (書道, "the way of writing") is the output rendering package. It convert
 
 The format registry maps file extensions to renderers and content types. It is the bridge between context-aware routing (which extracts the format) and response serialization (which needs the right renderer). Applications can enable/disable built-in formats, register custom formats, and override renderers for existing formats.
 
-- [ ] Define `Format` value object — holds extension string, content type, and renderer class/instance for a single format (e.g., `json` → `application/json` → `JsonRenderer`)
-- [ ] Define `FormatRegistry` interface — `register(Format $format): void`, `get(string $extension): Format`, `has(string $extension): bool`, `remove(string $extension): void`
-- [ ] Implement `FormatRegistry` — stores formats keyed by extension, resolves renderers from the Container when needed
-- [ ] Register built-in JSON format — extension `json`, content type `application/json`, uses `JsonRenderer`
+- [x] Define `Format` value object — holds extension, content type, and renderer class string
+- [x] Define and implement `FormatRegistry` — `register()`, `get()`, `has()`, `remove()`, and `renderer()` which resolves from the Container. Throws `UnsupportedFormat` (HTTP 406) for unregistered extensions.
+- [x] Register built-in JSON format in starter — extension `json`, content type `application/json`, uses `JsonRenderer`
+- [x] Wire `FormatRegistry` into starter kernel — replaces hardcoded `JsonRenderer` with `$formats->renderer($route->format)`
 - [ ] Add built-in HTML renderer — renders data into an HTML response (template integration point for apps)
 - [ ] Register built-in HTML format — extension `html`, content type `text/html`, uses `HtmlRenderer`
 - [ ] Add built-in CSV renderer — renders iterable/array data as CSV with proper escaping
@@ -358,9 +358,9 @@ The format registry maps file extensions to renderers and content types. It is t
 - [ ] Register built-in plain text format — extension `txt`, content type `text/plain`, uses `PlainTextRenderer`
 - [ ] Add format configuration — allow apps to enable/disable formats and override renderer classes via config (e.g., `config/formats.php`)
 - [ ] Add format bootstrapper for Ignition — reads format config, registers enabled formats, applies renderer overrides
-- [ ] Add tests for `Format` value object
-- [ ] Add tests for `FormatRegistry` — register, get, has, remove
-- [ ] Add tests for built-in JSON format registration and rendering
+- [x] Add tests for `Format` value object
+- [x] Add tests for `FormatRegistry` — register, get, has, remove, renderer resolution, unsupported format (406)
+- [x] Add tests for built-in JSON format registration and rendering
 - [ ] Add tests for built-in HTML format registration and rendering
 - [ ] Add tests for built-in CSV format registration and rendering
 - [ ] Add tests for built-in plain text format registration and rendering
