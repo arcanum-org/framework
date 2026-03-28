@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Arcanum\Flow\Conveyor;
 
 use Psr\Container\ContainerInterface;
+use Psr\Log\LoggerInterface;
 use Arcanum\Flow\Continuum\Continuum;
 use Arcanum\Flow\Continuum\Continuation;
 use Arcanum\Flow\Continuum\Progression;
@@ -13,12 +14,15 @@ use Arcanum\Flow\Pipeline\Pipeline;
 class MiddlewareBus implements Bus
 {
     /**
-     * MiddlewareBus
+     * @param bool $debug When true, log a warning when a prefixed handler
+     *                    is not found and the bus falls back to the unprefixed handler.
      */
     public function __construct(
         protected ContainerInterface $container,
         protected Continuation $dispatchFlow = new Continuum(),
-        protected Continuation $responseFlow = new Continuum()
+        protected Continuation $responseFlow = new Continuum(),
+        protected bool $debug = false,
+        protected LoggerInterface|null $logger = null,
     ) {
     }
 
@@ -42,16 +46,15 @@ class MiddlewareBus implements Bus
         }
     }
 
-
     /**
      * Dispatch an object to a handler.
      */
-    public function dispatch(object $object): object
+    public function dispatch(object $object, string $prefix = ''): object
     {
         return (new Pipeline())
             ->pipe($this->dispatchFlow)
-            ->pipe(function (object $object) {
-                return $this->handlerFor($object)($object) ?? new EmptyDTO();
+            ->pipe(function (object $object) use ($prefix) {
+                return $this->handlerFor($object, $prefix)($object) ?? new EmptyDTO();
             })
             ->pipe($this->responseFlow)
             ->send($object);
@@ -59,11 +62,25 @@ class MiddlewareBus implements Bus
 
     /**
      * Get the handler for an object.
-     *
-     * SwiftBus assumes that the handler is a callable.
      */
-    protected function handlerFor(object $object): callable
+    protected function handlerFor(object $object, string $prefix = ''): callable
     {
+        if ($prefix !== '') {
+            $prefixedName = $this->handlerNameFor($object, $prefix);
+            if ($this->container->has($prefixedName)) {
+                /** @var callable */
+                return $this->container->get($prefixedName);
+            }
+
+            if ($this->debug && $this->logger !== null) {
+                $this->logger->warning(sprintf(
+                    'Handler "%s" not found, falling back to "%s".',
+                    $prefixedName,
+                    $this->handlerNameFor($object),
+                ));
+            }
+        }
+
         /** @var callable */
         return $this->container->get($this->handlerNameFor($object));
     }
@@ -71,13 +88,30 @@ class MiddlewareBus implements Bus
     /**
      * Get the handler name for an object.
      *
-     * This is the class name of the object with the suffix "Handler".
+     * When a prefix is provided, it is prepended to the short class name:
+     * e.g., prefix 'Delete' + Namespace\DoSomething → Namespace\DeleteDoSomethingHandler
      *
      * @return class-string
      */
-    protected function handlerNameFor(object $object): string
+    protected function handlerNameFor(object $object, string $prefix = ''): string
     {
+        $className = get_class($object);
+
+        if ($prefix === '') {
+            /** @var class-string */
+            return $className . 'Handler';
+        }
+
+        $lastBackslash = strrpos($className, '\\');
+        if ($lastBackslash === false) {
+            /** @var class-string */
+            return $prefix . $className . 'Handler';
+        }
+
+        $namespace = substr($className, 0, $lastBackslash + 1);
+        $shortName = substr($className, $lastBackslash + 1);
+
         /** @var class-string */
-        return get_class($object) . 'Handler';
+        return $namespace . $prefix . $shortName . 'Handler';
     }
 }

@@ -84,14 +84,14 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 
 ### Conveyor (Command Bus)
 
-- [ ] Add `prefix` parameter to `MiddlewareBus::dispatch()` — defaults to `''`, prepended to the handler class name (e.g., prefix `Delete` + `SubmitPayment` → `DeleteSubmitPaymentHandler`)
-- [ ] Add fallback logic to handler resolution — if the prefixed handler class does not exist, fall back to the unprefixed handler (e.g., `DeleteSubmitPaymentHandler` not found → `SubmitPaymentHandler`)
-- [ ] Add debug-mode warning log on fallback — when a prefixed handler is not found and Conveyor falls back, log a warning in debug/development mode only. Silent in production.
-- [ ] Add tests for dispatch with empty prefix (default behavior, no change from current)
-- [ ] Add tests for dispatch with prefix resolving to a prefixed handler
-- [ ] Add tests for dispatch with prefix falling back to unprefixed handler
-- [ ] Add tests for debug-mode warning log on fallback
-- [ ] Add tests for dispatch with prefix where neither prefixed nor unprefixed handler exists — verify exception
+- [x] Add `prefix` parameter to `Bus::dispatch()` and `MiddlewareBus::dispatch()` — defaults to `''`, prepended to the short class name (e.g., prefix `Delete` + `Namespace\SubmitPayment` → `Namespace\DeleteSubmitPaymentHandler`)
+- [x] Add fallback logic to handler resolution — if the prefixed handler class does not exist in the container, fall back to the unprefixed handler
+- [x] Add debug-mode warning log on fallback — when a prefixed handler is not found and Conveyor falls back, log a warning via optional `LoggerInterface`. Silent when `debug: false` or no logger provided.
+- [x] Add tests for dispatch with empty prefix (default behavior, no change from current)
+- [x] Add tests for dispatch with prefix resolving to a prefixed handler
+- [x] Add tests for dispatch with prefix falling back to unprefixed handler
+- [x] Add tests for debug-mode warning log on fallback
+- [x] Add tests for dispatch with prefix where neither prefixed nor unprefixed handler exists — verify exception
 
 ### River (Streams)
 
