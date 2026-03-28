@@ -266,12 +266,12 @@ These items bridge the gap between HTTP (Hyper) and command/query dispatch (Conv
 
 ### Request → DTO Mapping
 
-- [ ] Define a request deserializer interface — extracts query params and body from `ServerRequestInterface` into a keyed array
-- [ ] Implement DTO hydrator — populates a command/query object's constructor or public properties from extracted request data
-- [ ] Add type coercion for scalar DTO properties — cast string request values to int, float, bool as needed by the DTO constructor
-- [ ] Add tests for query parameter injection into DTOs
-- [ ] Add tests for request body injection into DTOs
-- [ ] Add tests for type coercion (string → int, string → bool, etc.)
+- [x] Implement `Codex\Hydrator` — constructs DTOs by matching associative array keys to constructor parameter names. Handles missing params via defaults, throws for required params with no data.
+- [x] Add type coercion for scalar DTO properties — coerces string values to int (via `is_numeric`), float, bool (via `filter_var`), and string as needed by the constructor type hints
+- [x] Add tests for query parameter injection into DTOs
+- [ ] Add tests for request body injection into DTOs (pending Command implementation)
+- [x] Add tests for type coercion (string → int, string → bool, etc.)
+- [x] Add tests for missing required parameter, extra data ignored, default value fallback
 
 ### Query Response Serialization
 
