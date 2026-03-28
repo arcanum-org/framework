@@ -288,14 +288,14 @@ Query handlers always return data. The response is rendered by the format-aware 
 
 Command handlers signal intent through their return type. Commands have no response body by default — the status code communicates the outcome. An opt-in configuration escape hatch allows response bodies for users who need them, with documentation guiding against forcing REST/MVC patterns into CQRS defaults.
 
-- [ ] Implement command response builder — inspects handler return type to determine status code: `void`→204, scalar/DTO→201, `null`→202
+- [x] Implement `Shodo\CommandResponseBuilder` — inspects handler return to determine status code: `EmptyDTO`→204 No Content, anything else→201 Created. Returns empty body for both. (null→202 deferred until Conveyor distinguishes void from null)
 - [ ] Add `Location` header for 201 responses — set if the framework can resolve a URL from the returned identifier
 - [ ] Add opt-in configuration for command response bodies — disabled by default, allows commands to return rendered content when enabled
 - [ ] Add documentation guidance — explain CQRS command conventions and why response bodies are discouraged
-- [ ] Add tests for `void` handler → 204 No Content with empty body
-- [ ] Add tests for scalar return → 201 Created with empty body and Location header
-- [ ] Add tests for DTO return → 201 Created with empty body
-- [ ] Add tests for `null` return → 202 Accepted with empty body
+- [x] Add tests for `void` handler (EmptyDTO) → 204 No Content with empty body
+- [x] Add tests for DTO return → 201 Created with empty body
+- [ ] Add tests for scalar return → 201 Created with empty body and Location header (pending Location header implementation)
+- [ ] Add tests for `null` return → 202 Accepted with empty body (pending void/null distinction in Conveyor)
 - [ ] Add tests for opt-in response body configuration
 
 ### Handler Discovery
@@ -320,7 +320,7 @@ Track updates to the starter app (`../arcanum/`) as framework features land.
 - [x] Set up directory structure conventions — `app/Pages/`, `app/Query/` directories in the starter
 - [x] Add `config/routes.php` — page registration moved from bootstrap to config file, bootstrap reads `$routes['pages']` and registers each path/format pair
 - [ ] Add `config/formats.php` — configure enabled response formats and any renderer overrides
-- [ ] Add example Command — e.g., `PUT /health/ping` → `App\Command\Health\Ping` + `PingHandler`, demonstrating a simple Command returning void→204
+- [x] Add example Command — `PUT /contact/submit` → `App\Contact\Command\Submit` + `SubmitHandler`, demonstrates Command with DTO hydration from JSON body, void return→204
 - [ ] Update `config/` with any new configuration files needed by routing or middleware
 
 ---
