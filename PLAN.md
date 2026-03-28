@@ -309,16 +309,17 @@ Command handlers signal intent through their return type. Commands have no respo
 
 Track updates to the starter app (`../arcanum/`) as framework features land.
 
-- [ ] Update `bootstrap/http.php` to register `MiddlewareBus` (Conveyor) in the Container
-- [ ] Update `bootstrap/http.php` to register the Router in the Container
-- [ ] Update `App\HTTP\Kernel::handleRequest()` to dispatch requests through the Router → Conveyor pipeline instead of throwing 404
-- [ ] Add `config/routes.php` — register Pages (at minimum, the root `/` → `App\Pages\Index`) and any manual route overrides
+- [x] Update `bootstrap/http.php` to register `MiddlewareBus` (Conveyor) in the Container — including `ContainerInterface`, `$debug`, and `$logger` specifications
+- [x] Update `bootstrap/http.php` to register the Router in the Container — `ConventionResolver`, `PageResolver` (with root `/` page), and `HttpRouter` factory
+- [x] Update `bootstrap/http.php` to register `JsonRenderer` in the Container
+- [x] Update `App\HTTP\Kernel::handleRequest()` to dispatch requests through the Router → Conveyor → JsonRenderer pipeline (MVP: Query-only, JSON-only)
+- [x] Add `App\Pages\Index`, `App\Pages\IndexHandler`, and `App\Pages\IndexResult` — default homepage at root `/`
+- [x] Add `App\Query\Health`, `App\Query\HealthHandler`, and `App\Query\HealthResult` — example convention-routed Query
+- [x] Set up directory structure conventions — `app/Pages/`, `app/Query/` directories in the starter
+- [ ] Add `config/routes.php` — move page registration out of bootstrap into config file
 - [ ] Add `config/formats.php` — configure enabled response formats and any renderer overrides
-- [ ] Add `App\Pages\Index` and `App\Pages\IndexHandler` — default homepage, serves as the root `/` page
-- [ ] Add example Query — e.g., `GET /health` → `App\Query\Health` + `HealthHandler`, demonstrating convention-based routing with context-aware rendering (`.json`, `.html`)
 - [ ] Add example Command — e.g., `PUT /health/ping` → `App\Command\Health\Ping` + `PingHandler`, demonstrating a simple Command returning void→204
 - [ ] Update `config/` with any new configuration files needed by routing or middleware
-- [ ] Set up directory structure conventions — `app/Pages/`, `app/Query/`, `app/Command/` directories in the starter
 
 ---
 
