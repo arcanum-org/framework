@@ -100,6 +100,7 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 - [ ] Add test for `EmptyStream::getMetadata($key)` — verify it returns the correct value for valid metadata keys (currently always returns `null`)
 - [ ] Add test for `Stream::read(0)` edge case — verify reading zero bytes returns empty string
 - [ ] Add test for `CachingStream::seek()` with `SEEK_END` on an unseekable remote stream
+- [ ] Fix `CachingStream` not caching `php://input` — `Server::request()` wraps `php://input` in `CachingStream::fromStream()` but the body reads as empty. The starter app works around this by capturing `$_SERVER['RAW_BODY']` via `file_get_contents('php://input')` before the server consumes it. The framework should handle this internally.
 
 ### General
 
