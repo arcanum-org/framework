@@ -54,7 +54,14 @@ class MiddlewareBus implements Bus
         return (new Pipeline())
             ->pipe($this->dispatchFlow)
             ->pipe(function (object $object) use ($prefix) {
-                return $this->handlerFor($object, $prefix)($object) ?? new EmptyDTO();
+                $result = $this->handlerFor($object, $prefix)($object);
+                if ($result === null) {
+                    return new EmptyDTO();
+                }
+                if (!is_object($result)) {
+                    return new QueryResult($result);
+                }
+                return $result;
             })
             ->pipe($this->responseFlow)
             ->send($object);
