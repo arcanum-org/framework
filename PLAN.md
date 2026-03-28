@@ -248,9 +248,10 @@ The router strips file extensions from the URI path before matching, so `/shop/n
 
 ### Routing Bootstrapper
 
-- [ ] Add routing bootstrapper for Ignition — loads route config (pages, manual overrides), registers the Router in the Container
+- [x] Add `Ignition\Bootstrap\Routing` bootstrapper — reads `config/routes.php` (namespace, pages_namespace, pages) and `config/formats.php` (default format, format definitions) to register ConventionResolver, PageResolver, HttpRouter, FormatRegistry, JsonRenderer, and Hydrator in the container. Throws if required namespace config is missing. Added to HyperKernel bootstrapper sequence after Configuration.
 - [ ] Add tests for bootstrapper loading page registrations from config
-- [ ] Add tests for bootstrapper loading manual route overrides from config
+- [ ] Add tests for bootstrapper throwing on missing namespace config
+- [ ] Add tests for bootstrapper loading format definitions from config
 
 ---
 
@@ -356,8 +357,8 @@ The format registry maps file extensions to renderers and content types. It is t
 - [ ] Register built-in CSV format — extension `csv`, content type `text/csv`, uses `CsvRenderer`
 - [ ] Add built-in plain text renderer — renders data as plain text
 - [ ] Register built-in plain text format — extension `txt`, content type `text/plain`, uses `PlainTextRenderer`
-- [ ] Add format configuration — allow apps to enable/disable formats and override renderer classes via config (e.g., `config/formats.php`)
-- [ ] Add format bootstrapper for Ignition — reads format config, registers enabled formats, applies renderer overrides
+- [x] Add format configuration — apps define formats in `config/formats.php` with extension, content_type, and renderer class. The Routing bootstrapper reads this and registers them in the FormatRegistry.
+- [x] Add format bootstrapper for Ignition — consolidated into `Bootstrap\Routing` which handles both route and format config
 - [x] Add tests for `Format` value object
 - [x] Add tests for `FormatRegistry` — register, get, has, remove, renderer resolution, unsupported format (406)
 - [x] Add tests for built-in JSON format registration and rendering
