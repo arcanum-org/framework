@@ -27,7 +27,7 @@ final class PortTest extends TestCase
     {
         // Arrange
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Port must be between 1 and 65535, or null.');
+        $this->expectExceptionMessage('Port must be between 0 and 65535.');
 
         // Act
         new Port(65536);

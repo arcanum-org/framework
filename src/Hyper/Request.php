@@ -166,6 +166,7 @@ class Request implements RequestInterface, \Stringable
 
         $request = clone $this;
         $request->uri = $uri;
+        $request->requestTarget = null;
 
         if (!$preserveHost || empty($this->message->getHeader('Host'))) {
             $request->setHostHeaderFromURI();

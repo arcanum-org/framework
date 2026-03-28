@@ -29,10 +29,10 @@ final class Port implements \Stringable
     public function __construct(private int|string $value)
     {
         if (is_string($value)) {
-            $value = (int)$value;
+            $this->value = (int) $value;
         }
-        if ($value < 0 || $value > 65535) {
-            throw new \InvalidArgumentException('Port must be between 1 and 65535, or null.');
+        if ($this->value < 0 || $this->value > 65535) {
+            throw new \InvalidArgumentException('Port must be between 0 and 65535.');
         }
     }
 
