@@ -288,7 +288,7 @@ Query handlers always return data. The response is rendered by the format-aware 
 
 Command handlers signal intent through their return type. Commands have no response body by default — the status code communicates the outcome. An opt-in configuration escape hatch allows response bodies for users who need them, with documentation guiding against forcing REST/MVC patterns into CQRS defaults.
 
-- [x] Implement `Shodo\CommandResponseBuilder` — inspects handler return to determine status code: `EmptyDTO`→204 No Content, anything else→201 Created. Returns empty body for both. (null→202 deferred until Conveyor distinguishes void from null)
+- [x] Implement `Shodo\EmptyResponseRenderer` — generic renderer that produces an empty-body response with a configurable status code (defaults to 204). Command-specific logic (which status code to use) lives in the app kernel, not the framework.
 - [ ] Add `Location` header for 201 responses — set if the framework can resolve a URL from the returned identifier
 - [ ] Add opt-in configuration for command response bodies — disabled by default, allows commands to return rendered content when enabled
 - [ ] Add documentation guidance — explain CQRS command conventions and why response bodies are discouraged
