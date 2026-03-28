@@ -44,6 +44,15 @@ Arcanum is a CQRS PHP framework (not MVC). It's a monorepo with packages under `
 - Arrange-Act-Assert pattern throughout
 - Fixtures live in `tests/Fixture/` or in subpackage test directories
 
+### HTTP status codes
+
+Arcanum embraces the full HTTP status code spectrum. When implementing any HTTP-facing feature, always use the most precise status code — never collapse to 200/404/500. Examples:
+
+- Command returns void → **204 No Content**, returns a DTO → **201 Created**, returns null → **202 Accepted**
+- Valid path, wrong HTTP method → **405 Method Not Allowed** (not 404)
+- Unsupported response format → **406 Not Acceptable** (not 400)
+- Use `HttpException` with the specific `StatusCode` enum value, never raw integers
+
 ### Starter project
 
 A WIP starter app lives at `../arcanum/` — it demonstrates how apps consume the framework via Cabinet container, HyperKernel, and config files.

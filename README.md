@@ -39,11 +39,11 @@ Arcanum is a collection of packages that work together to create a robust, scala
 
 ### Arcanum Glitch
 
-[Glitch](https://github.com/arcanum-org/framework/tree/main/src/Glitch) is Arcanum's Exception handling package.
+[Glitch](https://github.com/arcanum-org/framework/tree/main/src/Glitch) is Arcanum's error handling package. It converts PHP errors to exceptions, manages shutdown handling, and dispatches to reporters for logging and alerting. `HttpException` lets you throw exceptions that carry a precise HTTP status code — a 409 Conflict, a 422 Unprocessable Entity, a 503 Service Unavailable — and the framework renders the correct response automatically.
 
 ### Arcanum Hyper
 
-[Hyper](https://github.com/arcanum-org/framework/tree/main/src/Hyper) is a package for working with PSR-7 HTTP requests and responses in a nice, object-oriented way.
+[Hyper](https://github.com/arcanum-org/framework/tree/main/src/Hyper) is Arcanum's HTTP layer — PSR-7 messages, PSR-15 server handling, and a type-safe `StatusCode` enum covering the full HTTP status code spectrum. Where most frameworks treat status codes as an afterthought (200 for success, 404 for missing, 500 for everything else), Hyper gives every code in the spec a first-class representation and encourages precise, semantic use throughout the framework.
 
 ### Arcanum Parchment
 
@@ -52,6 +52,14 @@ Arcanum is a collection of packages that work together to create a robust, scala
 ### Arcanum Quill
 
 [Quill](https://github.com/arcanum-org/framework/tree/main/src/Quill) is a package for logging messages to different logging channels. It uses the excellent [Monolog](https://github.com/Seldaek/monolog) package under the hood.
+
+### Arcanum Atlas
+
+[Atlas](https://github.com/arcanum-org/framework/tree/main/src/Atlas) is Arcanum's convention-based CQRS router. It maps HTTP requests to Query and Command handlers by converting URL path segments to PascalCase namespaces — no route files, no annotations, no configuration for the common case. The HTTP method determines intent: GET reads (Queries), PUT/POST/PATCH/DELETE writes (Commands). Atlas enforces this at the routing level — a GET to a Command-only path is a **405 Method Not Allowed**, not a silent misroute. Request a path that doesn't exist? **404 Not Found**. Every error gets the right status code.
+
+### Arcanum Shodo
+
+[Shodo](https://github.com/arcanum-org/framework/tree/main/src/Shodo) (書道, "the way of writing") is the output rendering package. It converts handler results into HTTP responses through a format-aware registry — the same handler can produce JSON, HTML, or CSV based on the file extension in the URL. Request an unsupported format? **406 Not Acceptable**. Shodo also handles exception rendering, mapping `HttpException` status codes to properly structured error responses.
 
 ### Arcanum Toolkit
 
@@ -81,6 +89,18 @@ Successful apps get bigger. Arcanum applications tackle this truth by utilizing 
 
 ## The Arcanum Philosophy
 
+### CQRS and Domain-Driven Design
+
 In Arcanum, we embrace CQRS and domain-driven design to tackle the complexity of modern web applications head-on. We're not trying to replace all the lovely MVC frameworks out there. We respect and appreciate their immense contributions. Instead, we're offering a novel perspective, a unique tool in your toolbox that can handle the intricacies of highly complex web applications differently.
+
+### HTTP Status Codes Mean Something
+
+Most frameworks collapse the richness of HTTP into a handful of status codes: 200 for success, 404 for missing, 500 for errors, and 403 if you're feeling fancy. The HTTP specification defines dozens of status codes, each with precise semantics — and Arcanum uses them.
+
+A Command that creates a resource returns **201 Created**. A Command that completes with nothing to report returns **204 No Content**. A Command that's accepted for deferred processing returns **202 Accepted**. Request a path with the wrong HTTP method? That's **405 Method Not Allowed**, not a 404 — because the resource exists, you just asked for it wrong. Ask for an unsupported response format? **406 Not Acceptable**.
+
+This isn't pedantry. Status codes are part of your API's contract. They tell clients, proxies, caches, and monitoring systems exactly what happened — without parsing a response body or guessing from context. When a load balancer sees a spike in 503s it knows the service is overloaded. When a client receives a 201 it knows something was created. When a cache sees a 304 it knows it can reuse what it has.
+
+Arcanum's `StatusCode` enum provides a type-safe representation of every standard HTTP status code, and the framework enforces their correct use. `HttpException` carries the precise status code with it. Renderers choose the right code based on what actually happened. The router distinguishes "nothing here" from "something here, wrong method." This precision flows from the framework into your application code, so your APIs communicate clearly by default.
 
 With that spirit, welcome to Arcanum.
