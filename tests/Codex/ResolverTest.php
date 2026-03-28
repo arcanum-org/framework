@@ -21,11 +21,13 @@ use Psr\Container\ContainerInterface;
 #[CoversClass(Resolver::class)]
 #[CoversClass(ClassNameResolver::class)]
 #[CoversClass(PrimitiveResolver::class)]
+#[UsesClass(Error\Unresolvable::class)]
 #[UsesClass(Error\UnresolvableClass::class)]
 #[UsesClass(Error\UnresolvablePrimitive::class)]
 #[UsesClass(Error\UnresolvableUnionType::class)]
 #[UsesClass(ClassResolved::class)]
 #[UsesClass(ClassRequested::class)]
+#[UsesClass(Fixture\ServiceWithNullableDependency::class)]
 final class ResolverTest extends TestCase
 {
     public function testClosure(): void
@@ -808,5 +810,25 @@ final class ResolverTest extends TestCase
 
         // Assert
         $this->assertInstanceOf(Fixture\ServiceImplementsInterface::class, $resolved->dependency);
+    }
+
+    public function testNullableParameterFallsBackToNullWhenUnresolvable(): void
+    {
+        // Arrange
+        $container = $this->createStub(ContainerInterface::class);
+
+        $container->method('has')
+            ->willReturn(false);
+
+        $resolver = Resolver::forContainer($container);
+        $resolver->specify(Fixture\ServiceWithNullableDependency::class, '$name', 'test');
+
+        // Act
+        $resolved = $resolver->resolve(Fixture\ServiceWithNullableDependency::class);
+
+        // Assert
+        $this->assertInstanceOf(Fixture\ServiceWithNullableDependency::class, $resolved);
+        $this->assertSame('test', $resolved->name);
+        $this->assertNull($resolved->logger);
     }
 }

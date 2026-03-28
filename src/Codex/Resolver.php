@@ -255,9 +255,9 @@ class Resolver implements ClassResolver, Specifier
 
     /**
      * @param class-string $name
-     * @return object|array<object>
+     * @return object|array<object>|null
      */
-    protected function resolveClass(\ReflectionParameter $parameter, string $name): object|array
+    protected function resolveClass(\ReflectionParameter $parameter, string $name): object|array|null
     {
         if ($parameter->isVariadic()) {
             // If we have gotten this far, then there were no specifications provided for the
@@ -273,7 +273,7 @@ class Resolver implements ClassResolver, Specifier
         } catch (Error\Unresolvable $e) {
             // handle the optional values on the parameter if it is not resolvable.
             if ($parameter->isDefaultValueAvailable()) {
-                /** @var object */
+                /** @var object|array<object>|null */
                 return $parameter->getDefaultValue();
             }
             throw $e;

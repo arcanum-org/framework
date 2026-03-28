@@ -67,6 +67,8 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 
 ## Codex
 
+- [x] Fix nullable parameter resolution — `resolveClass()` return type changed from `object|array` to `object|array|null` so nullable parameters (e.g., `LoggerInterface|null $logger = null`) fall back to `null` when the dependency can't be resolved, instead of throwing a TypeError
+- [x] Add tests for nullable parameter falling back to null when dependency is unresolvable
 - [ ] Add test for `Resolver::resolve()` with callable that returns non-object — currently only valid closures are tested, no test for callable returning a primitive or null
 - [ ] Add test for `Resolver::resolveWith()` with variadic constructor parameters — `resolveWith()` doesn't handle variadics like `resolveParameters()` does
 
