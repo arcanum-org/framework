@@ -249,9 +249,12 @@ The router strips file extensions from the URI path before matching, so `/shop/n
 ### Routing Bootstrapper
 
 - [x] Add `Ignition\Bootstrap\Routing` bootstrapper — reads `config/routes.php` (namespace, pages_namespace, pages) and `config/formats.php` (default format, format definitions) to register ConventionResolver, PageResolver, HttpRouter, FormatRegistry, JsonRenderer, and Hydrator in the container. Throws if required namespace config is missing. Added to HyperKernel bootstrapper sequence after Configuration.
-- [ ] Add tests for bootstrapper loading page registrations from config
-- [ ] Add tests for bootstrapper throwing on missing namespace config
-- [ ] Add tests for bootstrapper loading format definitions from config
+- [x] Add tests for bootstrapper loading page registrations from config
+- [x] Add tests for bootstrapper throwing on missing namespace config
+- [x] Add tests for bootstrapper loading format definitions from config
+- [x] Add tests for bootstrapper registering all core services (Router, ConventionResolver, PageResolver, FormatRegistry, Hydrator, JsonRenderer)
+- [x] Add tests for configurable root namespace via app.namespace
+- [x] Add tests for configurable default format via formats.default
 
 ---
 
