@@ -19,9 +19,11 @@ use Arcanum\Shodo\JsonRenderer;
 /**
  * Registers Atlas routing and Shodo format registry in the container.
  *
- * Reads from config/routes.php:
+ * Reads from config/app.php:
  *   - namespace (required) — the app's root namespace
  *   - pages_namespace (required) — the Pages namespace
+ *
+ * Reads from config/routes.php:
  *   - pages (optional) — path => format mappings for registered pages
  *
  * Reads from config/formats.php:
@@ -66,20 +68,20 @@ class Routing implements Bootstrapper
     private function registerRouter(Application $container, Configuration $config): void
     {
         /** @var mixed $namespace */
-        $namespace = $config->get('routes.namespace');
+        $namespace = $config->get('app.namespace');
         if (!is_string($namespace) || $namespace === '') {
             throw new \RuntimeException(
-                'Missing required config "routes.namespace". '
-                . 'Set it in config/routes.php to your app\'s root namespace (e.g., "App").'
+                'Missing required config "app.namespace". '
+                . 'Set it in config/app.php to your app\'s root namespace (e.g., "App").'
             );
         }
 
         /** @var mixed $pagesNamespace */
-        $pagesNamespace = $config->get('routes.pages_namespace');
+        $pagesNamespace = $config->get('app.pages_namespace');
         if (!is_string($pagesNamespace) || $pagesNamespace === '') {
             throw new \RuntimeException(
-                'Missing required config "routes.pages_namespace". '
-                . 'Set it in config/routes.php to your Pages namespace (e.g., "App\\Pages").'
+                'Missing required config "app.pages_namespace". '
+                . 'Set it in config/app.php to your Pages namespace (e.g., "App\\Pages").'
             );
         }
 
