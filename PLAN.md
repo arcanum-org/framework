@@ -274,20 +274,19 @@ These items bridge the gap between HTTP (Hyper) and command/query dispatch (Conv
 - [x] Implement `Codex\Hydrator` — constructs DTOs by matching associative array keys to constructor parameter names. Handles missing params via defaults, throws for required params with no data.
 - [x] Add type coercion for scalar DTO properties — coerces string values to int (via `is_numeric`), float, bool (via `filter_var`), and string as needed by the constructor type hints
 - [x] Add tests for query parameter injection into DTOs
-- [ ] Add tests for request body injection into DTOs (pending Command implementation)
+- [ ] Add tests for request body injection into DTOs — Commands are implemented, Hydrator works, but no framework-level test verifies the JSON body → Hydrator → Command DTO flow
 - [x] Add tests for type coercion (string → int, string → bool, etc.)
 - [x] Add tests for missing required parameter, extra data ignored, default value fallback
 
 ### Query Response Serialization
 
-Query handlers always return data. The response is rendered by the format-aware serializer (JSON, HTML, CSV, etc.) based on the extension extracted by context-aware routing. Status code is always 200.
+Query handlers always return data. The response is rendered by the format-aware serializer (JSON, HTML, CSV, etc.) based on the extension extracted by context-aware routing. Status code is always 200. The `FormatRegistry` already handles renderer selection — `$formats->renderer($route->format)->render($result)` is the pattern used by the starter kernel. A separate response serializer interface is not needed.
 
-- [ ] Define a response serializer interface — converts a handler's return value into a `ResponseInterface`
-- [ ] Implement format-aware response serializer — selects a Shodo renderer based on the `Route`'s parsed format, delegates rendering, returns the `ResponseInterface` with format-appropriate headers and 200 status
-- [ ] Add tests for format-aware renderer selection (format → renderer dispatch)
-- [ ] Add tests for Query response with JSON format
-- [ ] Add tests for Query response with HTML format
-- [ ] Add tests for Query response with CSV format
+- [x] ~~Define a response serializer interface~~ — not needed, `FormatRegistry::renderer()` already selects the right renderer based on the route's format
+- [x] ~~Implement format-aware response serializer~~ — the kernel calls `FormatRegistry::renderer()` directly, no wrapper needed
+- [ ] Add integration tests for Query response with JSON format — verify the full flow from Route → FormatRegistry → JsonRenderer → ResponseInterface
+- [ ] Add integration tests for Query response with HTML format (after HtmlRenderer is built)
+- [ ] Add integration tests for Query response with CSV format (after CsvRenderer is built)
 
 ### Command Response Serialization
 
@@ -320,13 +319,12 @@ Track updates to the starter app (`../arcanum/`) as framework features land.
 - [x] Update `bootstrap/http.php` to register the Router in the Container — `ConventionResolver`, `PageResolver` (with root `/` page), and `HttpRouter` factory
 - [x] Update `bootstrap/http.php` to register `JsonRenderer` in the Container
 - [x] Update `App\HTTP\Kernel::handleRequest()` to dispatch requests through the Router → Conveyor → JsonRenderer pipeline (MVP: Query-only, JSON-only)
-- [x] Add `App\Pages\Index`, `App\Pages\IndexHandler`, and `App\Pages\IndexResult` — default homepage at root `/`
-- [x] Add `App\Query\Health`, `App\Query\HealthHandler`, and `App\Query\HealthResult` — example convention-routed Query
+- [x] Add `App\Pages\Index` and `App\Pages\IndexHandler` — default homepage at root `/`, returns array (no result class needed)
+- [x] Add `App\Query\Health` and `App\Query\HealthHandler` — example convention-routed Query with `?verbose=true` param, returns array
 - [x] Set up directory structure conventions — `app/Pages/`, `app/Query/` directories in the starter
 - [x] Add `config/routes.php` — page registration moved from bootstrap to config file, bootstrap reads `$routes['pages']` and registers each path/format pair
 - [x] Add `config/formats.php` — configure enabled response formats and any renderer overrides
 - [x] Add example Command — `PUT /contact/submit` → `App\Contact\Command\Submit` + `SubmitHandler`, demonstrates Command with DTO hydration from JSON body, void return→204
-- [ ] Update `config/` with any new configuration files needed by routing or middleware
 
 ---
 
@@ -371,6 +369,30 @@ The format registry maps file extensions to renderers and content types. It is t
 - [ ] Add tests for app-defined custom format with custom renderer
 - [ ] Add tests for disabling a built-in format via config
 - [ ] Add tests for overriding a built-in format's renderer via config
+
+---
+
+## Missing Coverage (discovered during this session)
+
+Items built during the session that need tests or plan tracking:
+
+- [ ] Add tests for `Flow\Conveyor\QueryResult` — wrapper for non-object handler returns. No dedicated tests exist; only exercised indirectly via the starter app.
+- [ ] Add 404 handling for non-existent convention routes — `GET /nonexistent` currently returns 500 ("class does not exist"). The router or kernel should catch unresolvable classes and throw `HttpException(NotFound)`.
+- [ ] Add JSON body parsing to `Hyper\Server` or as middleware — the starter kernel manually decodes `application/json` request bodies because `Server::request()` only populates `parsedBody` from `$_POST`. This should be handled by the framework, not every app's kernel.
+- [ ] Add HTTP method enforcement — nothing prevents `GET /contact/submit` (resolves to `App\Contact\Query\Submit` instead of Command) or `PUT /health` (resolves to `App\Command\Health` instead of Query). The router should reject cross-type requests or the convention system should enforce method constraints.
+- [ ] Revisit `Renderer` interface return type — currently uses `mixed`. Consider whether a typed alternative (e.g., `ResponseInterface` for HTTP renderers) is feasible without breaking the transport-agnostic design.
+
+---
+
+## Open Questions (needs discussion before implementation)
+
+These items need design decisions before they can be worked on:
+
+- **Bootstrap lifecycle hooks** — What does "before/after events so the app can hook into the boot sequence" mean concretely? Events before/after each individual bootstrapper? Before/after the entire sequence? Who consumes these — the app kernel, service providers, middleware? What's the use case that config and the existing bootstrapper sequence can't handle?
+- **Handler auto-discovery** — Is this actually needed? Codex already resolves handler classes on demand via reflection. Pre-scanning the filesystem to register handlers in the Container adds complexity and startup cost. What use case requires pre-registration that on-demand resolution can't serve?
+- **Manual route overrides** — What's the priority order when resolving? Pages > manual overrides > convention? Or Pages > convention > manual overrides? How are overrides registered — config file, bootstrap code, or both? Can overrides change the DTO class, the handler, or both?
+- **HTML renderer and templates** — Does the framework ship a template engine, integrate with an existing one (Blade, Twig, Plates), or just provide a bare `HtmlRenderer` that the app overrides? This affects the built-in HTML format registration — we can't ship an HTML renderer without deciding the template strategy.
+- **Opt-in command response bodies** — What does the configuration look like? Per-handler attribute? Global config toggle? Per-route config? What format is the response body rendered in — always JSON, or format-aware like Queries?
 
 ---
 
