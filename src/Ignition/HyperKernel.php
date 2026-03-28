@@ -24,7 +24,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
     /**
      * The application container, set during bootstrap.
      */
-    private Application|null $container = null;
+    protected Application|null $container = null;
 
     /**
      * Environment variables that must be set for the application to run.
