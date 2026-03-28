@@ -97,7 +97,7 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 
 ### River (Streams)
 
-- [ ] Add test for `EmptyStream::getMetadata($key)` — verify it returns the correct value for valid metadata keys (currently always returns `null`)
+- [x] Add test for `EmptyStream::getMetadata($key)` — covered by the bug fix, tests verify correct values for valid keys and null for absent keys
 - [ ] Add test for `Stream::read(0)` edge case — verify reading zero bytes returns empty string
 - [ ] Add test for `CachingStream::seek()` with `SEEK_END` on an unseekable remote stream
 - [x] Fix `CachingStream` not caching `php://input` — `getContents()` was only reading from the local cache without first pulling uncached data from the remote stream. Fixed to drain remote into local before returning. `__toString()` now rewinds before reading. Removed `$_SERVER['RAW_BODY']` workaround from the starter app.
@@ -324,7 +324,7 @@ Track updates to the starter app (`../arcanum/`) as framework features land.
 - [x] Add `App\Query\Health`, `App\Query\HealthHandler`, and `App\Query\HealthResult` — example convention-routed Query
 - [x] Set up directory structure conventions — `app/Pages/`, `app/Query/` directories in the starter
 - [x] Add `config/routes.php` — page registration moved from bootstrap to config file, bootstrap reads `$routes['pages']` and registers each path/format pair
-- [ ] Add `config/formats.php` — configure enabled response formats and any renderer overrides
+- [x] Add `config/formats.php` — configure enabled response formats and any renderer overrides
 - [x] Add example Command — `PUT /contact/submit` → `App\Contact\Command\Submit` + `SubmitHandler`, demonstrates Command with DTO hydration from JSON body, void return→204
 - [ ] Update `config/` with any new configuration files needed by routing or middleware
 
