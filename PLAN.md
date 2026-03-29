@@ -119,8 +119,8 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 
 ## Quill
 
-- [ ] Review PSR-3 compliance and confirm complete — if gaps exist, address them
-- [ ] Add tests for `Logger` (multi-channel routing, default channel fallback)
+- [x] Review PSR-3 compliance and confirm complete — Logger and Channel both implement LoggerInterface correctly. All 8 severity methods, `log()`, context forwarding, and Stringable messages work. No gaps found.
+- [x] Add tests for `Logger` (multi-channel routing, default channel fallback, context forwarding, Stringable messages, non-existent channel exception) and `Channel` (name property, context forwarding, Stringable messages)
 - [x] Fix invalid `#[UsesClass(\Monolog\Logger::class)]` annotation in `LoggerTest` — removed; third-party classes don't belong in coverage metadata
 
 ---

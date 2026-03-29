@@ -425,10 +425,9 @@ final class LoggerTest extends TestCase
         $this->assertSame($channelB, $logger->channel('other'));
     }
 
-    public function testDefaulLoggerIfNoLoggerIsPassedIn(): void
+    public function testDefaultChannelCreatedWhenNoChannelsProvided(): void
     {
         // Arrange
-
         $logger = new Logger();
 
         // Act
@@ -437,5 +436,128 @@ final class LoggerTest extends TestCase
         // Assert
         $this->assertInstanceOf(Channel::class, $channel);
         $this->assertSame('default', $channel->name);
+    }
+
+    // -----------------------------------------------------------
+    // Context forwarding
+    // -----------------------------------------------------------
+
+    public function testContextIsForwardedToChannel(): void
+    {
+        // Arrange
+        $monolog = $this->createStub(\Monolog\Logger::class);
+        $monolog->method('getName')->willReturn('default');
+
+        $channel = $this->getMockBuilder(Channel::class)
+            ->setConstructorArgs([$monolog])
+            ->getMock();
+
+        $context = ['user_id' => 42, 'action' => 'login'];
+
+        $channel->expects($this->once())
+            ->method('info')
+            ->with('User logged in', $context);
+
+        $logger = new Logger($channel);
+
+        // Act
+        $logger->info('User logged in', $context);
+    }
+
+    public function testLogContextIsForwardedToChannel(): void
+    {
+        // Arrange
+        $monolog = $this->createStub(\Monolog\Logger::class);
+        $monolog->method('getName')->willReturn('default');
+
+        $channel = $this->getMockBuilder(Channel::class)
+            ->setConstructorArgs([$monolog])
+            ->getMock();
+
+        $context = ['exception' => new \RuntimeException('fail')];
+
+        $channel->expects($this->once())
+            ->method('log')
+            ->with('error', 'Something broke', $context);
+
+        $logger = new Logger($channel);
+
+        // Act
+        $logger->log('error', 'Something broke', $context);
+    }
+
+    // -----------------------------------------------------------
+    // Channel routing
+    // -----------------------------------------------------------
+
+    public function testLogToSpecificChannel(): void
+    {
+        // Arrange
+        $defaultMonolog = $this->createStub(\Monolog\Logger::class);
+        $defaultMonolog->method('getName')->willReturn('default');
+
+        $auditMonolog = $this->createStub(\Monolog\Logger::class);
+        $auditMonolog->method('getName')->willReturn('audit');
+
+        $defaultChannel = $this->getMockBuilder(Channel::class)
+            ->setConstructorArgs([$defaultMonolog])
+            ->getMock();
+
+        $defaultChannel->expects($this->never())->method('info');
+
+        $auditChannel = $this->getMockBuilder(Channel::class)
+            ->setConstructorArgs([$auditMonolog])
+            ->getMock();
+
+        $auditChannel->expects($this->once())
+            ->method('info')
+            ->with('Permission changed');
+
+        $logger = new Logger($defaultChannel, $auditChannel);
+
+        // Act
+        $logger->channel('audit')->info('Permission changed');
+    }
+
+    public function testNonExistentChannelThrowsInvalidArgumentException(): void
+    {
+        // Arrange
+        $logger = new Logger();
+
+        // Act & Assert
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Channel missing does not exist.');
+        $logger->channel('missing');
+    }
+
+    // -----------------------------------------------------------
+    // Stringable message support (PSR-3)
+    // -----------------------------------------------------------
+
+    public function testStringableMessageIsForwarded(): void
+    {
+        // Arrange
+        $monolog = $this->createStub(\Monolog\Logger::class);
+        $monolog->method('getName')->willReturn('default');
+
+        $stringable = new class () implements \Stringable {
+            public function __toString(): string
+            {
+                return 'stringable message';
+            }
+        };
+
+        $channel = $this->getMockBuilder(Channel::class)
+            ->setConstructorArgs([$monolog])
+            ->getMock();
+
+        $channel->expects($this->once())
+            ->method('warning')
+            ->with($stringable);
+
+        $logger = new Logger($channel);
+
+        // Act
+        $logger->warning($stringable);
     }
 }
