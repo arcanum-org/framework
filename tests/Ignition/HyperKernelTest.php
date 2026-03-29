@@ -11,15 +11,17 @@ use Arcanum\Glitch\HttpException;
 use Arcanum\Hyper\StatusCode;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\HyperKernel;
+use Arcanum\Test\Fixture\CapturingKernel;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\StreamInterface;
 
 #[CoversClass(HyperKernel::class)]
 #[UsesClass(HttpException::class)]
-#[UsesClass(\Arcanum\Hyper\StatusCode::class)]
+#[UsesClass(StatusCode::class)]
 #[UsesClass(\Arcanum\Hyper\Phrase::class)]
 final class HyperKernelTest extends TestCase
 {
@@ -237,5 +239,124 @@ final class HyperKernelTest extends TestCase
 
         // Assert
         $this->addToAssertionCount(1);
+    }
+
+    // -----------------------------------------------------------
+    // prepareRequest() — JSON body parsing
+    // -----------------------------------------------------------
+
+    private function stubJsonRequest(string $body, string $contentType = 'application/json'): ServerRequestInterface
+    {
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('__toString')->willReturn($body);
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getHeaderLine')->willReturnCallback(
+            fn(string $name) => $name === 'Content-Type' ? $contentType : ''
+        );
+        $request->method('getBody')->willReturn($stream);
+        $request->method('withParsedBody')->willReturnCallback(
+            function (mixed $data) {
+                $clone = $this->createStub(ServerRequestInterface::class);
+                $clone->method('getParsedBody')->willReturn($data);
+                $clone->method('getHeaderLine')->willReturnCallback(
+                    fn(string $name) => $name === 'Content-Type' ? 'application/json' : ''
+                );
+                return $clone;
+            }
+        );
+
+        return $request;
+    }
+
+    /**
+     * Create a kernel that captures the prepared request instead of throwing.
+     */
+    private function capturingKernel(): CapturingKernel
+    {
+        return new CapturingKernel('/app');
+    }
+
+    public function testPrepareRequestParsesJsonBody(): void
+    {
+        // Arrange
+        $kernel = $this->capturingKernel();
+        $request = $this->stubJsonRequest('{"name":"test","count":42}');
+
+        // Act
+        $kernel->handle($request);
+
+        // Assert
+        $this->assertSame(['name' => 'test', 'count' => 42], $kernel->capturedRequest?->getParsedBody());
+    }
+
+    public function testPrepareRequestThrows400ForMalformedJson(): void
+    {
+        // Arrange
+        $kernel = new HyperKernel('/app');
+        $request = $this->stubJsonRequest('{invalid json}');
+
+        // Act & Assert
+        try {
+            $kernel->handle($request);
+            $this->fail('Expected HttpException');
+        } catch (HttpException $e) {
+            $this->assertSame(StatusCode::BadRequest, $e->getStatusCode());
+            $this->assertSame('Malformed JSON body.', $e->getMessage());
+        }
+    }
+
+    public function testPrepareRequestLeavesEmptyJsonBodyAlone(): void
+    {
+        // Arrange
+        $kernel = $this->capturingKernel();
+        $request = $this->stubJsonRequest('');
+
+        // Act
+        $kernel->handle($request);
+
+        // Assert — request passed through without withParsedBody being called
+        $this->assertNull($kernel->capturedRequest?->getParsedBody());
+    }
+
+    public function testPrepareRequestIgnoresNonJsonContentType(): void
+    {
+        // Arrange
+        $kernel = $this->capturingKernel();
+        $request = $this->stubJsonRequest('not json', 'text/plain');
+
+        // Act
+        $kernel->handle($request);
+
+        // Assert — request passed through unchanged
+        $this->assertNull($kernel->capturedRequest?->getParsedBody());
+    }
+
+    public function testPrepareRequestHandlesJsonWithCharset(): void
+    {
+        // Arrange — Content-Type: application/json; charset=utf-8
+        $kernel = $this->capturingKernel();
+        $request = $this->stubJsonRequest('{"key":"value"}', 'application/json; charset=utf-8');
+
+        // Act
+        $kernel->handle($request);
+
+        // Assert
+        $this->assertSame(['key' => 'value'], $kernel->capturedRequest?->getParsedBody());
+    }
+
+    public function testPrepareRequestThrows400ForJsonScalar(): void
+    {
+        // Arrange — valid JSON but decodes to a scalar, not an array
+        $kernel = new HyperKernel('/app');
+        $request = $this->stubJsonRequest('"just a string"');
+
+        // Act & Assert
+        try {
+            $kernel->handle($request);
+            $this->fail('Expected HttpException');
+        } catch (HttpException $e) {
+            $this->assertSame(StatusCode::BadRequest, $e->getStatusCode());
+        }
     }
 }

@@ -7,6 +7,8 @@ namespace Arcanum\Ignition;
 use Arcanum\Cabinet\Application;
 use Arcanum\Glitch\ExceptionHandler;
 use Arcanum\Glitch\ExceptionRenderer;
+use Arcanum\Glitch\HttpException;
+use Arcanum\Hyper\StatusCode;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Server\RequestHandlerInterface;
@@ -124,10 +126,34 @@ class HyperKernel implements Kernel, RequestHandlerInterface
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
         try {
-            return $this->handleRequest($request);
+            return $this->handleRequest($this->prepareRequest($request));
         } catch (\Throwable $e) {
             return $this->handleException($e);
         }
+    }
+
+    /**
+     * Prepare the request before it reaches the application handler.
+     *
+     * Parses JSON request bodies into parsedBody so that application
+     * handlers receive structured data regardless of content type.
+     */
+    protected function prepareRequest(ServerRequestInterface $request): ServerRequestInterface
+    {
+        $contentType = $request->getHeaderLine('Content-Type');
+
+        if (str_contains($contentType, 'application/json')) {
+            $body = (string) $request->getBody();
+            if ($body !== '') {
+                $decoded = json_decode($body, true);
+                if (!is_array($decoded)) {
+                    throw new HttpException(StatusCode::BadRequest, 'Malformed JSON body.');
+                }
+                $request = $request->withParsedBody($decoded);
+            }
+        }
+
+        return $request;
     }
 
     /**
@@ -138,9 +164,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
      */
     protected function handleRequest(ServerRequestInterface $request): ResponseInterface
     {
-        throw new \Arcanum\Glitch\HttpException(
-            \Arcanum\Hyper\StatusCode::NotFound,
-        );
+        throw new HttpException(StatusCode::NotFound);
     }
 
     /**
