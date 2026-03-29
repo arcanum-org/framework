@@ -12,7 +12,6 @@ use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(Logger::class)]
 #[UsesClass(Channel::class)]
-#[UsesClass(\Monolog\Logger::class)]
 final class LoggerTest extends TestCase
 {
     public function testEmergency(): void
