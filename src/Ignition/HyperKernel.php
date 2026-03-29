@@ -26,7 +26,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
     /**
      * The application container, set during bootstrap.
      */
-    protected Application|null $container = null;
+    protected Application $container;
 
     /**
      * Environment variables that must be set for the application to run.
@@ -175,13 +175,13 @@ class HyperKernel implements Kernel, RequestHandlerInterface
      */
     protected function handleException(\Throwable $e): ResponseInterface
     {
-        if ($this->container?->has(ExceptionHandler::class)) {
+        if ($this->container->has(ExceptionHandler::class)) {
             /** @var ExceptionHandler $handler */
             $handler = $this->container->get(ExceptionHandler::class);
             $handler->handleException($e);
         }
 
-        if ($this->container?->has(ExceptionRenderer::class)) {
+        if ($this->container->has(ExceptionRenderer::class)) {
             /** @var ExceptionRenderer $renderer */
             $renderer = $this->container->get(ExceptionRenderer::class);
             return $renderer->render($e);

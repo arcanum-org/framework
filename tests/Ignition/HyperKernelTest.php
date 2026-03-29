@@ -213,13 +213,13 @@ final class HyperKernelTest extends TestCase
         $kernel->handle($this->createStub(ServerRequestInterface::class));
     }
 
-    public function testHandleWorksWithoutBootstrap(): void
+    public function testHandleThrowsWhenNotBootstrapped(): void
     {
-        // Arrange — no bootstrap called, so container is null
+        // Arrange — no bootstrap called, so container is uninitialized
         $kernel = new HyperKernel('/app');
 
-        // Assert — rethrows because no container means no renderer
-        $this->expectException(HttpException::class);
+        // Assert — accessing $this->container before bootstrap throws Error
+        $this->expectException(\Error::class);
 
         // Act
         $kernel->handle($this->createStub(ServerRequestInterface::class));
@@ -292,8 +292,14 @@ final class HyperKernelTest extends TestCase
 
     public function testPrepareRequestThrows400ForMalformedJson(): void
     {
-        // Arrange
+        // Arrange — bootstrap with a container that has no renderer, so exception rethrows
         $kernel = new HyperKernel('/app');
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturn(false);
+        $container->method('get')->willReturn($bootstrapper);
+        $kernel->bootstrap($container);
+
         $request = $this->stubJsonRequest('{invalid json}');
 
         // Act & Assert
@@ -349,6 +355,12 @@ final class HyperKernelTest extends TestCase
     {
         // Arrange — valid JSON but decodes to a scalar, not an array
         $kernel = new HyperKernel('/app');
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturn(false);
+        $container->method('get')->willReturn($bootstrapper);
+        $kernel->bootstrap($container);
+
         $request = $this->stubJsonRequest('"just a string"');
 
         // Act & Assert
