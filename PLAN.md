@@ -51,10 +51,10 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 - [x] Add environment validation — verify required env vars are set during bootstrap, fail fast with clear errors
 - [ ] Add bootstrap lifecycle hooks — before/after events so the app can hook into the boot sequence
 - [x] Add tests for `HyperKernel` (bootstrap sequence, directory accessors, terminate)
-- [ ] Add tests for `Bootstrap\Environment` (.env loading, Environment service registration)
-- [ ] Add tests for `Bootstrap\Configuration` (config file loading from directory)
-- [ ] Add tests for `Bootstrap\Logger` (handler/channel creation from config)
-- [ ] Add tests for `Bootstrap\Exceptions` (error/exception/shutdown handler registration, memory reservation)
+- [x] Add tests for `Bootstrap\Environment` (.env loading, missing .env graceful handling, required var validation, Environment factory registration)
+- [x] Add tests for `Bootstrap\Configuration` (config file loading, file name as top-level key, empty directory, cache usage, cache skips file scanning)
+- [x] Add tests for `Bootstrap\Logger` (QuillLogger/ChannelLogger registration, StreamHandler with defaults/custom path, ErrorLogHandler, SyslogHandler, multi-channel, multi-handler channels)
+- [x] Add tests for `Bootstrap\Exceptions` (memory reservation, error_reporting, display_errors per environment, error/exception/shutdown handler delegation, memory freed on exception/shutdown, error_log fallback)
 
 ---
 
