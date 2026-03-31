@@ -7,6 +7,7 @@ namespace Arcanum\Ignition\Bootstrap;
 use Arcanum\Atlas\ConventionResolver;
 use Arcanum\Atlas\HttpRouter;
 use Arcanum\Atlas\PageResolver;
+use Arcanum\Atlas\RouteMap;
 use Arcanum\Atlas\Router;
 use Arcanum\Cabinet\Application;
 use Arcanum\Codex\Hydrator;
@@ -24,6 +25,7 @@ use Arcanum\Shodo\JsonRenderer;
  *   - pages_namespace (required) — the Pages namespace
  *
  * Reads from config/routes.php:
+ *   - custom (optional) — explicit path → class route mappings
  *   - pages (optional) — path => format mappings for registered pages
  *
  * Reads from config/formats.php:
@@ -92,6 +94,21 @@ class Routing implements Bootstrapper
         $resolver = new ConventionResolver(rootNamespace: $namespace);
         $container->instance(ConventionResolver::class, $resolver);
 
+        $routeMap = new RouteMap();
+
+        /** @var array<string, array{class: string, methods?: list<string>, format?: string}>|null $customRoutes */
+        $customRoutes = $config->get('routes.custom');
+        foreach ($customRoutes ?? [] as $path => $definition) {
+            $routeMap->register(
+                path: $path,
+                dtoClass: $definition['class'],
+                methods: $definition['methods'] ?? ['GET'],
+                format: $definition['format'] ?? $defaultFormat,
+            );
+        }
+
+        $container->instance(RouteMap::class, $routeMap);
+
         $pages = new PageResolver(namespace: $pagesNamespace);
 
         /** @var array<string, string|null>|null $pageRoutes */
@@ -102,8 +119,8 @@ class Routing implements Bootstrapper
 
         $container->instance(PageResolver::class, $pages);
 
-        $container->factory(Router::class, function () use ($resolver, $pages, $defaultFormat) {
-            return new HttpRouter($resolver, $pages, $defaultFormat);
+        $container->factory(Router::class, function () use ($resolver, $routeMap, $pages, $defaultFormat) {
+            return new HttpRouter($resolver, $routeMap, $pages, $defaultFormat);
         });
     }
 

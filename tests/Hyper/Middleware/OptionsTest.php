@@ -64,7 +64,7 @@ final class OptionsTest extends TestCase
         $pages = new PageResolver(namespace: self::PAGES_NS);
         $pages->register('/');
         $pages->register('/thing');
-        return new HttpRouter(new ConventionResolver(self::ROOT_NS), $pages);
+        return new HttpRouter(new ConventionResolver(self::ROOT_NS), pages: $pages);
     }
 
     // -----------------------------------------------------------

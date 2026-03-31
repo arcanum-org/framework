@@ -15,11 +15,13 @@ final class HttpRouter implements Router
 
     /**
      * @param ConventionResolver $resolver The convention-based path-to-namespace resolver.
+     * @param RouteMap|null $routeMap Custom route overrides, checked before convention routing.
      * @param PageResolver|null $pages The page resolver, or null if no pages are registered.
      * @param string $defaultFormat Fallback format when no file extension is present.
      */
     public function __construct(
         private readonly ConventionResolver $resolver,
+        private readonly RouteMap|null $routeMap = null,
         private readonly PageResolver|null $pages = null,
         private readonly string $defaultFormat = 'json',
     ) {
@@ -36,6 +38,14 @@ final class HttpRouter implements Router
     public function allowedMethods(string $path): array
     {
         [$cleanPath] = $this->parseExtension($path);
+
+        // Custom routes take priority.
+        if ($this->routeMap !== null) {
+            $customMethods = $this->routeMap->allowedMethods($cleanPath);
+            if ($customMethods !== []) {
+                return $customMethods;
+            }
+        }
 
         // Pages only allow GET.
         if ($this->pages !== null && $this->pages->has($cleanPath)) {
@@ -70,6 +80,15 @@ final class HttpRouter implements Router
         $method = strtoupper($input->getMethod());
 
         [$cleanPath, $extensionFormat, $hasExtension] = $this->parseExtension($path);
+
+        // Custom routes take priority over everything.
+        if ($this->routeMap !== null && $this->routeMap->has($cleanPath)) {
+            return $this->routeMap->resolve(
+                $cleanPath,
+                $method,
+                $hasExtension ? $extensionFormat : null,
+            );
+        }
 
         if ($this->pages !== null && $this->pages->has($cleanPath)) {
             if ($method !== 'GET') {

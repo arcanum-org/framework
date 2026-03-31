@@ -58,7 +58,7 @@ final class HttpRouterTest extends TestCase
         $pages->register('/thing');
         $pages->register('/docs/getting-started');
 
-        return new HttpRouter(new ConventionResolver(self::ROOT_NS), $pages);
+        return new HttpRouter(new ConventionResolver(self::ROOT_NS), pages: $pages);
     }
 
     // ---------------------------------------------------------------
