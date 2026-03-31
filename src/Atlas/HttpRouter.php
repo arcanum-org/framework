@@ -25,6 +25,38 @@ final class HttpRouter implements Router
     ) {
     }
 
+    /**
+     * Determine which HTTP methods are allowed for a given path.
+     *
+     * Returns an empty array if the path doesn't resolve to any route
+     * (neither pages, nor Query, nor Command namespace).
+     *
+     * @return list<string>
+     */
+    public function allowedMethods(string $path): array
+    {
+        [$cleanPath] = $this->parseExtension($path);
+
+        // Pages only allow GET.
+        if ($this->pages !== null && $this->pages->has($cleanPath)) {
+            return self::QUERY_METHODS;
+        }
+
+        $methods = [];
+
+        $queryRoute = $this->resolver->resolve(path: $cleanPath, method: 'GET');
+        if (class_exists($queryRoute->dtoClass)) {
+            $methods = array_merge($methods, self::QUERY_METHODS);
+        }
+
+        $commandRoute = $this->resolver->resolve(path: $cleanPath, method: 'PUT');
+        if (class_exists($commandRoute->dtoClass)) {
+            $methods = array_merge($methods, self::COMMAND_METHODS);
+        }
+
+        return $methods;
+    }
+
     public function resolve(object $input): Route
     {
         if (!$input instanceof ServerRequestInterface) {

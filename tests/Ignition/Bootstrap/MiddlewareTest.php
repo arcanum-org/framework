@@ -6,6 +6,7 @@ namespace Arcanum\Test\Ignition\Bootstrap;
 
 use Arcanum\Cabinet\Container;
 use Arcanum\Gather\Configuration;
+use Arcanum\Hyper\Middleware\Options;
 use Arcanum\Ignition\Bootstrap\Middleware;
 use Arcanum\Ignition\HyperKernel;
 use Arcanum\Ignition\Kernel;
@@ -31,10 +32,14 @@ final class MiddlewareTest extends TestCase
     {
         // Arrange
         $kernel = $this->createMock(HyperKernel::class);
-        $kernel->expects($this->exactly(2))
+        $kernel->expects($this->exactly(3))
             ->method('middleware')
             ->willReturnCallback(fn(string $class) => match (true) {
-                in_array($class, ['App\Http\Middleware\Cors', 'App\Http\Middleware\Auth']) => null,
+                in_array($class, [
+                    'App\Http\Middleware\Cors',
+                    'App\Http\Middleware\Auth',
+                    Options::class,
+                ]) => null,
                 default => $this->fail("Unexpected middleware class: $class"),
             });
 
@@ -60,11 +65,13 @@ final class MiddlewareTest extends TestCase
     // No config key — graceful no-op
     // -----------------------------------------------------------
 
-    public function testNoConfigKeyDoesNothing(): void
+    public function testNoConfigKeyRegistersOnlyFrameworkMiddleware(): void
     {
         // Arrange
         $kernel = $this->createMock(HyperKernel::class);
-        $kernel->expects($this->never())->method('middleware');
+        $kernel->expects($this->once())
+            ->method('middleware')
+            ->with(Options::class);
 
         $container = new Container();
         $container->instance(\Arcanum\Cabinet\Application::class, $container);
@@ -81,11 +88,13 @@ final class MiddlewareTest extends TestCase
     // Empty array — no calls
     // -----------------------------------------------------------
 
-    public function testEmptyArrayDoesNothing(): void
+    public function testEmptyArrayRegistersOnlyFrameworkMiddleware(): void
     {
         // Arrange
         $kernel = $this->createMock(HyperKernel::class);
-        $kernel->expects($this->never())->method('middleware');
+        $kernel->expects($this->once())
+            ->method('middleware')
+            ->with(Options::class);
 
         $container = new Container();
         $container->instance(\Arcanum\Cabinet\Application::class, $container);

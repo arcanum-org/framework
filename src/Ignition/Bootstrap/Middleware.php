@@ -6,6 +6,7 @@ namespace Arcanum\Ignition\Bootstrap;
 
 use Arcanum\Cabinet\Application;
 use Arcanum\Gather\Configuration;
+use Arcanum\Hyper\Middleware\Options;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\HyperKernel;
 use Arcanum\Ignition\Kernel;
@@ -15,6 +16,9 @@ use Arcanum\Ignition\Kernel;
  *
  * Reads from config/middleware.php:
  *   - global (optional) — ordered list of middleware class names
+ *
+ * After app middleware, the framework appends its own middleware:
+ *   - Options — handles OPTIONS requests with 204 + Allow header
  */
 class Middleware implements Bootstrapper
 {
@@ -35,5 +39,8 @@ class Middleware implements Bootstrapper
         foreach ($middleware ?? [] as $class) {
             $kernel->middleware($class);
         }
+
+        // Framework middleware — always present, innermost layer.
+        $kernel->middleware(Options::class);
     }
 }

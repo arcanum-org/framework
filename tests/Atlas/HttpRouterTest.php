@@ -623,4 +623,80 @@ final class HttpRouterTest extends TestCase
             $this->assertSame(StatusCode::NotFound, $e->getStatusCode());
         }
     }
+
+    // ---------------------------------------------------------------
+    // allowedMethods()
+    // ---------------------------------------------------------------
+
+    public function testAllowedMethodsForQueryOnlyPath(): void
+    {
+        // Arrange — Reports\Query\Summary exists, no Command
+        $router = $this->router();
+
+        // Act
+        $methods = $router->allowedMethods('/reports/summary');
+
+        // Assert
+        $this->assertSame(['GET'], $methods);
+    }
+
+    public function testAllowedMethodsForCommandOnlyPath(): void
+    {
+        // Arrange — Contact\Command\Submit exists, no Query
+        $router = $this->router();
+
+        // Act
+        $methods = $router->allowedMethods('/contact/submit');
+
+        // Assert
+        $this->assertSame(['PUT', 'POST', 'PATCH', 'DELETE'], $methods);
+    }
+
+    public function testAllowedMethodsForPathWithBothQueryAndCommand(): void
+    {
+        // Arrange — Shop\Query\Products and Shop\Command\Products both exist
+        $router = $this->router();
+
+        // Act
+        $methods = $router->allowedMethods('/shop/products');
+
+        // Assert
+        $this->assertSame(['GET', 'PUT', 'POST', 'PATCH', 'DELETE'], $methods);
+    }
+
+    public function testAllowedMethodsForNonExistentPath(): void
+    {
+        // Arrange
+        $router = $this->router();
+
+        // Act
+        $methods = $router->allowedMethods('/nowhere/nothing');
+
+        // Assert
+        $this->assertSame([], $methods);
+    }
+
+    public function testAllowedMethodsForPage(): void
+    {
+        // Arrange
+        $router = $this->routerWithPages();
+
+        // Act
+        $methods = $router->allowedMethods('/');
+
+        // Assert
+        $this->assertSame(['GET'], $methods);
+    }
+
+    public function testAllowedMethodsStripsExtension(): void
+    {
+        // Arrange — Reports\Query\Summary exists
+        $router = $this->router();
+
+        // Act
+        $methods = $router->allowedMethods('/reports/summary.json');
+
+        // Assert
+        $this->assertSame(['GET'], $methods);
+    }
 }

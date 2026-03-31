@@ -242,9 +242,9 @@ The router strips file extensions from the URI path before matching, so `/shop/n
 
 ### OPTIONS Handling
 
-- [ ] Add OPTIONS middleware — automatically responds with allowed methods for a given path and CORS headers, no application handler involved
-- [ ] Add tests for OPTIONS response listing allowed methods for a convention route
-- [ ] Add tests for OPTIONS CORS preflight headers
+- [x] Add OPTIONS middleware — `Hyper\Middleware\Options` intercepts OPTIONS requests, queries `HttpRouter::allowedMethods()` for the path, returns 204 with `Allow` header. Auto-registered as innermost framework middleware by `Bootstrap\Middleware`. CORS headers handled by app middleware (e.g., starter app's `Cors` middleware) on the way out.
+- [x] Add tests for OPTIONS response listing allowed methods for a convention route
+- [x] Add tests for OPTIONS CORS preflight headers
 
 ### Routing Bootstrapper
 
