@@ -178,13 +178,103 @@ $page->handlerBaseName(); // → 'Arcanum\Flow\Conveyor\Page'
 // Resolves to: PageHandler
 ```
 
-## EmptyDTO
+## Command response conventions
 
-When a handler returns null (void handlers), the bus wraps the result in `EmptyDTO` — a final class with no properties. This prevents the Pipeline from throwing `Interrupted` on a null return.
+In CQRS, commands represent intent — "place this order", "ban this user", "queue this email". The handler executes the intent, but the **return type** signals what happened. Arcanum reads the handler's PHP return type declaration to determine the HTTP response:
 
-## QueryResult
+| Return type | Returns | HTTP status | Meaning |
+|---|---|---|---|
+| `: void` | (nothing) | **204 No Content** | Done. Nothing to report. |
+| `: ?Foo` | `null` | **202 Accepted** | Accepted for processing (async, queued, deferred). |
+| `: ?Foo` | `Foo` | **201 Created** | Created a resource. |
+| `: Foo` | `Foo` | **201 Created** | Created a resource. |
+| `: int` | `42` | **201 Created** | Created — scalar identifier. |
 
-When a handler returns a non-object value (array, scalar), the bus wraps it in `QueryResult` so it can flow through the pipeline. The kernel unwraps it before rendering.
+The return type is the signal. You don't need to remember status codes or use special annotations — just write the return type you mean.
+
+### Fire-and-forget (204)
+
+The command does its work synchronously and has nothing to report. Most commands fall here:
+
+```php
+class BanUserHandler
+{
+    public function __invoke(BanUser $command): void
+    {
+        $this->users->ban($command->userId);
+        // done — nothing to return
+    }
+}
+```
+
+### Accepted for processing (202)
+
+The command was validated and accepted, but the actual work happens later — a queue, a background job, an external system. Declare a nullable return type and return `null`:
+
+```php
+class SendWelcomeEmailHandler
+{
+    public function __invoke(SendWelcomeEmail $command): ?EmailReceipt
+    {
+        $this->queue->push($command);
+        return null;
+        // → 202 Accepted: "I got it, I'll handle it later"
+    }
+}
+```
+
+The nullable type signals to both the framework and to other developers reading the code: this handler *might* return a result, but `null` means "accepted, pending".
+
+### Created (201)
+
+The command created something and returns an identifier or value object:
+
+```php
+class CreateUserHandler
+{
+    public function __invoke(CreateUser $command): UserId
+    {
+        $user = $this->users->create($command->name, $command->email);
+        return $user->id;
+        // → 201 Created
+    }
+}
+```
+
+### Why commands don't return response bodies
+
+In CQRS, commands change state and queries read state. If a command returns a full object (the created user with all fields), you're mixing both concerns — the command handler becomes a query in disguise. This leads to:
+
+- **Coupling** — the command handler must know what shape the client expects, which changes independently of the write logic.
+- **Inconsistency** — the "created" representation may differ from what a proper query returns (stale caches, computed fields, related data).
+- **Complexity** — the handler grows to satisfy read concerns it shouldn't own.
+
+Instead, return an identifier (201) and let the client query for the full resource. Or return nothing (204) if the client doesn't need confirmation beyond "it worked".
+
+### How it works internally
+
+After calling the handler, the bus reflects on `__invoke`'s return type:
+
+- **`void`** or no return type → wraps in `EmptyDTO` (kernel maps to 204)
+- **Nullable type, returned `null`** → wraps in `AcceptedDTO` (kernel maps to 202)
+- **Object returned** → passes through as-is (kernel maps to 201)
+- **Scalar/array returned** → wraps in `QueryResult` (kernel maps to 201)
+
+Handlers with no return type declaration are treated as `void` for backwards compatibility.
+
+## Result wrappers
+
+### EmptyDTO
+
+Sentinel for `void` handlers. The bus wraps the result in `EmptyDTO` — a final class with no properties — so the pipeline doesn't break on a null return. The kernel maps this to **204 No Content**.
+
+### AcceptedDTO
+
+Sentinel for nullable handlers that returned `null`. The kernel maps this to **202 Accepted**. Distinct from `EmptyDTO` so the framework can express "nothing happened yet" differently from "the work is done".
+
+### QueryResult
+
+Wraps non-object handler return values (arrays, scalars) so they can flow through the pipeline. The kernel unwraps it before rendering.
 
 ## The interfaces
 
@@ -204,16 +294,24 @@ dispatch(PlaceOrder)
 MiddlewareBus (implements Bus)
 |-- dispatchFlow (Continuation — before middleware)
 |-- responseFlow (Continuation — after middleware)
-\-- Handler lookup (convention: ClassName + "Handler")
+|-- Handler lookup (convention: ClassName + "Handler")
+\-- Return type reflection (void → EmptyDTO, nullable null → AcceptedDTO)
 
 Dynamic DTOs (all extend DynamicDTO):
 |-- Command — handler-only commands, wraps request body
 |-- Query   — handler-only queries, wraps query params
 \-- Page    — template-driven pages, routes to PageHandler
 
-Special DTOs:
-|-- EmptyDTO    — void handler result sentinel
-\-- QueryResult — non-object handler result wrapper
+Result wrappers:
+|-- EmptyDTO    — void handler → 204 No Content
+|-- AcceptedDTO — nullable null → 202 Accepted
+\-- QueryResult — non-object return → wraps for pipeline
+
+Command return type → HTTP status:
+  : void        → 204 No Content
+  : ?Foo → null → 202 Accepted
+  : ?Foo → Foo  → 201 Created
+  : Foo         → 201 Created
 
 Middleware Filters:
 |-- FinalFilter

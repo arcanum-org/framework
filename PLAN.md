@@ -2,7 +2,7 @@
 
 This checklist tracks remaining work to complete all packages in the Arcanum framework. Each item is a small unit of work that includes 100% test coverage.
 
-**Progress: 212 done, 11 remaining.**
+**Progress: 213 done, 10 remaining.**
 
 ---
 
@@ -178,7 +178,7 @@ Now that all renderers are built, these integration tests are unblocked:
 ### Command Response Enhancements
 
 - [x] Add void/null distinction in Conveyor — reflect on handler return type: `void` → EmptyDTO (204), nullable returning null → AcceptedDTO (202), nullable returning value → 201
-- [ ] Add documentation guidance — explain CQRS command conventions and why response bodies are discouraged
+- [x] Add documentation guidance — explain CQRS command conventions and why response bodies are discouraged
 
 **Deferred — blocked on upstream work:**
 
