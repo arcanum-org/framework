@@ -15,11 +15,14 @@ use Arcanum\Codex\Hydrator;
 use Arcanum\Gather\Configuration;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\Kernel;
+use Arcanum\Shodo\CsvRenderer;
 use Arcanum\Shodo\Format;
 use Arcanum\Shodo\FormatRegistry;
 use Arcanum\Shodo\HtmlFallback;
 use Arcanum\Shodo\HtmlRenderer;
 use Arcanum\Shodo\JsonRenderer;
+use Arcanum\Shodo\PlainTextFallback;
+use Arcanum\Shodo\PlainTextRenderer;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Shodo\TemplateResolver;
@@ -70,29 +73,12 @@ class Routing implements Bootstrapper
             return $registry;
         });
 
-        // Register JsonRenderer so it can be resolved from the container
+        // Register renderers
         $container->service(JsonRenderer::class);
+        $container->service(CsvRenderer::class);
 
-        // Register HtmlRenderer and its dependencies
+        // Shared template infrastructure
         $container->service(TemplateCompiler::class);
-        $container->service(HtmlFallback::class);
-
-        $container->factory(TemplateResolver::class, function () use ($container, $config) {
-            /** @var Kernel $kernel */
-            $kernel = $container->get(Kernel::class);
-
-            /** @var string $rootNamespace */
-            $rootNamespace = $config->get('app.namespace');
-
-            // The root namespace may be nested (e.g. "App\Domain"), but PSR-4
-            // maps the top-level segment to the directory. Extract it.
-            $topLevelNamespace = strstr($rootNamespace, '\\', true) ?: $rootNamespace;
-
-            return new TemplateResolver(
-                rootDirectory: $kernel->rootDirectory(),
-                rootNamespace: $topLevelNamespace,
-            );
-        });
 
         $container->factory(TemplateCache::class, function () use ($container, $config) {
             /** @var mixed $cacheEnabled */
@@ -113,7 +99,57 @@ class Routing implements Bootstrapper
             );
         });
 
-        $container->service(HtmlRenderer::class);
+        // Template-based renderers — each gets its own TemplateResolver
+        // configured for its file extension.
+        $container->factory(HtmlRenderer::class, function () use ($container, $config) {
+            /** @var TemplateCompiler $compiler */
+            $compiler = $container->get(TemplateCompiler::class);
+            /** @var TemplateCache $cache */
+            $cache = $container->get(TemplateCache::class);
+
+            return new HtmlRenderer(
+                resolver: $this->createTemplateResolver($container, $config, 'html'),
+                compiler: $compiler,
+                cache: $cache,
+                fallback: new HtmlFallback(),
+            );
+        });
+
+        $container->factory(PlainTextRenderer::class, function () use ($container, $config) {
+            /** @var TemplateCompiler $compiler */
+            $compiler = $container->get(TemplateCompiler::class);
+            /** @var TemplateCache $cache */
+            $cache = $container->get(TemplateCache::class);
+
+            return new PlainTextRenderer(
+                resolver: $this->createTemplateResolver($container, $config, 'txt'),
+                compiler: $compiler,
+                cache: $cache,
+                fallback: new PlainTextFallback(),
+            );
+        });
+    }
+
+    private function createTemplateResolver(
+        Application $container,
+        Configuration $config,
+        string $extension,
+    ): TemplateResolver {
+        /** @var Kernel $kernel */
+        $kernel = $container->get(Kernel::class);
+
+        /** @var string $rootNamespace */
+        $rootNamespace = $config->get('app.namespace');
+
+        // The root namespace may be nested (e.g. "App\Domain"), but PSR-4
+        // maps the top-level segment to the directory. Extract it.
+        $topLevelNamespace = strstr($rootNamespace, '\\', true) ?: $rootNamespace;
+
+        return new TemplateResolver(
+            rootDirectory: $kernel->rootDirectory(),
+            rootNamespace: $topLevelNamespace,
+            extension: $extension,
+        );
     }
 
     private function registerRouter(Application $container, Configuration $config): void

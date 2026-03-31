@@ -21,7 +21,7 @@ final class TemplateCompilerTest extends TestCase
 
         // Assert
         $this->assertSame(
-            '<p><?= htmlspecialchars((string)($name), ENT_QUOTES, \'UTF-8\') ?></p>',
+            '<p><?= $__escape((string)($name)) ?></p>',
             $result,
         );
     }
@@ -48,7 +48,7 @@ final class TemplateCompilerTest extends TestCase
 
         // Assert
         $this->assertSame(
-            '<?= $safe ?> and <?= htmlspecialchars((string)($unsafe), ENT_QUOTES, \'UTF-8\') ?>',
+            '<?= $safe ?> and <?= $__escape((string)($unsafe)) ?>',
             $result,
         );
     }
@@ -184,7 +184,7 @@ final class TemplateCompilerTest extends TestCase
         // Assert
         $expected = '<?php foreach($rows as $row): ?>'
             . '<?php if($row): ?>'
-            . '<?= htmlspecialchars((string)($row), ENT_QUOTES, \'UTF-8\') ?>'
+            . '<?= $__escape((string)($row)) ?>'
             . '<?php endif; ?>'
             . '<?php endforeach; ?>';
         $this->assertSame($expected, $result);
@@ -200,7 +200,7 @@ final class TemplateCompilerTest extends TestCase
 
         // Assert
         $this->assertSame(
-            '<?= htmlspecialchars((string)($name), ENT_QUOTES, \'UTF-8\') ?>',
+            '<?= $__escape((string)($name)) ?>',
             $result,
         );
     }
@@ -215,7 +215,7 @@ final class TemplateCompilerTest extends TestCase
 
         // Assert
         $this->assertSame(
-            '<?= htmlspecialchars((string)($item[\'name\']), ENT_QUOTES, \'UTF-8\') ?>',
+            '<?= $__escape((string)($item[\'name\'])) ?>',
             $result,
         );
     }
@@ -254,7 +254,7 @@ final class TemplateCompilerTest extends TestCase
         // Assert
         $this->assertStringContainsString('<?php foreach($products as $product): ?>', $result);
         $this->assertStringContainsString(
-            '<?= htmlspecialchars((string)($product[\'name\']), ENT_QUOTES, \'UTF-8\') ?>',
+            '<?= $__escape((string)($product[\'name\'])) ?>',
             $result,
         );
         $this->assertStringContainsString('<?= $product[\'description\'] ?>', $result);

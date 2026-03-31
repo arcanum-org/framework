@@ -396,18 +396,18 @@ The format registry maps file extensions to renderers and content types. It is t
 - [x] Wire `FormatRegistry` into starter kernel — replaces hardcoded `JsonRenderer` with `$formats->renderer($route->format)`
 - [x] Add built-in HTML renderer — renders data into an HTML response via co-located templates with a micro template compiler (TemplateCompiler, TemplateResolver, TemplateCache, HtmlFallback, HtmlRenderer)
 - [x] Register built-in HTML format — extension `html`, content type `text/html`, uses `HtmlRenderer`
-- [ ] Add built-in CSV renderer — renders iterable/array data as CSV with proper escaping
-- [ ] Register built-in CSV format — extension `csv`, content type `text/csv`, uses `CsvRenderer`
-- [ ] Add built-in plain text renderer — renders data as plain text
-- [ ] Register built-in plain text format — extension `txt`, content type `text/plain`, uses `PlainTextRenderer`
+- [x] Add built-in CSV renderer — pure tabular serializer, renders arrays as CSV with proper escaping (CsvRenderer)
+- [x] Register built-in CSV format — extension `csv`, content type `text/csv`, uses `CsvRenderer`
+- [x] Add built-in plain text renderer — template-based renderer reusing TemplateCompiler with identity escape function (PlainTextRenderer, PlainTextFallback)
+- [x] Register built-in plain text format — extension `txt`, content type `text/plain`, uses `PlainTextRenderer`
 - [x] Add format configuration — apps define formats in `config/formats.php` with extension, content_type, and renderer class. The Routing bootstrapper reads this and registers them in the FormatRegistry.
 - [x] Add format bootstrapper for Ignition — consolidated into `Bootstrap\Routing` which handles both route and format config
 - [x] Add tests for `Format` value object
 - [x] Add tests for `FormatRegistry` — register, get, has, remove, renderer resolution, unsupported format (406)
 - [x] Add tests for built-in JSON format registration and rendering
 - [x] Add tests for built-in HTML format registration and rendering
-- [ ] Add tests for built-in CSV format registration and rendering
-- [ ] Add tests for built-in plain text format registration and rendering
+- [x] Add tests for built-in CSV format registration and rendering
+- [x] Add tests for built-in plain text format registration and rendering
 - [ ] Add tests for app-defined custom format with custom renderer
 - [ ] Add tests for disabling a built-in format via config
 - [ ] Add tests for overriding a built-in format's renderer via config

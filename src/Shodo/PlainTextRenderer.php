@@ -15,25 +15,27 @@ use Arcanum\Parchment\Reader;
 use Psr\Http\Message\ResponseInterface;
 
 /**
- * Renders data as an HTML HTTP response using co-located templates.
+ * Renders data as a plain text HTTP response using co-located templates.
  *
  * Template discovery follows PSR-4 convention: the DTO class name maps
- * to a .html file in the same directory as the class. When no template
- * exists, falls back to a generic HTML representation of the data.
+ * to a .txt file in the same directory as the class. When no template
+ * exists, falls back to a structured plain text representation.
+ *
+ * Uses an identity escape function — no escaping is needed for plain text.
  */
-class HtmlRenderer implements Renderer
+class PlainTextRenderer implements Renderer
 {
     public function __construct(
         private readonly TemplateResolver $resolver,
         private readonly TemplateCompiler $compiler,
         private readonly TemplateCache $cache,
-        private readonly HtmlFallback $fallback,
+        private readonly PlainTextFallback $fallback,
         private readonly Reader $reader = new Reader(),
     ) {
     }
 
     /**
-     * Render data as an HTML response.
+     * Render data as a plain text response.
      *
      * @param string $dtoClass The DTO class name, used to discover the template.
      */
@@ -42,12 +44,12 @@ class HtmlRenderer implements Renderer
         $templatePath = $this->resolver->resolve($dtoClass);
 
         if ($templatePath === null) {
-            $html = $this->fallback->render($data);
+            $text = $this->fallback->render($data);
         } else {
-            $html = $this->renderTemplate($templatePath, $data);
+            $text = $this->renderTemplate($templatePath, $data);
         }
 
-        return $this->buildResponse($html);
+        return $this->buildResponse($text);
     }
 
     private function renderTemplate(string $templatePath, mixed $data): string
@@ -61,8 +63,7 @@ class HtmlRenderer implements Renderer
         }
 
         $variables = $this->extractVariables($data);
-        $variables['__escape'] = static fn(string $value): string =>
-            htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+        $variables['__escape'] = static fn(string $value): string => $value;
 
         return $this->execute($compiled, $variables);
     }
@@ -89,7 +90,6 @@ class HtmlRenderer implements Renderer
      */
     private function execute(string $compiledPhp, array $variables): string
     {
-        // Use a static closure to prevent $this leakage into template scope.
         $executor = static function (string $__compiled, array $__vars): string {
             extract($__vars);
             ob_start();
@@ -100,16 +100,16 @@ class HtmlRenderer implements Renderer
         return $executor($compiledPhp, $variables);
     }
 
-    private function buildResponse(string $html): ResponseInterface
+    private function buildResponse(string $text): ResponseInterface
     {
         $body = new Stream(LazyResource::for('php://memory', 'w+'));
-        $body->write($html);
+        $body->write($text);
 
         return new Response(
             new Message(
                 new Headers([
-                    'Content-Type' => ['text/html; charset=UTF-8'],
-                    'Content-Length' => [(string) strlen($html)],
+                    'Content-Type' => ['text/plain; charset=UTF-8'],
+                    'Content-Length' => [(string) strlen($text)],
                 ]),
                 $body,
                 Version::v11,

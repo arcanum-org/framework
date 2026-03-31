@@ -10,6 +10,11 @@ namespace Arcanum\Shodo;
  * Translates Arcanum template syntax into PHP. All directives live inside
  * {{ }} delimiters. The compiled output is valid PHP suitable for eval()
  * or writing to a cache file.
+ *
+ * Escaped output ({{ $expr }}) emits a call to $__escape, a callable
+ * injected by the renderer. This keeps the compiler format-agnostic —
+ * HtmlRenderer provides htmlspecialchars, PlainTextRenderer provides
+ * an identity function, etc.
  */
 final class TemplateCompiler
 {
@@ -50,10 +55,10 @@ final class TemplateCompiler
             $compiled,
         );
 
-        // Escaped output: {{ $expr }}
+        // Escaped output: {{ $expr }} — calls $__escape provided by the renderer
         $compiled = $this->replace(
             '/\{\{\s*(.+?)\s*\}\}/s',
-            '<?= htmlspecialchars((string)($1), ENT_QUOTES, \'UTF-8\') ?>',
+            '<?= $__escape((string)($1)) ?>',
             $compiled,
         );
 
