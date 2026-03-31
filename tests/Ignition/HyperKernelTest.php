@@ -8,6 +8,9 @@ use Arcanum\Cabinet\Application;
 use Arcanum\Glitch\ExceptionHandler;
 use Arcanum\Glitch\ExceptionRenderer;
 use Arcanum\Glitch\HttpException;
+use Arcanum\Hyper\CallableHandler;
+use Arcanum\Hyper\HttpMiddleware;
+use Arcanum\Hyper\MiddlewareStage;
 use Arcanum\Hyper\StatusCode;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\HyperKernel;
@@ -18,8 +21,15 @@ use PHPUnit\Framework\Attributes\UsesClass;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamInterface;
+use Psr\Http\Server\MiddlewareInterface;
+use Psr\Http\Server\RequestHandlerInterface;
 
 #[CoversClass(HyperKernel::class)]
+#[UsesClass(CallableHandler::class)]
+#[UsesClass(HttpMiddleware::class)]
+#[UsesClass(MiddlewareStage::class)]
+#[UsesClass(\Arcanum\Flow\Pipeline\Pipeline::class)]
+#[UsesClass(\Arcanum\Flow\Pipeline\StandardProcessor::class)]
 #[UsesClass(HttpException::class)]
 #[UsesClass(StatusCode::class)]
 #[UsesClass(\Arcanum\Hyper\Phrase::class)]
@@ -84,7 +94,7 @@ final class HyperKernelTest extends TestCase
         $kernel = new HyperKernel('/app');
 
         $bootstrapper = $this->createMock(Bootstrapper::class);
-        $bootstrapper->expects($this->exactly(5))->method('bootstrap');
+        $bootstrapper->expects($this->exactly(6))->method('bootstrap');
 
         $container = $this->createStub(Application::class);
         $container->method('get')->willReturn($bootstrapper);
@@ -99,7 +109,7 @@ final class HyperKernelTest extends TestCase
         $kernel = new HyperKernel('/app');
 
         $bootstrapper = $this->createMock(Bootstrapper::class);
-        $bootstrapper->expects($this->exactly(5))->method('bootstrap');
+        $bootstrapper->expects($this->exactly(6))->method('bootstrap');
 
         $container = $this->createStub(Application::class);
         $container->method('get')->willReturn($bootstrapper);
@@ -370,5 +380,133 @@ final class HyperKernelTest extends TestCase
         } catch (HttpException $e) {
             $this->assertSame(StatusCode::BadRequest, $e->getStatusCode());
         }
+    }
+
+    // -----------------------------------------------------------
+    // Middleware pipeline integration
+    // -----------------------------------------------------------
+
+    /**
+     * Bootstrap a CapturingKernel with a container that supports middleware resolution.
+     *
+     * @param array<string, MiddlewareInterface> $middlewareServices
+     */
+    private function kernelWithMiddleware(array $middlewareServices = []): CapturingKernel
+    {
+        $kernel = $this->capturingKernel();
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturn(false);
+        $container->method('get')->willReturnCallback(
+            fn(string $id) => $middlewareServices[$id] ?? $bootstrapper
+        );
+
+        $kernel->bootstrap($container);
+
+        return $kernel;
+    }
+
+    public function testMiddlewareExecutesAroundHandleRequest(): void
+    {
+        // Arrange
+        $order = [];
+
+        $middleware = new class ($order) implements MiddlewareInterface {
+            /** @param list<string> $order */
+            public function __construct(public array &$order)
+            {
+            }
+
+            public function process(
+                ServerRequestInterface $request,
+                RequestHandlerInterface $handler,
+            ): ResponseInterface {
+                $this->order[] = 'middleware:before';
+                $response = $handler->handle($request);
+                $this->order[] = 'middleware:after';
+                return $response;
+            }
+        };
+
+        $class = get_class($middleware);
+        $kernel = $this->kernelWithMiddleware([
+            $class => $middleware,
+        ]);
+        $kernel->middleware($class);
+
+        // Act
+        $kernel->handle($this->createStub(ServerRequestInterface::class));
+
+        // Assert — middleware ran around the handler
+        $this->assertSame(['middleware:before', 'middleware:after'], $order);
+        $this->assertNotNull($kernel->capturedRequest);
+    }
+
+    public function testMiddlewareReceivesPreparedRequest(): void
+    {
+        // Arrange
+        $capturedByMiddleware = null;
+
+        $middleware = new class ($capturedByMiddleware) implements MiddlewareInterface {
+            public function __construct(public mixed &$captured)
+            {
+            }
+
+            public function process(
+                ServerRequestInterface $request,
+                RequestHandlerInterface $handler,
+            ): ResponseInterface {
+                $this->captured = $request->getParsedBody();
+                return $handler->handle($request);
+            }
+        };
+
+        $class = get_class($middleware);
+        $kernel = $this->kernelWithMiddleware([
+            $class => $middleware,
+        ]);
+        $kernel->middleware($class);
+
+        $request = $this->stubJsonRequest('{"from":"json"}');
+
+        // Act
+        $kernel->handle($request);
+
+        // Assert — middleware saw the parsed JSON body
+        $this->assertSame(['from' => 'json'], $capturedByMiddleware);
+    }
+
+    public function testMiddlewareCanShortCircuit(): void
+    {
+        // Arrange
+        $earlyResponse = $this->createStub(ResponseInterface::class);
+
+        $middleware = new class ($earlyResponse) implements MiddlewareInterface {
+            public function __construct(private ResponseInterface $response)
+            {
+            }
+
+            public function process(
+                ServerRequestInterface $request,
+                RequestHandlerInterface $handler,
+            ): ResponseInterface {
+                return $this->response;
+            }
+        };
+
+        $class = get_class($middleware);
+        $kernel = $this->kernelWithMiddleware([
+            $class => $middleware,
+        ]);
+        $kernel->middleware($class);
+
+        // Act
+        $result = $kernel->handle($this->createStub(ServerRequestInterface::class));
+
+        // Assert — middleware short-circuited, handler was never called
+        $this->assertSame($earlyResponse, $result);
+        $this->assertNull($kernel->capturedRequest);
     }
 }

@@ -8,9 +8,12 @@ use Arcanum\Cabinet\Application;
 use Arcanum\Glitch\ExceptionHandler;
 use Arcanum\Glitch\ExceptionRenderer;
 use Arcanum\Glitch\HttpException;
+use Arcanum\Hyper\CallableHandler;
+use Arcanum\Hyper\HttpMiddleware;
 use Arcanum\Hyper\StatusCode;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
 /**
@@ -22,6 +25,13 @@ class HyperKernel implements Kernel, RequestHandlerInterface
      * Whether the application has been bootstrapped yet.
      */
     private bool $isBootstrapped = false;
+
+    /**
+     * Global HTTP middleware class names, resolved from the container at dispatch time.
+     *
+     * @var list<class-string<MiddlewareInterface>>
+     */
+    private array $middleware = [];
 
     /**
      * The application container, set during bootstrap.
@@ -47,6 +57,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
         Bootstrap\Routing::class,
         Bootstrap\Logger::class,
         Bootstrap\Exceptions::class,
+        Bootstrap\Middleware::class,
     ];
 
     public function __construct(
@@ -121,12 +132,38 @@ class HyperKernel implements Kernel, RequestHandlerInterface
     }
 
     /**
+     * Register a global HTTP middleware class.
+     *
+     * Middleware is executed in the order it is registered — the first
+     * middleware registered is the outermost layer of the onion.
+     *
+     * @param class-string<MiddlewareInterface> $middlewareClass
+     */
+    public function middleware(string $middlewareClass): void
+    {
+        $this->middleware[] = $middlewareClass;
+    }
+
+    /**
      * Handle an incoming HTTP request.
      */
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
         try {
-            return $this->handleRequest($this->prepareRequest($request));
+            $request = $this->prepareRequest($request);
+
+            if ($this->middleware === []) {
+                return $this->handleRequest($request);
+            }
+
+            $core = new CallableHandler(fn(ServerRequestInterface $r) => $this->handleRequest($r));
+            $stack = new HttpMiddleware($core, $this->container);
+
+            foreach ($this->middleware as $middlewareClass) {
+                $stack->add($middlewareClass);
+            }
+
+            return $stack->handle($request);
         } catch (\Throwable $e) {
             return $this->handleException($e);
         }

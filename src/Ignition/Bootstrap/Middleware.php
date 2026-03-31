@@ -1,0 +1,39 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Arcanum\Ignition\Bootstrap;
+
+use Arcanum\Cabinet\Application;
+use Arcanum\Gather\Configuration;
+use Arcanum\Ignition\Bootstrapper;
+use Arcanum\Ignition\HyperKernel;
+use Arcanum\Ignition\Kernel;
+
+/**
+ * Registers global HTTP middleware from config/middleware.php.
+ *
+ * Reads from config/middleware.php:
+ *   - global (optional) — ordered list of middleware class names
+ */
+class Middleware implements Bootstrapper
+{
+    public function bootstrap(Application $container): void
+    {
+        $kernel = $container->get(Kernel::class);
+
+        if (!$kernel instanceof HyperKernel) {
+            return;
+        }
+
+        /** @var Configuration $config */
+        $config = $container->get(Configuration::class);
+
+        /** @var list<class-string<\Psr\Http\Server\MiddlewareInterface>>|null $middleware */
+        $middleware = $config->get('middleware.global');
+
+        foreach ($middleware ?? [] as $class) {
+            $kernel->middleware($class);
+        }
+    }
+}
