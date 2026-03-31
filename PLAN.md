@@ -394,8 +394,8 @@ The format registry maps file extensions to renderers and content types. It is t
 - [x] Define and implement `FormatRegistry` — `register()`, `get()`, `has()`, `remove()`, and `renderer()` which resolves from the Container. Throws `UnsupportedFormat` (HTTP 406) for unregistered extensions.
 - [x] Register built-in JSON format in starter — extension `json`, content type `application/json`, uses `JsonRenderer`
 - [x] Wire `FormatRegistry` into starter kernel — replaces hardcoded `JsonRenderer` with `$formats->renderer($route->format)`
-- [ ] Add built-in HTML renderer — renders data into an HTML response (template integration point for apps)
-- [ ] Register built-in HTML format — extension `html`, content type `text/html`, uses `HtmlRenderer`
+- [x] Add built-in HTML renderer — renders data into an HTML response via co-located templates with a micro template compiler (TemplateCompiler, TemplateResolver, TemplateCache, HtmlFallback, HtmlRenderer)
+- [x] Register built-in HTML format — extension `html`, content type `text/html`, uses `HtmlRenderer`
 - [ ] Add built-in CSV renderer — renders iterable/array data as CSV with proper escaping
 - [ ] Register built-in CSV format — extension `csv`, content type `text/csv`, uses `CsvRenderer`
 - [ ] Add built-in plain text renderer — renders data as plain text
@@ -405,7 +405,7 @@ The format registry maps file extensions to renderers and content types. It is t
 - [x] Add tests for `Format` value object
 - [x] Add tests for `FormatRegistry` — register, get, has, remove, renderer resolution, unsupported format (406)
 - [x] Add tests for built-in JSON format registration and rendering
-- [ ] Add tests for built-in HTML format registration and rendering
+- [x] Add tests for built-in HTML format registration and rendering
 - [ ] Add tests for built-in CSV format registration and rendering
 - [ ] Add tests for built-in plain text format registration and rendering
 - [ ] Add tests for app-defined custom format with custom renderer
@@ -434,7 +434,7 @@ These items need design decisions before they can be worked on:
 - **Bootstrap lifecycle hooks** — What does "before/after events so the app can hook into the boot sequence" mean concretely? Events before/after each individual bootstrapper? Before/after the entire sequence? Who consumes these — the app kernel, service providers, middleware? What's the use case that config and the existing bootstrapper sequence can't handle?
 - **Handler auto-discovery** — Is this actually needed? Codex already resolves handler classes on demand via reflection. Pre-scanning the filesystem to register handlers in the Container adds complexity and startup cost. What use case requires pre-registration that on-demand resolution can't serve?
 - ~~**Manual route overrides**~~ — Resolved: custom routes are the general mechanism (path+methods → explicit class mapping). Pages are a convenience layer that auto-discovers classes and registers them as GET-only custom routes. Priority: custom routes > convention. Registered via config and auto-discovery.
-- **HTML renderer and templates** — Does the framework ship a template engine, integrate with an existing one (Blade, Twig, Plates), or just provide a bare `HtmlRenderer` that the app overrides? This affects the built-in HTML format registration — we can't ship an HTML renderer without deciding the template strategy. **This is the next priority** — renderers (HTML, plain text, CSV) need to be built before static file pages can be implemented.
+- ~~**HTML renderer and templates**~~ — Resolved: custom micro template compiler in Shodo. Templates are co-located `.html` files discovered by convention (DTO class → `.html` file). Syntax uses `{{ }}` delimiters for escaped output, `{{! !}}` for raw output, and `{{ foreach/if/for/while }}` for control flow. Compiled to PHP and cached. Falls back to generic HTML dump when no template exists. No external dependencies, no layouts/inheritance/partials (can be added later).
 - **Static file pages** — Allow developers to drop static files (`.html`, `.json`, `.txt`) in `app/Pages/` and have them served through the middleware stack without writing PHP classes. Depends on renderers being built first so Content-Type mapping and the rendering infrastructure exist. Likely implemented as a middleware that intercepts static page routes. Deferred until renderers are complete.
 - **Opt-in command response bodies** — What does the configuration look like? Per-handler attribute? Global config toggle? Per-route config? What format is the response body rendered in — always JSON, or format-aware like Queries?
 

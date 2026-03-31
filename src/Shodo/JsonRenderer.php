@@ -18,7 +18,7 @@ class JsonRenderer implements Renderer
     /**
      * Render data as a JSON HTTP response.
      */
-    public function render(mixed $data, StatusCode $status = StatusCode::OK): ResponseInterface
+    public function render(mixed $data, string $dtoClass = '', StatusCode $status = StatusCode::OK): ResponseInterface
     {
         $json = json_encode($data, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
 

@@ -37,6 +37,6 @@ class JsonExceptionRenderer implements ExceptionRenderer
             $payload['error']['trace'] = $e->getTrace();
         }
 
-        return $this->renderer->render($payload, $status);
+        return $this->renderer->render($payload, status: $status);
     }
 }

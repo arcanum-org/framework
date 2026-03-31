@@ -109,7 +109,7 @@ final class JsonRendererTest extends TestCase
         $renderer = new JsonRenderer();
 
         // Act
-        $response = $renderer->render(['error' => 'not found'], StatusCode::NotFound);
+        $response = $renderer->render(['error' => 'not found'], status: StatusCode::NotFound);
 
         // Assert
         $this->assertSame(404, $response->getStatusCode());
@@ -127,6 +127,20 @@ final class JsonRendererTest extends TestCase
 
         // Assert
         $this->assertStringContainsString('https://example.com/path', $body->getContents());
+    }
+
+    public function testRenderAcceptsDtoClassParameter(): void
+    {
+        // Arrange
+        $renderer = new JsonRenderer();
+
+        // Act
+        $response = $renderer->render(['key' => 'value'], 'App\\Domain\\Query\\Health');
+
+        // Assert — dtoClass is ignored, output is normal JSON
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('application/json', $response->getHeaderLine('Content-Type'));
+        $this->assertSame(['key' => 'value'], $this->decodeBody($response));
     }
 
     public function testRenderThrowsOnUnencodableData(): void

@@ -17,7 +17,12 @@ use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\Kernel;
 use Arcanum\Shodo\Format;
 use Arcanum\Shodo\FormatRegistry;
+use Arcanum\Shodo\HtmlFallback;
+use Arcanum\Shodo\HtmlRenderer;
 use Arcanum\Shodo\JsonRenderer;
+use Arcanum\Shodo\TemplateCache;
+use Arcanum\Shodo\TemplateCompiler;
+use Arcanum\Shodo\TemplateResolver;
 
 /**
  * Registers Atlas routing and Shodo format registry in the container.
@@ -67,6 +72,48 @@ class Routing implements Bootstrapper
 
         // Register JsonRenderer so it can be resolved from the container
         $container->service(JsonRenderer::class);
+
+        // Register HtmlRenderer and its dependencies
+        $container->service(TemplateCompiler::class);
+        $container->service(HtmlFallback::class);
+
+        $container->factory(TemplateResolver::class, function () use ($container, $config) {
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+
+            /** @var string $rootNamespace */
+            $rootNamespace = $config->get('app.namespace');
+
+            // The root namespace may be nested (e.g. "App\Domain"), but PSR-4
+            // maps the top-level segment to the directory. Extract it.
+            $topLevelNamespace = strstr($rootNamespace, '\\', true) ?: $rootNamespace;
+
+            return new TemplateResolver(
+                rootDirectory: $kernel->rootDirectory(),
+                rootNamespace: $topLevelNamespace,
+            );
+        });
+
+        $container->factory(TemplateCache::class, function () use ($container, $config) {
+            /** @var mixed $cacheEnabled */
+            $cacheEnabled = $config->get('cache.templates.enabled');
+            $cacheEnabled = $cacheEnabled === null || $cacheEnabled === true;
+
+            if (!$cacheEnabled) {
+                return new TemplateCache('');
+            }
+
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+
+            return new TemplateCache(
+                $kernel->filesDirectory()
+                    . DIRECTORY_SEPARATOR . 'cache'
+                    . DIRECTORY_SEPARATOR . 'templates',
+            );
+        });
+
+        $container->service(HtmlRenderer::class);
     }
 
     private function registerRouter(Application $container, Configuration $config): void
