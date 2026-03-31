@@ -264,10 +264,10 @@ These items bridge the gap between HTTP (Hyper) and command/query dispatch (Conv
 
 ### HTTP Middleware Pipeline
 
-- [ ] Add global HTTP middleware stack to `HyperKernel` — a Continuum pipeline that processes every request before routing (for CORS, auth, content negotiation, etc.)
-- [ ] Add configuration for global middleware registration — allow apps to declare ordered middleware in config or bootstrap
-- [ ] Add tests for global middleware execution order
-- [ ] Add tests for middleware short-circuiting (returning a response without hitting the router)
+- [x] Add global HTTP middleware stack to `HyperKernel` — `HttpMiddleware` built on Flow's Pipeline (not Continuum, since PSR-15 middleware may short-circuit). `MiddlewareStage` adapts each `MiddlewareInterface` into a Pipeline Stage. `CallableHandler` bridges closures to `RequestHandlerInterface`.
+- [x] Add configuration for global middleware registration — `Bootstrap\Middleware` reads `config/middleware.php` `global` key and registers middleware on the kernel
+- [x] Add tests for global middleware execution order
+- [x] Add tests for middleware short-circuiting (returning a response without hitting the router)
 
 ### Request → DTO Mapping
 
