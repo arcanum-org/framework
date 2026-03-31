@@ -146,27 +146,53 @@ class HyperKernel implements Kernel, RequestHandlerInterface
 
     /**
      * Handle an incoming HTTP request.
+     *
+     * Exception handling is inside the core handler so that error responses
+     * flow back through the middleware stack — every response (success or
+     * error) passes through all middleware layers.
      */
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
         try {
             $request = $this->prepareRequest($request);
-
-            if ($this->middleware === []) {
-                return $this->handleRequest($request);
-            }
-
-            $core = new CallableHandler(fn(ServerRequestInterface $r) => $this->handleRequest($r));
-            $stack = new HttpMiddleware($core, $this->container);
-
-            foreach ($this->middleware as $middlewareClass) {
-                $stack->add($middlewareClass);
-            }
-
-            return $stack->handle($request);
         } catch (\Throwable $e) {
-            return $this->handleException($e);
+            return $this->sendThroughMiddleware(
+                $request,
+                new CallableHandler(fn() => $this->handleException($e)),
+            );
         }
+
+        $core = new CallableHandler(function (ServerRequestInterface $r): ResponseInterface {
+            try {
+                return $this->handleRequest($r);
+            } catch (\Throwable $e) {
+                return $this->handleException($e);
+            }
+        });
+
+        return $this->sendThroughMiddleware($request, $core);
+    }
+
+    /**
+     * Send a request through the middleware stack to a core handler.
+     *
+     * If no middleware is registered, delegates directly to the handler.
+     */
+    private function sendThroughMiddleware(
+        ServerRequestInterface $request,
+        CallableHandler $core,
+    ): ResponseInterface {
+        if ($this->middleware === []) {
+            return $core->handle($request);
+        }
+
+        $stack = new HttpMiddleware($core, $this->container);
+
+        foreach ($this->middleware as $middlewareClass) {
+            $stack->add($middlewareClass);
+        }
+
+        return $stack->handle($request);
     }
 
     /**

@@ -509,4 +509,115 @@ final class HyperKernelTest extends TestCase
         $this->assertSame($earlyResponse, $result);
         $this->assertNull($kernel->capturedRequest);
     }
+
+    public function testErrorResponseFlowsThroughMiddleware(): void
+    {
+        // Arrange — default handleRequest throws HttpException(NotFound),
+        // which should be caught and rendered, then the response should
+        // flow back through middleware.
+        $middlewareRan = false;
+
+        $middleware = new class ($middlewareRan) implements MiddlewareInterface {
+            public function __construct(public bool &$ran)
+            {
+            }
+
+            public function process(
+                ServerRequestInterface $request,
+                RequestHandlerInterface $handler,
+            ): ResponseInterface {
+                $response = $handler->handle($request);
+                $this->ran = true;
+                return $response;
+            }
+        };
+
+        $errorResponse = $this->createStub(ResponseInterface::class);
+
+        $renderer = $this->createStub(ExceptionRenderer::class);
+        $renderer->method('render')->willReturn($errorResponse);
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturnMap([
+            [ExceptionHandler::class, false],
+            [ExceptionRenderer::class, true],
+        ]);
+
+        $class = get_class($middleware);
+        $container->method('get')->willReturnCallback(
+            fn(string $id) => match ($id) {
+                ExceptionRenderer::class => $renderer,
+                $class => $middleware,
+                default => $bootstrapper,
+            }
+        );
+
+        $kernel = new HyperKernel('/app');
+        $kernel->bootstrap($container);
+        $kernel->middleware($class);
+
+        // Act
+        $kernel->handle($this->createStub(ServerRequestInterface::class));
+
+        // Assert — middleware ran even though the handler threw an exception
+        $this->assertTrue($middlewareRan);
+    }
+
+    public function testMalformedJsonErrorFlowsThroughMiddleware(): void
+    {
+        // Arrange — malformed JSON should produce a 400, and that 400
+        // should flow through middleware.
+        $middlewareRan = false;
+
+        $middleware = new class ($middlewareRan) implements MiddlewareInterface {
+            public function __construct(public bool &$ran)
+            {
+            }
+
+            public function process(
+                ServerRequestInterface $request,
+                RequestHandlerInterface $handler,
+            ): ResponseInterface {
+                $response = $handler->handle($request);
+                $this->ran = true;
+                return $response;
+            }
+        };
+
+        $errorResponse = $this->createStub(ResponseInterface::class);
+
+        $renderer = $this->createStub(ExceptionRenderer::class);
+        $renderer->method('render')->willReturn($errorResponse);
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturnMap([
+            [ExceptionHandler::class, false],
+            [ExceptionRenderer::class, true],
+        ]);
+
+        $class = get_class($middleware);
+        $container->method('get')->willReturnCallback(
+            fn(string $id) => match ($id) {
+                ExceptionRenderer::class => $renderer,
+                $class => $middleware,
+                default => $bootstrapper,
+            }
+        );
+
+        $kernel = new HyperKernel('/app');
+        $kernel->bootstrap($container);
+        $kernel->middleware($class);
+
+        $request = $this->stubJsonRequest('{invalid json}');
+
+        // Act
+        $kernel->handle($request);
+
+        // Assert — middleware ran even for a prepareRequest error
+        $this->assertTrue($middlewareRan);
+    }
 }

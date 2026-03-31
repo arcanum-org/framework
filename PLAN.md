@@ -382,6 +382,7 @@ Items built during the session that need tests or plan tracking:
 - [x] Add JSON body parsing to `HyperKernel::prepareRequest()` — parses `application/json` request bodies into `parsedBody` before the app's `handleRequest()` sees the request. Throws `HttpException(BadRequest)` for malformed JSON. Removed manual JSON decoding from the starter app kernel.
 - [x] Add HTTP method enforcement — `HttpRouter` now validates that the resolved DTO class exists. Pages reject non-GET with 405. Convention routes check the alternate namespace (Query↔Command) to distinguish 405 Method Not Allowed from 404 Not Found. Added `MethodNotAllowed` exception extending `HttpException` with allowed methods list for RFC 7231 `Allow` header.
 - [ ] Revisit `Renderer` interface return type — currently uses `mixed`. Consider whether a typed alternative (e.g., `ResponseInterface` for HTTP renderers) is feasible without breaking the transport-agnostic design.
+- [x] Fix error responses bypassing middleware — exception handling now lives inside the core handler, so error responses (404, 405, 400, 500) flow back through the full middleware stack. `prepareRequest` errors also run through middleware via a fixed-response handler. Every response — success or error — passes through all middleware layers.
 
 ---
 
