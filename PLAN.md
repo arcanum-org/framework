@@ -196,7 +196,7 @@ The remaining command response items depend on infrastructure that doesn't exist
 
 Items flagged for future discussion. Not blocking — the framework works without them.
 
-- [ ] Revisit `Renderer` interface return type — currently uses `mixed`. Consider `ResponseInterface` for HTTP renderers without breaking transport-agnostic design.
+- [ ] Revisit `Renderer` interface return type — currently uses `mixed`. Consider `ResponseInterface` for HTTP renderers, but CLI support (not yet planned) will need a different return type. Decide after CLI transport is designed.
 
 ### Documentation
 
