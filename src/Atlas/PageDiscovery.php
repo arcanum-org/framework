@@ -55,7 +55,7 @@ final class PageDiscovery
 
         foreach ($pages as $path => $dtoClass) {
             $format = $formatOverrides[$path] ?? $this->defaultFormat;
-            $routeMap->register($path, $dtoClass, ['GET'], $format);
+            $routeMap->register($path, $dtoClass, ['GET'], $format, isPage: true);
         }
     }
 
@@ -105,9 +105,13 @@ final class PageDiscovery
     }
 
     /**
-     * Scan the pages directory for PHP classes.
+     * Scan the pages directory for template files.
      *
-     * @return array<string, string> path → fully-qualified class name
+     * A page exists because a template exists, not because a PHP class exists.
+     * The dtoClass is a virtual class name that may or may not have a matching
+     * PHP file — the kernel handles the distinction.
+     *
+     * @return array<string, string> path → fully-qualified virtual class name
      */
     private function scan(): array
     {
@@ -117,21 +121,16 @@ final class PageDiscovery
 
         $pages = [];
 
-        foreach (Searcher::findAll('*.php', $this->directory) as $file) {
+        foreach (Searcher::findAll('*.html', $this->directory) as $file) {
             $relativePath = $file->getRelativePathname();
-            // Remove .php extension
-            $relativePath = substr($relativePath, 0, -4);
+            // Remove .html extension
+            $relativePath = substr($relativePath, 0, -5);
 
             // Convert directory separators to namespace separators
             $classSegments = explode(DIRECTORY_SEPARATOR, $relativePath);
 
-            // Build the fully-qualified class name
+            // Build the virtual fully-qualified class name
             $className = $this->namespace . '\\' . implode('\\', $classSegments);
-
-            // Skip handler classes — they're resolved by convention from the DTO
-            if (str_ends_with($className, 'Handler')) {
-                continue;
-            }
 
             // Derive the URL path from the class segments
             $path = $this->classToPath($classSegments);

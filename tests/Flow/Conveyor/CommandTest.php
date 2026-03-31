@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Arcanum\Test\Flow\Conveyor;
 
 use Arcanum\Flow\Conveyor\Command;
+use Arcanum\Flow\Conveyor\DynamicDTO;
 use Arcanum\Flow\Conveyor\HandlerProxy;
 use Arcanum\Gather\Registry;
 use PHPUnit\Framework\TestCase;
@@ -12,6 +13,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(Command::class)]
+#[UsesClass(DynamicDTO::class)]
 #[UsesClass(Registry::class)]
 
 final class CommandTest extends TestCase

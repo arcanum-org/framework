@@ -25,7 +25,7 @@ final class RouteMap
     /**
      * Registered custom routes.
      *
-     * @var array<string, array{dtoClass: string, methods: list<string>, format: string}>
+     * @var array<string, array{dtoClass: string, methods: list<string>, format: string, isPage: bool}>
      */
     private array $routes = [];
 
@@ -36,17 +36,20 @@ final class RouteMap
      * @param string $dtoClass The fully-qualified DTO class name.
      * @param list<string> $methods Allowed HTTP methods (e.g., ['GET'], ['PUT', 'POST']).
      * @param string $format Default response format.
+     * @param bool $isPage Whether this route is a page (template-driven, no handler).
      */
     public function register(
         string $path,
         string $dtoClass,
         array $methods = ['GET'],
         string $format = 'json',
+        bool $isPage = false,
     ): void {
         $this->routes[$this->normalize($path)] = [
             'dtoClass' => $dtoClass,
             'methods' => array_map('strtoupper', $methods),
             'format' => $format,
+            'isPage' => $isPage,
         ];
     }
 
@@ -89,6 +92,7 @@ final class RouteMap
             dtoClass: $entry['dtoClass'],
             handlerPrefix: self::HANDLER_PREFIXES[$method] ?? '',
             format: $extensionFormat ?? $entry['format'],
+            isPage: $entry['isPage'],
         );
     }
 

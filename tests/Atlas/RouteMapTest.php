@@ -230,6 +230,36 @@ final class RouteMapTest extends TestCase
         $this->assertSame('App\\Admin\\Query\\Dashboard', $route->dtoClass);
     }
 
+    // -----------------------------------------------------------
+    // isPage propagation
+    // -----------------------------------------------------------
+
+    public function testIsPageDefaultsFalse(): void
+    {
+        // Arrange
+        $map = new RouteMap();
+        $map->register('/dashboard', 'App\\Query\\Dashboard');
+
+        // Act
+        $route = $map->resolve('/dashboard', 'GET');
+
+        // Assert
+        $this->assertFalse($route->isPage());
+    }
+
+    public function testIsPagePropagatedToRoute(): void
+    {
+        // Arrange
+        $map = new RouteMap();
+        $map->register('/about', 'App\\Pages\\About', ['GET'], 'html', isPage: true);
+
+        // Act
+        $route = $map->resolve('/about', 'GET');
+
+        // Assert
+        $this->assertTrue($route->isPage());
+    }
+
     public function testMethodsCaseInsensitive(): void
     {
         // Arrange

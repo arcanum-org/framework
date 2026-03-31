@@ -75,15 +75,15 @@ final class PageDiscoveryTest extends TestCase
         );
     }
 
-    public function testSkipsHandlerClasses(): void
+    public function testPhpOnlyFilesAreNotDiscovered(): void
     {
-        // Arrange
+        // Arrange — IndexHandler.php exists but no IndexHandler.html
         $discovery = new PageDiscovery(self::PAGES_NS, self::PAGES_DIR);
 
         // Act
         $pages = $discovery->discover();
 
-        // Assert — IndexHandler should not be a page
+        // Assert — handler PHP files are naturally excluded (only .html is scanned)
         foreach ($pages as $class) {
             $this->assertStringNotContainsString('Handler', $class);
         }
@@ -158,6 +158,20 @@ final class PageDiscoveryTest extends TestCase
 
         // Assert
         $this->assertSame('html', $route->format);
+    }
+
+    public function testRegisteredPagesHaveIsPageFlag(): void
+    {
+        // Arrange
+        $discovery = new PageDiscovery(self::PAGES_NS, self::PAGES_DIR);
+        $routeMap = new RouteMap();
+        $discovery->register($routeMap);
+
+        // Act
+        $route = $routeMap->resolve('/', 'GET');
+
+        // Assert
+        $this->assertTrue($route->isPage());
     }
 
     public function testCustomDefaultFormat(): void

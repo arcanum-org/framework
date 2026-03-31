@@ -18,6 +18,7 @@ final class Route
         public readonly string $dtoClass,
         public readonly string $handlerPrefix = '',
         public readonly string $format = 'json',
+        public readonly bool $isPage = false,
     ) {
     }
 
@@ -31,6 +32,11 @@ final class Route
         return str_contains($this->dtoClass, '\\Command\\');
     }
 
+    public function isPage(): bool
+    {
+        return $this->isPage;
+    }
+
     /**
      * Return a new Route with a different format.
      */
@@ -40,6 +46,7 @@ final class Route
             dtoClass: $this->dtoClass,
             handlerPrefix: $this->handlerPrefix,
             format: $format,
+            isPage: $this->isPage,
         );
     }
 }

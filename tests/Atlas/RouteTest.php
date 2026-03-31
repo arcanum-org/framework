@@ -132,6 +132,37 @@ final class RouteTest extends TestCase
         $this->assertSame('', $csv->handlerPrefix);
     }
 
+    public function testIsPageDefaultsFalse(): void
+    {
+        // Arrange & Act
+        $route = new Route(dtoClass: 'App\\Query\\Dashboard');
+
+        // Assert
+        $this->assertFalse($route->isPage());
+    }
+
+    public function testIsPageReturnsTrueWhenSet(): void
+    {
+        // Arrange & Act
+        $route = new Route(dtoClass: 'App\\Pages\\About', isPage: true);
+
+        // Assert
+        $this->assertTrue($route->isPage());
+    }
+
+    public function testWithFormatPreservesIsPage(): void
+    {
+        // Arrange
+        $original = new Route(dtoClass: 'App\\Pages\\About', format: 'html', isPage: true);
+
+        // Act
+        $txt = $original->withFormat('txt');
+
+        // Assert
+        $this->assertTrue($txt->isPage());
+        $this->assertSame('txt', $txt->format);
+    }
+
     public function testRouteIsImmutable(): void
     {
         // Arrange

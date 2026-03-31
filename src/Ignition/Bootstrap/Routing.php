@@ -15,6 +15,7 @@ use Arcanum\Codex\Hydrator;
 use Arcanum\Gather\Configuration;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\Kernel;
+use Arcanum\Flow\Conveyor\PageHandler;
 use Arcanum\Shodo\CsvRenderer;
 use Arcanum\Shodo\Format;
 use Arcanum\Shodo\FormatRegistry;
@@ -52,6 +53,9 @@ class Routing implements Bootstrapper
         $this->registerFormats($container, $config);
         $this->registerRouter($container, $config);
         $this->registerHydrator($container);
+
+        // PageHandler is the framework-provided handler for all pages.
+        $container->service(PageHandler::class);
     }
 
     private function registerFormats(Application $container, Configuration $config): void

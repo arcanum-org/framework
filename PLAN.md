@@ -242,16 +242,22 @@ GET /dashboard            → App\Domain\Admin\Query\Dashboard
 
 #### Pages (built on Custom Routes)
 
-Pages live outside the Domain namespace (default `App\Pages`) since they are not convention-routed CQRS handlers. Pages are auto-discovered from the filesystem — creating a class *is* registering the route. The framework scans the pages directory during bootstrap, derives paths from class names via `Strings::kebab()`, and registers them as GET-only custom routes.
+Pages live outside the Domain namespace (default `App\Pages`) since they are not convention-routed CQRS handlers. Pages are template-driven — a page exists because a **template** exists, not because a PHP class exists. The framework scans the pages directory for `.html` template files during bootstrap, derives paths from filenames via `Strings::kebab()`, and registers them as GET-only custom routes with `isPage: true`.
+
+Pages are: **handler: never, DTO: optional, template: required.** A framework-provided `PageHandler` handles all pages via the `Page` dynamic DTO. The optional PHP DTO class provides default data for the template. Query params are hydrated into the DTO or passed directly as template variables.
 
 ```
-app/Pages/Index.php                  → GET /                   (class: App\Pages\Index)
-app/Pages/Thing.php                  → GET /thing              (class: App\Pages\Thing)
-app/Pages/Docs/GettingStarted.php   → GET /docs/getting-started (class: App\Pages\Docs\GettingStarted)
+app/Pages/Index.html                       → GET /                   (template, optional DTO: App\Pages\Index)
+app/Pages/About.html                       → GET /about              (template only, no DTO needed)
+app/Pages/Docs/GettingStarted.html         → GET /docs/getting-started
 ```
 
-- [x] Refactor page registration to use `PageDiscovery` + `RouteMap` — `PageDiscovery` scans the pages directory and registers each page as a GET-only custom route in `RouteMap`. Replaces manual `PageResolver` registration.
-- [x] Add page auto-discovery — scan the pages namespace directory during bootstrap, derive paths from class names via `Strings::kebab()`. Nested directories map to nested path segments. Handler classes are skipped.
+- [x] Refactor page registration to use `PageDiscovery` + `RouteMap` — `PageDiscovery` scans the pages directory for `.html` template files and registers each page as a GET-only custom route in `RouteMap` with `isPage: true`.
+- [x] Add page auto-discovery — scan the pages directory for template files during bootstrap, derive paths from filenames via `Strings::kebab()`. Nested directories map to nested path segments.
+- [x] Add `Route.isPage` flag — pages carry `isPage: true` so the kernel can branch. `RouteMap` propagates the flag.
+- [x] Add `Page` dynamic DTO — extends `DynamicDTO`, implements `HandlerProxy` with fixed `handlerBaseName()` routing all pages to `PageHandler`.
+- [x] Add `PageHandler` — framework-provided handler that extracts `Page` data as an array for the template.
+- [x] Extract `DynamicDTO` base class — shared body of `Command`, `Query`, and `Page` (Registry wrapper, Coercible, HandlerProxy).
 - [x] Add page route caching — cache discovered page routes to avoid filesystem scanning on every request. Cache file written on first scan, loaded on subsequent requests.
 - [x] Move Pages out of Domain in the starter app — pages live in `App\Pages` (outside Domain) to avoid namespace collision with convention-routed paths.
 - [x] Add config overrides for auto-discovered pages — `config/routes.php` `pages` key overrides default format for auto-discovered pages.
@@ -435,7 +441,7 @@ These items need design decisions before they can be worked on:
 - **Handler auto-discovery** — Is this actually needed? Codex already resolves handler classes on demand via reflection. Pre-scanning the filesystem to register handlers in the Container adds complexity and startup cost. What use case requires pre-registration that on-demand resolution can't serve?
 - ~~**Manual route overrides**~~ — Resolved: custom routes are the general mechanism (path+methods → explicit class mapping). Pages are a convenience layer that auto-discovers classes and registers them as GET-only custom routes. Priority: custom routes > convention. Registered via config and auto-discovery.
 - ~~**HTML renderer and templates**~~ — Resolved: custom micro template compiler in Shodo. Templates are co-located `.html` files discovered by convention (DTO class → `.html` file). Syntax uses `{{ }}` delimiters for escaped output, `{{! !}}` for raw output, and `{{ foreach/if/for/while }}` for control flow. Compiled to PHP and cached. Falls back to generic HTML dump when no template exists. No external dependencies, no layouts/inheritance/partials (can be added later).
-- **Static file pages** — Allow developers to drop static files (`.html`, `.json`, `.txt`) in `app/Pages/` and have them served through the middleware stack without writing PHP classes. Depends on renderers being built first so Content-Type mapping and the rendering infrastructure exist. Likely implemented as a middleware that intercepts static page routes. Deferred until renderers are complete.
+- ~~**Static file pages**~~ — Resolved: pages are template-driven. A page exists because a `.html` template exists in `app/Pages/`. No PHP class needed, no handler needed. Pages flow through Conveyor via the `Page` dynamic DTO and `PageHandler`. Optional DTO class provides default template data. Query params are hydrated into the DTO or passed as template variables.
 - **Opt-in command response bodies** — What does the configuration look like? Per-handler attribute? Global config toggle? Per-route config? What format is the response body rendered in — always JSON, or format-aware like Queries?
 
 ---
