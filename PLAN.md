@@ -453,5 +453,5 @@ These items need design decisions before they can be worked on:
 - [ ] Write `src/Ignition/README.md`
 - [ ] Write `src/Quill/README.md`
 - [x] Write `src/Parchment/README.md`
-- [ ] Write `src/Atlas/README.md` (after package is built)
-- [ ] Write `src/Shodo/README.md` (after package is built)
+- [x] Write `src/Atlas/README.md`
+- [x] Write `src/Shodo/README.md`
