@@ -185,8 +185,7 @@ Now that all renderers are built, these integration tests are unblocked:
 The remaining command response items depend on infrastructure that doesn't exist yet:
 
 - **`Location` header for 201 responses** — requires reverse routing (URL generation from a class/identifier) and a persistence layer (handlers need to create things and get IDs back). In CQRS, commands and queries live at different paths, so there's no canonical resource URL to point to like in REST/CRUD. A `Locatable` interface would force devs to hardcode URLs, which is brittle. Revisit after: persistence layer, reverse routing, and a convention linking Commands to their corresponding Queries.
-- **Opt-in command response bodies** — design depends on how persistence results look. Revisit alongside `Location` header.
-- **Integration tests for 202/201 in Kernel** — straightforward once the above are settled, but low value without `Location` header to test.
+- **Integration tests for 202/201 in Kernel** — straightforward once the Location header is settled, but low value without it.
 
 ### Route Middleware
 
@@ -208,13 +207,13 @@ Items flagged for future discussion. Not blocking — the framework works withou
 
 ---
 
-## Open Questions
+## Closed Questions
 
-These items need design decisions before they can be worked on:
+Decided — preserved for context:
 
-- **Bootstrap lifecycle hooks** — What does "before/after events so the app can hook into the boot sequence" mean concretely? Events before/after each individual bootstrapper? Before/after the entire sequence? Who consumes these — the app kernel, service providers, middleware? What's the use case that config and the existing bootstrapper sequence can't handle?
-- **Handler auto-discovery** — Is this actually needed? Codex already resolves handler classes on demand via reflection. Pre-scanning the filesystem to register handlers in the Container adds complexity and startup cost. What use case requires pre-registration that on-demand resolution can't serve?
-- **Opt-in command response bodies** — What does the configuration look like? Per-handler attribute? Global config toggle? Per-route config? What format is the response body rendered in — always JSON, or format-aware like Queries?
+- ~~**Bootstrap lifecycle hooks**~~ — **Won't do.** The app controls the Kernel subclass and can add, remove, or reorder bootstrappers directly. Events would add complexity to an already detailed middleware lifecycle without solving a problem that bootstrapper ordering doesn't already handle.
+- ~~**Handler auto-discovery**~~ — **Won't do.** Codex resolves handlers on demand via reflection — no pre-registration needed. The only value would be boot-time validation, which belongs in a future dev-mode CLI command (`php arcanum validate:handlers`), not a runtime filesystem scan.
+- ~~**Opt-in command response bodies**~~ — **Won't do.** Commands shouldn't respond with data. The Location header (once persistence + reverse routing exist) gives clients a way to fetch the created resource via a proper Query. Keeping commands body-less preserves clean CQRS separation.
 
 ## Resolved Questions
 
