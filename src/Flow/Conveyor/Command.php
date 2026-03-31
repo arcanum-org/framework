@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Flow\Conveyor;
 
+use Arcanum\Gather\Coercible;
 use Arcanum\Gather\Registry;
 
 /**
@@ -11,7 +12,7 @@ use Arcanum\Gather\Registry;
  *
  * When only a handler exists (e.g., MakePaymentHandler without MakePayment),
  * the framework creates a Command from the request body and dispatches it
- * to the handler. Data is accessed via typed accessors inherited from Registry.
+ * to the handler. Data is accessed via Gather's typed accessors.
  *
  * ```php
  * class MakePaymentHandler {
@@ -22,7 +23,7 @@ use Arcanum\Gather\Registry;
  * }
  * ```
  */
-final class Command implements HandlerProxy
+final class Command implements HandlerProxy, Coercible
 {
     private Registry $registry;
 
@@ -42,20 +43,35 @@ final class Command implements HandlerProxy
         return $this->handlerBaseName;
     }
 
-    public function get(string $key): mixed
+    public function get(string $id): mixed
     {
-        return $this->registry->get($key);
+        return $this->registry->get($id);
     }
 
-    public function has(string $key): bool
+    public function has(string $id): bool
     {
-        return $this->registry->has($key);
+        return $this->registry->has($id);
     }
 
     /** @return array<string, mixed> */
     public function toArray(): array
     {
         return $this->registry->toArray();
+    }
+
+    public function asAlpha(string $key, string $fallback = ''): string
+    {
+        return $this->registry->asAlpha($key, $fallback);
+    }
+
+    public function asAlnum(string $key, string $fallback = ''): string
+    {
+        return $this->registry->asAlnum($key, $fallback);
+    }
+
+    public function asDigits(string $key, string $fallback = ''): string
+    {
+        return $this->registry->asDigits($key, $fallback);
     }
 
     public function asString(string $key, string $fallback = ''): string
@@ -76,5 +92,35 @@ final class Command implements HandlerProxy
     public function asBool(string $key, bool $fallback = false): bool
     {
         return $this->registry->asBool($key, $fallback);
+    }
+
+    public function getIterator(): \Traversable
+    {
+        return $this->registry->getIterator();
+    }
+
+    public function count(): int
+    {
+        return $this->registry->count();
+    }
+
+    public function offsetExists(mixed $offset): bool
+    {
+        return $this->registry->offsetExists($offset);
+    }
+
+    public function offsetGet(mixed $offset): mixed
+    {
+        return $this->registry->offsetGet($offset);
+    }
+
+    public function offsetSet(mixed $offset, mixed $value): void
+    {
+        $this->registry->offsetSet($offset, $value);
+    }
+
+    public function offsetUnset(mixed $offset): void
+    {
+        $this->registry->offsetUnset($offset);
     }
 }
