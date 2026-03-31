@@ -6,10 +6,13 @@ namespace Arcanum\Test\Flow\Conveyor;
 
 use Arcanum\Flow\Conveyor\HandlerProxy;
 use Arcanum\Flow\Conveyor\Query;
+use Arcanum\Gather\Registry;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(Query::class)]
+#[UsesClass(Registry::class)]
 final class QueryTest extends TestCase
 {
     public function testImplementsHandlerProxy(): void
@@ -37,48 +40,45 @@ final class QueryTest extends TestCase
         $this->assertSame('electronics', $query->get('category'));
     }
 
-    public function testGetReturnsDefaultForMissingKey(): void
-    {
-        $query = new Query('App\\Catalog\\Query\\Products', []);
-
-        $this->assertNull($query->get('nonexistent'));
-        $this->assertSame(10, $query->get('limit', 10));
-    }
-
-    public function testHasReturnsTrueForExistingKey(): void
+    public function testHasChecksExistence(): void
     {
         $query = new Query('App\\Catalog\\Query\\Products', [
             'page' => '1',
         ]);
 
         $this->assertTrue($query->has('page'));
-    }
-
-    public function testHasReturnsFalseForMissingKey(): void
-    {
-        $query = new Query('App\\Catalog\\Query\\Products', []);
-
         $this->assertFalse($query->has('nonexistent'));
     }
 
-    public function testMagicGetAccessesProperties(): void
+    public function testAsIntCoerces(): void
     {
         $query = new Query('App\\Catalog\\Query\\Products', [
-            'page' => '2',
+            'page' => '3',
+            'limit' => '25',
         ]);
 
-        // @phpstan-ignore property.notFound
-        $this->assertSame('2', $query->page);
+        $this->assertSame(3, $query->asInt('page'));
+        $this->assertSame(25, $query->asInt('limit'));
+        $this->assertSame(10, $query->asInt('missing', 10));
     }
 
-    public function testMagicIssetChecksProperties(): void
+    public function testAsStringCoerces(): void
     {
         $query = new Query('App\\Catalog\\Query\\Products', [
-            'page' => '1',
+            'category' => 'electronics',
         ]);
 
-        $this->assertTrue(isset($query->page));
-        $this->assertFalse(isset($query->nonexistent));
+        $this->assertSame('electronics', $query->asString('category'));
+    }
+
+    public function testAsBoolCoerces(): void
+    {
+        $query = new Query('App\\Catalog\\Query\\Products', [
+            'include_archived' => true,
+        ]);
+
+        $this->assertTrue($query->asBool('include_archived'));
+        $this->assertFalse($query->asBool('missing'));
     }
 
     public function testToArrayReturnsAllData(): void

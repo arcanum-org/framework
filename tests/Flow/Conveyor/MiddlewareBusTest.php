@@ -27,6 +27,7 @@ use Arcanum\Flow\Continuum\Continuum;
 #[UsesClass(\Arcanum\Flow\Continuum\StandardAdvancer::class)]
 #[UsesClass(\Arcanum\Flow\Continuum\ContinuationCollection::class)]
 #[UsesClass(Command::class)]
+#[UsesClass(\Arcanum\Gather\Registry::class)]
 #[UsesClass(Container::class)]
 #[UsesClass(\Arcanum\Cabinet\PrototypeProvider::class)]
 #[UsesClass(\Arcanum\Codex\Event\ClassRequested::class)]

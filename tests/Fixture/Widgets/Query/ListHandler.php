@@ -15,6 +15,6 @@ final class ListHandler
     /** @return array<string, mixed> */
     public function __invoke(Query $query): array
     {
-        return ['widgets' => [], 'page' => $query->get('page', 1)];
+        return ['widgets' => [], 'page' => $query->asInt('page', 1)];
     }
 }

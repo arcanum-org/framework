@@ -4,32 +4,37 @@ declare(strict_types=1);
 
 namespace Arcanum\Flow\Conveyor;
 
+use Arcanum\Gather\Registry;
+
 /**
  * A dynamic Command DTO for handlers that don't define an explicit DTO class.
  *
  * When only a handler exists (e.g., MakePaymentHandler without MakePayment),
  * the framework creates a Command from the request body and dispatches it
- * to the handler. Properties are accessed dynamically via __get.
+ * to the handler. Data is accessed via typed accessors inherited from Registry.
  *
  * ```php
  * class MakePaymentHandler {
  *     public function __invoke(Command $command): void {
- *         $command->amount;   // dynamic property access
- *         $command->currency;
+ *         $amount = $command->asFloat('amount');
+ *         $currency = $command->asString('currency');
  *     }
  * }
  * ```
  */
 final class Command implements HandlerProxy
 {
+    private Registry $registry;
+
     /**
      * @param string $handlerBaseName The virtual DTO class name for handler resolution.
      * @param array<string, mixed> $data Request data (body params).
      */
     public function __construct(
         private readonly string $handlerBaseName,
-        private readonly array $data = [],
+        array $data = [],
     ) {
+        $this->registry = new Registry($data);
     }
 
     public function handlerBaseName(): string
@@ -37,39 +42,39 @@ final class Command implements HandlerProxy
         return $this->handlerBaseName;
     }
 
-    /**
-     * Get a value by key.
-     */
-    public function get(string $name, mixed $default = null): mixed
+    public function get(string $key): mixed
     {
-        return $this->data[$name] ?? $default;
+        return $this->registry->get($key);
     }
 
-    /**
-     * Check if a key exists.
-     */
-    public function has(string $name): bool
+    public function has(string $key): bool
     {
-        return array_key_exists($name, $this->data);
+        return $this->registry->has($key);
     }
 
-    public function __get(string $name): mixed
-    {
-        return $this->data[$name] ?? null;
-    }
-
-    public function __isset(string $name): bool
-    {
-        return array_key_exists($name, $this->data);
-    }
-
-    /**
-     * Get all data as an associative array.
-     *
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
-        return $this->data;
+        return $this->registry->toArray();
+    }
+
+    public function asString(string $key, string $fallback = ''): string
+    {
+        return $this->registry->asString($key, $fallback);
+    }
+
+    public function asInt(string $key, int $fallback = 0): int
+    {
+        return $this->registry->asInt($key, $fallback);
+    }
+
+    public function asFloat(string $key, float $fallback = 0.0): float
+    {
+        return $this->registry->asFloat($key, $fallback);
+    }
+
+    public function asBool(string $key, bool $fallback = false): bool
+    {
+        return $this->registry->asBool($key, $fallback);
     }
 }

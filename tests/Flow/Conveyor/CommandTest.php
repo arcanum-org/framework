@@ -6,10 +6,14 @@ namespace Arcanum\Test\Flow\Conveyor;
 
 use Arcanum\Flow\Conveyor\Command;
 use Arcanum\Flow\Conveyor\HandlerProxy;
+use Arcanum\Gather\Registry;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(Command::class)]
+#[UsesClass(Registry::class)]
+
 final class CommandTest extends TestCase
 {
     public function testImplementsHandlerProxy(): void
@@ -37,48 +41,53 @@ final class CommandTest extends TestCase
         $this->assertSame('USD', $command->get('currency'));
     }
 
-    public function testGetReturnsDefaultForMissingKey(): void
-    {
-        $command = new Command('App\\Store\\Command\\MakePayment', []);
-
-        $this->assertNull($command->get('nonexistent'));
-        $this->assertSame('default', $command->get('nonexistent', 'default'));
-    }
-
-    public function testHasReturnsTrueForExistingKey(): void
+    public function testHasChecksExistence(): void
     {
         $command = new Command('App\\Store\\Command\\MakePayment', [
             'amount' => 100,
         ]);
 
         $this->assertTrue($command->has('amount'));
-    }
-
-    public function testHasReturnsFalseForMissingKey(): void
-    {
-        $command = new Command('App\\Store\\Command\\MakePayment', []);
-
         $this->assertFalse($command->has('nonexistent'));
     }
 
-    public function testMagicGetAccessesProperties(): void
+    public function testAsStringCoerces(): void
     {
         $command = new Command('App\\Store\\Command\\MakePayment', [
             'amount' => 100,
         ]);
 
-        // @phpstan-ignore property.notFound
-        $this->assertSame(100, $command->amount);
+        $this->assertSame('100', $command->asString('amount'));
+        $this->assertSame('default', $command->asString('missing', 'default'));
     }
 
-    public function testMagicIssetChecksProperties(): void
+    public function testAsIntCoerces(): void
     {
         $command = new Command('App\\Store\\Command\\MakePayment', [
-            'amount' => 100,
+            'quantity' => '5',
         ]);
 
-        $this->assertTrue(isset($command->amount));
-        $this->assertFalse(isset($command->nonexistent));
+        $this->assertSame(5, $command->asInt('quantity'));
+        $this->assertSame(1, $command->asInt('missing', 1));
+    }
+
+    public function testAsFloatCoerces(): void
+    {
+        $command = new Command('App\\Store\\Command\\MakePayment', [
+            'amount' => '99.99',
+        ]);
+
+        $this->assertSame(99.99, $command->asFloat('amount'));
+    }
+
+    public function testAsBoolCoerces(): void
+    {
+        $command = new Command('App\\Store\\Command\\MakePayment', [
+            'express' => true,
+        ]);
+
+        $this->assertTrue($command->asBool('express'));
+        $this->assertFalse($command->asBool('missing'));
     }
 
     public function testToArrayReturnsAllData(): void

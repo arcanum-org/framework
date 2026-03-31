@@ -10,8 +10,6 @@ final class DynamicCommandHandler
 {
     public function __invoke(Command $command): DynamicCommandResult
     {
-        /** @var string $name */
-        $name = $command->get('name', 'unknown');
-        return new DynamicCommandResult($name);
+        return new DynamicCommandResult($command->asString('name', 'unknown'));
     }
 }
