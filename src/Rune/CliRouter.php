@@ -27,10 +27,12 @@ final class CliRouter implements Router
 
     /**
      * @param ConventionResolver $resolver The convention-based path-to-namespace resolver.
+     * @param CliRouteMap|null $routeMap Custom CLI route overrides, checked before convention routing.
      * @param string $defaultFormat Default output format when no --format flag is present.
      */
     public function __construct(
         private readonly ConventionResolver $resolver,
+        private readonly CliRouteMap|null $routeMap = null,
         private readonly string $defaultFormat = 'cli',
     ) {
     }
@@ -48,6 +50,13 @@ final class CliRouter implements Router
 
         if ($command === '') {
             throw new UnresolvableRoute('No command specified.');
+        }
+
+        $format = $input->option('format') ?? $this->defaultFormat;
+
+        // Custom routes take priority — check full command name first.
+        if ($this->routeMap !== null && $this->routeMap->has($command)) {
+            return $this->routeMap->resolve($command, $format);
         }
 
         $colonPos = strpos($command, ':');
@@ -81,7 +90,6 @@ final class CliRouter implements Router
         }
 
         $path = str_replace(':', '/', $rest);
-        $format = $input->option('format') ?? $this->defaultFormat;
 
         $route = $this->resolver->resolveByType(
             path: $path,

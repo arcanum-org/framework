@@ -7,6 +7,7 @@ namespace Arcanum\Test\Rune;
 use Arcanum\Atlas\ConventionResolver;
 use Arcanum\Atlas\Route;
 use Arcanum\Atlas\UnresolvableRoute;
+use Arcanum\Rune\CliRouteMap;
 use Arcanum\Rune\CliRouter;
 use Arcanum\Rune\Input;
 use Arcanum\Toolkit\Strings;
@@ -15,6 +16,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(CliRouter::class)]
+#[UsesClass(CliRouteMap::class)]
 #[UsesClass(ConventionResolver::class)]
 #[UsesClass(Input::class)]
 #[UsesClass(Route::class)]
@@ -247,5 +249,89 @@ final class CliRouterTest extends TestCase
 
         // Assert
         $this->assertSame('Arcanum\\Test\\Fixture\\Contact\\Command\\Submit', $route->dtoClass);
+    }
+
+    // ---------------------------------------------------------------
+    // CliRouteMap integration
+    // ---------------------------------------------------------------
+
+    public function testCustomRoutesTakePriorityOverConvention(): void
+    {
+        // Arrange
+        $routeMap = new CliRouteMap();
+        $routeMap->register('query:shop:products', 'App\\Custom\\OverriddenProducts', 'query');
+
+        $router = new CliRouter(
+            new ConventionResolver(rootNamespace: 'Arcanum\\Test\\Fixture'),
+            $routeMap,
+        );
+
+        $input = new Input('query:shop:products');
+
+        // Act
+        $route = $router->resolve($input);
+
+        // Assert — custom route wins over convention
+        $this->assertSame('App\\Custom\\OverriddenProducts', $route->dtoClass);
+    }
+
+    public function testCustomRouteWithNonConventionalName(): void
+    {
+        // Arrange
+        $routeMap = new CliRouteMap();
+        $routeMap->register('stripe:webhook', 'App\\Integration\\Stripe\\ProcessWebhook');
+
+        $router = new CliRouter(
+            new ConventionResolver(rootNamespace: 'Arcanum\\Test\\Fixture'),
+            $routeMap,
+        );
+
+        $input = new Input('stripe:webhook');
+
+        // Act
+        $route = $router->resolve($input);
+
+        // Assert
+        $this->assertSame('App\\Integration\\Stripe\\ProcessWebhook', $route->dtoClass);
+    }
+
+    public function testCustomRouteRespectsFormatFlag(): void
+    {
+        // Arrange
+        $routeMap = new CliRouteMap();
+        $routeMap->register('stripe:webhook', 'App\\Integration\\Stripe\\ProcessWebhook');
+
+        $router = new CliRouter(
+            new ConventionResolver(rootNamespace: 'Arcanum\\Test\\Fixture'),
+            $routeMap,
+        );
+
+        $input = new Input('stripe:webhook', options: ['format' => 'json']);
+
+        // Act
+        $route = $router->resolve($input);
+
+        // Assert
+        $this->assertSame('json', $route->format);
+    }
+
+    public function testFallsBackToConventionWhenNotInRouteMap(): void
+    {
+        // Arrange
+        $routeMap = new CliRouteMap();
+        $routeMap->register('stripe:webhook', 'App\\Integration\\Stripe\\ProcessWebhook');
+
+        $router = new CliRouter(
+            new ConventionResolver(rootNamespace: 'Arcanum\\Test\\Fixture'),
+            $routeMap,
+        );
+
+        $input = new Input('query:shop:products');
+
+        // Act
+        $route = $router->resolve($input);
+
+        // Assert — falls through to convention routing
+        $this->assertSame('Arcanum\\Test\\Fixture\\Shop\\Query\\Products', $route->dtoClass);
     }
 }
