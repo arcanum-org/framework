@@ -325,6 +325,7 @@ Track updates to the starter app (`../arcanum/`) as framework features land.
 - [x] Add `config/routes.php` — page registration moved from bootstrap to config file, bootstrap reads `$routes['pages']` and registers each path/format pair
 - [x] Add `config/formats.php` — configure enabled response formats and any renderer overrides
 - [x] Add example Command — `PUT /contact/submit` → `App\Contact\Command\Submit` + `SubmitHandler`, demonstrates Command with DTO hydration from JSON body, void return→204
+- [ ] Add `config/middleware.php` with a `global` key and an example middleware (e.g., CORS headers) to demonstrate `HttpMiddleware` integration
 
 ---
 
