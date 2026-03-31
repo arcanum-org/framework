@@ -224,6 +224,90 @@ final class CliRouterTest extends TestCase
     }
 
     // ---------------------------------------------------------------
+    // "Did you mean?" suggestions
+    // ---------------------------------------------------------------
+
+    public function testSuggestsAlternatePrefixWhenOppositeTypeExists(): void
+    {
+        // Arrange — Reports\Query\Summary exists, Reports\Command\Summary does not
+        $input = new Input('command:reports:summary');
+
+        // Act & Assert
+        $this->expectException(UnresolvableRoute::class);
+        $this->expectExceptionMessage('Did you mean: query:reports:summary?');
+        $this->router()->resolve($input);
+    }
+
+    public function testSuggestsCommandPrefixWhenQueryUsedForCommand(): void
+    {
+        // Arrange — Orders\Command\Cancel exists, Orders\Query\Cancel does not
+        $input = new Input('query:orders:cancel');
+
+        // Act & Assert
+        $this->expectException(UnresolvableRoute::class);
+        $this->expectExceptionMessage('Did you mean: command:orders:cancel?');
+        $this->router()->resolve($input);
+    }
+
+    public function testSuggestsSimilarCustomRouteNames(): void
+    {
+        // Arrange — "stripe:webhok" is 1 edit from "stripe:webhook"
+        $routeMap = new CliRouteMap();
+        $routeMap->register('stripe:webhook', 'App\\Stripe\\Webhook');
+
+        $router = new CliRouter(
+            new ConventionResolver(rootNamespace: 'Arcanum\\Test\\Fixture'),
+            $routeMap,
+        );
+
+        $input = new Input('stripe:webhok');
+
+        // Act & Assert
+        $this->expectException(UnresolvableRoute::class);
+        $this->expectExceptionMessage('Did you mean: stripe:webhook?');
+        $router->resolve($input);
+    }
+
+    public function testNoSuggestionsWhenNothingSimilar(): void
+    {
+        // Arrange
+        $input = new Input('command:completely:unknown');
+
+        // Act
+        try {
+            $this->router()->resolve($input);
+            $this->fail('Expected UnresolvableRoute');
+        } catch (UnresolvableRoute $e) {
+            // Assert — no "Did you mean" when nothing is close
+            $this->assertStringNotContainsString('Did you mean', $e->getMessage());
+        }
+    }
+
+    public function testSuggestsBothAlternatePrefixAndSimilarCustomRoute(): void
+    {
+        // Arrange — Reports\Query\Summary exists, and custom route is close
+        $routeMap = new CliRouteMap();
+        $routeMap->register('command:reports:sumary', 'App\\Custom\\Summary');
+
+        $router = new CliRouter(
+            new ConventionResolver(rootNamespace: 'Arcanum\\Test\\Fixture'),
+            $routeMap,
+        );
+
+        $input = new Input('command:reports:summary');
+
+        // Act
+        try {
+            $router->resolve($input);
+            $this->fail('Expected UnresolvableRoute');
+        } catch (UnresolvableRoute $e) {
+            // Assert — both suggestions present
+            $this->assertStringContainsString('query:reports:summary', $e->getMessage());
+            $this->assertStringContainsString('command:reports:sumary', $e->getMessage());
+        }
+    }
+
+    // ---------------------------------------------------------------
     // Prefix case insensitivity
     // ---------------------------------------------------------------
 

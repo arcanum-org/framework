@@ -76,10 +76,14 @@ final class CliRouter implements Router
         $typeNamespace = self::TYPE_MAP[strtolower($prefix)] ?? null;
 
         if ($typeNamespace === null) {
-            throw new UnresolvableRoute(sprintf(
-                'Unknown type prefix "%s". Use "command:" or "query:".',
-                $prefix,
-            ));
+            $message = sprintf('Unknown type prefix "%s". Use "command:" or "query:".', $prefix);
+            $similar = $this->findSimilarCustomRoutes($command);
+
+            if ($similar !== []) {
+                $message .= sprintf(' Did you mean: %s?', implode(', ', $similar));
+            }
+
+            throw new UnresolvableRoute($message);
         }
 
         if ($rest === '') {
@@ -105,11 +109,69 @@ final class CliRouter implements Router
             return $route;
         }
 
-        throw new UnresolvableRoute(sprintf(
-            'No %s found for "%s" (expected class %s).',
-            strtolower($typeNamespace),
-            $command,
-            $route->dtoClass,
-        ));
+        throw $this->buildNotFoundError($command, $typeNamespace, $path, $format);
+    }
+
+    /**
+     * Build a descriptive error for a failed resolution, with suggestions.
+     *
+     * Checks two sources of suggestions:
+     * 1. Wrong prefix — if the user typed command: but a query exists (or vice versa).
+     * 2. Similar names — Levenshtein distance against registered custom routes.
+     */
+    private function buildNotFoundError(
+        string $command,
+        string $typeNamespace,
+        string $path,
+        string $format,
+    ): UnresolvableRoute {
+        $suggestions = [];
+
+        // Check if the opposite type exists (CLI equivalent of HTTP 405).
+        $alternateType = $typeNamespace === 'Command' ? 'Query' : 'Command';
+        $alternatePrefix = strtolower($alternateType);
+        $alternateRoute = $this->resolver->resolveByType(
+            path: $path,
+            typeNamespace: $alternateType,
+            format: $format,
+        );
+
+        if (class_exists($alternateRoute->dtoClass) || class_exists($alternateRoute->dtoClass . 'Handler')) {
+            $colonPos = strpos($command, ':');
+            $rest = $colonPos !== false ? substr($command, $colonPos + 1) : $command;
+            $suggestions[] = sprintf('%s:%s', $alternatePrefix, $rest);
+        }
+
+        $suggestions = array_merge($suggestions, $this->findSimilarCustomRoutes($command));
+
+        $message = sprintf('No %s found for "%s".', strtolower($typeNamespace), $command);
+
+        if ($suggestions !== []) {
+            $message .= sprintf(' Did you mean: %s?', implode(', ', $suggestions));
+        }
+
+        return new UnresolvableRoute($message);
+    }
+
+    /**
+     * Find custom route names within 3 edits of the given command.
+     *
+     * @return list<string>
+     */
+    private function findSimilarCustomRoutes(string $command): array
+    {
+        if ($this->routeMap === null) {
+            return [];
+        }
+
+        $similar = [];
+
+        foreach ($this->routeMap->names() as $name) {
+            if (levenshtein($command, $name) <= 3) {
+                $similar[] = $name;
+            }
+        }
+
+        return $similar;
     }
 }
