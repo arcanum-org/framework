@@ -274,7 +274,7 @@ These items bridge the gap between HTTP (Hyper) and command/query dispatch (Conv
 - [x] Implement `Codex\Hydrator` — constructs DTOs by matching associative array keys to constructor parameter names. Handles missing params via defaults, throws for required params with no data.
 - [x] Add type coercion for scalar DTO properties — coerces string values to int (via `is_numeric`), float, bool (via `filter_var`), and string as needed by the constructor type hints
 - [x] Add tests for query parameter injection into DTOs
-- [ ] Add tests for request body injection into DTOs — Commands are implemented, Hydrator works, but no framework-level test verifies the JSON body → Hydrator → Command DTO flow
+- [x] Add tests for request body injection into DTOs — integration tests verify JSON body → Hydrator → Command DTO flow, including default values and full dispatch lifecycle
 - [x] Add tests for type coercion (string → int, string → bool, etc.)
 - [x] Add tests for missing required parameter, extra data ignored, default value fallback
 
@@ -284,7 +284,7 @@ Query handlers always return data. The response is rendered by the format-aware 
 
 - [x] ~~Define a response serializer interface~~ — not needed, `FormatRegistry::renderer()` already selects the right renderer based on the route's format
 - [x] ~~Implement format-aware response serializer~~ — the kernel calls `FormatRegistry::renderer()` directly, no wrapper needed
-- [ ] Add integration tests for Query response with JSON format — verify the full flow from Route → FormatRegistry → JsonRenderer → ResponseInterface
+- [x] Add integration tests for Query response with JSON format — verify the full flow from Route → FormatRegistry → JsonRenderer → ResponseInterface, with and without query params
 - [ ] Add integration tests for Query response with HTML format (after HtmlRenderer is built)
 - [ ] Add integration tests for Query response with CSV format (after CsvRenderer is built)
 
@@ -377,7 +377,7 @@ The format registry maps file extensions to renderers and content types. It is t
 
 Items built during the session that need tests or plan tracking:
 
-- [ ] Add tests for `Flow\Conveyor\QueryResult` — wrapper for non-object handler returns. No dedicated tests exist; only exercised indirectly via the starter app.
+- [x] Add tests for `Flow\Conveyor\QueryResult` — wrapper for non-object handler returns. Dedicated unit tests for array, string, int, null, bool, float wrapping.
 - [x] Add 404 handling for non-existent convention routes — `HttpRouter` now throws `HttpException(NotFound)` when neither Query nor Command DTO class exists for a path, instead of letting the container blow up with a 500.
 - [x] Add JSON body parsing to `HyperKernel::prepareRequest()` — parses `application/json` request bodies into `parsedBody` before the app's `handleRequest()` sees the request. Throws `HttpException(BadRequest)` for malformed JSON. Removed manual JSON decoding from the starter app kernel.
 - [x] Add HTTP method enforcement — `HttpRouter` now validates that the resolved DTO class exists. Pages reject non-GET with 405. Convention routes check the alternate namespace (Query↔Command) to distinguish 405 Method Not Allowed from 404 Not Found. Added `MethodNotAllowed` exception extending `HttpException` with allowed methods list for RFC 7231 `Allow` header.
