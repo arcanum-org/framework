@@ -812,6 +812,46 @@ final class ResolverTest extends TestCase
         $this->assertInstanceOf(Fixture\ServiceImplementsInterface::class, $resolved->dependency);
     }
 
+    public function testResolveWithCallableThatReturnsNonObjectThrowsTypeError(): void
+    {
+        // Arrange
+        $container = $this->createStub(ContainerInterface::class);
+
+        $container->method('has')
+            ->willReturn(false);
+
+        $resolver = Resolver::forContainer($container);
+
+        // Assert
+        $this->expectException(\TypeError::class);
+
+        // Act
+        $resolver->resolve(fn() => 'not an object'); // @phpstan-ignore argument.type, argument.templateType
+    }
+
+    public function testResolveWithVariadicConstructorParameters(): void
+    {
+        // Arrange
+        $container = $this->createStub(ContainerInterface::class);
+
+        $container->method('has')
+            ->willReturn(false);
+
+        $resolver = Resolver::forContainer($container);
+
+        // Act
+        $resolved = $resolver->resolveWith(Fixture\VariadicClassService::class, [
+            Fixture\SimpleDependency::class,
+            Fixture\SimpleDependency::class,
+            Fixture\SimpleDependency::class,
+        ]);
+
+        // Assert
+        $this->assertInstanceOf(Fixture\VariadicClassService::class, $resolved);
+        $this->assertCount(3, $resolved->dependencies);
+        $this->assertInstanceOf(Fixture\SimpleDependency::class, $resolved->dependencies[0]);
+    }
+
     public function testNullableParameterFallsBackToNullWhenUnresolvable(): void
     {
         // Arrange

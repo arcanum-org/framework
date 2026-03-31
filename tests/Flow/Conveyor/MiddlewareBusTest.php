@@ -212,6 +212,16 @@ final class MiddlewareBusTest extends TestCase
         $bus->dispatch(new EmptyDTO(), prefix: 'Delete');
     }
 
+    public function testDispatchThrowsWhenHandlerClassNotFoundInContainer(): void
+    {
+        // Arrange — dispatching an object with no handler at all, no prefix
+        $bus = new MiddlewareBus(new Container());
+
+        // Act & Assert
+        $this->expectException(\InvalidArgumentException::class);
+        $bus->dispatch(new EmptyDTO());
+    }
+
     // ---------------------------------------------------------------
     // HandlerProxy — dynamic DTOs
     // ---------------------------------------------------------------

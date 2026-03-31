@@ -238,6 +238,12 @@ class Resolver implements ClassResolver, Specifier
         // Now we can resolve the dependencies.
         $dependencies = [];
         foreach ($parameters as $index => $parameter) {
+            if ($parameter->isVariadic()) {
+                foreach (array_slice($arguments, $index) as $variadicArgument) {
+                    $dependencies[] = $this->resolve($variadicArgument, isDependency: true);
+                }
+                break;
+            }
             $argument = $arguments[$index] ?? null;
             $dependencies[] = match (true) {
                 $argument !== null => $this->resolve($argument, isDependency: true),

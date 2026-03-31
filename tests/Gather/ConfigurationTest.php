@@ -231,4 +231,69 @@ final class ConfigurationTest extends TestCase
         $this->assertSame(1.0, $float);
         $this->assertTrue($bool);
     }
+
+    public function testAsAlphaWithDotNotationKey(): void
+    {
+        // Arrange
+        $configuration = new Configuration([
+            'app' => [
+                'name' => '1b2a3r4'
+            ]
+        ]);
+
+        // Act
+        $alpha = $configuration->asAlpha('app.name');
+
+        // Assert
+        $this->assertSame('bar', $alpha);
+    }
+
+    public function testAsAlnumWithDotNotationKey(): void
+    {
+        // Arrange
+        $configuration = new Configuration([
+            'app' => [
+                'version' => '1b2a@3r4'
+            ]
+        ]);
+
+        // Act
+        $alnum = $configuration->asAlnum('app.version');
+
+        // Assert
+        $this->assertSame('1b2a3r4', $alnum);
+    }
+
+    public function testAsDigitsWithDotNotationKey(): void
+    {
+        // Arrange
+        $configuration = new Configuration([
+            'app' => [
+                'port' => '80ab80'
+            ]
+        ]);
+
+        // Act
+        $digits = $configuration->asDigits('app.port');
+
+        // Assert
+        $this->assertSame('8080', $digits);
+    }
+
+    public function testSetOverwritesScalarIntermediatePathValue(): void
+    {
+        // Arrange
+        $configuration = new Configuration([
+            'database' => [
+                'host' => 'localhost'
+            ]
+        ]);
+
+        // Act — 'host' is a scalar, but we set a child key under it
+        $configuration->set('database.host.primary', '10.0.0.1');
+
+        // Assert — scalar was replaced with an array
+        $this->assertSame('10.0.0.1', $configuration->get('database.host.primary'));
+        $this->assertSame(['primary' => '10.0.0.1'], $configuration->get('database.host'));
+    }
 }

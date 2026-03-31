@@ -75,4 +75,49 @@ final class EnvironmentTest extends TestCase
         // Act
         $_ = clone $environment;
     }
+
+    public function testGetReturnsValue(): void
+    {
+        // Arrange
+        $environment = new Environment(['DB_HOST' => 'localhost', 'DB_PORT' => '5432']);
+
+        // Act & Assert
+        $this->assertSame('localhost', $environment->get('DB_HOST'));
+        $this->assertSame('5432', $environment->get('DB_PORT'));
+        $this->assertNull($environment->get('MISSING'));
+    }
+
+    public function testHasChecksExistence(): void
+    {
+        // Arrange
+        $environment = new Environment(['APP_KEY' => 'secret']);
+
+        // Act & Assert
+        $this->assertTrue($environment->has('APP_KEY'));
+        $this->assertFalse($environment->has('MISSING'));
+    }
+
+    public function testSetStoresValue(): void
+    {
+        // Arrange
+        $environment = new Environment();
+
+        // Act
+        $environment->set('REDIS_HOST', '127.0.0.1');
+
+        // Assert
+        $this->assertSame('127.0.0.1', $environment->get('REDIS_HOST'));
+        $this->assertTrue($environment->has('REDIS_HOST'));
+    }
+
+    public function testCountReturnsNumberOfEntries(): void
+    {
+        // Arrange
+        $empty = new Environment();
+        $populated = new Environment(['a' => '1', 'b' => '2', 'c' => '3']);
+
+        // Act & Assert
+        $this->assertCount(0, $empty);
+        $this->assertCount(3, $populated);
+    }
 }

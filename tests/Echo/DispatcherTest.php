@@ -11,6 +11,8 @@ use Arcanum\Echo\Provider;
 use Arcanum\Echo\Event;
 use Arcanum\Echo\UnknownEvent;
 use Arcanum\Test\Echo\Fixture\SomethingHappened;
+use Arcanum\Test\Echo\Fixture\ChildTriggered;
+use Arcanum\Test\Echo\Fixture\MutableEvent;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(Dispatcher::class)]
@@ -209,5 +211,77 @@ final class DispatcherTest extends TestCase
         // Assert
         $this->assertSame($event, $result);
         $this->assertSame(1, $count);
+    }
+
+    public function testNonInterruptedExceptionPropagatesFromListener(): void
+    {
+        // Arrange
+        $provider = new Provider();
+        $provider->listen(SomethingHappened::class, function (Event $event): Event {
+            throw new \RuntimeException('Listener failed');
+        });
+
+        $event = new SomethingHappened();
+        $dispatcher = new Dispatcher($provider);
+
+        // Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Listener failed');
+
+        // Act
+        $dispatcher->dispatch($event);
+    }
+
+    public function testInterruptedExceptionStopsPropagationAndReturnsEvent(): void
+    {
+        // Arrange
+        $count = 0;
+        $provider = new Provider();
+        $provider->listen(SomethingHappened::class, function (Event $event) use (&$count): Event {
+            $count++;
+            $event->stopPropagation();
+            return $event;
+        });
+        $provider->listen(SomethingHappened::class, function (Event $event): Event {
+            $this->fail('Listener called after Interrupted');
+        });
+
+        $event = new SomethingHappened();
+        $dispatcher = new Dispatcher($provider);
+
+        // Act
+        $result = $dispatcher->dispatch($event);
+
+        // Assert
+        $this->assertSame($event, $result);
+        $this->assertSame(1, $count);
+    }
+
+    public function testEventMutationPropagatesThroughListenerChain(): void
+    {
+        // Arrange
+        $provider = new Provider();
+        $provider->listen(MutableEvent::class, function (MutableEvent $event): MutableEvent {
+            $event->counter += 10;
+            return $event;
+        });
+        $provider->listen(MutableEvent::class, function (MutableEvent $event): MutableEvent {
+            $event->counter *= 3;
+            return $event;
+        });
+        $provider->listen(MutableEvent::class, function (MutableEvent $event): MutableEvent {
+            $event->counter += 5;
+            return $event;
+        });
+
+        $event = new MutableEvent();
+        $dispatcher = new Dispatcher($provider);
+
+        // Act
+        $result = $dispatcher->dispatch($event);
+
+        // Assert — mutations accumulate: (0+10)*3+5 = 35
+        $this->assertSame($event, $result);
+        $this->assertSame(35, $event->counter);
     }
 }

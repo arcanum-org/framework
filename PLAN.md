@@ -2,7 +2,7 @@
 
 This checklist tracks remaining work to complete all packages in the Arcanum framework. Each item is a small unit of work that includes 100% test coverage.
 
-**Progress: 185 done, 37 remaining.**
+**Progress: 200 done, 22 remaining.**
 
 ---
 
@@ -137,30 +137,30 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 Small, isolated test cases for edge cases and untested paths.
 
 **Cabinet:**
-- [ ] Add test for `Container::specify()` with array `when` parameter — only the string form is tested
-- [ ] Add test for `Container` default constructor — no test creates a Container with `null` parameters
+- [x] Add test for `Container::specify()` with array `when` parameter — only the string form is tested
+- [x] Add test for `Container` default constructor — no test creates a Container with `null` parameters
 
 **Codex:**
-- [ ] Add test for `Resolver::resolve()` with callable that returns non-object
-- [ ] Add test for `Resolver::resolveWith()` with variadic constructor parameters
+- [x] Add test for `Resolver::resolve()` with callable that returns non-object
+- [x] Add test for `Resolver::resolveWith()` with variadic constructor parameters — also fixed `resolveWith()` to handle variadic params
 
 **Echo:**
-- [ ] Add test for listener that throws a non-`Interrupted` exception during dispatch
-- [ ] Add test for `Interrupted` exception during dispatch — verify event is returned and propagation stops
-- [ ] Add test for event mutation propagation through listener chain
+- [x] Add test for listener that throws a non-`Interrupted` exception during dispatch
+- [x] Add test for `Interrupted` exception during dispatch — verify event is returned and propagation stops
+- [x] Add test for event mutation propagation through listener chain
 
 **Flow — River:**
-- [ ] Add test for `Stream::read(0)` edge case — verify reading zero bytes returns empty string
-- [ ] Add test for `CachingStream::seek()` with `SEEK_END` on an unseekable remote stream
+- [x] Add test for `Stream::read(0)` edge case — already existed at `StreamTest::testReadReturnsEmptyStringIfLengthToReadIsZero`
+- [x] Add test for `CachingStream::seek()` with `SEEK_END` on an unseekable remote stream
 
 **Flow — Conveyor:**
-- [ ] Add test for `MiddlewareBus::dispatch()` when handler class is not found in container
+- [x] Add test for `MiddlewareBus::dispatch()` when handler class is not found in container
 
 **Gather:**
-- [ ] Add tests for `Configuration::asAlpha()`, `asAlnum()`, `asDigits()` with dot-notation keys
-- [ ] Add tests for `IgnoreCaseRegistry::asAlpha()`, `asAlnum()`, `asDigits()` — verify case-insensitive coercion
-- [ ] Add tests for `Environment` inherited methods (`get()`, `has()`, `set()`, `count()`)
-- [ ] Add test for `Configuration::set()` where an intermediate path value is a scalar, not an array
+- [x] Add tests for `Configuration::asAlpha()`, `asAlnum()`, `asDigits()` with dot-notation keys
+- [x] Add tests for `IgnoreCaseRegistry::asAlpha()`, `asAlnum()`, `asDigits()` — verify case-insensitive coercion
+- [x] Add tests for `Environment` inherited methods (`get()`, `has()`, `set()`, `count()`)
+- [x] Add test for `Configuration::set()` where an intermediate path value is a scalar, not an array
 
 ### Integration Tests
 

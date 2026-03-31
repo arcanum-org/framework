@@ -841,6 +841,44 @@ final class CachingStreamTest extends TestCase
         $streamInterface->seek(-10, SEEK_END);
     }
 
+    public function testSeekWithSeekEndConsumesEverythingWhenRemoteSizeIsNull(): void
+    {
+        // Arrange — remote stream with unknown size, 20 bytes of content
+        $remoteData = 'abcdefghij0123456789';
+
+        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
+        $stream = $this->getMockBuilder(Stream::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getSize', 'eof', 'read'])
+            ->getMock();
+
+        $stream->expects($this->once())
+            ->method('getSize')
+            ->willReturn(null);
+
+        $readOffset = 0;
+        $stream->method('read')
+            ->willReturnCallback(function (int $length) use ($remoteData, &$readOffset): string {
+                $chunk = substr($remoteData, $readOffset, $length);
+                $readOffset += strlen($chunk);
+                return $chunk;
+            });
+
+        $stream->method('eof')
+            ->willReturnCallback(function () use ($remoteData, &$readOffset): bool {
+                return $readOffset >= strlen($remoteData);
+            });
+
+        $streamInterface = CachingStream::fromStream($stream);
+
+        // Act — seek 5 bytes back from end; since size is null, consumeEverything() is called
+        $streamInterface->seek(-5, SEEK_END);
+
+        // Assert — position should be at byte 15 (20 - 5)
+        $this->assertSame(15, $streamInterface->tell());
+        $this->assertSame('56789', $streamInterface->read(5));
+    }
+
     public function testSeekWithInvalidWhenceThrows(): void
     {
         // Arrange

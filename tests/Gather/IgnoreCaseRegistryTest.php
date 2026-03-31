@@ -188,4 +188,40 @@ final class IgnoreCaseRegistryTest extends TestCase
         // Assert
         $this->assertSame(['foo' => 'bar'], $array);
     }
+
+    public function testAsAlphaCaseInsensitive(): void
+    {
+        // Arrange
+        $registry = new IgnoreCaseRegistry(['Content-Type' => '1a2p3p@']);
+
+        // Act
+        $alpha = $registry->asAlpha('CONTENT-TYPE');
+
+        // Assert
+        $this->assertSame('app', $alpha);
+    }
+
+    public function testAsAlnumCaseInsensitive(): void
+    {
+        // Arrange
+        $registry = new IgnoreCaseRegistry(['X-Rate' => '1a2b@3c']);
+
+        // Act
+        $alnum = $registry->asAlnum('x-rate');
+
+        // Assert
+        $this->assertSame('1a2b3c', $alnum);
+    }
+
+    public function testAsDigitsCaseInsensitive(): void
+    {
+        // Arrange
+        $registry = new IgnoreCaseRegistry(['Content-Length' => '12ab34']);
+
+        // Act
+        $digits = $registry->asDigits('content-LENGTH');
+
+        // Assert
+        $this->assertSame('1234', $digits);
+    }
 }
