@@ -2,7 +2,7 @@
 
 This checklist tracks remaining work to complete all packages in the Arcanum framework. Each item is a small unit of work that includes 100% test coverage.
 
-**Progress: 208 done, 15 remaining.**
+**Progress: 212 done, 11 remaining.**
 
 ---
 
@@ -177,13 +177,16 @@ Now that all renderers are built, these integration tests are unblocked:
 
 ### Command Response Enhancements
 
-- [ ] Add `Location` header for 201 responses — set if the framework can resolve a URL from the returned identifier
-- [ ] Add tests for scalar return → 201 Created with empty body and Location header
 - [x] Add void/null distinction in Conveyor — reflect on handler return type: `void` → EmptyDTO (204), nullable returning null → AcceptedDTO (202), nullable returning value → 201
-- [ ] Add tests for `null` return → 202 Accepted with empty body in Kernel integration test
-- [ ] Add opt-in configuration for command response bodies — disabled by default
-- [ ] Add tests for opt-in response body configuration
 - [ ] Add documentation guidance — explain CQRS command conventions and why response bodies are discouraged
+
+**Deferred — blocked on upstream work:**
+
+The remaining command response items depend on infrastructure that doesn't exist yet:
+
+- **`Location` header for 201 responses** — requires reverse routing (URL generation from a class/identifier) and a persistence layer (handlers need to create things and get IDs back). In CQRS, commands and queries live at different paths, so there's no canonical resource URL to point to like in REST/CRUD. A `Locatable` interface would force devs to hardcode URLs, which is brittle. Revisit after: persistence layer, reverse routing, and a convention linking Commands to their corresponding Queries.
+- **Opt-in command response bodies** — design depends on how persistence results look. Revisit alongside `Location` header.
+- **Integration tests for 202/201 in Kernel** — straightforward once the above are settled, but low value without `Location` header to test.
 
 ### Route Middleware
 
@@ -198,10 +201,10 @@ Items flagged for future discussion. Not blocking — the framework works withou
 
 ### Documentation
 
-- [ ] Write `src/Toolkit/README.md` (once Toolkit has more than just Strings)
-- [ ] Write `src/Glitch/README.md`
-- [ ] Write `src/Ignition/README.md`
-- [ ] Write `src/Quill/README.md`
+- [x] Write `src/Toolkit/README.md`
+- [x] Write `src/Glitch/README.md`
+- [x] Write `src/Ignition/README.md`
+- [x] Write `src/Quill/README.md`
 
 ---
 
