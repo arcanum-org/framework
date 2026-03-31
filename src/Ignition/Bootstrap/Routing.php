@@ -123,15 +123,28 @@ class Routing implements Bootstrapper
         $absolutePagesDir = str_starts_with($pagesDirectory, DIRECTORY_SEPARATOR)
             ? $pagesDirectory
             : $kernel->rootDirectory() . DIRECTORY_SEPARATOR . $pagesDirectory;
-        $cachePath = $kernel->filesDirectory()
-            . DIRECTORY_SEPARATOR . 'cache'
-            . DIRECTORY_SEPARATOR . 'pages.php';
+
+        // Page cache configuration.
+        /** @var mixed $cacheEnabled */
+        $cacheEnabled = $config->get('cache.pages.enabled');
+        $cacheEnabled = $cacheEnabled === null || $cacheEnabled === true;
+
+        /** @var mixed $cacheMaxAge */
+        $cacheMaxAge = $config->get('cache.pages.max_age');
+        $cacheMaxAge = is_int($cacheMaxAge) ? $cacheMaxAge : 0;
+
+        $cachePath = $cacheEnabled
+            ? $kernel->filesDirectory()
+                . DIRECTORY_SEPARATOR . 'cache'
+                . DIRECTORY_SEPARATOR . 'pages.php'
+            : '';
 
         $pageDiscovery = new PageDiscovery(
             namespace: $pagesNamespace,
             directory: $absolutePagesDir,
             defaultFormat: 'html',
             cachePath: $cachePath,
+            cacheMaxAge: $cacheMaxAge,
         );
 
         /** @var array<string, string>|null $pageOverrides */

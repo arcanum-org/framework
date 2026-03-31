@@ -23,11 +23,19 @@ use Arcanum\Toolkit\Strings;
  */
 final class PageDiscovery
 {
+    /**
+     * @param string $namespace The Pages namespace (e.g., 'App\Pages').
+     * @param string $directory Absolute path to the pages directory.
+     * @param string $defaultFormat Default response format for pages.
+     * @param string $cachePath Path to the cache file. Empty string disables caching.
+     * @param int $cacheMaxAge Maximum cache age in seconds. 0 means no expiry.
+     */
     public function __construct(
         private string $namespace,
         private string $directory,
         private string $defaultFormat = 'html',
         private string $cachePath = '',
+        private int $cacheMaxAge = 0,
         private Reader $reader = new Reader(),
         private Writer $writer = new Writer(),
         private FileSystem $fileSystem = new FileSystem(),
@@ -58,7 +66,7 @@ final class PageDiscovery
      */
     public function discover(): array
     {
-        if ($this->cachePath !== '' && $this->fileSystem->isFile($this->cachePath)) {
+        if ($this->cachePath !== '' && $this->isCacheValid()) {
             /** @var array<string, string> */
             return $this->reader->require($this->cachePath);
         }
@@ -73,6 +81,27 @@ final class PageDiscovery
         }
 
         return $pages;
+    }
+
+    /**
+     * Check if the cache file exists and is not expired.
+     */
+    private function isCacheValid(): bool
+    {
+        if (!$this->fileSystem->isFile($this->cachePath)) {
+            return false;
+        }
+
+        if ($this->cacheMaxAge === 0) {
+            return true;
+        }
+
+        $modifiedAt = filemtime($this->cachePath);
+        if ($modifiedAt === false) {
+            return false;
+        }
+
+        return (time() - $modifiedAt) < $this->cacheMaxAge;
     }
 
     /**

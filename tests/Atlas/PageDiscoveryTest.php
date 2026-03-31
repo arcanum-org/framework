@@ -206,6 +206,72 @@ final class PageDiscoveryTest extends TestCase
         @unlink($cachePath);
     }
 
+    public function testExpiredCacheRescans(): void
+    {
+        // Arrange — create cache, then backdate it beyond max age
+        $cachePath = sys_get_temp_dir() . '/arcanum_pages_test_' . uniqid() . '.php';
+        $discovery = new PageDiscovery(
+            self::PAGES_NS,
+            self::PAGES_DIR,
+            cachePath: $cachePath,
+            cacheMaxAge: 60,
+        );
+        $discovery->discover(); // writes cache
+
+        // Backdate the cache file to 120 seconds ago
+        touch($cachePath, time() - 120);
+
+        // Act — should rescan because cache is expired
+        $pages = $discovery->discover();
+
+        // Assert — still finds pages (rescanned, not empty)
+        $this->assertArrayHasKey('/', $pages);
+
+        // Cleanup
+        @unlink($cachePath);
+    }
+
+    public function testZeroMaxAgeMeansNoExpiry(): void
+    {
+        // Arrange — create cache, backdate it significantly
+        $cachePath = sys_get_temp_dir() . '/arcanum_pages_test_' . uniqid() . '.php';
+        $discovery = new PageDiscovery(
+            self::PAGES_NS,
+            self::PAGES_DIR,
+            cachePath: $cachePath,
+            cacheMaxAge: 0,
+        );
+        $discovery->discover(); // writes cache
+
+        // Backdate the cache file to 1 day ago
+        touch($cachePath, time() - 86400);
+
+        // Act — should still use cache (maxAge 0 = no expiry)
+        $pages = $discovery->discover();
+
+        // Assert
+        $this->assertArrayHasKey('/', $pages);
+
+        // Cleanup
+        @unlink($cachePath);
+    }
+
+    public function testNoCachingWhenPathEmpty(): void
+    {
+        // Arrange — empty cachePath means no caching
+        $discovery = new PageDiscovery(
+            self::PAGES_NS,
+            self::PAGES_DIR,
+            cachePath: '',
+        );
+
+        // Act — should scan every time, never write cache
+        $pages = $discovery->discover();
+
+        // Assert — still works
+        $this->assertArrayHasKey('/', $pages);
+    }
+
     public function testClearCacheRemovesFile(): void
     {
         // Arrange
