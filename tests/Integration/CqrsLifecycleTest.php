@@ -6,7 +6,6 @@ namespace Arcanum\Test\Integration;
 
 use Arcanum\Atlas\ConventionResolver;
 use Arcanum\Atlas\HttpRouter;
-use Arcanum\Atlas\Route;
 use Arcanum\Cabinet\Container;
 use Arcanum\Codex\Hydrator;
 use Arcanum\Flow\Conveyor\EmptyDTO;
@@ -71,18 +70,6 @@ final class CqrsLifecycleTest extends TestCase
         return new HttpRouter(new ConventionResolver(self::ROOT_NS));
     }
 
-    /**
-     * Hydrate a DTO from route and data.
-     *
-     * @param array<string, mixed> $data
-     */
-    private function hydrate(Hydrator $hydrator, Route $route, array $data): object
-    {
-        /** @var class-string $class */
-        $class = $route->dtoClass;
-        return $hydrator->hydrate($class, $data);
-    }
-
     // -----------------------------------------------------------
     // JSON body → Hydrator → Command DTO
     // -----------------------------------------------------------
@@ -100,7 +87,9 @@ final class CqrsLifecycleTest extends TestCase
         // Act — resolve route, hydrate DTO from parsed body
         $route = $this->router()->resolve($request);
         $data = (array) ($request->getParsedBody() ?? []);
-        $dto = $this->hydrate($hydrator, $route, $data);
+        /** @var class-string $dtoClass */
+        $dtoClass = $route->dtoClass;
+        $dto = $hydrator->hydrate($dtoClass, $data);
 
         // Assert
         $this->assertSame(self::ROOT_NS . '\\Integration\\Command\\Submit', $route->dtoClass);
@@ -123,7 +112,9 @@ final class CqrsLifecycleTest extends TestCase
         // Act
         $route = $this->router()->resolve($request);
         $data = (array) ($request->getParsedBody() ?? []);
-        $dto = $this->hydrate($hydrator, $route, $data);
+        /** @var class-string $dtoClass */
+        $dtoClass = $route->dtoClass;
+        $dto = $hydrator->hydrate($dtoClass, $data);
 
         // Assert
         $this->assertInstanceOf(Submit::class, $dto);
@@ -148,7 +139,9 @@ final class CqrsLifecycleTest extends TestCase
         // Act — resolve, hydrate, dispatch
         $route = $this->router()->resolve($request);
         $data = (array) ($request->getParsedBody() ?? []);
-        $dto = $this->hydrate($hydrator, $route, $data);
+        /** @var class-string $dtoClass */
+        $dtoClass = $route->dtoClass;
+        $dto = $hydrator->hydrate($dtoClass, $data);
         $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
 
         // Assert — void handler returns EmptyDTO
@@ -171,7 +164,9 @@ final class CqrsLifecycleTest extends TestCase
 
         // Act
         $route = $this->router()->resolve($request);
-        $dto = $this->hydrate($hydrator, $route, $request->getQueryParams());
+        /** @var class-string $dtoClass */
+        $dtoClass = $route->dtoClass;
+        $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
 
         // Assert
         $this->assertSame(self::ROOT_NS . '\\Integration\\Query\\Status', $route->dtoClass);
@@ -194,7 +189,9 @@ final class CqrsLifecycleTest extends TestCase
 
         // Act — resolve, hydrate, dispatch
         $route = $this->router()->resolve($request);
-        $dto = $this->hydrate($hydrator, $route, $request->getQueryParams());
+        /** @var class-string $dtoClass */
+        $dtoClass = $route->dtoClass;
+        $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
         $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
 
         // Assert — array handler result is wrapped in QueryResult
@@ -226,7 +223,9 @@ final class CqrsLifecycleTest extends TestCase
 
         // Act — the full lifecycle
         $route = $router->resolve($request);
-        $dto = $this->hydrate($hydrator, $route, $request->getQueryParams());
+        /** @var class-string $dtoClass */
+        $dtoClass = $route->dtoClass;
+        $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
         $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
 
         // Unwrap QueryResult
@@ -262,7 +261,9 @@ final class CqrsLifecycleTest extends TestCase
 
         // Act
         $route = $router->resolve($request);
-        $dto = $this->hydrate($hydrator, $route, $request->getQueryParams());
+        /** @var class-string $dtoClass */
+        $dtoClass = $route->dtoClass;
+        $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
         $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
         $data = $result instanceof QueryResult ? $result->data : $result;
 
@@ -297,7 +298,9 @@ final class CqrsLifecycleTest extends TestCase
         // Act — the full command lifecycle
         $route = $router->resolve($request);
         $data = (array) ($request->getParsedBody() ?? []);
-        $dto = $this->hydrate($hydrator, $route, $data);
+        /** @var class-string $dtoClass */
+        $dtoClass = $route->dtoClass;
+        $dto = $hydrator->hydrate($dtoClass, $data);
         $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
 
         // Determine status code from result type
