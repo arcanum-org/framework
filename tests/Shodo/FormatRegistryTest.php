@@ -201,4 +201,79 @@ final class FormatRegistryTest extends TestCase
         // Assert
         $this->assertSame('App\\Custom\\JsonRenderer', $registry->get('json')->rendererClass);
     }
+
+    // ---------------------------------------------------------------
+    // Config-driven scenarios
+    // ---------------------------------------------------------------
+
+    public function testAppDefinedCustomFormatWithCustomRenderer(): void
+    {
+        // Arrange — simulate an app registering a custom "yaml" format
+        $yamlRenderer = $this->createStub(Renderer::class);
+
+        /** @var ContainerInterface&\PHPUnit\Framework\MockObject\MockObject */
+        $container = $this->getMockBuilder(ContainerInterface::class)
+            ->onlyMethods(['get', 'has'])
+            ->getMock();
+
+        $container->expects($this->once())
+            ->method('get')
+            ->with('App\\Shodo\\YamlRenderer')
+            ->willReturn($yamlRenderer);
+
+        $registry = new FormatRegistry($container);
+
+        // Act — register a custom format just as Bootstrap\Routing would from config
+        $registry->register(new Format('yaml', 'application/x-yaml', 'App\\Shodo\\YamlRenderer'));
+
+        // Assert
+        $this->assertTrue($registry->has('yaml'));
+        $this->assertSame('application/x-yaml', $registry->get('yaml')->contentType);
+        $this->assertSame($yamlRenderer, $registry->renderer('yaml'));
+    }
+
+    public function testDisablingBuiltInFormatViaConfig(): void
+    {
+        // Arrange — register built-in formats, then remove one as config would
+        $container = $this->createStub(ContainerInterface::class);
+        $registry = new FormatRegistry($container);
+        $registry->register($this->jsonFormat());
+        $registry->register($this->htmlFormat());
+
+        // Act — app config disables HTML format
+        $registry->remove('html');
+
+        // Assert — JSON still works, HTML throws 406
+        $this->assertTrue($registry->has('json'));
+        $this->assertFalse($registry->has('html'));
+        $this->expectException(UnsupportedFormat::class);
+        $registry->renderer('html');
+    }
+
+    public function testOverridingBuiltInFormatRendererViaConfig(): void
+    {
+        // Arrange — register built-in JSON, then override with custom renderer
+        $customRenderer = $this->createStub(Renderer::class);
+
+        /** @var ContainerInterface&\PHPUnit\Framework\MockObject\MockObject */
+        $container = $this->getMockBuilder(ContainerInterface::class)
+            ->onlyMethods(['get', 'has'])
+            ->getMock();
+
+        $container->expects($this->once())
+            ->method('get')
+            ->with('App\\Shodo\\CustomJsonRenderer')
+            ->willReturn($customRenderer);
+
+        $registry = new FormatRegistry($container);
+        $registry->register($this->jsonFormat());
+
+        // Act — app config overrides JSON with a custom renderer class
+        $registry->register(new Format('json', 'application/json', 'App\\Shodo\\CustomJsonRenderer'));
+
+        // Assert — same extension, same content type, different renderer
+        $this->assertSame('application/json', $registry->get('json')->contentType);
+        $this->assertSame('App\\Shodo\\CustomJsonRenderer', $registry->get('json')->rendererClass);
+        $this->assertSame($customRenderer, $registry->renderer('json'));
+    }
 }

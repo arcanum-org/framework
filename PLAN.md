@@ -2,7 +2,7 @@
 
 This checklist tracks remaining work to complete all packages in the Arcanum framework. Each item is a small unit of work that includes 100% test coverage.
 
-**Progress: 200 done, 22 remaining.**
+**Progress: 205 done, 17 remaining.**
 
 ---
 
@@ -166,14 +166,14 @@ Small, isolated test cases for edge cases and untested paths.
 
 Now that all renderers are built, these integration tests are unblocked:
 
-- [ ] Add integration tests for Query response with HTML format
-- [ ] Add integration tests for Query response with CSV format
+- [x] Add integration tests for Query response with HTML format
+- [x] Add integration tests for Query response with CSV format
 
 ### Format Registry Tests
 
-- [ ] Add tests for app-defined custom format with custom renderer
-- [ ] Add tests for disabling a built-in format via config
-- [ ] Add tests for overriding a built-in format's renderer via config
+- [x] Add tests for app-defined custom format with custom renderer
+- [x] Add tests for disabling a built-in format via config
+- [x] Add tests for overriding a built-in format's renderer via config
 
 ### Command Response Enhancements
 

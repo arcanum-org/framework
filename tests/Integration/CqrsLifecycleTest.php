@@ -11,9 +11,15 @@ use Arcanum\Codex\Hydrator;
 use Arcanum\Flow\Conveyor\EmptyDTO;
 use Arcanum\Flow\Conveyor\MiddlewareBus;
 use Arcanum\Flow\Conveyor\QueryResult;
+use Arcanum\Shodo\CsvRenderer;
 use Arcanum\Shodo\Format;
 use Arcanum\Shodo\FormatRegistry;
+use Arcanum\Shodo\HtmlFallback;
+use Arcanum\Shodo\HtmlRenderer;
 use Arcanum\Shodo\JsonRenderer;
+use Arcanum\Shodo\TemplateCache;
+use Arcanum\Shodo\TemplateCompiler;
+use Arcanum\Shodo\TemplateResolver;
 use Arcanum\Test\Fixture\Integration\Command\Submit;
 use Arcanum\Test\Fixture\Integration\Query\Status;
 use PHPUnit\Framework\TestCase;
@@ -313,5 +319,104 @@ final class CqrsLifecycleTest extends TestCase
         // Assert — void handler → 204 No Content, empty body
         $this->assertSame(204, $response->getStatusCode());
         $this->assertSame('', (string) $response->getBody());
+    }
+
+    // -----------------------------------------------------------
+    // Full query lifecycle: HTML format
+    // -----------------------------------------------------------
+
+    public function testFullQueryLifecycleProducesHtmlResponse(): void
+    {
+        // Arrange
+        $container = $this->container();
+        $bus = new MiddlewareBus($container);
+        $hydrator = new Hydrator();
+        $router = $this->router();
+
+        $formats = new FormatRegistry($container);
+        $formats->register(new Format('html', 'text/html', HtmlRenderer::class));
+
+        // Wire up HtmlRenderer — TemplateResolver points at a nonexistent dir
+        // so it falls back to HtmlFallback for a generic HTML representation.
+        $container->factory(HtmlRenderer::class, function () {
+            return new HtmlRenderer(
+                resolver: new TemplateResolver('/nonexistent', 'Arcanum\Test'),
+                compiler: new TemplateCompiler(),
+                cache: new TemplateCache(''),
+                fallback: new HtmlFallback(),
+            );
+        });
+
+        $request = $this->stubRequest(
+            'GET',
+            '/integration/status.html',
+            queryParams: ['verbose' => 'true'],
+        );
+
+        // Act — full lifecycle: Route → Hydrate → Dispatch → Render
+        $route = $router->resolve($request);
+        /** @var class-string $dtoClass */
+        $dtoClass = $route->dtoClass;
+        $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
+        $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
+        $data = $result instanceof QueryResult ? $result->data : $result;
+
+        /** @var HtmlRenderer $renderer */
+        $renderer = $formats->renderer($route->format);
+        $response = $renderer->render($data, $route->dtoClass);
+
+        // Assert
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('text/html; charset=UTF-8', $response->getHeaderLine('Content-Type'));
+
+        $body = (string) $response->getBody();
+        $this->assertStringContainsString('<!DOCTYPE html>', $body);
+        $this->assertStringContainsString('ok', $body);
+        $this->assertStringContainsString('1.0.0', $body);
+    }
+
+    // -----------------------------------------------------------
+    // Full query lifecycle: CSV format
+    // -----------------------------------------------------------
+
+    public function testFullQueryLifecycleProducesCsvResponse(): void
+    {
+        // Arrange
+        $container = $this->container();
+        $bus = new MiddlewareBus($container);
+        $hydrator = new Hydrator();
+        $router = $this->router();
+
+        $formats = new FormatRegistry($container);
+        $formats->register(new Format('csv', 'text/csv', CsvRenderer::class));
+        $container->service(CsvRenderer::class);
+
+        $request = $this->stubRequest(
+            'GET',
+            '/integration/status.csv',
+            queryParams: ['verbose' => 'true'],
+        );
+
+        // Act — full lifecycle: Route → Hydrate → Dispatch → Render
+        $route = $router->resolve($request);
+        /** @var class-string $dtoClass */
+        $dtoClass = $route->dtoClass;
+        $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
+        $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
+        $data = $result instanceof QueryResult ? $result->data : $result;
+
+        /** @var ResponseInterface $response */
+        $response = $formats->renderer($route->format)->render($data);
+
+        // Assert
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('text/csv; charset=UTF-8', $response->getHeaderLine('Content-Type'));
+
+        $body = (string) $response->getBody();
+        // Associative array renders as key,value CSV
+        $this->assertStringContainsString('key,value', $body);
+        $this->assertStringContainsString('status,ok', $body);
+        $this->assertStringContainsString('version,1.0.0', $body);
+        $this->assertStringContainsString('uptime,42', $body);
     }
 }
