@@ -115,6 +115,152 @@ return [
 ];
 ```
 
+## Route middleware
+
+Arcanum supports per-route middleware at two layers — **HTTP** (PSR-15, can short-circuit) and **Conveyor** (Progression, runs around the handler). Middleware is co-located with the code it protects, not hidden in config files.
+
+### Attributes on DTOs
+
+Declare middleware directly on Command, Query, or Page DTO classes using PHP 8 attributes:
+
+```php
+use Arcanum\Atlas\Attribute\HttpMiddleware;
+use Arcanum\Atlas\Attribute\Before;
+use Arcanum\Atlas\Attribute\After;
+
+#[HttpMiddleware(RequireAuth::class)]
+#[HttpMiddleware(RateLimit::class)]
+#[Before(ValidateInput::class)]
+#[After(AuditLog::class)]
+final class PlaceOrder
+{
+    public function __construct(
+        public readonly string $item,
+        public readonly int $qty,
+    ) {}
+}
+```
+
+| Attribute | Layer | Purpose |
+|-----------|-------|---------|
+| `#[HttpMiddleware]` | HTTP (PSR-15) | Wraps the request handler. Can short-circuit (return 401, 429, etc.) before the handler runs. |
+| `#[Before]` | Conveyor (Progression) | Runs before the handler. Receives the DTO payload. Use for validation, sanitization, enrichment. |
+| `#[After]` | Conveyor (Progression) | Runs after the handler. Receives the result. Use for response transformation, audit logging. |
+
+All three attributes are repeatable — stack as many as needed. They accept a single class-string argument.
+
+### Co-located Middleware.php files
+
+Place a `Middleware.php` file in any domain directory to apply middleware to **all** handlers beneath it:
+
+```
+app/Domain/Admin/
+├── Command/
+│   ├── BanUser.php
+│   └── BanUserHandler.php
+├── Query/
+│   └── AuditLog.php
+└── Middleware.php          ← applies to everything in Admin/
+```
+
+The file returns an array with middleware class-strings for each layer:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+// app/Domain/Admin/Middleware.php
+return [
+    'http' => [
+        \App\Http\Middleware\RequireAdmin::class,
+    ],
+    'before' => [
+        \App\Domain\Admin\Middleware\AdminAuditBefore::class,
+    ],
+    'after' => [
+        \App\Domain\Admin\Middleware\AdminAuditAfter::class,
+    ],
+];
+```
+
+All three keys are optional. A file that only declares `http` middleware is valid.
+
+`Middleware.php` files apply to all DTOs in the directory and all subdirectories. Multiple levels are supported — middleware at shallower directories wraps middleware at deeper directories.
+
+### Execution order
+
+Directory middleware is **outer** (runs first on the way in, last on the way out). Attribute middleware is **inner** (closest to the handler). Global middleware wraps everything.
+
+For a request to `App\Domain\Admin\Command\BanUser` with a root `Middleware.php`, an `Admin/Middleware.php`, and attributes on `BanUser`:
+
+```
+ Request
+ │
+ ├─ 1.  Global HTTP middleware          ← config/middleware.php
+ │  ├─ 2.  Root Middleware.php [http]    ← app/Domain/Middleware.php
+ │  │  ├─ 3.  Admin Middleware.php [http]  ← app/Domain/Admin/Middleware.php
+ │  │  │  ├─ 4.  #[HttpMiddleware] on DTO   ← BanUser.php attributes
+ │  │  │  │
+ │  │  │  │  ── Hydration ──
+ │  │  │  │
+ │  │  │  │  ├─ 5.  Root Middleware.php [before]
+ │  │  │  │  │  ├─ 6.  Admin Middleware.php [before]
+ │  │  │  │  │  │  ├─ 7.  #[Before] on DTO
+ │  │  │  │  │  │  │  ├─ 8.  Global Conveyor before    ← MiddlewareBus.before()
+ │  │  │  │  │  │  │  │
+ │  │  │  │  │  │  │  │      ▼ Handler ▼
+ │  │  │  │  │  │  │  │
+ │  │  │  │  │  │  │  ├─ 9.  Global Conveyor after     ← MiddlewareBus.after()
+ │  │  │  │  │  │  ├─ 10. #[After] on DTO
+ │  │  │  │  │  ├─ 11. Admin Middleware.php [after]
+ │  │  │  │  ├─ 12. Root Middleware.php [after]
+ │  │  │  │
+ │  │  │  ├─ 4.  #[HttpMiddleware] (response path)
+ │  │  ├─ 3.  Admin Middleware.php [http] (response path)
+ │  ├─ 2.  Root Middleware.php [http] (response path)
+ ├─ 1.  Global HTTP middleware (response path)
+ │
+ Response
+```
+
+**Key rules:**
+- Shallower directories wrap deeper directories (outermost first)
+- Directory middleware wraps attribute middleware
+- HTTP middleware wraps Conveyor middleware
+- Global middleware wraps per-route middleware
+- HTTP middleware can short-circuit (return early without calling the handler)
+- Conveyor middleware (`Progression`) must call `$next()`
+
+### Discovery and caching
+
+`MiddlewareDiscovery` scans the app directory at bootstrap time, just like `PageDiscovery` scans for pages. Results are cached to avoid filesystem scanning on every request.
+
+Cache configuration in `config/cache.php`:
+
+```php
+return [
+    'route_middleware' => [
+        'enabled' => true,  // set to false in development to always re-scan
+    ],
+];
+```
+
+### Middleware that applies to everything
+
+If you want middleware on *every* handler in your app (not just global HTTP middleware), place a `Middleware.php` at the root of your app directory:
+
+```
+app/
+├── Domain/
+│   └── ...
+├── Pages/
+│   └── ...
+└── Middleware.php          ← applies to all commands, queries, and pages
+```
+
+This is useful for Conveyor-level concerns (validation, audit logging) that should run for every dispatch but aren't HTTP-specific.
+
 ## Custom routes
 
 Custom routes are explicit path → class mappings that bypass convention-based resolution. Use them for paths that don't fit the convention system:

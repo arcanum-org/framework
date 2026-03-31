@@ -57,6 +57,33 @@ Under the hood, `dispatch()` builds a Pipeline with three stages:
 
 If the handler returns null, it's wrapped in an `EmptyDTO` so the pipeline doesn't break.
 
+## Global vs per-route middleware
+
+The `before()` and `after()` methods on `MiddlewareBus` register **global** Conveyor middleware — it runs for every dispatch. For middleware that only applies to specific handlers, use per-route middleware via PHP attributes on your DTO classes:
+
+```php
+use Arcanum\Atlas\Attribute\Before;
+use Arcanum\Atlas\Attribute\After;
+
+#[Before(ValidateOrderInput::class)]
+#[After(OrderAuditLog::class)]
+final class PlaceOrder
+{
+    public function __construct(
+        public readonly string $item,
+        public readonly int $qty,
+    ) {}
+}
+```
+
+Per-route middleware wraps the bus dispatch from the outside. The execution order is:
+
+```
+Per-route Before → Global Before → Handler → Global After → Per-route After
+```
+
+Per-route middleware is resolved by `RouteDispatcher`, which composes with the existing `MiddlewareBus`. See the [Atlas README](../Atlas/README.md#route-middleware) for the full execution order diagram, including HTTP-layer middleware, directory-scoped `Middleware.php` files, and the ordering rules.
+
 ## DTO validation middleware
 
 Conveyor ships with middleware filters that validate the structure of objects passing through the bus. These are useful for enforcing that command and query objects are well-formed DTOs:
