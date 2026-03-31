@@ -6,6 +6,7 @@ namespace Arcanum\Ignition\Bootstrap;
 
 use Arcanum\Atlas\ConventionResolver;
 use Arcanum\Atlas\HttpRouter;
+use Arcanum\Atlas\PageDiscovery;
 use Arcanum\Atlas\PageResolver;
 use Arcanum\Atlas\RouteMap;
 use Arcanum\Atlas\Router;
@@ -13,6 +14,7 @@ use Arcanum\Cabinet\Application;
 use Arcanum\Codex\Hydrator;
 use Arcanum\Gather\Configuration;
 use Arcanum\Ignition\Bootstrapper;
+use Arcanum\Ignition\Kernel;
 use Arcanum\Shodo\Format;
 use Arcanum\Shodo\FormatRegistry;
 use Arcanum\Shodo\JsonRenderer;
@@ -26,7 +28,7 @@ use Arcanum\Shodo\JsonRenderer;
  *
  * Reads from config/routes.php:
  *   - custom (optional) — explicit path → class route mappings
- *   - pages (optional) — path => format mappings for registered pages
+ *   - pages (optional) — path => format overrides for auto-discovered pages
  *
  * Reads from config/formats.php:
  *   - default (optional) — fallback format for convention routes (default: 'json')
@@ -107,16 +109,40 @@ class Routing implements Bootstrapper
             );
         }
 
-        $container->instance(RouteMap::class, $routeMap);
-
-        $pages = new PageResolver(namespace: $pagesNamespace);
-
-        /** @var array<string, string|null>|null $pageRoutes */
-        $pageRoutes = $config->get('routes.pages');
-        foreach ($pageRoutes ?? [] as $path => $format) {
-            $pages->register($path, $format);
+        // Auto-discover pages from filesystem and register as custom routes.
+        /** @var mixed $pagesDirectory */
+        $pagesDirectory = $config->get('app.pages_directory');
+        if (!is_string($pagesDirectory) || $pagesDirectory === '') {
+            $pagesDirectory = 'app' . DIRECTORY_SEPARATOR . 'Pages';
         }
 
+        /** @var Kernel $kernel */
+        $kernel = $container->get(Kernel::class);
+
+        // Support both relative (to root) and absolute paths.
+        $absolutePagesDir = str_starts_with($pagesDirectory, DIRECTORY_SEPARATOR)
+            ? $pagesDirectory
+            : $kernel->rootDirectory() . DIRECTORY_SEPARATOR . $pagesDirectory;
+        $cachePath = $kernel->filesDirectory()
+            . DIRECTORY_SEPARATOR . 'cache'
+            . DIRECTORY_SEPARATOR . 'pages.php';
+
+        $pageDiscovery = new PageDiscovery(
+            namespace: $pagesNamespace,
+            directory: $absolutePagesDir,
+            defaultFormat: 'html',
+            cachePath: $cachePath,
+        );
+
+        /** @var array<string, string>|null $pageOverrides */
+        $pageOverrides = $config->get('routes.pages');
+        $pageDiscovery->register($routeMap, $pageOverrides ?? []);
+
+        $container->instance(PageDiscovery::class, $pageDiscovery);
+        $container->instance(RouteMap::class, $routeMap);
+
+        // PageResolver is still available for backwards compatibility.
+        $pages = new PageResolver(namespace: $pagesNamespace);
         $container->instance(PageResolver::class, $pages);
 
         $container->factory(Router::class, function () use ($resolver, $routeMap, $pages, $defaultFormat) {

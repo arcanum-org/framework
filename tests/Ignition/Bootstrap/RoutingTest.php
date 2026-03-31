@@ -6,13 +6,17 @@ namespace Arcanum\Test\Ignition\Bootstrap;
 
 use Arcanum\Atlas\ConventionResolver;
 use Arcanum\Atlas\HttpRouter;
+use Arcanum\Atlas\PageDiscovery;
 use Arcanum\Atlas\PageResolver;
 use Arcanum\Atlas\Route;
+use Arcanum\Atlas\RouteMap;
 use Arcanum\Atlas\Router;
 use Arcanum\Cabinet\Container;
 use Arcanum\Codex\Hydrator;
 use Arcanum\Gather\Configuration;
 use Arcanum\Ignition\Bootstrap\Routing;
+use Arcanum\Ignition\HyperKernel;
+use Arcanum\Ignition\Kernel;
 use Arcanum\Shodo\Format;
 use Arcanum\Shodo\FormatRegistry;
 use Arcanum\Shodo\JsonRenderer;
@@ -36,6 +40,9 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(Format::class)]
 #[UsesClass(FormatRegistry::class)]
 #[UsesClass(JsonRenderer::class)]
+#[UsesClass(RouteMap::class)]
+#[UsesClass(PageDiscovery::class)]
+#[UsesClass(HyperKernel::class)]
 #[UsesClass(\Arcanum\Toolkit\Strings::class)]
 final class RoutingTest extends TestCase
 {
@@ -57,6 +64,9 @@ final class RoutingTest extends TestCase
         ]);
         $container->instance(Configuration::class, $config);
 
+        $kernel = new HyperKernel(sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'arcanum_test_' . uniqid());
+        $container->instance(Kernel::class, $kernel);
+
         return $container;
     }
 
@@ -67,7 +77,8 @@ final class RoutingTest extends TestCase
     {
         return [
             'namespace' => 'App',
-            'pages_namespace' => 'App\\Pages',
+            'pages_namespace' => 'Arcanum\\Test\\Atlas\\Fixture\\Pages',
+            'pages_directory' => dirname(__DIR__, 2) . '/Atlas/Fixture/Pages',
         ];
     }
 
@@ -231,12 +242,12 @@ final class RoutingTest extends TestCase
     // Page registration from config
     // ---------------------------------------------------------------
 
-    public function testRegistersPages(): void
+    public function testDiscoversAndRegistersPages(): void
     {
-        // Arrange
+        // Arrange — uses test fixture pages at tests/Atlas/Fixture/Pages/
         $container = $this->buildContainer(
             $this->defaultApp(),
-            ['pages' => ['/' => 'json', '/about' => null]],
+            [],
             $this->defaultFormats(),
         );
         $bootstrapper = new Routing();
@@ -244,18 +255,19 @@ final class RoutingTest extends TestCase
         // Act
         $bootstrapper->bootstrap($container);
 
-        /** @var PageResolver $pages */
-        $pages = $container->get(PageResolver::class);
+        /** @var RouteMap $routeMap */
+        $routeMap = $container->get(RouteMap::class);
 
-        // Assert
-        $this->assertTrue($pages->has('/'));
-        $this->assertTrue($pages->has('/about'));
-        $this->assertFalse($pages->has('/nonexistent'));
+        // Assert — auto-discovered pages registered as custom routes
+        $this->assertTrue($routeMap->has('/'));
+        $this->assertTrue($routeMap->has('/about-us'));
+        $this->assertTrue($routeMap->has('/docs/getting-started'));
+        $this->assertFalse($routeMap->has('/nonexistent'));
     }
 
-    public function testPageFormatFromConfig(): void
+    public function testPageFormatOverrideFromConfig(): void
     {
-        // Arrange
+        // Arrange — override root page format to json
         $container = $this->buildContainer(
             $this->defaultApp(),
             ['pages' => ['/' => 'json']],
@@ -266,9 +278,9 @@ final class RoutingTest extends TestCase
         // Act
         $bootstrapper->bootstrap($container);
 
-        /** @var PageResolver $pages */
-        $pages = $container->get(PageResolver::class);
-        $route = $pages->resolve('/');
+        /** @var RouteMap $routeMap */
+        $routeMap = $container->get(RouteMap::class);
+        $route = $routeMap->resolve('/', 'GET');
 
         // Assert
         $this->assertSame('json', $route->format);
