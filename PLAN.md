@@ -2,7 +2,7 @@
 
 This checklist tracks remaining work to complete all packages in the Arcanum framework. Each item is a small unit of work that includes 100% test coverage.
 
-**Progress: 205 done, 17 remaining.**
+**Progress: 207 done, 15 remaining.**
 
 ---
 
@@ -186,8 +186,8 @@ Now that all renderers are built, these integration tests are unblocked:
 
 ### Route Middleware
 
-- [ ] Add per-route middleware support — integrate with Flow's Continuum for route-specific middleware
-- [ ] Add tests for per-route middleware execution
+- [x] Add per-route middleware support — PHP attributes (#[HttpMiddleware], #[Before], #[After]) on DTOs + co-located Middleware.php files for directory-scoped middleware. RouteDispatcher composes per-route middleware with existing Bus at both HTTP and Conveyor layers.
+- [x] Add tests for per-route middleware execution
 
 ### Design Considerations
 

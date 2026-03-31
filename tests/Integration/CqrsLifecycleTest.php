@@ -6,11 +6,15 @@ namespace Arcanum\Test\Integration;
 
 use Arcanum\Atlas\ConventionResolver;
 use Arcanum\Atlas\HttpRouter;
+use Arcanum\Atlas\MiddlewareRegistry;
+use Arcanum\Atlas\RouteMiddleware;
 use Arcanum\Cabinet\Container;
 use Arcanum\Codex\Hydrator;
 use Arcanum\Flow\Conveyor\EmptyDTO;
 use Arcanum\Flow\Conveyor\MiddlewareBus;
 use Arcanum\Flow\Conveyor\QueryResult;
+use Arcanum\Flow\Continuum\Progression;
+use Arcanum\Ignition\RouteDispatcher;
 use Arcanum\Shodo\CsvRenderer;
 use Arcanum\Shodo\Format;
 use Arcanum\Shodo\FormatRegistry;
@@ -418,5 +422,81 @@ final class CqrsLifecycleTest extends TestCase
         $this->assertStringContainsString('status,ok', $body);
         $this->assertStringContainsString('version,1.0.0', $body);
         $this->assertStringContainsString('uptime,42', $body);
+    }
+
+    // -----------------------------------------------------------
+    // Per-route middleware via RouteDispatcher
+    // -----------------------------------------------------------
+
+    public function testRouteDispatcherAppliesBeforeMiddleware(): void
+    {
+        // Arrange — before middleware that adds a tag to the DTO
+        $container = $this->container();
+        $bus = new MiddlewareBus($container);
+        $hydrator = new Hydrator();
+        $router = $this->router();
+
+        $registry = new MiddlewareRegistry();
+        $registry->register(
+            self::ROOT_NS . '\\Integration\\Query\\Status',
+            new RouteMiddleware(before: ['test.before']),
+        );
+
+        // Register a before progression that marks execution
+        $beforeRan = false;
+        $container->instance('test.before', new class ($beforeRan) implements Progression {
+            public function __construct(public bool &$ran)
+            {
+            }
+
+            public function __invoke(object $payload, callable $next): void
+            {
+                $this->ran = true;
+                $next();
+            }
+        });
+
+        $dispatcher = new RouteDispatcher($container, $registry, $bus);
+
+        $request = $this->stubRequest('GET', '/integration/status');
+        $route = $router->resolve($request);
+
+        /** @var class-string $dtoClass */
+        $dtoClass = $route->dtoClass;
+        $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
+
+        // Act
+        $result = $dispatcher->dispatch($dto, $route);
+
+        // Assert — before middleware ran, query still produced a result
+        $this->assertTrue($beforeRan);
+        $this->assertInstanceOf(QueryResult::class, $result);
+        $this->assertSame(['status' => 'ok'], $result->data);
+    }
+
+    public function testRouteDispatcherSkipsMiddlewareWhenNoneRegistered(): void
+    {
+        // Arrange — empty registry, should behave identically to direct bus dispatch
+        $container = $this->container();
+        $bus = new MiddlewareBus($container);
+        $hydrator = new Hydrator();
+        $router = $this->router();
+
+        $registry = new MiddlewareRegistry();
+        $dispatcher = new RouteDispatcher($container, $registry, $bus);
+
+        $request = $this->stubRequest('GET', '/integration/status', queryParams: ['verbose' => 'true']);
+        $route = $router->resolve($request);
+
+        /** @var class-string $dtoClass */
+        $dtoClass = $route->dtoClass;
+        $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
+
+        // Act
+        $result = $dispatcher->dispatch($dto, $route);
+
+        // Assert
+        $this->assertInstanceOf(QueryResult::class, $result);
+        $this->assertSame(['status' => 'ok', 'version' => '1.0.0', 'uptime' => 42], $result->data);
     }
 }
