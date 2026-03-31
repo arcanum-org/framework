@@ -55,12 +55,12 @@ final class HttpRouter implements Router
         $methods = [];
 
         $queryRoute = $this->resolver->resolve(path: $cleanPath, method: 'GET');
-        if (class_exists($queryRoute->dtoClass)) {
+        if (class_exists($queryRoute->dtoClass) || class_exists($queryRoute->dtoClass . 'Handler')) {
             $methods = array_merge($methods, self::QUERY_METHODS);
         }
 
         $commandRoute = $this->resolver->resolve(path: $cleanPath, method: 'PUT');
-        if (class_exists($commandRoute->dtoClass)) {
+        if (class_exists($commandRoute->dtoClass) || class_exists($commandRoute->dtoClass . 'Handler')) {
             $methods = array_merge($methods, self::COMMAND_METHODS);
         }
 
@@ -111,6 +111,12 @@ final class HttpRouter implements Router
             return $route;
         }
 
+        // If the DTO class doesn't exist but the handler does, allow it —
+        // the kernel will create a dynamic Command or Query DTO.
+        if (class_exists($route->dtoClass . 'Handler')) {
+            return $route;
+        }
+
         $this->throwForMissingClass($route, $cleanPath, $method, $extensionFormat);
     }
 
@@ -136,7 +142,7 @@ final class HttpRouter implements Router
             format: $format,
         );
 
-        if (class_exists($alternateRoute->dtoClass)) {
+        if (class_exists($alternateRoute->dtoClass) || class_exists($alternateRoute->dtoClass . 'Handler')) {
             throw new MethodNotAllowed($alternateMethods);
         }
 

@@ -699,4 +699,43 @@ final class HttpRouterTest extends TestCase
         // Assert
         $this->assertSame(['GET'], $methods);
     }
+
+    // ---------------------------------------------------------------
+    // Handler-only routes (no DTO class, only Handler exists)
+    // ---------------------------------------------------------------
+
+    public function testHandlerOnlyQueryRouteResolves(): void
+    {
+        // Arrange — Widgets\Query\List doesn't exist, but Widgets\Query\ListHandler does
+        $request = $this->stubRequest('GET', '/widgets/list');
+
+        // Act
+        $route = $this->router()->resolve($request);
+
+        // Assert
+        $this->assertSame(self::ROOT_NS . '\\Widgets\\Query\\List', $route->dtoClass);
+        $this->assertTrue($route->isQuery());
+    }
+
+    public function testHandlerOnlyRouteAllowedMethods(): void
+    {
+        // Arrange — only ListHandler exists in Query namespace
+        $router = $this->router();
+
+        // Act
+        $methods = $router->allowedMethods('/widgets/list');
+
+        // Assert
+        $this->assertSame(['GET'], $methods);
+    }
+
+    public function testHandlerOnlyRoutePutThrows405(): void
+    {
+        // Arrange — Widgets\Query\ListHandler exists, no Command handler
+        $request = $this->stubRequest('PUT', '/widgets/list');
+
+        // Act & Assert
+        $this->expectException(MethodNotAllowed::class);
+        $this->router()->resolve($request);
+    }
 }

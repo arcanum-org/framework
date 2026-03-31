@@ -102,7 +102,9 @@ class MiddlewareBus implements Bus
      */
     protected function handlerNameFor(object $object, string $prefix = ''): string
     {
-        $className = get_class($object);
+        $className = $object instanceof HandlerProxy
+            ? $object->handlerBaseName()
+            : get_class($object);
 
         if ($prefix === '') {
             /** @var class-string */

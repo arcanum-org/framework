@@ -7,12 +7,15 @@ namespace Arcanum\Test\Flow\Conveyor;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
+use Arcanum\Flow\Conveyor\Command;
 use Arcanum\Flow\Conveyor\MiddlewareBus;
 use Arcanum\Flow\Conveyor\EmptyDTO;
 use Arcanum\Cabinet\Container;
 use Arcanum\Test\Flow\Conveyor\Fixture\DoSomething;
 use Arcanum\Test\Flow\Conveyor\Fixture\DoSomethingHandler;
 use Arcanum\Test\Flow\Conveyor\Fixture\DoSomethingResult;
+use Arcanum\Test\Flow\Conveyor\Fixture\DynamicCommandHandler;
+use Arcanum\Test\Flow\Conveyor\Fixture\DynamicCommandResult;
 use Arcanum\Test\Flow\Conveyor\Fixture\PostDoSomethingHandler;
 use Arcanum\Flow\Continuum\Continuum;
 
@@ -23,6 +26,7 @@ use Arcanum\Flow\Continuum\Continuum;
 #[UsesClass(\Arcanum\Flow\Continuum\Continuum::class)]
 #[UsesClass(\Arcanum\Flow\Continuum\StandardAdvancer::class)]
 #[UsesClass(\Arcanum\Flow\Continuum\ContinuationCollection::class)]
+#[UsesClass(Command::class)]
 #[UsesClass(Container::class)]
 #[UsesClass(\Arcanum\Cabinet\PrototypeProvider::class)]
 #[UsesClass(\Arcanum\Codex\Event\ClassRequested::class)]
@@ -204,5 +208,26 @@ final class MiddlewareBusTest extends TestCase
         // Act & Assert
         $this->expectException(\InvalidArgumentException::class);
         $bus->dispatch(new EmptyDTO(), prefix: 'Delete');
+    }
+
+    // ---------------------------------------------------------------
+    // HandlerProxy — dynamic DTOs
+    // ---------------------------------------------------------------
+
+    public function testDispatchUsesHandlerProxyBaseName(): void
+    {
+        // Arrange — Command with a virtual class name pointing to DynamicCommand
+        $bus = new MiddlewareBus(new Container());
+        $command = new Command(
+            'Arcanum\Test\Flow\Conveyor\Fixture\DynamicCommand',
+            ['name' => 'Alice'],
+        );
+
+        // Act — should resolve DynamicCommandHandler via the proxy base name
+        $result = $bus->dispatch($command);
+
+        // Assert
+        $this->assertInstanceOf(DynamicCommandResult::class, $result);
+        $this->assertSame('Alice', $result->name);
     }
 }
