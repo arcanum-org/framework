@@ -196,16 +196,9 @@ PATCH  /checkout/submit-payment         → App\Checkout\Command\SubmitPayment  
 - [x] Add tests for POST/PATCH/DELETE → Command namespace insertion with handler prefix
 - [x] Add tests for configurable root namespace
 
-### Pages
+### Pages (legacy — being replaced by Custom Routes)
 
-Pages are explicitly registered Query routes that bypass convention-based URL-to-namespace mapping. They live under a dedicated namespace (`App\Pages\` by default, configurable) without a `Query\` sub-namespace since Pages are always Queries. The root path `/` maps to `Index` by convention.
-
-```
-GET /                        → App\Pages\Index         + IndexHandler           (default format: html)
-GET /thing.html              → App\Pages\Thing         + ThingHandler           (format: html)
-GET /thing.json              → App\Pages\Thing         + ThingHandler           (format: json)
-GET /docs/getting-started    → App\Pages\Docs\GettingStarted + GettingStartedHandler
-```
+The original page system used explicit registration in config. This is being replaced by auto-discovered pages built on the custom route system (see Custom Routes section above). The items below are the original implementation that will be refactored.
 
 - [x] Add `PageResolver` with page registration — `register()` stores path-to-format mappings, `resolve()` maps path segments to PascalCase classes under the Pages namespace, `has()` checks registration
 - [x] Add configurable Pages namespace — default `App\Pages`, set via constructor
@@ -219,10 +212,50 @@ GET /docs/getting-started    → App\Pages\Docs\GettingStarted + GettingStartedH
 - [x] Add tests for page with context-aware format extension (e.g., `/thing.json`)
 - [x] Add tests for unregistered page path returning 404
 
-### Manual Route Overrides
+### Custom Routes
 
-- [ ] Add route registration for manual overrides — allow explicit route→handler mappings when conventions don't fit
-- [ ] Add tests for manual route registration overriding convention
+Custom routes are explicit path → class mappings that bypass convention-based resolution. They are the general mechanism for routing paths that don't fit the convention system. Pages are a convenience layer built on top of custom routes.
+
+Priority order: custom routes (including auto-discovered pages) > convention routing.
+
+```
+# Custom route examples
+GET /this/is/custom       → App\Domain\Something\Different\Query\Custom
+PUT /legacy/endpoint      → App\Domain\Compat\Command\LegacyEndpoint
+GET /dashboard            → App\Domain\Admin\Query\Dashboard
+```
+
+#### Custom Route Registration
+
+- [ ] Add `RouteMap` to Atlas — stores explicit path+method(s) → Route mappings. Supports `register(path, dtoClass, methods, format)` and `resolve(path, method)`.
+- [ ] Integrate `RouteMap` into `HttpRouter` — checked before convention routing. Returns the matched Route directly, no convention resolution needed.
+- [ ] Add `allowedMethods()` support for custom routes — `HttpRouter::allowedMethods()` checks RouteMap before convention namespaces.
+- [ ] Add config-based custom route registration — `config/routes.php` gains a `custom` key with explicit path → class mappings, loaded by `Bootstrap\Routing`.
+- [ ] Add tests for custom route overriding convention
+- [ ] Add tests for custom route with multiple methods
+- [ ] Add tests for custom route 405 when path exists but method doesn't match
+- [ ] Add tests for custom route priority over convention
+
+#### Pages (built on Custom Routes)
+
+Pages live outside the Domain namespace (default `App\Pages`) since they are not convention-routed CQRS handlers. Pages are auto-discovered from the filesystem — creating a class *is* registering the route. The framework scans the pages directory during bootstrap, derives paths from class names via `Strings::kebab()`, and registers them as GET-only custom routes.
+
+```
+app/Pages/Index.php                  → GET /                   (class: App\Pages\Index)
+app/Pages/Thing.php                  → GET /thing              (class: App\Pages\Thing)
+app/Pages/Docs/GettingStarted.php   → GET /docs/getting-started (class: App\Pages\Docs\GettingStarted)
+```
+
+- [ ] Refactor `PageResolver` to generate custom route registrations — instead of its own lookup table, `PageResolver` scans the pages directory and registers each page as a GET-only custom route in `RouteMap`.
+- [ ] Add page auto-discovery — scan the pages namespace directory during bootstrap, derive paths from class names via `Strings::kebab()`. Nested directories map to nested path segments.
+- [ ] Add page route caching — cache discovered page routes to avoid filesystem scanning on every request. Cache is invalidated when files change (development) or rebuilt on deploy (production).
+- [ ] Move Pages out of Domain in the starter app — pages live in `App\Pages` (outside Domain) to avoid namespace collision with convention-routed paths.
+- [ ] Add config overrides for auto-discovered pages — `config/routes.php` `pages` key can override default format or add pages that don't follow the naming convention.
+- [ ] Add tests for page auto-discovery from directory scanning
+- [ ] Add tests for page path derivation (PascalCase → kebab-case)
+- [ ] Add tests for nested page directory scanning
+- [ ] Add tests for page route caching (cache hit skips filesystem scan)
+- [ ] Add tests for config override of auto-discovered page format
 
 ### Route Middleware
 
@@ -326,6 +359,10 @@ Track updates to the starter app (`../arcanum/`) as framework features land.
 - [x] Add `config/formats.php` — configure enabled response formats and any renderer overrides
 - [x] Add example Command — `PUT /contact/submit` → `App\Contact\Command\Submit` + `SubmitHandler`, demonstrates Command with DTO hydration from JSON body, void return→204
 - [x] Add `config/middleware.php` with a `global` key and an example middleware (e.g., CORS headers) to demonstrate `HttpMiddleware` integration
+- [x] Separate domain code from application infrastructure — moved Commands, Queries into `app/Domain/`, convention resolver root changed to `App\Domain`
+- [ ] Move Pages out of Domain — pages live in `App\Pages` (outside Domain) to avoid namespace collision with convention-routed paths
+- [ ] Remove explicit page registration from `config/routes.php` — pages are auto-discovered after framework refactor
+- [ ] Add example custom route to `config/routes.php` — demonstrate explicit path → class mapping
 
 ---
 
@@ -392,7 +429,7 @@ These items need design decisions before they can be worked on:
 
 - **Bootstrap lifecycle hooks** — What does "before/after events so the app can hook into the boot sequence" mean concretely? Events before/after each individual bootstrapper? Before/after the entire sequence? Who consumes these — the app kernel, service providers, middleware? What's the use case that config and the existing bootstrapper sequence can't handle?
 - **Handler auto-discovery** — Is this actually needed? Codex already resolves handler classes on demand via reflection. Pre-scanning the filesystem to register handlers in the Container adds complexity and startup cost. What use case requires pre-registration that on-demand resolution can't serve?
-- **Manual route overrides** — What's the priority order when resolving? Pages > manual overrides > convention? Or Pages > convention > manual overrides? How are overrides registered — config file, bootstrap code, or both? Can overrides change the DTO class, the handler, or both?
+- ~~**Manual route overrides**~~ — Resolved: custom routes are the general mechanism (path+methods → explicit class mapping). Pages are a convenience layer that auto-discovers classes and registers them as GET-only custom routes. Priority: custom routes > convention. Registered via config and auto-discovery.
 - **HTML renderer and templates** — Does the framework ship a template engine, integrate with an existing one (Blade, Twig, Plates), or just provide a bare `HtmlRenderer` that the app overrides? This affects the built-in HTML format registration — we can't ship an HTML renderer without deciding the template strategy.
 - **Opt-in command response bodies** — What does the configuration look like? Per-handler attribute? Global config toggle? Per-route config? What format is the response body rendered in — always JSON, or format-aware like Queries?
 
