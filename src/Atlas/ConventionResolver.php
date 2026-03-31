@@ -36,14 +36,40 @@ final class ConventionResolver
         string $format = 'json',
     ): Route {
         $method = strtoupper($method);
+
+        return $this->resolveByType(
+            path: $path,
+            typeNamespace: $this->typeNamespace($method),
+            handlerPrefix: $this->handlerPrefix($method),
+            format: $format,
+        );
+    }
+
+    /**
+     * Resolve path segments and an explicit type namespace into a Route.
+     *
+     * This is the transport-agnostic core. HTTP routing maps methods to
+     * type namespaces (GET → Query, POST → Command). CLI routing maps
+     * prefixes (query: → Query, command: → Command). Both delegate here.
+     *
+     * @param string $path The path (e.g., '/catalog/products/featured' or 'catalog/products/featured').
+     * @param string $typeNamespace The CQRS type namespace (e.g., 'Query', 'Command').
+     * @param string $handlerPrefix Handler name prefix (e.g., 'Post', 'Delete', or '').
+     * @param string $format The response format (e.g., 'json', 'html').
+     */
+    public function resolveByType(
+        string $path,
+        string $typeNamespace,
+        string $handlerPrefix = '',
+        string $format = 'json',
+    ): Route {
         $segments = $this->parseSegments($path);
 
         if ($segments === []) {
             throw new UnresolvableRoute('Cannot resolve an empty path via conventions.');
         }
 
-        $className = $this->buildClassName($segments, $method);
-        $handlerPrefix = $this->handlerPrefix($method);
+        $className = $this->buildClassName($segments, $typeNamespace);
 
         return new Route(
             dtoClass: $className,
@@ -72,11 +98,11 @@ final class ConventionResolver
     }
 
     /**
-     * Build the fully-qualified DTO class name from path segments and HTTP method.
+     * Build the fully-qualified DTO class name from path segments and a type namespace.
      *
      * @param list<string> $segments
      */
-    private function buildClassName(array $segments, string $method): string
+    private function buildClassName(array $segments, string $typeNamespace): string
     {
         $pascalSegments = array_map(
             static fn(string $segment): string => Strings::pascal($segment),
@@ -84,7 +110,6 @@ final class ConventionResolver
         );
 
         $className = array_pop($pascalSegments);
-        $typeNamespace = $this->typeNamespace($method);
 
         $parts = [$this->rootNamespace];
 

@@ -458,4 +458,137 @@ final class ConventionResolverTest extends TestCase
         // Assert
         $this->assertSame('BoilerRoom\\Shop\\Query\\Tickers', $route->dtoClass);
     }
+
+    // ---------------------------------------------------------------
+    // resolveByType — transport-agnostic core
+    // ---------------------------------------------------------------
+
+    public function testResolveByTypeWithQueryNamespace(): void
+    {
+        // Arrange
+        $resolver = new ConventionResolver();
+
+        // Act
+        $route = $resolver->resolveByType('/health', 'Query');
+
+        // Assert
+        $this->assertSame('App\\Query\\Health', $route->dtoClass);
+        $this->assertSame('', $route->handlerPrefix);
+        $this->assertTrue($route->isQuery());
+    }
+
+    public function testResolveByTypeWithCommandNamespace(): void
+    {
+        // Arrange
+        $resolver = new ConventionResolver();
+
+        // Act
+        $route = $resolver->resolveByType('/contact/submit', 'Command');
+
+        // Assert
+        $this->assertSame('App\\Contact\\Command\\Submit', $route->dtoClass);
+        $this->assertSame('', $route->handlerPrefix);
+        $this->assertTrue($route->isCommand());
+    }
+
+    public function testResolveByTypeWithHandlerPrefix(): void
+    {
+        // Arrange
+        $resolver = new ConventionResolver();
+
+        // Act
+        $route = $resolver->resolveByType('/orders/place', 'Command', handlerPrefix: 'Post');
+
+        // Assert
+        $this->assertSame('App\\Orders\\Command\\Place', $route->dtoClass);
+        $this->assertSame('Post', $route->handlerPrefix);
+    }
+
+    public function testResolveByTypeWithFormat(): void
+    {
+        // Arrange
+        $resolver = new ConventionResolver();
+
+        // Act
+        $route = $resolver->resolveByType('/users/find', 'Query', format: 'csv');
+
+        // Assert
+        $this->assertSame('App\\Users\\Query\\Find', $route->dtoClass);
+        $this->assertSame('csv', $route->format);
+    }
+
+    public function testResolveByTypeWithCustomRootNamespace(): void
+    {
+        // Arrange
+        $resolver = new ConventionResolver(rootNamespace: 'MyApp');
+
+        // Act
+        $route = $resolver->resolveByType('/billing/charge', 'Command');
+
+        // Assert
+        $this->assertSame('MyApp\\Billing\\Command\\Charge', $route->dtoClass);
+    }
+
+    public function testResolveByTypeWithDeeplyNestedPath(): void
+    {
+        // Arrange
+        $resolver = new ConventionResolver();
+
+        // Act
+        $route = $resolver->resolveByType('/admin/catalog/products/featured', 'Query');
+
+        // Assert
+        $this->assertSame('App\\Admin\\Query\\Catalog\\Products\\Featured', $route->dtoClass);
+    }
+
+    public function testResolveByTypeThrowsForEmptyPath(): void
+    {
+        // Arrange
+        $resolver = new ConventionResolver();
+
+        // Act & Assert
+        $this->expectException(UnresolvableRoute::class);
+        $resolver->resolveByType('', 'Query');
+    }
+
+    public function testResolveByTypeDefaultFormatIsJson(): void
+    {
+        // Arrange
+        $resolver = new ConventionResolver();
+
+        // Act
+        $route = $resolver->resolveByType('/health', 'Query');
+
+        // Assert
+        $this->assertSame('json', $route->format);
+    }
+
+    public function testResolveByTypeProducesSameResultAsResolveForGet(): void
+    {
+        // Arrange
+        $resolver = new ConventionResolver();
+
+        // Act
+        $viaMethod = $resolver->resolve('/orders/recent', 'GET', 'html');
+        $viaType = $resolver->resolveByType('/orders/recent', 'Query', format: 'html');
+
+        // Assert
+        $this->assertSame($viaMethod->dtoClass, $viaType->dtoClass);
+        $this->assertSame($viaMethod->handlerPrefix, $viaType->handlerPrefix);
+        $this->assertSame($viaMethod->format, $viaType->format);
+    }
+
+    public function testResolveByTypeProducesSameResultAsResolveForPost(): void
+    {
+        // Arrange
+        $resolver = new ConventionResolver();
+
+        // Act
+        $viaMethod = $resolver->resolve('/orders/place', 'POST');
+        $viaType = $resolver->resolveByType('/orders/place', 'Command', handlerPrefix: 'Post');
+
+        // Assert
+        $this->assertSame($viaMethod->dtoClass, $viaType->dtoClass);
+        $this->assertSame($viaMethod->handlerPrefix, $viaType->handlerPrefix);
+    }
 }
