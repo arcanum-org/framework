@@ -94,6 +94,10 @@ This checklist tracks remaining work to complete all packages in the Arcanum fra
 - [x] Add tests for dispatch with prefix falling back to unprefixed handler
 - [x] Add tests for debug-mode warning log on fallback
 - [x] Add tests for dispatch with prefix where neither prefixed nor unprefixed handler exists — verify exception
+- [x] Add `HandlerProxy` interface — allows DTOs to override handler resolution. `handlerNameFor()` checks this before `get_class()`.
+- [x] Add `Command` dynamic DTO — implements `HandlerProxy`, provides `get()`/`has()`/`toArray()` and `__get`/`__isset` for dynamic property access. Used when a command handler exists without a paired DTO class.
+- [x] Add `Query` dynamic DTO — same as `Command` but for query handlers.
+- [x] Add handler-only route support in `HttpRouter` — when the DTO class doesn't exist but the Handler class does, the route resolves and the kernel creates a dynamic `Command` or `Query` from request data.
 
 ### River (Streams)
 
