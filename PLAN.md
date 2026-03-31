@@ -2,7 +2,7 @@
 
 This checklist tracks remaining work to complete all packages in the Arcanum framework. Each item is a small unit of work that includes 100% test coverage.
 
-**Progress: 207 done, 15 remaining.**
+**Progress: 208 done, 15 remaining.**
 
 ---
 
@@ -179,7 +179,8 @@ Now that all renderers are built, these integration tests are unblocked:
 
 - [ ] Add `Location` header for 201 responses — set if the framework can resolve a URL from the returned identifier
 - [ ] Add tests for scalar return → 201 Created with empty body and Location header
-- [ ] Add tests for `null` return → 202 Accepted with empty body (pending void/null distinction in Conveyor)
+- [x] Add void/null distinction in Conveyor — reflect on handler return type: `void` → EmptyDTO (204), nullable returning null → AcceptedDTO (202), nullable returning value → 201
+- [ ] Add tests for `null` return → 202 Accepted with empty body in Kernel integration test
 - [ ] Add opt-in configuration for command response bodies — disabled by default
 - [ ] Add tests for opt-in response body configuration
 - [ ] Add documentation guidance — explain CQRS command conventions and why response bodies are discouraged

@@ -54,9 +54,12 @@ class MiddlewareBus implements Bus
         return (new Pipeline())
             ->pipe($this->dispatchFlow)
             ->pipe(function (object $object) use ($prefix) {
-                $result = $this->handlerFor($object, $prefix)($object);
+                $handler = $this->handlerFor($object, $prefix);
+                $result = $handler($object);
                 if ($result === null) {
-                    return new EmptyDTO();
+                    return $this->isVoidHandler($handler)
+                        ? new EmptyDTO()
+                        : new AcceptedDTO();
                 }
                 if (!is_object($result)) {
                     return new QueryResult($result);
@@ -90,6 +93,34 @@ class MiddlewareBus implements Bus
 
         /** @var callable */
         return $this->container->get($this->handlerNameFor($object));
+    }
+
+    /**
+     * Check if a handler's __invoke method declares a void return type.
+     */
+    protected function isVoidHandler(callable $handler): bool
+    {
+        if (!is_object($handler)) {
+            return true; // fallback: treat non-object callables as void
+        }
+
+        try {
+            $method = new \ReflectionMethod($handler, '__invoke');
+        } catch (\ReflectionException) {
+            return true; // no __invoke — treat as void
+        }
+
+        $returnType = $method->getReturnType();
+
+        if ($returnType === null) {
+            return true; // no declared return type — treat as void
+        }
+
+        if ($returnType instanceof \ReflectionNamedType) {
+            return $returnType->getName() === 'void';
+        }
+
+        return false;
     }
 
     /**

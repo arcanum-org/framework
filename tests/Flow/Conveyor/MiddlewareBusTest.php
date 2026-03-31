@@ -7,6 +7,7 @@ namespace Arcanum\Test\Flow\Conveyor;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
+use Arcanum\Flow\Conveyor\AcceptedDTO;
 use Arcanum\Flow\Conveyor\Command;
 use Arcanum\Flow\Conveyor\MiddlewareBus;
 use Arcanum\Flow\Conveyor\EmptyDTO;
@@ -16,7 +17,15 @@ use Arcanum\Test\Flow\Conveyor\Fixture\DoSomethingHandler;
 use Arcanum\Test\Flow\Conveyor\Fixture\DoSomethingResult;
 use Arcanum\Test\Flow\Conveyor\Fixture\DynamicCommandHandler;
 use Arcanum\Test\Flow\Conveyor\Fixture\DynamicCommandResult;
+use Arcanum\Test\Flow\Conveyor\Fixture\FireAndForget;
+use Arcanum\Test\Flow\Conveyor\Fixture\FireAndForgetHandler;
+use Arcanum\Test\Flow\Conveyor\Fixture\LegacyAction;
+use Arcanum\Test\Flow\Conveyor\Fixture\LegacyActionHandler;
+use Arcanum\Test\Flow\Conveyor\Fixture\MaybeCreate;
+use Arcanum\Test\Flow\Conveyor\Fixture\MaybeCreateHandler;
 use Arcanum\Test\Flow\Conveyor\Fixture\PostDoSomethingHandler;
+use Arcanum\Test\Flow\Conveyor\Fixture\QueueJob;
+use Arcanum\Test\Flow\Conveyor\Fixture\QueueJobHandler;
 use Arcanum\Flow\Continuum\Continuum;
 
 #[CoversClass(MiddlewareBus::class)]
@@ -36,6 +45,7 @@ use Arcanum\Flow\Continuum\Continuum;
 #[UsesClass(\Arcanum\Quill\Logger::class)]
 #[UsesClass(\Arcanum\Quill\Channel::class)]
 #[UsesClass(EmptyDTO::class)]
+#[UsesClass(AcceptedDTO::class)]
 final class MiddlewareBusTest extends TestCase
 {
     public function testDispatchHappyPath(): void
@@ -241,5 +251,58 @@ final class MiddlewareBusTest extends TestCase
         // Assert
         $this->assertInstanceOf(DynamicCommandResult::class, $result);
         $this->assertSame('Alice', $result->name);
+    }
+
+    // ---------------------------------------------------------------
+    // Void vs nullable return type distinction
+    // ---------------------------------------------------------------
+
+    public function testVoidHandlerReturnsEmptyDTO(): void
+    {
+        // Arrange — FireAndForgetHandler declares `: void`
+        $bus = new MiddlewareBus(new Container());
+
+        // Act
+        $result = $bus->dispatch(new FireAndForget());
+
+        // Assert — void → EmptyDTO (kernel maps to 204)
+        $this->assertInstanceOf(EmptyDTO::class, $result);
+    }
+
+    public function testNullableHandlerReturningNullReturnsAcceptedDTO(): void
+    {
+        // Arrange — QueueJobHandler declares `: ?DoSomethingResult` and returns null
+        $bus = new MiddlewareBus(new Container());
+
+        // Act
+        $result = $bus->dispatch(new QueueJob());
+
+        // Assert — nullable returning null → AcceptedDTO (kernel maps to 202)
+        $this->assertInstanceOf(AcceptedDTO::class, $result);
+    }
+
+    public function testNullableHandlerReturningValueReturnsValue(): void
+    {
+        // Arrange — MaybeCreateHandler declares `: ?DoSomethingResult` and returns a value
+        $bus = new MiddlewareBus(new Container());
+
+        // Act
+        $result = $bus->dispatch(new MaybeCreate('test'));
+
+        // Assert — nullable returning a value → the value itself (kernel maps to 201)
+        $this->assertInstanceOf(DoSomethingResult::class, $result);
+        $this->assertSame('test', $result->name);
+    }
+
+    public function testHandlerWithNoReturnTypeDeclarationReturnsEmptyDTO(): void
+    {
+        // Arrange — LegacyActionHandler has no return type declaration
+        $bus = new MiddlewareBus(new Container());
+
+        // Act
+        $result = $bus->dispatch(new LegacyAction());
+
+        // Assert — no return type → treated as void → EmptyDTO
+        $this->assertInstanceOf(EmptyDTO::class, $result);
     }
 }
