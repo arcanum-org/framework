@@ -43,7 +43,7 @@ Arcanum is a collection of packages that work together to create a robust, scala
 
 ### Arcanum Hyper
 
-[Hyper](https://github.com/arcanum-org/framework/tree/main/src/Hyper) is Arcanum's HTTP layer — PSR-7 messages, PSR-15 server handling, and a type-safe `StatusCode` enum covering the full HTTP status code spectrum. Where most frameworks treat status codes as an afterthought (200 for success, 404 for missing, 500 for everything else), Hyper gives every code in the spec a first-class representation and encourages precise, semantic use throughout the framework.
+[Hyper](https://github.com/arcanum-org/framework/tree/main/src/Hyper) is Arcanum's HTTP layer — PSR-7 messages, PSR-15 server handling, a type-safe `StatusCode` enum covering the full HTTP status code spectrum, and a PSR-15 middleware stack for global request/response processing. Where most frameworks treat status codes as an afterthought (200 for success, 404 for missing, 500 for everything else), Hyper gives every code in the spec a first-class representation and encourages precise, semantic use throughout the framework.
 
 ### Arcanum Parchment
 

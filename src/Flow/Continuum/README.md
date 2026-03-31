@@ -79,6 +79,8 @@ Use **Pipeline** when each stage transforms data and passes it along — a strai
 
 Use **Continuum** when stages need to wrap around the rest of the chain — running setup/teardown, enforcing policies, or measuring timing across the entire inner execution.
 
+**A note on PSR-15 HTTP middleware:** PSR-15's `MiddlewareInterface` looks like middleware but has a key difference — it may short-circuit by returning a response without calling the next handler. Continuum's contract requires every Progression to call `$next()`, making short-circuit a chain-breaking error. For this reason, Hyper's `HttpMiddleware` builds the HTTP middleware onion using Pipeline (each middleware wraps the inner handler as a Stage) rather than Continuum. See `Arcanum\Hyper\HttpMiddleware` for details.
+
 ## The interfaces
 
 - **Progression** — a middleware stage: `__invoke(object $payload, callable $next): void`
