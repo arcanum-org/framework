@@ -2,7 +2,7 @@
 
 This checklist tracks remaining work to complete all packages in the Arcanum framework. Each item is a small unit of work that includes 100% test coverage.
 
-**Progress: 213 done, 10 remaining.**
+**Progress: 213 done, 10 remaining + Rune (43 items).**
 
 ---
 
@@ -192,12 +192,6 @@ The remaining command response items depend on infrastructure that doesn't exist
 - [x] Add per-route middleware support — PHP attributes (#[HttpMiddleware], #[Before], #[After]) on DTOs + co-located Middleware.php files for directory-scoped middleware. RouteDispatcher composes per-route middleware with existing Bus at both HTTP and Conveyor layers.
 - [x] Add tests for per-route middleware execution
 
-### Design Considerations
-
-Items flagged for future discussion. Not blocking — the framework works without them.
-
-- [ ] Revisit `Renderer` interface return type — currently uses `mixed`. Consider `ResponseInterface` for HTTP renderers, but CLI support (not yet planned) will need a different return type. Decide after CLI transport is designed.
-
 ### Documentation
 
 - [x] Write `src/Toolkit/README.md`
@@ -207,16 +201,164 @@ Items flagged for future discussion. Not blocking — the framework works withou
 
 ---
 
+## Rune — CLI Transport
+
+Rune is Arcanum's CLI transport layer. It lets developers execute the same Commands and Queries from the terminal that they execute over HTTP — same DTOs, same handlers, same Conveyor bus. Where Atlas maps HTTP requests to Routes, Rune maps CLI arguments. Where Shodo renders JSON/HTML for browsers, Rune renders tables and key-value output for terminals.
+
+### Design Principles
+
+- **The DTO is the contract.** A developer writes a DTO and a handler. It works on HTTP and CLI without ceremony. The transport is just plumbing.
+- **Explicit intent.** HTTP uses methods (GET/POST) to distinguish queries from commands. CLI uses prefixes: `query:` and `command:`. Every CLI invocation declares its CQRS intent.
+- **Convention routing.** The same namespace conventions drive both transports. `command:contact:submit` maps to `App\Domain\Contact\Command\Submit` the same way `POST /contact/submit` does.
+- **Unprefixed = framework.** Built-in operational commands (`list`, `help`, `validate:handlers`) have no prefix. The `command:`/`query:` prefix explicitly enters domain dispatch.
+
+### CLI Syntax
+
+```
+php arcanum command:<domain>:<action> [--arg=value ...]
+php arcanum query:<domain>:<action> [--arg=value ...] [--format=json|table|text]
+php arcanum <built-in> [--flags]
+```
+
+Mapping examples:
+```
+query:health                → App\Domain\Query\Health
+query:users:find            → App\Domain\Users\Query\Find
+command:contact:submit      → App\Domain\Contact\Command\Submit
+command:users:deactivate    → App\Domain\Users\Command\Deactivate
+```
+
+CLI flags map to DTO constructor parameters via the Hydrator — the same mechanism HTTP uses:
+```
+php arcanum command:contact:submit --name="Jo" --email="jo@example.com"
+```
+
+### Phase 1: Core I/O
+
+The foundation — parsing CLI input and writing CLI output.
+
+- [ ] `Input` value object — parses `$argv` into command name, positional arguments, named options (`--key=value`), and boolean flags (`--verbose`)
+- [ ] `Output` interface — `write(string)`, `writeLine(string)`, `error(string)`, `errorLine(string)`
+- [ ] `ConsoleOutput` — concrete `Output` writing to `STDOUT`/`STDERR` with ANSI color support (detect TTY, allow `--no-ansi` flag)
+- [ ] `ExitCode` enum — `Success = 0`, `Failure = 1`, `Invalid = 2` (mirrors standard CLI conventions)
+
+### Phase 2: Routing
+
+Map CLI arguments to Route objects, reusing the convention system.
+
+- [ ] Refactor `ConventionResolver` — extract a lower-level `resolveByType(string $path, string $typeNamespace, string $handlerPrefix, string $format): Route` method that both HTTP method mapping and CLI type prefix can call. No breaking changes to existing `resolve()`.
+- [ ] `CliRouter` implementing `Router` — accepts `Input`, parses `command:`/`query:` prefix, delegates to `ConventionResolver::resolveByType()`. Throws `UnresolvableRoute` for unknown prefixes.
+- [ ] `CliRouteMap` — config-based CLI aliases for non-conventional classes (parallels `RouteMap` for HTTP). Loaded from `config/routes.php` under a `'cli'` key.
+- [ ] 404/405 equivalent for CLI — `UnresolvableRoute` for unknown commands, clear error messages with "did you mean?" suggestions based on registered commands
+- [ ] `--help` flag interception — when present, `CliRouter` returns a special help route instead of dispatching
+- [ ] `--format` flag extraction — passed through to `Route::$format`, defaults to CLI-appropriate format (not JSON)
+
+### Phase 3: Kernel
+
+The CLI entry point — parallel to `HyperKernel` but without PSR-7/PSR-15 coupling.
+
+- [ ] `RuneKernel` extending/implementing `Kernel` — shares `rootDirectory`, `configDirectory`, `filesDirectory`, `requiredEnvironmentVariables`. Has its own `handle(array $argv): int` method returning an exit code.
+- [ ] `RuneKernel` bootstrapper list — reuses `Environment`, `Configuration`, `Routing`, `Logger`, `Exceptions`. Skips `Middleware` and `RouteMiddleware` (PSR-15 specific). Adds CLI-specific bootstrappers as needed.
+- [ ] `RuneKernel::handle()` flow — parse `Input` → route → hydrate DTO → dispatch through Conveyor → render output → return exit code
+- [ ] `RuneKernel` exception handling — catches exceptions, renders to `STDERR` via a `CliExceptionRenderer`, returns appropriate exit codes
+- [ ] `CliExceptionRenderer` — renders exceptions as formatted error messages to `Output`. Debug mode shows stack traces, production mode shows clean messages with status context.
+- [ ] `Bootstrap\CliRouting` bootstrapper — registers `CliRouter`, CLI format registry, and CLI-specific renderers in the container. Parallels `Bootstrap\Routing` for HTTP.
+
+### Phase 4: Rendering
+
+CLI-specific output rendering — tables, key-value pairs, and reuse of existing renderers.
+
+- [ ] Resolve `Renderer` return type — the `mixed` return was deferred for this moment. Renderers stay `mixed` return (string for content renderers), and each Kernel is responsible for wrapping the result into its transport's response type. HTTP kernels wrap into `ResponseInterface`. CLI kernels write to `Output`. The Renderer contract stays transport-agnostic.
+- [ ] `CliRenderer` — default CLI renderer. Single objects render as key-value pairs. Arrays of objects render as tables. Scalars render as plain text. Null/void renders nothing (just exit code).
+- [ ] `TableRenderer` — ASCII table formatting for array/list data. Auto-detects columns from object properties or array keys. Supports column width calculation and truncation.
+- [ ] `CliFormatRegistry` — maps `--format` values to renderers. Built-in: `table` → `TableRenderer`, `json` → existing `JsonRenderer`, `text` → existing `PlainTextRenderer`, `csv` → existing `CsvRenderer`. Default (no `--format`) → `CliRenderer`.
+- [ ] `CliEmptyResponseRenderer` — parallel to HTTP's `EmptyResponseRenderer`. Void commands → silent (exit 0). Null-returning commands → "Accepted." message. DTO-returning commands → render the DTO.
+
+### Phase 5: Help System
+
+Auto-generated help from DTO reflection and attributes.
+
+- [ ] `Arcanum\Rune\Attribute\Description` — PHP attribute for DTOs and constructor params. Provides help text. Ignored by HTTP.
+- [ ] `Arcanum\Rune\Attribute\Example` — PHP attribute for DTOs. Provides usage examples for `--help` output.
+- [ ] Help renderer — reads DTO class via reflection: constructor params become documented flags (name, type, required/optional, default value, `#[Description]` text). Outputs formatted help to `Output`.
+- [ ] `list` built-in command — discovers all available commands and queries by scanning the app namespace. Groups by domain. Shows `#[Description]` text if present.
+- [ ] `help` built-in command — alias for `<command> --help`. Example: `php arcanum help query:health`.
+
+### Phase 6: Transport Restriction
+
+Middleware that restricts DTOs to specific transports.
+
+- [ ] `Arcanum\Rune\Attribute\CliOnly` — PHP attribute on DTOs. Marks a command/query as CLI-only.
+- [ ] `Arcanum\Hyper\Attribute\HttpOnly` — PHP attribute on DTOs. Marks a command/query as HTTP-only.
+- [ ] `TransportGuard` Conveyor middleware — reads transport context from a container-registered value (e.g., `Transport::Http` or `Transport::Cli` enum), checks DTO attributes, throws appropriate error. For HTTP: `HttpException(405)` — the thing exists, wrong transport. For CLI: clear error message with suggestion to use the other transport.
+- [ ] Transport context registration — each Kernel registers its `Transport` enum value in the container during bootstrap so `TransportGuard` can check it.
+- [ ] Tests for cross-transport rejection — HTTP request to `#[CliOnly]` DTO returns 405, CLI call to `#[HttpOnly]` DTO shows error.
+
+### Phase 7: Built-in Framework Commands
+
+Operational commands that ship with Rune (no `command:`/`query:` prefix).
+
+- [ ] `list` — discover and display all registered commands and queries (convention + custom CLI routes)
+- [ ] `validate:handlers` — scan all DTO classes, verify each has a corresponding handler class. Report missing handlers. (The dev tool mentioned in Closed Questions — now has a home.)
+- [ ] Built-in command registry — framework commands registered separately from domain dispatch. `RuneKernel` checks built-ins before routing to `CliRouter`.
+- [ ] Extensible built-in commands — app developers can register custom operational commands (e.g., `cache:clear`, `migrate`) via config or Kernel method, without the `command:` prefix.
+
+### Phase 8: Starter App Integration
+
+Wire Rune into the starter project as a working example.
+
+- [ ] `bin/arcanum` entry point — `#!/usr/bin/env php` script. Loads autoloader, requires `bootstrap/cli.php`, bootstraps, handles `$argv`, exits with code.
+- [ ] `bootstrap/cli.php` — container setup for CLI. Parallels `bootstrap/http.php`. Registers `RuneKernel`, `CliRouter`, `ConsoleOutput`, CLI renderers.
+- [ ] `app/Cli/Kernel.php` — app-level CLI kernel extending `RuneKernel`. Developers customize bootstrappers and built-in commands here.
+- [ ] CLI route config — add `'cli'` key to `config/routes.php` for custom CLI aliases.
+- [ ] Verify existing `Health` query works from CLI — `php arcanum query:health` should dispatch to `HealthHandler` and render the result.
+- [ ] Verify existing `Contact\Submit` command works from CLI — `php arcanum command:contact:submit --name="Jo" --email="jo@test.com"` should dispatch to `SubmitHandler`.
+
+### Phase 9: Documentation
+
+- [ ] Write `src/Rune/README.md` — package overview, CLI syntax, routing conventions, renderers, transport restriction, built-in commands
+- [ ] Update `README.md` — add Rune to the package list
+- [ ] Update `src/Atlas/README.md` — document `ConventionResolver` refactoring and shared convention system
+- [ ] Update `src/Ignition/README.md` — document `RuneKernel` and shared bootstrapper architecture
+
+---
+
+## Future Work
+
+### Persistence Layer
+
+A database/filesystem/SQLite persistence layer to make Arcanum a viable full-stack framework. Blocked on Rune completion — CLI commands like migrations, schema management, and seed scripts need the CLI transport. Design should embrace CQRS: repositories for the write side (aggregates), query builder for the read side (projections). Not a full ORM — lightweight entity mapping, not Doctrine-level magic.
+
+Key areas: connection management (PDO, multi-driver), repository pattern, query builder, migrations, schema management, entity hydration. The `Location` header for 201 responses (deferred in Command Response Enhancements) depends on this + reverse routing.
+
+### Deferred — Command Response Enhancements
+
+Blocked on persistence layer:
+
+- **`Location` header for 201 responses** — requires reverse routing (URL generation from a class/identifier) and a persistence layer (handlers need to create things and get IDs back). In CQRS, commands and queries live at different paths, so there's no canonical resource URL to point to like in REST/CRUD. A `Locatable` interface would force devs to hardcode URLs, which is brittle. Revisit after: persistence layer, reverse routing, and a convention linking Commands to their corresponding Queries.
+- **Integration tests for 202/201 in Kernel** — straightforward once the Location header is settled, but low value without it.
+
+### Design Considerations
+
+Items flagged for future discussion. Not blocking.
+
+- ~~Revisit `Renderer` interface return type~~ — resolved by Rune Phase 4. Renderers stay `mixed` return. Each Kernel wraps the result into its transport's response type.
+
+---
+
 ## Closed Questions
 
 Decided — preserved for context:
 
 - ~~**Bootstrap lifecycle hooks**~~ — **Won't do.** The app controls the Kernel subclass and can add, remove, or reorder bootstrappers directly. Events would add complexity to an already detailed middleware lifecycle without solving a problem that bootstrapper ordering doesn't already handle.
-- ~~**Handler auto-discovery**~~ — **Won't do.** Codex resolves handlers on demand via reflection — no pre-registration needed. The only value would be boot-time validation, which belongs in a future dev-mode CLI command (`php arcanum validate:handlers`), not a runtime filesystem scan.
+- ~~**Handler auto-discovery**~~ — **Won't do for runtime.** Codex resolves handlers on demand via reflection — no pre-registration needed. Boot-time validation is now the `validate:handlers` built-in CLI command in Rune Phase 7.
 - ~~**Opt-in command response bodies**~~ — **Won't do.** Commands shouldn't respond with data. The Location header (once persistence + reverse routing exist) gives clients a way to fetch the created resource via a proper Query. Keeping commands body-less preserves clean CQRS separation.
+- ~~**CLI command prefixes**~~ — All domain dispatch uses `command:` or `query:` prefix. No prefix = built-in framework command. This mirrors how HTTP method determines CQRS intent — the prefix is the CLI equivalent.
+- ~~**CLI custom routes vs HTTP custom routes**~~ — Independent configs. HTTP custom routes exist for URL aesthetics (API versioning, pretty paths). CLI custom routes exist for aliasing non-conventional namespaces. Convention routing covers 90% on both sides. Config lives in `config/routes.php` under `'http'` and `'cli'` keys.
 
 ## Resolved Questions
 
 - ~~**Manual route overrides**~~ — Custom routes are the general mechanism (path+methods → explicit class mapping). Pages are a convenience layer that auto-discovers templates and registers them as GET-only custom routes. Priority: custom routes > convention.
 - ~~**HTML renderer and templates**~~ — Custom micro template compiler in Shodo. Templates co-located with DTOs, `{{ }}` syntax compiled to PHP and cached. Format-agnostic `$__escape` injected by each renderer.
 - ~~**Static file pages**~~ — Pages are template-driven. A `.html` template in `app/Pages/` is all that's needed. Pages flow through Conveyor via `Page` DTO and `PageHandler`. Optional DTO provides default data. Query params hydrated into template variables.
+- ~~**Renderer return type**~~ — Stays `mixed`. Renderers produce content (string), Kernels wrap it into transport-specific responses. Decided during Rune design — see Phase 4.
