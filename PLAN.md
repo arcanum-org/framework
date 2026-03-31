@@ -227,14 +227,14 @@ GET /dashboard            → App\Domain\Admin\Query\Dashboard
 
 #### Custom Route Registration
 
-- [ ] Add `RouteMap` to Atlas — stores explicit path+method(s) → Route mappings. Supports `register(path, dtoClass, methods, format)` and `resolve(path, method)`.
-- [ ] Integrate `RouteMap` into `HttpRouter` — checked before convention routing. Returns the matched Route directly, no convention resolution needed.
-- [ ] Add `allowedMethods()` support for custom routes — `HttpRouter::allowedMethods()` checks RouteMap before convention namespaces.
-- [ ] Add config-based custom route registration — `config/routes.php` gains a `custom` key with explicit path → class mappings, loaded by `Bootstrap\Routing`.
-- [ ] Add tests for custom route overriding convention
-- [ ] Add tests for custom route with multiple methods
-- [ ] Add tests for custom route 405 when path exists but method doesn't match
-- [ ] Add tests for custom route priority over convention
+- [x] Add `RouteMap` to Atlas — stores explicit path+method(s) → Route mappings. Supports `register(path, dtoClass, methods, format)` and `resolve(path, method)`.
+- [x] Integrate `RouteMap` into `HttpRouter` — checked before convention routing. Returns the matched Route directly, no convention resolution needed.
+- [x] Add `allowedMethods()` support for custom routes — `HttpRouter::allowedMethods()` checks RouteMap before convention namespaces.
+- [x] Add config-based custom route registration — `config/routes.php` gains a `custom` key with explicit path → class mappings, loaded by `Bootstrap\Routing`.
+- [x] Add tests for custom route overriding convention
+- [x] Add tests for custom route with multiple methods
+- [x] Add tests for custom route 405 when path exists but method doesn't match
+- [x] Add tests for custom route priority over convention
 
 #### Pages (built on Custom Routes)
 
@@ -246,16 +246,16 @@ app/Pages/Thing.php                  → GET /thing              (class: App\Pag
 app/Pages/Docs/GettingStarted.php   → GET /docs/getting-started (class: App\Pages\Docs\GettingStarted)
 ```
 
-- [ ] Refactor `PageResolver` to generate custom route registrations — instead of its own lookup table, `PageResolver` scans the pages directory and registers each page as a GET-only custom route in `RouteMap`.
-- [ ] Add page auto-discovery — scan the pages namespace directory during bootstrap, derive paths from class names via `Strings::kebab()`. Nested directories map to nested path segments.
-- [ ] Add page route caching — cache discovered page routes to avoid filesystem scanning on every request. Cache is invalidated when files change (development) or rebuilt on deploy (production).
-- [ ] Move Pages out of Domain in the starter app — pages live in `App\Pages` (outside Domain) to avoid namespace collision with convention-routed paths.
-- [ ] Add config overrides for auto-discovered pages — `config/routes.php` `pages` key can override default format or add pages that don't follow the naming convention.
-- [ ] Add tests for page auto-discovery from directory scanning
-- [ ] Add tests for page path derivation (PascalCase → kebab-case)
-- [ ] Add tests for nested page directory scanning
-- [ ] Add tests for page route caching (cache hit skips filesystem scan)
-- [ ] Add tests for config override of auto-discovered page format
+- [x] Refactor page registration to use `PageDiscovery` + `RouteMap` — `PageDiscovery` scans the pages directory and registers each page as a GET-only custom route in `RouteMap`. Replaces manual `PageResolver` registration.
+- [x] Add page auto-discovery — scan the pages namespace directory during bootstrap, derive paths from class names via `Strings::kebab()`. Nested directories map to nested path segments. Handler classes are skipped.
+- [x] Add page route caching — cache discovered page routes to avoid filesystem scanning on every request. Cache file written on first scan, loaded on subsequent requests.
+- [x] Move Pages out of Domain in the starter app — pages live in `App\Pages` (outside Domain) to avoid namespace collision with convention-routed paths.
+- [x] Add config overrides for auto-discovered pages — `config/routes.php` `pages` key overrides default format for auto-discovered pages.
+- [x] Add tests for page auto-discovery from directory scanning
+- [x] Add tests for page path derivation (PascalCase → kebab-case)
+- [x] Add tests for nested page directory scanning
+- [x] Add tests for page route caching (cache hit skips filesystem scan)
+- [x] Add tests for config override of auto-discovered page format
 
 ### Route Middleware
 
@@ -360,9 +360,9 @@ Track updates to the starter app (`../arcanum/`) as framework features land.
 - [x] Add example Command — `PUT /contact/submit` → `App\Contact\Command\Submit` + `SubmitHandler`, demonstrates Command with DTO hydration from JSON body, void return→204
 - [x] Add `config/middleware.php` with a `global` key and an example middleware (e.g., CORS headers) to demonstrate `HttpMiddleware` integration
 - [x] Separate domain code from application infrastructure — moved Commands, Queries into `app/Domain/`, convention resolver root changed to `App\Domain`
-- [ ] Move Pages out of Domain — pages live in `App\Pages` (outside Domain) to avoid namespace collision with convention-routed paths
-- [ ] Remove explicit page registration from `config/routes.php` — pages are auto-discovered after framework refactor
-- [ ] Add example custom route to `config/routes.php` — demonstrate explicit path → class mapping
+- [x] Move Pages out of Domain — pages live in `App\Pages` (outside Domain) to avoid namespace collision with convention-routed paths
+- [x] Remove explicit page registration from `config/routes.php` — pages are auto-discovered, config is format overrides only
+- [x] Add example custom route to `config/routes.php` — commented-out example demonstrating explicit path → class mapping
 
 ---
 
