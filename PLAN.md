@@ -275,32 +275,55 @@ PSR-16 defines key constraints: keys must be strings, at least one character, an
 
 #### Prefix Scoping
 
-- [ ] `PrefixedCache` — decorator that prepends a namespace prefix to all keys. Wraps any `CacheInterface` instance. Useful for isolating framework caches from app caches on the same driver (e.g., `framework:templates:` prefix vs. `app:` prefix). `clear()` only clears keys with the prefix (for file/array drivers) or delegates to the inner driver's `clear()` (for Redis/APCu where prefix-scoped clearing isn't practical without `SCAN` — document this limitation).
+- [ ] `PrefixedCache` — decorator that prepends a namespace prefix to all keys. Wraps any `CacheInterface` instance. Useful for isolating framework caches from app caches on the same driver (e.g., `framework:pages:` prefix vs. `app:sessions:` prefix). `clear()` only clears keys with the prefix (for file/array drivers) or delegates to the inner driver's `clear()` (for Redis/APCu where prefix-scoped clearing isn't practical without `SCAN` — document this limitation).
 - [ ] Tests: get/set/delete prepend prefix, clear behavior, inner driver receives prefixed keys.
+
+#### Store Assignment — framework and app caches
+
+Different caches have different performance and durability requirements. The config lets both the framework and the app assign specific stores to specific purposes.
+
+- [ ] Framework store mapping in `config/cache.php` — maps framework cache names to store names:
+  ```php
+  'framework' => [
+      'pages'      => 'file',    // page discovery — durable, survives restarts
+      'middleware' => 'file',    // middleware discovery — same
+      'templates'  => 'file',   // template compilation directory (path only, not PSR-16)
+  ],
+  ```
+  Bootstrappers read this mapping and resolve the named store for each framework cache. An app can move discovery caches to APCu for speed (`'pages' => 'apcu'`) or Redis for shared deployments without touching framework code.
+- [ ] App developers use `CacheManager::store($name)` to get different drivers for different concerns:
+  ```php
+  // In a handler or service
+  $userCache = $cache->store('redis');      // fast, distributed
+  $reportCache = $cache->store('file');     // large payloads, durable
+  $requestCache = $cache->store('array');   // per-request only
+  ```
+  The default store (`$cache->store()` or typehinting `CacheInterface`) covers the common case. Named stores cover everything else. No new classes needed — this is just `CacheManager` doing its job.
+- [ ] Tests: framework store mapping resolves correct driver per cache name, falls back to default store when mapping key is absent.
 
 #### Bootstrap & Wiring
 
 - [ ] `Bootstrap\Cache` bootstrapper in Ignition — reads `config/cache.php`, builds `CacheManager`, registers it in the container. Also registers the default store as `CacheInterface` so apps can typehint the PSR-16 interface directly. Slot after `Configuration` in both kernel bootstrapper lists.
 - [ ] Add `Bootstrap\Cache` to `HyperKernel::$bootstrappers` and `RuneKernel::$bootstrappers`.
-- [ ] Starter app: update `config/cache.php` to include the new `default`/`stores` structure alongside existing page/template cache toggles.
-- [ ] Tests: bootstrapper registers `CacheManager` and `CacheInterface`, default store is resolvable.
+- [ ] Starter app: update `config/cache.php` with `default`, `stores`, and `framework` mapping structure.
+- [ ] Tests: bootstrapper registers `CacheManager` and `CacheInterface`, default store is resolvable, framework store mapping is respected.
 
 #### Migrate Framework Ad-hoc Caches
 
 Four existing caches currently use bespoke file-based caching. Once Vault exists, they can optionally use it for unified driver selection and cache clearing.
 
 - [ ] Evaluate `ConfigurationCache` — currently serialized PHP array via Parchment. This cache is special: it must work *before* the container is built (it's read during `Bootstrap\Configuration`). It cannot depend on the CacheManager (which is registered *after* Configuration). **Decision: leave as-is.** ConfigurationCache is a bootstrap primitive, not an app cache. Document why it stays independent.
-- [ ] Evaluate `TemplateCache` — compiled PHP per template, mtime-based freshness. This is content-addressed (key = hash of template path) with file-specific freshness (mtime comparison, not TTL). A generic PSR-16 cache doesn't support mtime freshness natively. **Decision: leave as-is but make the cache directory configurable via CacheManager config.** The template cache is a specialized compilation cache, not a generic key-value store. Unify the directory configuration so `cache:clear` knows about it.
-- [ ] Migrate `PageDiscovery` cache — currently a single `var_export`ed file with TTL. This fits PSR-16 well: `$cache->set('page_discovery', $pages, $ttl)`. Refactor to accept `CacheInterface` instead of managing its own file. Use `PrefixedCache` to namespace it.
-- [ ] Migrate `MiddlewareDiscovery` cache — same pattern as PageDiscovery. Refactor to accept `CacheInterface`.
-- [ ] Update `Bootstrap\Routing` and `Bootstrap\RouteMiddleware` to pass the cache instance to PageDiscovery and MiddlewareDiscovery.
-- [ ] Tests: PageDiscovery and MiddlewareDiscovery work with ArrayDriver in tests, produce same results as before migration.
+- [ ] Evaluate `TemplateCache` — compiled PHP per template, mtime-based freshness. This is content-addressed (key = hash of template path) with file-specific freshness (mtime comparison, not TTL). A generic PSR-16 cache doesn't support mtime freshness natively. **Decision: leave as-is but make the cache directory configurable via the `framework.templates` store mapping in config.** The template cache is a specialized compilation cache, not a generic key-value store. Unify the directory configuration so `cache:clear` knows about it.
+- [ ] Migrate `PageDiscovery` cache — currently a single `var_export`ed file with TTL. This fits PSR-16 well: `$cache->set('page_discovery', $pages, $ttl)`. Refactor to accept `CacheInterface` instead of managing its own file. Use `PrefixedCache` to namespace it. The bootstrapper reads `config.cache.framework.pages` to resolve which store to use.
+- [ ] Migrate `MiddlewareDiscovery` cache — same pattern as PageDiscovery. Reads `config.cache.framework.middleware` for store selection.
+- [ ] Update `Bootstrap\Routing` and `Bootstrap\RouteMiddleware` to resolve the framework store for each cache and pass the `CacheInterface` instance to PageDiscovery and MiddlewareDiscovery.
+- [ ] Tests: PageDiscovery and MiddlewareDiscovery work with ArrayDriver in tests, produce same results as before migration, respect store mapping.
 
 #### CLI
 
-- [ ] `cache:clear` built-in Rune command — clears the default cache store via `CacheInterface::clear()`. Also clears the framework's independent caches (ConfigurationCache, TemplateCache) so that one command resets everything. Prints what was cleared. Registered in `Bootstrap\CliRouting`.
-- [ ] `cache:status` built-in Rune command (optional/low priority) — shows configured stores, default store, and whether each store's backing service is reachable (Redis ping, APCu enabled, file directory writable). Useful for debugging.
-- [ ] Tests for `cache:clear`: clears cache, prints confirmation. Tests for `cache:status`: shows store info.
+- [ ] `cache:clear` built-in Rune command — clears all configured stores via `CacheManager`, plus the framework's independent caches (ConfigurationCache, TemplateCache). Accepts an optional `--store=NAME` flag to clear only a specific store. Prints what was cleared. Registered in `Bootstrap\CliRouting`.
+- [ ] `cache:status` built-in Rune command (optional/low priority) — shows configured stores, default store, framework store assignments, and whether each store's backing service is reachable (Redis ping, APCu enabled, file directory writable). Useful for debugging.
+- [ ] Tests for `cache:clear`: clears all stores, clears single store with `--store` flag, prints confirmation. Tests for `cache:status`: shows store info.
 
 #### Documentation
 
