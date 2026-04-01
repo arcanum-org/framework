@@ -65,9 +65,37 @@ All package READMEs written/updated: Cabinet, Codex, Echo, Gather, Parchment, Fl
 
 ## Upcoming Work
 
-### Validation — new package
+Items are ordered by priority. The dependency chain drives the order: **Security → Validation → Caching → Scaffolding → Sessions → Auth**, then standalone items, then the heavyweights.
 
-DTO-attribute-based validation, executed as Conveyor middleware before the handler runs. Arcanum's CQRS architecture makes this exceptionally clean: the DTO already declares its shape via constructor params, so validation rules live as attributes right on the parameters.
+| Priority | Item | Impact | Difficulty | Blocking | Depends on |
+|---|---|---|---|---|---|
+| 1 | Security primitives | 6 | 3 | 9 | — |
+| 2 | Validation | 10 | 4 | 8 | — |
+| 3 | Caching (Vault) | 7 | 4 | 7 | — |
+| 4 | Scaffolding generators | 8 | 3 | 1 | — |
+| 5 | Session management | 7 | 5 | 8 | Security, Caching |
+| 6 | Auth & Authorization | 9 | 7 | 4 | Security, Validation, Sessions |
+| 7 | HTTP client | 5 | 2 | 1 | — |
+| 8 | Custom app scripts | 5 | 2 | 1 | — |
+| 9 | Persistence layer | 10 | 9 | 6 | — (but Auth benefits from it) |
+| 10 | Template helpers | 6 | 4 | 2 | Persistence (for reverse routing) |
+| 11 | Starter app polish | 4 | 2 | 1 | Auth, Persistence, Caching |
+
+Scores: Impact (1=niche, 10=affects everyone), Difficulty (1=simple wrapper, 10=bespoke behemoth), Blocking (1=standalone, 10=everything else needs it first).
+
+---
+
+### 1. Security Primitives — in Toolkit
+
+Foundational security utilities that other packages build on. Smallest effort, highest blocking score — sessions, auth, CSRF, and signed URLs all depend on these existing. Lives in Toolkit since these are general-purpose tools, not a standalone package.
+
+- **Encryption** — AES-256-GCM encrypt/decrypt with key management. Used by sessions (cookie encryption), signed URLs, API token generation.
+- **Hashing** — bcrypt and argon2id password hashing with a `Hasher` interface. Used by authentication.
+- **CSRF protection** — Token generation and verification middleware for HTML form submissions. Integrates with sessions (once sessions exist) and the template engine (a `{{ csrf() }}` helper).
+
+### 2. Validation — new package
+
+DTO-attribute-based validation, executed as Conveyor middleware before the handler runs. Affects every DTO in the framework. Auth will need it. Arcanum's CQRS architecture makes this exceptionally clean: the DTO already declares its shape via constructor params, so validation rules live as attributes right on the parameters.
 
 ```php
 #[Description('Submit a contact form')]
@@ -88,25 +116,36 @@ Validation runs automatically via a Conveyor middleware — if validation fails,
 
 Design areas: attribute-based rule system, a `Validator` class that inspects DTO constructor params via reflection, a `ValidationError` exception carrying structured field→messages, Conveyor middleware integration, extensible custom rules. The same validation works on both HTTP and CLI because it operates on the DTO, not the transport.
 
-### Caching — new package (Vault)
+### 3. Caching — new package (Vault)
 
-A general-purpose PSR-16 (`CacheInterface`) caching package with swappable drivers.
+A general-purpose PSR-16 (`CacheInterface`) caching package with swappable drivers. Sessions need cache drivers. The framework's own caches migrate onto it. PSR-16 is a clean, well-defined spec.
 
 Drivers: file (default, zero-config), APCu (in-memory, single-server), Redis (distributed), array (testing). All drivers implement PSR-16 `CacheInterface` — app code depends on the interface, never a concrete driver.
 
 Once the general cache abstraction exists, the framework's ad-hoc caches (template cache, config cache, page discovery cache, route middleware cache) should migrate onto it. This unifies cache configuration, clearing, and driver selection under one system. A `cache:clear` built-in CLI command becomes trivial.
 
-### Security Primitives — in Toolkit
+### 4. Scaffolding Generators — Rune built-in commands
 
-Foundational security utilities that other packages build on. Lives in Toolkit since these are general-purpose tools, not a standalone package.
+Zero dependencies on other upcoming work. Massive DX payoff. Slotted after validation so the generated stubs can include validation attributes.
 
-- **Encryption** — AES-256-GCM encrypt/decrypt with key management. Used by sessions (cookie encryption), signed URLs, API token generation.
-- **Hashing** — bcrypt and argon2id password hashing with a `Hasher` interface. Used by authentication.
-- **CSRF protection** — Token generation and verification middleware for HTML form submissions. Integrates with sessions (once sessions exist) and the template engine (a `{{ csrf() }}` helper).
+Code generators that create DTO + handler + template stubs from the command line:
 
-### Session Management — needs design discussion
+```
+php arcanum make:query Users/Find
+php arcanum make:command Contact/Submit
+php arcanum make:page About
+php arcanum make:middleware RateLimit
+```
+
+Each generator creates the files in the correct directory following Arcanum's conventions, with proper namespaces, constructor params, and handler stubs. `make:page` also creates the `.html` template. Generators are registered as Rune built-in commands.
+
+This is the single biggest DX improvement for onboarding — new developers go from zero to a working endpoint in seconds without memorizing namespace conventions.
+
+### 5. Session Management — needs design discussion
 
 ⚠️ **Needs careful design before implementation.** Sessions have CQRS ramifications.
+
+Depends on: security primitives (encryption for cookie sessions), caching (driver reuse).
 
 Sessions are required for HTML-serving apps (login state, flash messages, CSRF tokens). Drivers: file, database (once persistence exists), Redis (once caching exists).
 
@@ -114,9 +153,11 @@ Sessions are required for HTML-serving apps (login state, flash messages, CSRF t
 
 This also affects authentication and authorization (below) since both depend on session infrastructure. Needs discussion before building.
 
-### Authentication & Authorization
+### 6. Authentication & Authorization
 
-Depends on: security primitives (hashing, encryption), sessions, persistence layer.
+The capstone that ties security + sessions + validation together. Highest complexity of the dependency chain, but correctly positioned after its prerequisites.
+
+Depends on: security primitives (hashing, encryption), sessions, validation. Persistence layer enhances it (user storage) but isn't strictly required (token-based auth can work without a database).
 
 **Authentication** (who are you?) — Guards that check credentials via different strategies: session-based (HTML apps), token-based (API apps, including optional JWT support), API key. A `Guard` interface with swappable implementations. The guard resolves a `User` (or similar identity object) from the request and makes it available to the rest of the pipeline.
 
@@ -137,7 +178,11 @@ The middleware checks the authenticated user against the DTO's requirements befo
 
 Policies for complex authorization logic (e.g., "users can only edit their own posts") as invocable classes resolved from the container.
 
-### HTTP Client — PSR-18 wrapper
+The starter app should ship with an auth example (login flow or API token guard) and example middleware (rate limiting, request logging) once this is complete.
+
+### 7. HTTP Client — PSR-18 wrapper
+
+Standalone, low effort. Useful for handlers that call external APIs. No other framework feature depends on it.
 
 A thin PSR-18 (`ClientInterface`) wrapper around an established HTTP client (likely Guzzle or Symfony HttpClient). The wrapper provides:
 
@@ -147,22 +192,9 @@ A thin PSR-18 (`ClientInterface`) wrapper around an established HTTP client (lik
 
 The goal is not to build an HTTP client from scratch — it's to provide a consistent, testable interface that integrates with the container and can be swapped in tests.
 
-### Scaffolding Generators — Rune built-in commands
+### 8. Custom App Scripts — Rune extension
 
-Code generators that create DTO + handler + template stubs from the command line:
-
-```
-php arcanum make:query Users/Find
-php arcanum make:command Contact/Submit
-php arcanum make:page About
-php arcanum make:middleware RateLimit
-```
-
-Each generator creates the files in the correct directory following Arcanum's conventions, with proper namespaces, constructor params, and handler stubs. `make:page` also creates the `.html` template. Generators are registered as Rune built-in commands.
-
-This is the single biggest DX improvement for onboarding — new developers go from zero to a working endpoint in seconds without memorizing namespace conventions.
-
-### Custom App Scripts — Rune extension
+Small extension to Rune's built-in registry. Standalone. Nice to have once people are building real apps.
 
 Allow app developers to define their own CLI scripts that have access to the bootstrapped framework container but live outside the `command:`/`query:` domain dispatch. Similar to Rune's built-in commands, but defined by the application.
 
@@ -170,7 +202,21 @@ Use case: operational scripts like `db:seed`, `cache:warm`, `deploy:check` — t
 
 This is distinct from built-in framework commands (which ship with Rune) and domain commands (which go through the full CQRS dispatch). It fills the gap for application-level tooling.
 
-### Template Helpers — Shodo extension
+### 9. Persistence Layer
+
+Highest effort by far. Correctly deferred until the auth/session/validation stack is solid. Apps need to authenticate users before they need to persist data.
+
+A database persistence layer to make Arcanum a viable full-stack framework. CLI commands like migrations, schema management, and seed scripts use Rune.
+
+**Design philosophy:** SQL is a powerful language — Arcanum treats `.sql` files as first-class citizens rather than hiding SQL behind a query builder abstraction. Migrations are `.sql` files, not PHP classes that generate SQL. Complex queries are written in SQL, not chained method calls. The framework provides connection management, parameter binding, result hydration, and migration tooling — but the SQL itself is yours.
+
+CQRS shapes the design: repositories for the write side (aggregates), direct SQL queries for the read side (projections). Not a full ORM — lightweight entity mapping, not Doctrine-level magic. No active record pattern (models don't save themselves — commands handle writes).
+
+Key areas: connection management (PDO, multi-driver), repository pattern, migration runner (`.sql` files, up/down, CLI commands), schema introspection, result hydration into DTOs. The `Location` header for 201 responses (deferred below) depends on this + reverse routing.
+
+### 10. Template Helpers — Shodo extension
+
+Reverse routing is the valuable piece, but it depends on conventions that may shift as persistence lands. Formatting helpers are trivial and could ship earlier as a subset.
 
 A library of helper functions exposed to the template engine. Templates currently have access to `{{ $variable }}` and control flow, but lack common utilities for formatting and URL generation.
 
@@ -185,23 +231,15 @@ These could live as a Shodo subpackage or a dedicated helpers package. Some unde
 
 Reverse routing (URL generation from a DTO class or route name) is particularly important — it's needed by both templates and the deferred `Location` header for 201 responses.
 
-### Starter App — shipped middleware and styling
+### 11. Starter App — shipped middleware and styling
+
+Most valuable after auth and persistence exist — that's when the starter app becomes a real demo. Rate limiter is more useful with cache-backed counters.
 
 **Rate limiting middleware** — ships as an example in the starter app's `app/Http/Middleware/`. Configurable limits per route or globally. Demonstrates how to write middleware that short-circuits with **429 Too Many Requests**.
 
 **Request logging middleware** — ships as an example. Logs request method, path, status code, and duration. Demonstrates the middleware onion model (starts a timer on the way in, logs on the way out).
 
 **Default CSS and styling** — a minimal CSS file and base HTML layout that ships with the starter app (not the framework). Makes the default pages and error screens look presentable out of the box. Lives in `public/css/` and is referenced by the page templates. This is purely a starter app concern — the framework has no opinion on styling.
-
-### Persistence Layer
-
-A database persistence layer to make Arcanum a viable full-stack framework. CLI commands like migrations, schema management, and seed scripts use Rune.
-
-**Design philosophy:** SQL is a powerful language — Arcanum treats `.sql` files as first-class citizens rather than hiding SQL behind a query builder abstraction. Migrations are `.sql` files, not PHP classes that generate SQL. Complex queries are written in SQL, not chained method calls. The framework provides connection management, parameter binding, result hydration, and migration tooling — but the SQL itself is yours.
-
-CQRS shapes the design: repositories for the write side (aggregates), direct SQL queries for the read side (projections). Not a full ORM — lightweight entity mapping, not Doctrine-level magic. No active record pattern (models don't save themselves — commands handle writes).
-
-Key areas: connection management (PDO, multi-driver), repository pattern, migration runner (`.sql` files, up/down, CLI commands), schema introspection, result hydration into DTOs. The `Location` header for 201 responses (deferred above) depends on this + reverse routing.
 
 ### Deferred — Command Response Enhancements
 
