@@ -6,6 +6,9 @@ namespace Arcanum\Test\Atlas;
 
 use Arcanum\Atlas\MiddlewareDiscovery;
 use Arcanum\Atlas\RouteMiddleware;
+use Arcanum\Vault\ArrayDriver;
+use Arcanum\Vault\InvalidArgument;
+use Arcanum\Vault\KeyValidator;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -17,8 +20,10 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(\Arcanum\Atlas\Attribute\After::class)]
 #[UsesClass(\Arcanum\Parchment\Searcher::class)]
 #[UsesClass(\Arcanum\Parchment\Reader::class)]
-#[UsesClass(\Arcanum\Parchment\Writer::class)]
 #[UsesClass(\Arcanum\Parchment\FileSystem::class)]
+#[UsesClass(ArrayDriver::class)]
+#[UsesClass(KeyValidator::class)]
+#[UsesClass(InvalidArgument::class)]
 final class MiddlewareDiscoveryTest extends TestCase
 {
     private const FIXTURE_DIR = __DIR__ . '/Fixture/Middleware';
@@ -107,49 +112,46 @@ final class MiddlewareDiscoveryTest extends TestCase
     public function testDiscoveryCacheWriteAndRead(): void
     {
         // Arrange
-        $cachePath = sys_get_temp_dir() . '/arcanum_mw_discovery_test_' . uniqid() . '.php';
+        $cache = new ArrayDriver();
 
         $discovery = new MiddlewareDiscovery(
             rootNamespace: self::ROOT_NS,
             rootDirectory: self::FIXTURE_DIR,
-            cachePath: $cachePath,
+            cache: $cache,
         );
 
         // Act — first call scans and writes cache
         $first = $discovery->discover();
 
-        // Assert cache file exists
-        $this->assertFileExists($cachePath);
+        // Assert cache is populated
+        $this->assertTrue($cache->has('middleware_discovery'));
 
         // Act — second call reads from cache
         $second = $discovery->discover();
 
         // Assert — same results
         $this->assertEquals($first, $second);
-
-        // Cleanup
-        @unlink($cachePath);
     }
 
     public function testClearCache(): void
     {
         // Arrange
-        $cachePath = sys_get_temp_dir() . '/arcanum_mw_discovery_clear_test_' . uniqid() . '.php';
+        $cache = new ArrayDriver();
 
         $discovery = new MiddlewareDiscovery(
             rootNamespace: self::ROOT_NS,
             rootDirectory: self::FIXTURE_DIR,
-            cachePath: $cachePath,
+            cache: $cache,
         );
 
         $discovery->discover(); // writes cache
-        $this->assertFileExists($cachePath);
+        $this->assertTrue($cache->has('middleware_discovery'));
 
         // Act
         $discovery->clearCache();
 
         // Assert
-        $this->assertFileDoesNotExist($cachePath);
+        $this->assertFalse($cache->has('middleware_discovery'));
     }
 
     public function testDirectoryMiddlewareOrderIsShallowFirst(): void

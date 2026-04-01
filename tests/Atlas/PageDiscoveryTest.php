@@ -12,6 +12,9 @@ use Arcanum\Atlas\UnresolvableRoute;
 use Arcanum\Glitch\HttpException;
 use Arcanum\Hyper\StatusCode;
 use Arcanum\Toolkit\Strings;
+use Arcanum\Vault\ArrayDriver;
+use Arcanum\Vault\InvalidArgument;
+use Arcanum\Vault\KeyValidator;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -24,6 +27,9 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(StatusCode::class)]
 #[UsesClass(Strings::class)]
 #[UsesClass(UnresolvableRoute::class)]
+#[UsesClass(ArrayDriver::class)]
+#[UsesClass(KeyValidator::class)]
+#[UsesClass(InvalidArgument::class)]
 final class PageDiscoveryTest extends TestCase
 {
     private const PAGES_NS = 'Arcanum\\Test\\Atlas\\Fixture\\Pages';
@@ -199,108 +205,70 @@ final class PageDiscoveryTest extends TestCase
     public function testCachesDiscoveryResults(): void
     {
         // Arrange
-        $cachePath = sys_get_temp_dir() . '/arcanum_pages_test_' . uniqid() . '.php';
+        $cache = new ArrayDriver();
         $discovery = new PageDiscovery(
             self::PAGES_NS,
             self::PAGES_DIR,
-            cachePath: $cachePath,
+            cache: $cache,
         );
 
         // Act — first call scans and writes cache
         $pages = $discovery->discover();
 
-        // Assert — cache file exists
-        $this->assertFileExists($cachePath);
+        // Assert — cache is populated
+        $this->assertTrue($cache->has('page_discovery'));
 
         // Act — second call reads from cache
         $cachedPages = $discovery->discover();
         $this->assertSame($pages, $cachedPages);
-
-        // Cleanup
-        @unlink($cachePath);
     }
 
-    public function testExpiredCacheRescans(): void
+    public function testNoCachingWhenCacheIsNull(): void
     {
-        // Arrange — create cache, then backdate it beyond max age
-        $cachePath = sys_get_temp_dir() . '/arcanum_pages_test_' . uniqid() . '.php';
+        // Arrange — null cache means no caching
         $discovery = new PageDiscovery(
             self::PAGES_NS,
             self::PAGES_DIR,
-            cachePath: $cachePath,
-            cacheMaxAge: 60,
-        );
-        $discovery->discover(); // writes cache
-
-        // Backdate the cache file to 120 seconds ago
-        touch($cachePath, time() - 120);
-
-        // Act — should rescan because cache is expired
-        $pages = $discovery->discover();
-
-        // Assert — still finds pages (rescanned, not empty)
-        $this->assertArrayHasKey('/', $pages);
-
-        // Cleanup
-        @unlink($cachePath);
-    }
-
-    public function testZeroMaxAgeMeansNoExpiry(): void
-    {
-        // Arrange — create cache, backdate it significantly
-        $cachePath = sys_get_temp_dir() . '/arcanum_pages_test_' . uniqid() . '.php';
-        $discovery = new PageDiscovery(
-            self::PAGES_NS,
-            self::PAGES_DIR,
-            cachePath: $cachePath,
-            cacheMaxAge: 0,
-        );
-        $discovery->discover(); // writes cache
-
-        // Backdate the cache file to 1 day ago
-        touch($cachePath, time() - 86400);
-
-        // Act — should still use cache (maxAge 0 = no expiry)
-        $pages = $discovery->discover();
-
-        // Assert
-        $this->assertArrayHasKey('/', $pages);
-
-        // Cleanup
-        @unlink($cachePath);
-    }
-
-    public function testNoCachingWhenPathEmpty(): void
-    {
-        // Arrange — empty cachePath means no caching
-        $discovery = new PageDiscovery(
-            self::PAGES_NS,
-            self::PAGES_DIR,
-            cachePath: '',
+            cache: null,
         );
 
-        // Act — should scan every time, never write cache
+        // Act — should scan every time
         $pages = $discovery->discover();
 
         // Assert — still works
         $this->assertArrayHasKey('/', $pages);
     }
 
-    public function testClearCacheRemovesFile(): void
+    public function testClearCacheRemovesEntry(): void
     {
         // Arrange
-        $cachePath = sys_get_temp_dir() . '/arcanum_pages_test_' . uniqid() . '.php';
+        $cache = new ArrayDriver();
         $discovery = new PageDiscovery(
             self::PAGES_NS,
             self::PAGES_DIR,
-            cachePath: $cachePath,
+            cache: $cache,
         );
-        $discovery->discover(); // create cache
+        $discovery->discover(); // populate cache
 
         // Act
         $discovery->clearCache();
 
         // Assert
-        $this->assertFileDoesNotExist($cachePath);
+        $this->assertFalse($cache->has('page_discovery'));
+    }
+
+    public function testClearCacheWithNullCacheDoesNotThrow(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        // Arrange
+        $discovery = new PageDiscovery(
+            self::PAGES_NS,
+            self::PAGES_DIR,
+            cache: null,
+        );
+
+        // Act — should not throw
+        $discovery->clearCache();
     }
 }

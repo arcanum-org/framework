@@ -274,9 +274,10 @@ Downstream consumers:
 
 - [x] `ConfigurationCache` — **left as-is.** Bootstrap primitive that runs before the container is built; cannot depend on CacheManager.
 - [x] `TemplateCache` — **left as-is.** Specialized mtime-based compilation cache; PSR-16 doesn't support mtime freshness natively. `cache:clear` knows about it.
-- [ ] Migrate `PageDiscovery` cache — refactor to accept `CacheInterface`. Deferred to a separate PR.
-- [ ] Migrate `MiddlewareDiscovery` cache — same pattern. Deferred to a separate PR.
-- [ ] Update `Bootstrap\Routing` and `Bootstrap\RouteMiddleware` for store-based discovery caches. Deferred.
+- [x] Migrate `PageDiscovery` cache — refactored to accept `CacheInterface`. Replaced `$cachePath`/`$cacheMaxAge`/`$reader`/`$writer` with `$cache`/`$cacheTtl`. Uses PSR-16 get/set/delete. Tests updated to use `ArrayDriver`.
+- [x] Migrate `MiddlewareDiscovery` cache — same pattern. Replaced bespoke file cache with `CacheInterface`. Serializes `RouteMiddleware` to/from arrays for cache storage. Tests updated.
+- [x] Updated `Bootstrap\Routing` — resolves framework `pages` store via `CacheManager`, wraps in `PrefixedCache('fw.pages.')`, passes to `PageDiscovery`.
+- [x] Updated `Bootstrap\RouteMiddleware` — resolves framework `middleware` store, wraps in `PrefixedCache('fw.middleware.')`, passes to `MiddlewareDiscovery`.
 
 #### CLI
 

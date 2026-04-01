@@ -36,6 +36,8 @@ use Arcanum\Flow\Conveyor\MiddlewareBus;
 use Arcanum\Glitch\ExceptionRenderer;
 use Arcanum\Hyper\ValidationExceptionRenderer;
 use Arcanum\Validation\ValidationGuard;
+use Arcanum\Vault\CacheManager;
+use Arcanum\Vault\PrefixedCache;
 
 /**
  * Registers Atlas routing and Shodo format registry in the container.
@@ -247,18 +249,19 @@ class Routing implements Bootstrapper
         $cacheMaxAge = $config->get('cache.pages.max_age');
         $cacheMaxAge = is_int($cacheMaxAge) ? $cacheMaxAge : 0;
 
-        $cachePath = $cacheEnabled
-            ? $kernel->filesDirectory()
-                . DIRECTORY_SEPARATOR . 'cache'
-                . DIRECTORY_SEPARATOR . 'pages.php'
-            : '';
+        $pageCache = null;
+        if ($cacheEnabled && $container->has(CacheManager::class)) {
+            /** @var CacheManager $cacheManager */
+            $cacheManager = $container->get(CacheManager::class);
+            $pageCache = new PrefixedCache($cacheManager->frameworkStore('pages'), 'fw.pages.');
+        }
 
         $pageDiscovery = new PageDiscovery(
             namespace: $pagesNamespace,
             directory: $absolutePagesDir,
             defaultFormat: 'html',
-            cachePath: $cachePath,
-            cacheMaxAge: $cacheMaxAge,
+            cache: $pageCache,
+            cacheTtl: $cacheMaxAge,
         );
 
         /** @var array<string, string>|null $pageOverrides */

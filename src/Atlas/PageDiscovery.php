@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Arcanum\Atlas;
 
 use Arcanum\Parchment\FileSystem;
-use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Searcher;
-use Arcanum\Parchment\Writer;
 use Arcanum\Toolkit\Strings;
+use Psr\SimpleCache\CacheInterface;
 
 /**
  * Auto-discovers page classes from the filesystem and registers them
@@ -19,25 +18,26 @@ use Arcanum\Toolkit\Strings;
  *   - App\Pages\Thing        → /thing
  *   - App\Pages\Docs\GettingStarted → /docs/getting-started
  *
- * Discovery results can be cached to avoid filesystem scanning on every request.
+ * Discovery results can be cached via any PSR-16 driver to avoid
+ * filesystem scanning on every request.
  */
 final class PageDiscovery
 {
+    private const CACHE_KEY = 'page_discovery';
+
     /**
      * @param string $namespace The Pages namespace (e.g., 'App\Pages').
      * @param string $directory Absolute path to the pages directory.
      * @param string $defaultFormat Default response format for pages.
-     * @param string $cachePath Path to the cache file. Empty string disables caching.
-     * @param int $cacheMaxAge Maximum cache age in seconds. 0 means no expiry.
+     * @param CacheInterface|null $cache PSR-16 cache driver. Null disables caching.
+     * @param int $cacheTtl Cache TTL in seconds. 0 means no expiry (null TTL to PSR-16).
      */
     public function __construct(
         private string $namespace,
         private string $directory,
         private string $defaultFormat = 'html',
-        private string $cachePath = '',
-        private int $cacheMaxAge = 0,
-        private Reader $reader = new Reader(),
-        private Writer $writer = new Writer(),
+        private CacheInterface|null $cache = null,
+        private int $cacheTtl = 0,
         private FileSystem $fileSystem = new FileSystem(),
     ) {
     }
@@ -66,42 +66,23 @@ final class PageDiscovery
      */
     public function discover(): array
     {
-        if ($this->cachePath !== '' && $this->isCacheValid()) {
-            /** @var array<string, string> */
-            return $this->reader->require($this->cachePath);
+        if ($this->cache !== null) {
+            /** @var array<string, string>|null $cached */
+            $cached = $this->cache->get(self::CACHE_KEY);
+
+            if ($cached !== null) {
+                return $cached;
+            }
         }
 
         $pages = $this->scan();
 
-        if ($this->cachePath !== '') {
-            $this->writer->write(
-                $this->cachePath,
-                '<?php return ' . var_export($pages, true) . ';' . \PHP_EOL,
-            );
+        if ($this->cache !== null) {
+            $ttl = $this->cacheTtl > 0 ? $this->cacheTtl : null;
+            $this->cache->set(self::CACHE_KEY, $pages, $ttl);
         }
 
         return $pages;
-    }
-
-    /**
-     * Check if the cache file exists and is not expired.
-     */
-    private function isCacheValid(): bool
-    {
-        if (!$this->fileSystem->isFile($this->cachePath)) {
-            return false;
-        }
-
-        if ($this->cacheMaxAge === 0) {
-            return true;
-        }
-
-        $modifiedAt = filemtime($this->cachePath);
-        if ($modifiedAt === false) {
-            return false;
-        }
-
-        return (time() - $modifiedAt) < $this->cacheMaxAge;
     }
 
     /**
@@ -172,8 +153,6 @@ final class PageDiscovery
      */
     public function clearCache(): void
     {
-        if ($this->cachePath !== '' && $this->fileSystem->isFile($this->cachePath)) {
-            $this->fileSystem->delete($this->cachePath);
-        }
+        $this->cache?->delete(self::CACHE_KEY);
     }
 }

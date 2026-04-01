@@ -12,6 +12,8 @@ use Arcanum\Gather\Configuration;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\Kernel;
 use Arcanum\Ignition\RouteDispatcher;
+use Arcanum\Vault\CacheManager;
+use Arcanum\Vault\PrefixedCache;
 
 /**
  * Discovers per-route middleware from attributes and co-located
@@ -44,16 +46,20 @@ class RouteMiddleware implements Bootstrapper
         $cacheEnabled = $config->get('cache.route_middleware.enabled');
         $cacheEnabled = $cacheEnabled === null || $cacheEnabled === true;
 
-        $cachePath = $cacheEnabled
-            ? $kernel->filesDirectory()
-                . DIRECTORY_SEPARATOR . 'cache'
-                . DIRECTORY_SEPARATOR . 'route_middleware.php'
-            : '';
+        $middlewareCache = null;
+        if ($cacheEnabled && $container->has(CacheManager::class)) {
+            /** @var CacheManager $cacheManager */
+            $cacheManager = $container->get(CacheManager::class);
+            $middlewareCache = new PrefixedCache(
+                $cacheManager->frameworkStore('middleware'),
+                'fw.middleware.',
+            );
+        }
 
         $discovery = new MiddlewareDiscovery(
             rootNamespace: $namespace,
             rootDirectory: $rootDirectory,
-            cachePath: $cachePath,
+            cache: $middlewareCache,
         );
 
         $registry = new MiddlewareRegistry();

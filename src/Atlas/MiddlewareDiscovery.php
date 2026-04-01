@@ -10,7 +10,7 @@ use Arcanum\Atlas\Attribute\HttpMiddleware;
 use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Searcher;
-use Arcanum\Parchment\Writer;
+use Psr\SimpleCache\CacheInterface;
 
 /**
  * Discovers per-route middleware from two sources:
@@ -23,24 +23,24 @@ use Arcanum\Parchment\Writer;
  * way out). Attribute middleware is inner. When multiple directory levels
  * exist, shallower directories are outermost.
  *
- * Results are cached as a PHP return array, following the same pattern
- * as PageDiscovery.
+ * Results are cached via any PSR-16 driver.
  */
 final class MiddlewareDiscovery
 {
+    private const CACHE_KEY = 'middleware_discovery';
+
     /**
      * @param string $rootNamespace The app's root namespace (e.g., 'App').
      * @param string $rootDirectory Absolute path to the app directory.
-     * @param string $cachePath Path to the cache file. Empty disables caching.
-     * @param int $cacheMaxAge Maximum cache age in seconds. 0 means no expiry.
+     * @param CacheInterface|null $cache PSR-16 cache driver. Null disables caching.
+     * @param int $cacheTtl Cache TTL in seconds. 0 means no expiry.
      */
     public function __construct(
         private readonly string $rootNamespace,
         private readonly string $rootDirectory,
-        private readonly string $cachePath = '',
-        private readonly int $cacheMaxAge = 0,
+        private readonly CacheInterface|null $cache = null,
+        private readonly int $cacheTtl = 0,
         private readonly Reader $reader = new Reader(),
-        private readonly Writer $writer = new Writer(),
         private readonly FileSystem $fileSystem = new FileSystem(),
     ) {
     }
@@ -52,14 +52,20 @@ final class MiddlewareDiscovery
      */
     public function discover(): array
     {
-        if ($this->cachePath !== '' && $this->isCacheValid()) {
-            return $this->loadCache();
+        if ($this->cache !== null) {
+            /** @var array<string, array{http: list<string>, before: list<string>, after: list<string>}>|null $cached */
+            $cached = $this->cache->get(self::CACHE_KEY);
+
+            if ($cached !== null) {
+                return $this->hydrateCache($cached);
+            }
         }
 
         $result = $this->scan();
 
-        if ($this->cachePath !== '') {
-            $this->writeCache($result);
+        if ($this->cache !== null) {
+            $ttl = $this->cacheTtl > 0 ? $this->cacheTtl : null;
+            $this->cache->set(self::CACHE_KEY, $this->dehydrateCache($result), $ttl);
         }
 
         return $result;
@@ -70,9 +76,7 @@ final class MiddlewareDiscovery
      */
     public function clearCache(): void
     {
-        if ($this->cachePath !== '' && $this->fileSystem->isFile($this->cachePath)) {
-            $this->fileSystem->delete($this->cachePath);
-        }
+        $this->cache?->delete(self::CACHE_KEY);
     }
 
     /**
@@ -218,7 +222,6 @@ final class MiddlewareDiscovery
         $allDtoClasses = array_keys($attributeMiddleware);
 
         // Also include DTOs that only have directory middleware (no attributes)
-        // We need to scan for all PHP classes in Command/Query dirs for this
         foreach (Searcher::findAll('*.php', $this->rootDirectory) as $file) {
             $filename = $file->getFilename();
             if ($filename === 'Middleware.php' || str_ends_with($filename, 'Handler.php')) {
@@ -264,32 +267,12 @@ final class MiddlewareDiscovery
         return $result;
     }
 
-    private function isCacheValid(): bool
-    {
-        if (!$this->fileSystem->isFile($this->cachePath)) {
-            return false;
-        }
-
-        if ($this->cacheMaxAge === 0) {
-            return true;
-        }
-
-        $modifiedAt = filemtime($this->cachePath);
-        if ($modifiedAt === false) {
-            return false;
-        }
-
-        return (time() - $modifiedAt) < $this->cacheMaxAge;
-    }
-
     /**
+     * @param array<string, array{http: list<string>, before: list<string>, after: list<string>}> $cached
      * @return array<string, RouteMiddleware>
      */
-    private function loadCache(): array
+    private function hydrateCache(array $cached): array
     {
-        /** @var array<string, array{http: list<string>, before: list<string>, after: list<string>}> $cached */
-        $cached = $this->reader->require($this->cachePath);
-
         $result = [];
         foreach ($cached as $dtoClass => $data) {
             $result[$dtoClass] = new RouteMiddleware(
@@ -298,14 +281,14 @@ final class MiddlewareDiscovery
                 after: $data['after'],
             );
         }
-
         return $result;
     }
 
     /**
      * @param array<string, RouteMiddleware> $middleware
+     * @return array<string, array{http: list<string>, before: list<string>, after: list<string>}>
      */
-    private function writeCache(array $middleware): void
+    private function dehydrateCache(array $middleware): array
     {
         $data = [];
         foreach ($middleware as $dtoClass => $mw) {
@@ -315,10 +298,6 @@ final class MiddlewareDiscovery
                 'after' => $mw->after,
             ];
         }
-
-        $this->writer->write(
-            $this->cachePath,
-            '<?php return ' . var_export($data, true) . ';' . \PHP_EOL,
-        );
+        return $data;
     }
 }
