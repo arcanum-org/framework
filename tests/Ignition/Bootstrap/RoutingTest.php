@@ -17,9 +17,9 @@ use Arcanum\Gather\Configuration;
 use Arcanum\Ignition\Bootstrap\Routing;
 use Arcanum\Ignition\HyperKernel;
 use Arcanum\Ignition\Kernel;
+use Arcanum\Hyper\FormatRegistry;
+use Arcanum\Hyper\JsonResponseRenderer;
 use Arcanum\Shodo\Format;
-use Arcanum\Shodo\FormatRegistry;
-use Arcanum\Shodo\JsonRenderer;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -39,7 +39,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(Hydrator::class)]
 #[UsesClass(Format::class)]
 #[UsesClass(FormatRegistry::class)]
-#[UsesClass(JsonRenderer::class)]
+#[UsesClass(JsonResponseRenderer::class)]
 #[UsesClass(RouteMap::class)]
 #[UsesClass(PageDiscovery::class)]
 #[UsesClass(HyperKernel::class)]
@@ -92,7 +92,7 @@ final class RoutingTest extends TestCase
             'formats' => [
                 'json' => [
                     'content_type' => 'application/json',
-                    'renderer' => JsonRenderer::class,
+                    'renderer' => JsonResponseRenderer::class,
                 ],
             ],
         ];
@@ -177,7 +177,7 @@ final class RoutingTest extends TestCase
         $bootstrapper->bootstrap($container);
 
         // Assert
-        $this->assertTrue($container->has(JsonRenderer::class));
+        $this->assertTrue($container->has(JsonResponseRenderer::class));
     }
 
     // ---------------------------------------------------------------
@@ -313,7 +313,7 @@ final class RoutingTest extends TestCase
         $formats = [
             'default' => 'json',
             'formats' => [
-                'json' => ['content_type' => 'application/json', 'renderer' => JsonRenderer::class],
+                'json' => ['content_type' => 'application/json', 'renderer' => JsonResponseRenderer::class],
                 'txt' => ['content_type' => 'text/plain', 'renderer' => 'App\\Shodo\\PlainTextRenderer'],
             ],
         ];

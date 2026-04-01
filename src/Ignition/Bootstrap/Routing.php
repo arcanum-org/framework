@@ -16,14 +16,18 @@ use Arcanum\Gather\Configuration;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\Kernel;
 use Arcanum\Flow\Conveyor\PageHandler;
-use Arcanum\Shodo\CsvRenderer;
+use Arcanum\Hyper\CsvResponseRenderer;
+use Arcanum\Hyper\FormatRegistry;
+use Arcanum\Hyper\HtmlResponseRenderer;
+use Arcanum\Hyper\JsonResponseRenderer;
+use Arcanum\Hyper\PlainTextResponseRenderer;
+use Arcanum\Shodo\CsvFormatter;
 use Arcanum\Shodo\Format;
-use Arcanum\Shodo\FormatRegistry;
 use Arcanum\Shodo\HtmlFallback;
-use Arcanum\Shodo\HtmlRenderer;
-use Arcanum\Shodo\JsonRenderer;
+use Arcanum\Shodo\HtmlFormatter;
+use Arcanum\Shodo\JsonFormatter;
 use Arcanum\Shodo\PlainTextFallback;
-use Arcanum\Shodo\PlainTextRenderer;
+use Arcanum\Shodo\PlainTextFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Shodo\TemplateResolver;
@@ -77,9 +81,9 @@ class Routing implements Bootstrapper
             return $registry;
         });
 
-        // Register renderers
-        $container->service(JsonRenderer::class);
-        $container->service(CsvRenderer::class);
+        // Register formatters
+        $container->service(JsonFormatter::class);
+        $container->service(CsvFormatter::class);
 
         // Shared template infrastructure
         $container->service(TemplateCompiler::class);
@@ -103,15 +107,15 @@ class Routing implements Bootstrapper
             );
         });
 
-        // Template-based renderers — each gets its own TemplateResolver
+        // Template-based formatters — each gets its own TemplateResolver
         // configured for its file extension.
-        $container->factory(HtmlRenderer::class, function () use ($container, $config) {
+        $container->factory(HtmlFormatter::class, function () use ($container, $config) {
             /** @var TemplateCompiler $compiler */
             $compiler = $container->get(TemplateCompiler::class);
             /** @var TemplateCache $cache */
             $cache = $container->get(TemplateCache::class);
 
-            return new HtmlRenderer(
+            return new HtmlFormatter(
                 resolver: $this->createTemplateResolver($container, $config, 'html'),
                 compiler: $compiler,
                 cache: $cache,
@@ -119,18 +123,34 @@ class Routing implements Bootstrapper
             );
         });
 
-        $container->factory(PlainTextRenderer::class, function () use ($container, $config) {
+        $container->factory(PlainTextFormatter::class, function () use ($container, $config) {
             /** @var TemplateCompiler $compiler */
             $compiler = $container->get(TemplateCompiler::class);
             /** @var TemplateCache $cache */
             $cache = $container->get(TemplateCache::class);
 
-            return new PlainTextRenderer(
+            return new PlainTextFormatter(
                 resolver: $this->createTemplateResolver($container, $config, 'txt'),
                 compiler: $compiler,
                 cache: $cache,
                 fallback: new PlainTextFallback(),
             );
+        });
+
+        // HTTP response renderers — compose formatters
+        $container->service(JsonResponseRenderer::class);
+        $container->service(CsvResponseRenderer::class);
+
+        $container->factory(HtmlResponseRenderer::class, function () use ($container) {
+            /** @var HtmlFormatter $formatter */
+            $formatter = $container->get(HtmlFormatter::class);
+            return new HtmlResponseRenderer($formatter);
+        });
+
+        $container->factory(PlainTextResponseRenderer::class, function () use ($container) {
+            /** @var PlainTextFormatter $formatter */
+            $formatter = $container->get(PlainTextFormatter::class);
+            return new PlainTextResponseRenderer($formatter);
         });
     }
 

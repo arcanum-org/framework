@@ -401,26 +401,27 @@ Thin wrappers that compose a Shodo formatter and build ResponseInterface.
 
 Remove the HTTP-coupled classes from Shodo now that Hyper owns them.
 
-- [ ] Delete `Shodo\JsonRenderer` — replaced by `Hyper\JsonResponseRenderer` + `Shodo\JsonFormatter`.
-- [ ] Delete `Shodo\CsvRenderer` — replaced by `Hyper\CsvResponseRenderer` + `Shodo\CsvFormatter`.
-- [ ] Delete `Shodo\HtmlRenderer` — replaced by `Hyper\HtmlResponseRenderer` + `Shodo\HtmlFormatter`.
-- [ ] Delete `Shodo\PlainTextRenderer` — replaced by `Hyper\PlainTextResponseRenderer` + `Shodo\PlainTextFormatter`.
-- [ ] Delete `Shodo\EmptyResponseRenderer` — moved to Hyper.
-- [ ] Delete `Shodo\JsonExceptionRenderer` — moved to Hyper.
-- [ ] Delete `Shodo\Renderer` interface — replaced by `Shodo\Formatter`. HTTP adapters in Hyper don't need a shared interface (they're concrete classes resolved by FormatRegistry).
-- [ ] Delete `Shodo\CliJsonRenderer` — replaced by `Shodo\JsonFormatter`.
+- [x] Delete `Shodo\JsonRenderer` — replaced by `Hyper\JsonResponseRenderer` + `Shodo\JsonFormatter`.
+- [x] Delete `Shodo\CsvRenderer` — replaced by `Hyper\CsvResponseRenderer` + `Shodo\CsvFormatter`.
+- [x] Delete `Shodo\HtmlRenderer` — replaced by `Hyper\HtmlResponseRenderer` + `Shodo\HtmlFormatter`.
+- [x] Delete `Shodo\PlainTextRenderer` — replaced by `Hyper\PlainTextResponseRenderer` + `Shodo\PlainTextFormatter`.
+- [x] Delete `Shodo\EmptyResponseRenderer` — moved to Hyper.
+- [x] Delete `Shodo\JsonExceptionRenderer` — moved to Hyper as `JsonExceptionResponseRenderer`.
+- [x] Delete `Shodo\Renderer` interface — replaced by `Hyper\ResponseRenderer` abstract class. FormatRegistry returns `ResponseRenderer`.
+- [x] Delete `Shodo\CliJsonRenderer` — replaced by `Shodo\JsonFormatter` (done in Phase 1).
 
 ### Phase 4: Update Wiring
 
 Update bootstrappers, registries, and the starter app.
 
-- [ ] Update `FormatRegistry` — resolves Hyper response renderers (for HTTP). Stays in Shodo or moves to Hyper — TBD based on dependency direction.
-- [ ] Update `CliFormatRegistry` — resolves Shodo formatters (for CLI). Stays in Shodo.
-- [ ] Update `Bootstrap\Routing` (HTTP) — register Hyper response renderers instead of Shodo renderers. Wire formatter → adapter composition.
-- [ ] Update `Bootstrap\CliRouting` (CLI) — register Shodo formatters directly. Remove `CliJsonRenderer` reference, use `JsonFormatter`.
-- [ ] Update `RuneKernel` — call `Formatter::format()` instead of `Renderer::render()`. Remove `is_string()` check (formatters always return strings).
-- [ ] Update starter app `Http\Kernel` — import changes for moved classes.
-- [ ] Update integration tests — verify full HTTP pipeline still works with new adapter classes.
+- [x] Move `FormatRegistry` to Hyper — resolves Hyper response renderers. Returns `ResponseRenderer`. Throws `HttpException(406)` directly instead of `UnsupportedFormat`.
+- [x] Update `CliFormatRegistry` — resolves Shodo formatters (for CLI). Stays in Shodo. (Done in Phase 1.)
+- [x] Update `Bootstrap\Routing` (HTTP) — register Hyper response renderers instead of Shodo renderers. Wire formatter → adapter composition.
+- [x] Update `Bootstrap\CliRouting` (CLI) — register Shodo formatters directly. (Done in Phase 1.)
+- [x] Update `RuneKernel` — call `Formatter::format()` instead of `Renderer::render()`. (Done in Phase 1.)
+- [x] Decouple `UnsupportedFormat` from `HttpException` — now a plain `RuntimeException` in Shodo (for CliFormatRegistry).
+- [x] Update starter app `Http\Kernel`, `bootstrap/http.php`, `config/formats.php` — import changes for moved classes.
+- [x] Update integration tests — verify full HTTP pipeline still works with new adapter classes.
 - [ ] Update Shodo README — document the formatter-first architecture.
 
 ### Phase 5: Verify and Clean Up

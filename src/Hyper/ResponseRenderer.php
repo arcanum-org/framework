@@ -6,7 +6,6 @@ namespace Arcanum\Hyper;
 
 use Arcanum\Flow\River\LazyResource;
 use Arcanum\Flow\River\Stream;
-use Arcanum\Shodo\Renderer;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -16,8 +15,16 @@ use Psr\Http\Message\ResponseInterface;
  * formatted string body — Content-Type, Content-Length, Stream wrapping.
  * Subclasses compose a specific Formatter and call buildResponse().
  */
-abstract class ResponseRenderer implements Renderer
+abstract class ResponseRenderer
 {
+    /**
+     * Render the given data into an HTTP response.
+     *
+     * @param string $dtoClass The DTO class name, used by template-based
+     *                         renderers to discover co-located templates.
+     */
+    abstract public function render(mixed $data, string $dtoClass = ''): ResponseInterface;
+
     protected function buildResponse(
         string $content,
         string $contentType,

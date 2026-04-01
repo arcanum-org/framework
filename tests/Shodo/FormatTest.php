@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Shodo;
 
+use Arcanum\Hyper\JsonResponseRenderer;
 use Arcanum\Shodo\Format;
-use Arcanum\Shodo\JsonRenderer;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 
@@ -18,12 +18,12 @@ final class FormatTest extends TestCase
         $format = new Format(
             extension: 'json',
             contentType: 'application/json',
-            rendererClass: JsonRenderer::class,
+            rendererClass: JsonResponseRenderer::class,
         );
 
         // Assert
         $this->assertSame('json', $format->extension);
         $this->assertSame('application/json', $format->contentType);
-        $this->assertSame(JsonRenderer::class, $format->rendererClass);
+        $this->assertSame(JsonResponseRenderer::class, $format->rendererClass);
     }
 }

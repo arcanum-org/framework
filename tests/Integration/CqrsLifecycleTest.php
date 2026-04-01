@@ -15,12 +15,13 @@ use Arcanum\Flow\Conveyor\MiddlewareBus;
 use Arcanum\Flow\Conveyor\QueryResult;
 use Arcanum\Flow\Continuum\Progression;
 use Arcanum\Ignition\RouteDispatcher;
-use Arcanum\Shodo\CsvRenderer;
+use Arcanum\Hyper\CsvResponseRenderer;
+use Arcanum\Hyper\FormatRegistry;
+use Arcanum\Hyper\HtmlResponseRenderer;
+use Arcanum\Hyper\JsonResponseRenderer;
 use Arcanum\Shodo\Format;
-use Arcanum\Shodo\FormatRegistry;
 use Arcanum\Shodo\HtmlFallback;
-use Arcanum\Shodo\HtmlRenderer;
-use Arcanum\Shodo\JsonRenderer;
+use Arcanum\Shodo\HtmlFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Shodo\TemplateResolver;
@@ -222,8 +223,8 @@ final class CqrsLifecycleTest extends TestCase
         $router = $this->router();
 
         $formats = new FormatRegistry($container);
-        $formats->register(new Format('json', 'application/json', JsonRenderer::class));
-        $container->service(JsonRenderer::class);
+        $formats->register(new Format('json', 'application/json', JsonResponseRenderer::class));
+        $container->service(JsonResponseRenderer::class);
 
         $request = $this->stubRequest(
             'GET',
@@ -264,8 +265,8 @@ final class CqrsLifecycleTest extends TestCase
         $router = $this->router();
 
         $formats = new FormatRegistry($container);
-        $formats->register(new Format('json', 'application/json', JsonRenderer::class));
-        $container->service(JsonRenderer::class);
+        $formats->register(new Format('json', 'application/json', JsonResponseRenderer::class));
+        $container->service(JsonResponseRenderer::class);
 
         $request = $this->stubRequest('GET', '/integration/status');
 
@@ -297,7 +298,7 @@ final class CqrsLifecycleTest extends TestCase
         $hydrator = new Hydrator();
         $router = $this->router();
 
-        $emptyRenderer = new \Arcanum\Shodo\EmptyResponseRenderer();
+        $emptyRenderer = new \Arcanum\Hyper\EmptyResponseRenderer();
 
         $request = $this->stubRequest(
             'PUT',
@@ -338,17 +339,18 @@ final class CqrsLifecycleTest extends TestCase
         $router = $this->router();
 
         $formats = new FormatRegistry($container);
-        $formats->register(new Format('html', 'text/html', HtmlRenderer::class));
+        $formats->register(new Format('html', 'text/html', HtmlResponseRenderer::class));
 
-        // Wire up HtmlRenderer — TemplateResolver points at a nonexistent dir
+        // Wire up HtmlResponseRenderer — TemplateResolver points at a nonexistent dir
         // so it falls back to HtmlFallback for a generic HTML representation.
-        $container->factory(HtmlRenderer::class, function () {
-            return new HtmlRenderer(
+        $container->factory(HtmlResponseRenderer::class, function () {
+            $formatter = new HtmlFormatter(
                 resolver: new TemplateResolver('/nonexistent', 'Arcanum\Test'),
                 compiler: new TemplateCompiler(),
                 cache: new TemplateCache(''),
                 fallback: new HtmlFallback(),
             );
+            return new HtmlResponseRenderer($formatter);
         });
 
         $request = $this->stubRequest(
@@ -365,7 +367,7 @@ final class CqrsLifecycleTest extends TestCase
         $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
         $data = $result instanceof QueryResult ? $result->data : $result;
 
-        /** @var HtmlRenderer $renderer */
+        /** @var HtmlResponseRenderer $renderer */
         $renderer = $formats->renderer($route->format);
         $response = $renderer->render($data, $route->dtoClass);
 
@@ -392,8 +394,8 @@ final class CqrsLifecycleTest extends TestCase
         $router = $this->router();
 
         $formats = new FormatRegistry($container);
-        $formats->register(new Format('csv', 'text/csv', CsvRenderer::class));
-        $container->service(CsvRenderer::class);
+        $formats->register(new Format('csv', 'text/csv', CsvResponseRenderer::class));
+        $container->service(CsvResponseRenderer::class);
 
         $request = $this->stubRequest(
             'GET',

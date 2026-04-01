@@ -2,13 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Shodo;
+namespace Arcanum\Hyper;
 
+use Arcanum\Glitch\HttpException;
+use Arcanum\Shodo\Format;
 use Psr\Container\ContainerInterface;
 
 /**
- * Maps file extensions to Format definitions and resolves renderers
- * from the container.
+ * Maps file extensions to Format definitions and resolves HTTP response
+ * renderers from the container.
  */
 final class FormatRegistry
 {
@@ -33,12 +35,15 @@ final class FormatRegistry
     /**
      * Get a format by extension.
      *
-     * @throws UnsupportedFormat If the extension is not registered.
+     * @throws HttpException If the extension is not registered (406 Not Acceptable).
      */
     public function get(string $extension): Format
     {
         if (!isset($this->formats[$extension])) {
-            throw new UnsupportedFormat($extension);
+            throw new HttpException(
+                StatusCode::NotAcceptable,
+                sprintf('Format "%s" is not supported.', $extension),
+            );
         }
 
         return $this->formats[$extension];
@@ -61,15 +66,15 @@ final class FormatRegistry
     }
 
     /**
-     * Resolve the renderer for a given extension from the container.
+     * Resolve the response renderer for a given extension from the container.
      *
-     * @throws UnsupportedFormat If the extension is not registered.
+     * @throws HttpException If the extension is not registered (406 Not Acceptable).
      */
-    public function renderer(string $extension): Renderer
+    public function renderer(string $extension): ResponseRenderer
     {
         $format = $this->get($extension);
 
-        /** @var Renderer */
+        /** @var ResponseRenderer */
         return $this->container->get($format->rendererClass);
     }
 }
