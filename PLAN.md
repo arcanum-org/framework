@@ -345,13 +345,13 @@ php arcanum make:middleware RateLimit
 
 This is the single biggest DX improvement for onboarding — new developers go from zero to a working endpoint in seconds without memorizing namespace conventions.
 
-#### Stub Engine
+#### Stub Rendering via Shodo
 
-The generators need a lightweight template system for producing PHP source files. This is different from Shodo's runtime template engine — stubs are developer tooling, not user-facing output.
+Generators use Shodo's existing template engine to render stubs — no parallel template system needed. Stubs are just templates with variables like `{{ $namespace }}`, `{{ $className }}`, `{{ $dtoClass }}`.
 
-- [ ] `StubRenderer` — takes a stub template string and a `array<string, string>` of replacements, produces the final file content. Stubs use a simple `{{PLACEHOLDER}}` syntax (all-caps, no spaces, no dollar sign — visually distinct from Shodo's `{{ $var }}`). No compilation, no caching, just `str_replace`. Lives in Rune since it's CLI tooling.
-- [ ] Stub templates stored as string constants or embedded files within each generator command class — not separate `.stub` files. Each generator owns its template. This keeps the generator self-contained and avoids a file discovery problem.
-- [ ] Tests: placeholder replacement works, multiple placeholders in one template, unused placeholders are left as-is (not silently swallowed — makes debugging easy).
+- [ ] Stub templates stored as co-located `.stub` files alongside each generator command class (e.g., `Rune/Command/stubs/command.stub`, `handler.stub`). Shodo's `TemplateCompiler` compiles them, identity escape (no HTML escaping in PHP source).
+- [ ] Each generator uses `TemplateCompiler::compile()` directly on the stub source string, then executes with variables — same pipeline as `PlainTextFormatter` but without resolver or caching (stubs are one-shot, no caching needed).
+- [ ] Tests: stub templates render with correct variable substitution, control flow works if needed (e.g., optional sections).
 
 #### make:command
 
