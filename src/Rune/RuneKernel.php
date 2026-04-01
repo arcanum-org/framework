@@ -248,12 +248,18 @@ class RuneKernel implements Kernel
             $handler->handleException($e);
         }
 
-        if ($e instanceof UnresolvableRoute) {
+        if ($this->container->has(CliExceptionRenderer::class)) {
+            /** @var CliExceptionRenderer $renderer */
+            $renderer = $this->container->get(CliExceptionRenderer::class);
+            $renderer->render($e);
+        } else {
             $output->errorLine('Error: ' . $e->getMessage());
+        }
+
+        if ($e instanceof UnresolvableRoute) {
             return ExitCode::Invalid->value;
         }
 
-        $output->errorLine('Error: ' . $e->getMessage());
         return ExitCode::Failure->value;
     }
 
