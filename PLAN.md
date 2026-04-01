@@ -616,6 +616,87 @@ Ideas worth exploring eventually, but not on the near-term roadmap:
 
 ---
 
+## Performance Notes
+
+### Reflection caching — explored and rejected
+
+We built a reflection caching layer ("Mirror") that memoized `ReflectionClass` instances, constructor parameters, attributes, and property/method metadata. Three variants were benchmarked under production-like conditions (nginx + PHP-FPM + opcache + JIT, 10k requests, concurrency 20):
+
+1. **In-memory static cache** — same `ReflectionClass` instance reused within a request
+2. **Flyweight facade** — `ClassReflector`/`ParameterReflector` wrappers with eager caching, no raw reflection leakage
+3. **APCu persistence** — serialized reflection data cached across requests, zero reflection on warm cache
+
+**Results:**
+
+| Variant | req/s (3-field DTO) | req/s (10-field DTO) |
+|---|---|---|
+| No caching (raw reflection) | ~301 | ~298 |
+| In-memory cache | ~304 | ~300 |
+| Flyweight facade | ~304 | ~300 |
+| APCu persistence | ~301 | not tested |
+
+**Conclusion: PHP 8.4's reflection with opcache + JIT is already fast enough that caching it produces no measurable improvement.** The ~300 req/s ceiling is dominated by something other than reflection — likely FPM process overhead, FastCGI protocol, JSON parsing, container resolution, or the handler itself. Mirror was reverted.
+
+**Open question:** Going from 3 fields to 10 fields drops throughput from ~1,300 req/s (early tests) to ~300 req/s — a 77% drop for 3.3x more fields. This is far worse than linear and worth investigating with a real profiler (Xdebug, SPX, or Blackfire).
+
+### Benchmark harness
+
+Quick nginx + PHP-FPM benchmark setup for future performance testing:
+
+```bash
+# Temp config directory
+BD=$(mktemp -d /tmp/arcanum_bench.XXXXXX)
+
+# nginx.conf
+cat > "$BD/nginx.conf" << CONF
+worker_processes 4;
+error_log /dev/null;
+pid $BD/nginx.pid;
+events { worker_connections 1024; }
+http {
+    access_log off;
+    upstream php-fpm { server 127.0.0.1:9199; }
+    server {
+        listen 8299;
+        root /path/to/arcanum/public;
+        index index.php;
+        location / { try_files \$uri /index.php\$is_args\$args; }
+        location ~ \.php\$ {
+            fastcgi_pass php-fpm;
+            fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+            include /opt/homebrew/etc/nginx/fastcgi_params;
+        }
+    }
+}
+CONF
+
+# php-fpm.conf
+cat > "$BD/php-fpm.conf" << CONF
+[global]
+error_log = $BD/fpm_error.log
+pid = $BD/php-fpm.pid
+daemonize = yes
+[www]
+listen = 127.0.0.1:9199
+pm = static
+pm.max_children = 8
+php_admin_value[opcache.enable] = 1
+php_admin_value[opcache.validate_timestamps] = 0
+php_admin_value[opcache.jit] = tracing
+php_admin_value[opcache.jit_buffer_size] = 64M
+CONF
+
+# Start, warm, bench, tear down
+php-fpm --fpm-config "$BD/php-fpm.conf" && nginx -c "$BD/nginx.conf"
+for i in {1..200}; do curl -s http://127.0.0.1:8299/health.json > /dev/null; done
+ab -n 10000 -c 20 -q -p body.json -T "application/json" http://127.0.0.1:8299/contact/submit
+nginx -s stop; kill $(cat "$BD/php-fpm.pid"); rm -rf "$BD"
+```
+
+Requires: `brew install nginx`, PHP-FPM (ships with Homebrew PHP), Apache Bench (`ab`, ships with macOS).
+
+---
+
 ## Closed Questions
 
 Decided — preserved for context:
@@ -633,3 +714,4 @@ Decided — preserved for context:
 - ~~**WebSocket / real-time**~~ — **Won't do in core.** Too specialized and infrastructure-dependent. Better as an optional add-on package.
 - ~~**Asset compilation**~~ — **Won't do.** Vite/esbuild/Webpack are JS tools. The framework has no opinion on frontend build tooling.
 - ~~**Full template engine (Blade/Twig competitor)**~~ — **Won't do.** Shodo's `{{ }}` compiler handles lightweight pages. Apps with complex frontend needs will use a JS framework.
+- ~~**Reflection caching (Mirror)**~~ — **Won't do.** Benchmarked three approaches (in-memory, flyweight facade, APCu persistence). PHP 8.4 reflection with opcache + JIT is already fast enough — caching produced no measurable throughput improvement. See Performance Notes above.
