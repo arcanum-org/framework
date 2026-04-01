@@ -341,7 +341,7 @@ This is the single biggest DX improvement for onboarding — new developers go f
 
 #### Documentation
 
-- [ ] Update `src/Rune/README.md` — add scaffolding generators section with examples for each generator.
+- [x] Updated `src/Rune/README.md` — scaffolding generators, custom stubs, cache commands, updated built-in command list and at-a-glance.
 
 ### 5. Session Management — needs design discussion
 

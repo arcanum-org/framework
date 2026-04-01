@@ -187,7 +187,7 @@ The `#[Description]` attribute is purely for CLI help — it's ignored by HTTP.
 
 ## Built-in commands
 
-Rune ships with three framework commands. They don't use a `command:` or `query:` prefix:
+Rune ships with framework commands that don't use a `command:` or `query:` prefix:
 
 ### `list`
 
@@ -197,9 +197,16 @@ Discovers and displays all available commands and queries:
 $ php arcanum list
 
 Built-in commands:
-  list                Show available commands
-  help                Show help for a command
-  validate:handlers   Verify DTOs have handlers
+  list
+  help
+  validate:handlers
+  make:key
+  cache:clear
+  cache:status
+  make:command
+  make:query
+  make:page
+  make:middleware
 
 Queries:
   query:health        Check application status
@@ -257,6 +264,98 @@ final class CacheClearCommand implements BuiltInCommand
         return 0;  // ExitCode::Success
     }
 }
+```
+
+## Scaffolding generators
+
+Rune ships with four code generators that create DTO, handler, and template stubs from the command line:
+
+```bash
+php arcanum make:command Contact/Submit
+php arcanum make:query Users/Find
+php arcanum make:page About
+php arcanum make:middleware RateLimit
+```
+
+### make:command
+
+Creates a Command DTO and void handler:
+
+```bash
+$ php arcanum make:command Contact/Submit
+Created: app/Domain/Contact/Command/Submit.php
+Created: app/Domain/Contact/Command/SubmitHandler.php
+```
+
+The handler has a `void` return type — commands don't return data.
+
+### make:query
+
+Creates a Query DTO and handler that returns `array`:
+
+```bash
+$ php arcanum make:query Users/Find
+Created: app/Domain/Users/Query/Find.php
+Created: app/Domain/Users/Query/FindHandler.php
+```
+
+### make:page
+
+Creates a Page DTO and HTML template:
+
+```bash
+$ php arcanum make:page Docs/GettingStarted
+Created: app/Pages/Docs/GettingStarted.php
+Created: app/Pages/Docs/GettingStarted.html
+```
+
+The DTO gets a `$title` property with a default derived from the class name ("Getting Started"). The template is a minimal HTML5 boilerplate using Shodo's `{{ $title }}` syntax.
+
+### make:middleware
+
+Creates a PSR-15 middleware class:
+
+```bash
+$ php arcanum make:middleware RateLimit
+Created: app/Http/Middleware/RateLimit.php
+```
+
+### Naming conventions
+
+Slash-separated paths map to namespace segments. The last segment becomes the class name:
+
+```
+Contact/Submit       → App\Domain\Contact\Command\Submit
+Admin/Users/BanUser  → App\Domain\Admin\Users\Command\BanUser
+Submit               → App\Domain\Command\Submit (single segment)
+```
+
+All generators convert names to PascalCase automatically, refuse to overwrite existing files, and create intermediate directories as needed.
+
+### Custom stubs
+
+To customize the generated code, copy any stub from the framework's `src/Rune/Command/stubs/` directory to your app's `stubs/` directory:
+
+```
+your-app/
+└── stubs/
+    ├── command.stub           ← overrides the Command DTO template
+    ├── command_handler.stub   ← overrides the Command handler template
+    ├── query.stub
+    ├── query_handler.stub
+    ├── page.stub
+    ├── page_template.stub
+    └── middleware.stub
+```
+
+Stubs use Shodo's `{{! $variable !}}` syntax for placeholder substitution. Available variables vary by generator: `$namespace`, `$className`, and `$title` (pages only).
+
+## Cache commands
+
+```bash
+php arcanum cache:clear              # clear all stores + framework caches
+php arcanum cache:clear --store=file # clear only a specific store
+php arcanum cache:status             # show configured stores and assignments
 ```
 
 ## Transport restriction
@@ -349,13 +448,20 @@ Input parsing:
 Routing:
   CliRouter → ConventionResolver (shared with HTTP)
   command:contact:submit → App\Domain\Contact\Command\Submit
-  Built-in commands checked first (list, help, validate:handlers)
+  Built-in commands checked first
 
 Dispatch:
   Same Conveyor bus as HTTP → same handlers, same middleware
 
 Output:
   CliFormatRegistry → KeyValueFormatter | TableFormatter | JsonFormatter | CsvFormatter
+
+Built-in commands:
+  list, help, validate:handlers        — discovery & debugging
+  make:command, make:query             — generate CQRS stubs
+  make:page, make:middleware           — generate page & middleware stubs
+  make:key                             — generate APP_KEY
+  cache:clear, cache:status            — cache management
 
 Help:
   HelpWriter → reflection on DTO constructor + #[Description] attributes
