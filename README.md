@@ -55,11 +55,15 @@ Arcanum is a collection of packages that work together to create a robust, scala
 
 ### Arcanum Atlas
 
-[Atlas](https://github.com/arcanum-org/framework/tree/main/src/Atlas) is Arcanum's convention-based CQRS router. It maps HTTP requests to Query and Command handlers by converting URL path segments to PascalCase namespaces — no route files, no annotations, no configuration for the common case. The HTTP method determines intent: GET reads (Queries), PUT/POST/PATCH/DELETE writes (Commands). Atlas enforces this at the routing level — a GET to a Command-only path is a **405 Method Not Allowed**, not a silent misroute. Request a path that doesn't exist? **404 Not Found**. Every error gets the right status code.
+[Atlas](https://github.com/arcanum-org/framework/tree/main/src/Atlas) is Arcanum's convention-based CQRS router. It maps both HTTP requests and CLI commands to Query and Command handlers by converting path segments to PascalCase namespaces — no route files, no annotations, no configuration for the common case. On HTTP, the request method determines intent: GET reads (Queries), PUT/POST/PATCH/DELETE writes (Commands). On CLI, an explicit prefix does the same: `query:` and `command:`. A shared `ConventionResolver` drives both transports, so the same DTO is reachable as `GET /shop/products` and `query:shop:products`. Atlas enforces precise error responses — a GET to a Command-only path is a **405 Method Not Allowed**, not a silent misroute. Request a path that doesn't exist? **404 Not Found**. Every error gets the right status code.
 
 ### Arcanum Shodo
 
-[Shodo](https://github.com/arcanum-org/framework/tree/main/src/Shodo) (書道, "the way of writing") is the output rendering package. It converts handler results into HTTP responses through a format-aware registry — the same handler can produce JSON, HTML, or CSV based on the file extension in the URL. Request an unsupported format? **406 Not Acceptable**. Shodo also handles exception rendering, mapping `HttpException` status codes to properly structured error responses.
+[Shodo](https://github.com/arcanum-org/framework/tree/main/src/Shodo) (書道, "the way of writing") is the output formatting package. It converts handler results into strings — JSON, CSV, HTML, plain text, key-value pairs, tables — without any knowledge of HTTP or CLI. Formatters produce content; transport layers deliver it. On HTTP, Hyper's response renderers wrap formatter output in a `ResponseInterface` with the correct Content-Type and status code. On CLI, Rune writes formatter output directly to the terminal. The same `JsonFormatter` serves both `GET /health.json` and `php arcanum query:health --format=json`.
+
+### Arcanum Rune
+
+[Rune](https://github.com/arcanum-org/framework/tree/main/src/Rune) is Arcanum's CLI transport layer. It lets you run the same Commands and Queries from the terminal that you run over HTTP — same DTOs, same handlers, same Conveyor bus. Where Atlas maps HTTP requests to routes, Rune maps CLI arguments. Where Hyper renders responses for browsers, Rune renders tables and key-value output for terminals. Built-in commands (`list`, `help`, `validate:handlers`) ship with every app, and you can add your own. Mark DTOs with `#[CliOnly]` or `#[HttpOnly]` to restrict them to a single transport.
 
 ### Arcanum Toolkit
 
