@@ -102,11 +102,11 @@ final class RuneKernelTest extends TestCase
 
     public function testBootstrapRunsBootstrappers(): void
     {
-        // Arrange — RuneKernel has 4 bootstrappers (Environment, Configuration, Logger, Exceptions)
+        // Arrange — RuneKernel has 5 bootstrappers (Environment, Configuration, CliRouting, Logger, Exceptions)
         $kernel = new RuneKernel('/app');
 
         $bootstrapper = $this->createMock(Bootstrapper::class);
-        $bootstrapper->expects($this->exactly(4))->method('bootstrap');
+        $bootstrapper->expects($this->exactly(5))->method('bootstrap');
 
         $container = $this->createStub(Application::class);
         $container->method('get')->willReturn($bootstrapper);
@@ -121,7 +121,7 @@ final class RuneKernelTest extends TestCase
         $kernel = new RuneKernel('/app');
 
         $bootstrapper = $this->createMock(Bootstrapper::class);
-        $bootstrapper->expects($this->exactly(4))->method('bootstrap');
+        $bootstrapper->expects($this->exactly(5))->method('bootstrap');
 
         $container = $this->createStub(Application::class);
         $container->method('get')->willReturn($bootstrapper);
