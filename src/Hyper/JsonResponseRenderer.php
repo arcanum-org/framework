@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Arcanum\Hyper;
 
 use Arcanum\Shodo\JsonFormatter;
-use Arcanum\Shodo\Renderer;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -14,10 +13,8 @@ use Psr\Http\Message\ResponseInterface;
  * Composes a JsonFormatter for data → string conversion, then wraps
  * the result in a ResponseInterface with application/json content type.
  */
-class JsonResponseRenderer implements Renderer
+class JsonResponseRenderer extends ResponseRenderer
 {
-    use ResponseBuilder;
-
     public function __construct(
         private readonly JsonFormatter $formatter = new JsonFormatter(),
     ) {

@@ -387,7 +387,7 @@ Extract pure formatting logic from each HTTP renderer into a `Formatter` class.
 
 Thin wrappers that compose a Shodo formatter and build ResponseInterface.
 
-- [x] `ResponseBuilder` trait in Hyper — shared logic for building a Response from a string body (Content-Type, Content-Length, Stream wrapping). Avoids duplicating the Response construction in every adapter.
+- [x] `ResponseRenderer` abstract class in Hyper — shared logic for building a Response from a string body (Content-Type, Content-Length, Stream wrapping). Avoids duplicating the Response construction in every adapter.
 - [x] `JsonResponseRenderer` in Hyper — wraps `JsonFormatter`, sets `application/json` content type.
 - [x] `CsvResponseRenderer` in Hyper — wraps `CsvFormatter`, sets `text/csv` content type.
 - [x] `HtmlResponseRenderer` in Hyper — wraps `HtmlFormatter`, sets `text/html` content type.

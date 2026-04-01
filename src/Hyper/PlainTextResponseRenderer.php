@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Arcanum\Hyper;
 
 use Arcanum\Shodo\PlainTextFormatter;
-use Arcanum\Shodo\Renderer;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -14,10 +13,8 @@ use Psr\Http\Message\ResponseInterface;
  * Composes a PlainTextFormatter for data → string conversion, then wraps
  * the result in a ResponseInterface with text/plain content type.
  */
-class PlainTextResponseRenderer implements Renderer
+class PlainTextResponseRenderer extends ResponseRenderer
 {
-    use ResponseBuilder;
-
     public function __construct(
         private readonly PlainTextFormatter $formatter,
     ) {

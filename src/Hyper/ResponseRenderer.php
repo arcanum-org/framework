@@ -6,17 +6,17 @@ namespace Arcanum\Hyper;
 
 use Arcanum\Flow\River\LazyResource;
 use Arcanum\Flow\River\Stream;
+use Arcanum\Shodo\Renderer;
 use Psr\Http\Message\ResponseInterface;
 
 /**
- * Shared logic for building an HTTP Response from a string body.
+ * Base class for HTTP response renderers that wrap Shodo formatters.
  *
- * Used by response renderers that wrap Shodo formatters —
- * each renderer formats data into a string, then uses this
- * trait to build the Response with Content-Type, Content-Length,
- * and a proper Stream body.
+ * Provides the shared logic for building a ResponseInterface from a
+ * formatted string body — Content-Type, Content-Length, Stream wrapping.
+ * Subclasses compose a specific Formatter and call buildResponse().
  */
-trait ResponseBuilder
+abstract class ResponseRenderer implements Renderer
 {
     protected function buildResponse(
         string $content,

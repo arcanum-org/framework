@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Arcanum\Hyper;
 
 use Arcanum\Shodo\HtmlFormatter;
-use Arcanum\Shodo\Renderer;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -14,10 +13,8 @@ use Psr\Http\Message\ResponseInterface;
  * Composes an HtmlFormatter for data → string conversion, then wraps
  * the result in a ResponseInterface with text/html content type.
  */
-class HtmlResponseRenderer implements Renderer
+class HtmlResponseRenderer extends ResponseRenderer
 {
-    use ResponseBuilder;
-
     public function __construct(
         private readonly HtmlFormatter $formatter,
     ) {
