@@ -21,10 +21,8 @@ use Arcanum\Rune\Command\ValidateHandlersCommand;
 use Arcanum\Rune\ConsoleOutput;
 use Arcanum\Rune\Output;
 use Arcanum\Shodo\CliFormatRegistry;
+use Arcanum\Shodo\CliJsonRenderer;
 use Arcanum\Shodo\CliRenderer;
-use Arcanum\Shodo\CsvRenderer;
-use Arcanum\Shodo\JsonRenderer;
-use Arcanum\Shodo\PlainTextRenderer;
 use Arcanum\Shodo\TableRenderer;
 
 /**
@@ -99,16 +97,13 @@ class CliRouting implements Bootstrapper
             $registry = new CliFormatRegistry($container);
             $registry->register('cli', CliRenderer::class);
             $registry->register('table', TableRenderer::class);
-            $registry->register('json', JsonRenderer::class);
-            $registry->register('csv', CsvRenderer::class);
-            $registry->register('text', PlainTextRenderer::class);
+            $registry->register('json', CliJsonRenderer::class);
             return $registry;
         });
 
         $container->service(CliRenderer::class);
         $container->service(TableRenderer::class);
-        $container->service(JsonRenderer::class);
-        $container->service(CsvRenderer::class);
+        $container->service(CliJsonRenderer::class);
     }
 
     private function registerOutput(Application $container, Configuration $config): void
