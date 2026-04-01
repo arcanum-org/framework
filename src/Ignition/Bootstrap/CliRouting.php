@@ -20,7 +20,11 @@ use Arcanum\Rune\Command\ListCommand;
 use Arcanum\Ignition\ConfigurationCache;
 use Arcanum\Rune\Command\CacheClearCommand;
 use Arcanum\Rune\Command\CacheStatusCommand;
+use Arcanum\Rune\Command\MakeCommandCommand;
 use Arcanum\Rune\Command\MakeKeyCommand;
+use Arcanum\Rune\Command\MakeMiddlewareCommand;
+use Arcanum\Rune\Command\MakePageCommand;
+use Arcanum\Rune\Command\MakeQueryCommand;
 use Arcanum\Rune\Command\ValidateHandlersCommand;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Vault\CacheManager;
@@ -177,6 +181,10 @@ class CliRouting implements Bootstrapper
             $registry->register('make:key', MakeKeyCommand::class);
             $registry->register('cache:clear', CacheClearCommand::class);
             $registry->register('cache:status', CacheStatusCommand::class);
+            $registry->register('make:command', MakeCommandCommand::class);
+            $registry->register('make:query', MakeQueryCommand::class);
+            $registry->register('make:page', MakePageCommand::class);
+            $registry->register('make:middleware', MakeMiddlewareCommand::class);
             return $registry;
         });
 
@@ -242,6 +250,51 @@ class CliRouting implements Bootstrapper
                 ? $container->get(CacheManager::class)
                 : null;
             return new CacheStatusCommand($cacheManager);
+        });
+
+        // Generator commands — all share rootDirectory and rootNamespace.
+        $container->factory(MakeCommandCommand::class, function () use ($container, $namespace) {
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+            return new MakeCommandCommand(
+                rootDirectory: $kernel->rootDirectory(),
+                rootNamespace: $namespace,
+            );
+        });
+
+        $container->factory(MakeQueryCommand::class, function () use ($container, $namespace) {
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+            return new MakeQueryCommand(
+                rootDirectory: $kernel->rootDirectory(),
+                rootNamespace: $namespace,
+            );
+        });
+
+        $container->factory(MakePageCommand::class, function () use ($container, $namespace, $config) {
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+
+            /** @var mixed $pagesNs */
+            $pagesNs = $config->get('app.pages_namespace');
+            /** @var mixed $pagesDir */
+            $pagesDir = $config->get('app.pages_directory');
+
+            return new MakePageCommand(
+                rootDirectory: $kernel->rootDirectory(),
+                rootNamespace: $namespace,
+                pagesNamespace: is_string($pagesNs) ? $pagesNs : '',
+                pagesDirectory: is_string($pagesDir) ? $pagesDir : '',
+            );
+        });
+
+        $container->factory(MakeMiddlewareCommand::class, function () use ($container, $namespace) {
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+            return new MakeMiddlewareCommand(
+                rootDirectory: $kernel->rootDirectory(),
+                rootNamespace: $namespace,
+            );
         });
     }
 

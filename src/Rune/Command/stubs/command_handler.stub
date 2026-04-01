@@ -1,0 +1,13 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{! $namespace !}};
+
+final class {{! $className !}}Handler
+{
+    public function __invoke({{! $className !}} $command): void
+    {
+        // TODO: implement
+    }
+}

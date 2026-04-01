@@ -273,4 +273,53 @@ final class TemplateCompilerTest extends TestCase
         // Assert
         $this->assertSame($withColon, $withoutColon);
     }
+
+    // -----------------------------------------------------------
+    // render() — direct substitution for stubs
+    // -----------------------------------------------------------
+
+    public function testRenderReplacesRawPlaceholders(): void
+    {
+        $compiler = new TemplateCompiler();
+
+        $result = $compiler->render(
+            'Hello {{! $name !}}, you are {{! $age !}}.',
+            ['name' => 'Alice', 'age' => '30'],
+        );
+
+        $this->assertSame('Hello Alice, you are 30.', $result);
+    }
+
+    public function testRenderPreservesPhpSourceCode(): void
+    {
+        $compiler = new TemplateCompiler();
+        $stub = "<?php\n\nnamespace {{! \$namespace !}};\n\nfinal class {{! \$className !}}\n{\n}\n";
+
+        $result = $compiler->render($stub, [
+            'namespace' => 'App\\Domain\\Command',
+            'className' => 'Submit',
+        ]);
+
+        $this->assertStringContainsString('<?php', $result);
+        $this->assertStringContainsString('namespace App\\Domain\\Command;', $result);
+        $this->assertStringContainsString('final class Submit', $result);
+    }
+
+    public function testRenderLeavesUnmatchedPlaceholders(): void
+    {
+        $compiler = new TemplateCompiler();
+
+        $result = $compiler->render('{{! $known !}} and {{! $unknown !}}', ['known' => 'yes']);
+
+        $this->assertSame('yes and {{! $unknown !}}', $result);
+    }
+
+    public function testRenderWithEmptyVariables(): void
+    {
+        $compiler = new TemplateCompiler();
+
+        $result = $compiler->render('no placeholders here', []);
+
+        $this->assertSame('no placeholders here', $result);
+    }
 }

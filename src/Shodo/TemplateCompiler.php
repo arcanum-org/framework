@@ -19,6 +19,28 @@ namespace Arcanum\Shodo;
 final class TemplateCompiler
 {
     /**
+     * Render a template with variables using direct substitution.
+     *
+     * Unlike compile(), this does not produce eval-able PHP. It replaces
+     * `{{! $var !}}` placeholders directly with variable values. Designed
+     * for stubs and other templates where the output itself contains PHP
+     * source code (which would conflict with eval's PHP tag processing).
+     *
+     * Only supports raw output (`{{! $var !}}`), not control structures
+     * or escaped output — stubs don't need those.
+     *
+     * @param array<string, string> $variables
+     */
+    public function render(string $source, array $variables): string
+    {
+        foreach ($variables as $name => $value) {
+            $source = str_replace('{{! $' . $name . ' !}}', $value, $source);
+        }
+
+        return $source;
+    }
+
+    /**
      * Compile template source into PHP.
      */
     public function compile(string $source): string
