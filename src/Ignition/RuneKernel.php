@@ -216,8 +216,8 @@ class RuneKernel implements Kernel
         if ($this->container->has(CliFormatRegistry::class)) {
             /** @var CliFormatRegistry $formats */
             $formats = $this->container->get(CliFormatRegistry::class);
-            $rendered = $formats->renderer($route->format)->render($result);
-            if (is_string($rendered) && $rendered !== '') {
+            $rendered = $formats->formatter($route->format)->format($result);
+            if ($rendered !== '') {
                 $output->writeLine($rendered);
             }
         } else {

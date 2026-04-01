@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Arcanum\Test\Shodo;
 
 use Arcanum\Shodo\CliFormatRegistry;
-use Arcanum\Shodo\CliRenderer;
-use Arcanum\Shodo\JsonRenderer;
-use Arcanum\Shodo\TableRenderer;
+use Arcanum\Shodo\JsonFormatter;
+use Arcanum\Shodo\KeyValueFormatter;
+use Arcanum\Shodo\TableFormatter;
 use Arcanum\Shodo\UnsupportedFormat;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -23,17 +23,17 @@ final class CliFormatRegistryTest extends TestCase
         $container = $this->createStub(ContainerInterface::class);
         $container->method('get')->willReturnCallback(
             fn(string $id): object => match ($id) {
-                CliRenderer::class => new CliRenderer(),
-                TableRenderer::class => new TableRenderer(),
-                JsonRenderer::class => new JsonRenderer(),
+                KeyValueFormatter::class => new KeyValueFormatter(),
+                TableFormatter::class => new TableFormatter(),
+                JsonFormatter::class => new JsonFormatter(),
                 default => throw new \RuntimeException("Unexpected: $id"),
             },
         );
 
         $registry = new CliFormatRegistry($container);
-        $registry->register('cli', CliRenderer::class);
-        $registry->register('table', TableRenderer::class);
-        $registry->register('json', JsonRenderer::class);
+        $registry->register('cli', KeyValueFormatter::class);
+        $registry->register('table', TableFormatter::class);
+        $registry->register('json', JsonFormatter::class);
 
         return $registry;
     }
@@ -58,66 +58,66 @@ final class CliFormatRegistryTest extends TestCase
         $this->assertFalse($registry->has('xml'));
     }
 
-    public function testRendererResolvesFromContainer(): void
+    public function testFormatterResolvesFromContainer(): void
     {
         // Arrange
         $registry = $this->registryWithDefaults();
 
         // Act
-        $renderer = $registry->renderer('cli');
+        $formatter = $registry->formatter('cli');
 
         // Assert
-        $this->assertInstanceOf(CliRenderer::class, $renderer);
+        $this->assertInstanceOf(KeyValueFormatter::class, $formatter);
     }
 
-    public function testRendererResolvesTableRenderer(): void
+    public function testFormatterResolvesTableFormatter(): void
     {
         // Arrange
         $registry = $this->registryWithDefaults();
 
         // Act
-        $renderer = $registry->renderer('table');
+        $formatter = $registry->formatter('table');
 
         // Assert
-        $this->assertInstanceOf(TableRenderer::class, $renderer);
+        $this->assertInstanceOf(TableFormatter::class, $formatter);
     }
 
-    public function testRendererResolvesJsonRenderer(): void
+    public function testFormatterResolvesJsonFormatter(): void
     {
         // Arrange
         $registry = $this->registryWithDefaults();
 
         // Act
-        $renderer = $registry->renderer('json');
+        $formatter = $registry->formatter('json');
 
         // Assert
-        $this->assertInstanceOf(JsonRenderer::class, $renderer);
+        $this->assertInstanceOf(JsonFormatter::class, $formatter);
     }
 
-    public function testRendererThrowsForUnsupportedFormat(): void
+    public function testFormatterThrowsForUnsupportedFormat(): void
     {
         // Arrange
         $registry = $this->registryWithDefaults();
 
         // Act & Assert
         $this->expectException(UnsupportedFormat::class);
-        $registry->renderer('xml');
+        $registry->formatter('xml');
     }
 
     public function testRegisterOverwritesPreviousEntry(): void
     {
         // Arrange
         $container = $this->createStub(ContainerInterface::class);
-        $container->method('get')->willReturn(new TableRenderer());
+        $container->method('get')->willReturn(new TableFormatter());
 
         $registry = new CliFormatRegistry($container);
-        $registry->register('default', CliRenderer::class);
-        $registry->register('default', TableRenderer::class);
+        $registry->register('default', KeyValueFormatter::class);
+        $registry->register('default', TableFormatter::class);
 
         // Act
-        $renderer = $registry->renderer('default');
+        $formatter = $registry->formatter('default');
 
         // Assert
-        $this->assertInstanceOf(TableRenderer::class, $renderer);
+        $this->assertInstanceOf(TableFormatter::class, $formatter);
     }
 }

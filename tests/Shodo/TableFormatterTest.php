@@ -4,28 +4,28 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Shodo;
 
-use Arcanum\Shodo\TableRenderer;
+use Arcanum\Shodo\TableFormatter;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 
-#[CoversClass(TableRenderer::class)]
-final class TableRendererTest extends TestCase
+#[CoversClass(TableFormatter::class)]
+final class TableFormatterTest extends TestCase
 {
     // ---------------------------------------------------------------
     // List of associative arrays (tabular)
     // ---------------------------------------------------------------
 
-    public function testRendersListOfArraysAsTable(): void
+    public function testFormatsListOfArraysAsTable(): void
     {
         // Arrange
-        $renderer = new TableRenderer();
+        $formatter = new TableFormatter();
         $data = [
             ['id' => 1, 'name' => 'Jo'],
             ['id' => 2, 'name' => 'Sam'],
         ];
 
         // Act
-        $result = $renderer->render($data);
+        $result = $formatter->format($data);
 
         // Assert
         $this->assertStringContainsString('│ id │ name │', $result);
@@ -35,17 +35,17 @@ final class TableRendererTest extends TestCase
         $this->assertStringEndsWith('┘', $result);
     }
 
-    public function testRendersListOfObjectsAsTable(): void
+    public function testFormatsListOfObjectsAsTable(): void
     {
         // Arrange
-        $renderer = new TableRenderer();
+        $formatter = new TableFormatter();
         $data = [
             (object) ['status' => 'ok', 'code' => 200],
             (object) ['status' => 'fail', 'code' => 500],
         ];
 
         // Act
-        $result = $renderer->render($data);
+        $result = $formatter->format($data);
 
         // Assert
         $this->assertStringContainsString('│ status │ code │', $result);
@@ -56,11 +56,11 @@ final class TableRendererTest extends TestCase
     public function testTableHasCorrectBorderCharacters(): void
     {
         // Arrange
-        $renderer = new TableRenderer();
+        $formatter = new TableFormatter();
         $data = [['a' => '1', 'b' => '2']];
 
         // Act
-        $result = $renderer->render($data);
+        $result = $formatter->format($data);
 
         // Assert
         $this->assertStringContainsString('┌', $result);
@@ -78,14 +78,14 @@ final class TableRendererTest extends TestCase
     // Associative array (key-value)
     // ---------------------------------------------------------------
 
-    public function testRendersAssociativeArrayAsKeyValueTable(): void
+    public function testFormatsAssociativeArrayAsKeyValueTable(): void
     {
         // Arrange
-        $renderer = new TableRenderer();
+        $formatter = new TableFormatter();
         $data = ['status' => 'ok', 'version' => '1.0'];
 
         // Act
-        $result = $renderer->render($data);
+        $result = $formatter->format($data);
 
         // Assert
         $this->assertStringContainsString('│ key     │ value │', $result);
@@ -97,14 +97,14 @@ final class TableRendererTest extends TestCase
     // List of scalars
     // ---------------------------------------------------------------
 
-    public function testRendersListOfScalarsAsSingleColumnTable(): void
+    public function testFormatsListOfScalarsAsSingleColumnTable(): void
     {
         // Arrange
-        $renderer = new TableRenderer();
+        $formatter = new TableFormatter();
         $data = ['alpha', 'beta', 'gamma'];
 
         // Act
-        $result = $renderer->render($data);
+        $result = $formatter->format($data);
 
         // Assert
         $this->assertStringContainsString('│ value │', $result);
@@ -116,14 +116,14 @@ final class TableRendererTest extends TestCase
     // Object input
     // ---------------------------------------------------------------
 
-    public function testRendersSingleObjectAsKeyValueTable(): void
+    public function testFormatsSingleObjectAsKeyValueTable(): void
     {
         // Arrange
-        $renderer = new TableRenderer();
+        $formatter = new TableFormatter();
         $data = (object) ['name' => 'Jo', 'age' => '30'];
 
         // Act
-        $result = $renderer->render($data);
+        $result = $formatter->format($data);
 
         // Assert
         $this->assertStringContainsString('│ key  │ value │', $result);
@@ -137,29 +137,29 @@ final class TableRendererTest extends TestCase
     public function testReturnsEmptyStringForEmptyArray(): void
     {
         // Arrange
-        $renderer = new TableRenderer();
+        $formatter = new TableFormatter();
 
         // Act & Assert
-        $this->assertSame('', $renderer->render([]));
+        $this->assertSame('', $formatter->format([]));
     }
 
     public function testReturnsEmptyStringForNull(): void
     {
         // Arrange
-        $renderer = new TableRenderer();
+        $formatter = new TableFormatter();
 
         // Act & Assert
-        $this->assertSame('', $renderer->render(null));
+        $this->assertSame('', $formatter->format(null));
     }
 
     public function testHandlesBooleanValues(): void
     {
         // Arrange
-        $renderer = new TableRenderer();
+        $formatter = new TableFormatter();
         $data = [['active' => true, 'deleted' => false]];
 
         // Act
-        $result = $renderer->render($data);
+        $result = $formatter->format($data);
 
         // Assert
         $this->assertStringContainsString('true', $result);
@@ -169,11 +169,11 @@ final class TableRendererTest extends TestCase
     public function testHandlesNestedArrayValues(): void
     {
         // Arrange
-        $renderer = new TableRenderer();
+        $formatter = new TableFormatter();
         $data = [['name' => 'Jo', 'tags' => ['a', 'b']]];
 
         // Act
-        $result = $renderer->render($data);
+        $result = $formatter->format($data);
 
         // Assert
         $this->assertStringContainsString('["a","b"]', $result);

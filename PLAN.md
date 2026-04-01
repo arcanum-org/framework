@@ -372,16 +372,16 @@ Hyper            Rune
 
 Extract pure formatting logic from each HTTP renderer into a `Formatter` class.
 
-- [ ] `Formatter` interface in Shodo — `format(mixed $data): string`. Replaces `Renderer` as Shodo's primary contract.
-- [ ] `JsonFormatter` — extract JSON encoding from `JsonRenderer`. Pretty-print, unescaped slashes, throw on error.
-- [ ] `CsvFormatter` — extract CSV encoding from `CsvRenderer`. All the tabular/associative/scalar detection logic stays here.
-- [ ] `HtmlFormatter` — extract template compilation and rendering from `HtmlRenderer`. Takes data + DTO class, returns HTML string. Depends on TemplateCompiler, TemplateCache, TemplateResolver (all stay in Shodo).
-- [ ] `PlainTextFormatter` — extract from `PlainTextRenderer`. Same template system, identity escape.
-- [ ] Delete `CliJsonRenderer` — replaced by `JsonFormatter` (same thing, now properly named).
-- [ ] Rename `CliRenderer` → `KeyValueFormatter` or similar — it's not CLI-specific, it's a formatting strategy. Auto-detects data shape (object → key-value, list → table, scalar → plain text).
-- [ ] Rename `TableRenderer` → `TableFormatter` — pure string output, not a renderer.
-- [ ] Update `CliFormatRegistry` to resolve `Formatter` instances instead of `Renderer`.
-- [ ] Tests for each new formatter — mostly extracted from existing renderer tests, assertions change from checking ResponseInterface to checking strings.
+- [x] `Formatter` interface in Shodo — `format(mixed $data): string`. Replaces `Renderer` as Shodo's primary contract.
+- [x] `JsonFormatter` — extract JSON encoding from `JsonRenderer`. Pretty-print, unescaped slashes, throw on error.
+- [x] `CsvFormatter` — extract CSV encoding from `CsvRenderer`. All the tabular/associative/scalar detection logic stays here.
+- [x] `HtmlFormatter` — extract template compilation and rendering from `HtmlRenderer`. Takes data + DTO class, returns HTML string. Depends on TemplateCompiler, TemplateCache, TemplateResolver (all stay in Shodo).
+- [x] `PlainTextFormatter` — extract from `PlainTextRenderer`. Same template system, identity escape.
+- [x] Delete `CliJsonRenderer` — replaced by `JsonFormatter` (same thing, now properly named).
+- [x] Rename `CliRenderer` → `KeyValueFormatter` — it's not CLI-specific, it's a formatting strategy. Auto-detects data shape (object → key-value, list → table, scalar → plain text).
+- [x] Rename `TableRenderer` → `TableFormatter` — pure string output, not a renderer.
+- [x] Update `CliFormatRegistry` to resolve `Formatter` instances instead of `Renderer`.
+- [x] Tests for each new formatter — mostly extracted from existing renderer tests, assertions change from checking ResponseInterface to checking strings.
 
 ### Phase 2: HTTP Response Adapters in Hyper
 

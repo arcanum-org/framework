@@ -5,17 +5,15 @@ declare(strict_types=1);
 namespace Arcanum\Shodo;
 
 /**
- * Renders list data as an ASCII table.
+ * Formats list data as an ASCII table.
  *
  * Auto-detects columns from the keys of the first row. Objects are
  * converted to associative arrays via get_object_vars(). Non-tabular
  * data is rendered as a single-column table.
- *
- * Returns a string. The kernel writes it to Output.
  */
-class TableRenderer implements Renderer
+class TableFormatter implements Formatter
 {
-    public function render(mixed $data, string $dtoClass = ''): string
+    public function format(mixed $data, string $dtoClass = ''): string
     {
         if (is_object($data)) {
             $data = get_object_vars($data);

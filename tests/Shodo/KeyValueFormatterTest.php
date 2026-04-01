@@ -4,27 +4,27 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Shodo;
 
-use Arcanum\Shodo\CliRenderer;
-use Arcanum\Shodo\TableRenderer;
+use Arcanum\Shodo\KeyValueFormatter;
+use Arcanum\Shodo\TableFormatter;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
-#[CoversClass(CliRenderer::class)]
-#[UsesClass(TableRenderer::class)]
-final class CliRendererTest extends TestCase
+#[CoversClass(KeyValueFormatter::class)]
+#[UsesClass(TableFormatter::class)]
+final class KeyValueFormatterTest extends TestCase
 {
     // ---------------------------------------------------------------
     // Associative array → key-value pairs
     // ---------------------------------------------------------------
 
-    public function testRendersAssociativeArrayAsKeyValuePairs(): void
+    public function testFormatsAssociativeArrayAsKeyValuePairs(): void
     {
         // Arrange
-        $renderer = new CliRenderer();
+        $formatter = new KeyValueFormatter();
 
         // Act
-        $result = $renderer->render(['status' => 'ok', 'version' => '1.0']);
+        $result = $formatter->format(['status' => 'ok', 'version' => '1.0']);
 
         // Assert
         $this->assertStringContainsString('status', $result);
@@ -36,10 +36,10 @@ final class CliRendererTest extends TestCase
     public function testKeyValuePairsAreAligned(): void
     {
         // Arrange
-        $renderer = new CliRenderer();
+        $formatter = new KeyValueFormatter();
 
         // Act
-        $result = $renderer->render(['a' => '1', 'long_key' => '2']);
+        $result = $formatter->format(['a' => '1', 'long_key' => '2']);
 
         // Assert — both values should be at the same column
         $lines = explode(\PHP_EOL, $result);
@@ -52,14 +52,14 @@ final class CliRendererTest extends TestCase
     // Object → key-value pairs
     // ---------------------------------------------------------------
 
-    public function testRendersObjectAsKeyValuePairs(): void
+    public function testFormatsObjectAsKeyValuePairs(): void
     {
         // Arrange
-        $renderer = new CliRenderer();
+        $formatter = new KeyValueFormatter();
         $data = (object) ['name' => 'Jo', 'email' => 'jo@test.com'];
 
         // Act
-        $result = $renderer->render($data);
+        $result = $formatter->format($data);
 
         // Assert
         $this->assertStringContainsString('name', $result);
@@ -68,20 +68,20 @@ final class CliRendererTest extends TestCase
     }
 
     // ---------------------------------------------------------------
-    // List of arrays → table (delegates to TableRenderer)
+    // List of arrays → table (delegates to TableFormatter)
     // ---------------------------------------------------------------
 
-    public function testRendersListOfArraysAsTable(): void
+    public function testFormatsListOfArraysAsTable(): void
     {
         // Arrange
-        $renderer = new CliRenderer();
+        $formatter = new KeyValueFormatter();
         $data = [
             ['id' => 1, 'name' => 'Jo'],
             ['id' => 2, 'name' => 'Sam'],
         ];
 
         // Act
-        $result = $renderer->render($data);
+        $result = $formatter->format($data);
 
         // Assert — should have table borders
         $this->assertStringContainsString('┌', $result);
@@ -89,17 +89,17 @@ final class CliRendererTest extends TestCase
         $this->assertStringContainsString('Jo', $result);
     }
 
-    public function testRendersListOfObjectsAsTable(): void
+    public function testFormatsListOfObjectsAsTable(): void
     {
         // Arrange
-        $renderer = new CliRenderer();
+        $formatter = new KeyValueFormatter();
         $data = [
             (object) ['x' => 1],
             (object) ['x' => 2],
         ];
 
         // Act
-        $result = $renderer->render($data);
+        $result = $formatter->format($data);
 
         // Assert
         $this->assertStringContainsString('┌', $result);
@@ -109,66 +109,66 @@ final class CliRendererTest extends TestCase
     // Scalar → plain text
     // ---------------------------------------------------------------
 
-    public function testRendersStringScalar(): void
+    public function testFormatsStringScalar(): void
     {
         // Arrange
-        $renderer = new CliRenderer();
+        $formatter = new KeyValueFormatter();
 
         // Act & Assert
-        $this->assertSame('hello', $renderer->render('hello'));
+        $this->assertSame('hello', $formatter->format('hello'));
     }
 
-    public function testRendersIntegerScalar(): void
+    public function testFormatsIntegerScalar(): void
     {
         // Arrange
-        $renderer = new CliRenderer();
+        $formatter = new KeyValueFormatter();
 
         // Act & Assert
-        $this->assertSame('42', $renderer->render(42));
+        $this->assertSame('42', $formatter->format(42));
     }
 
-    public function testRendersBooleanTrue(): void
+    public function testFormatsBooleanTrue(): void
     {
         // Arrange
-        $renderer = new CliRenderer();
+        $formatter = new KeyValueFormatter();
 
         // Act & Assert
-        $this->assertSame('1', $renderer->render(true));
+        $this->assertSame('1', $formatter->format(true));
     }
 
     // ---------------------------------------------------------------
     // Empty / null
     // ---------------------------------------------------------------
 
-    public function testRendersNullAsEmptyString(): void
+    public function testFormatsNullAsEmptyString(): void
     {
         // Arrange
-        $renderer = new CliRenderer();
+        $formatter = new KeyValueFormatter();
 
         // Act & Assert
-        $this->assertSame('', $renderer->render(null));
+        $this->assertSame('', $formatter->format(null));
     }
 
-    public function testRendersEmptyArrayAsEmptyString(): void
+    public function testFormatsEmptyArrayAsEmptyString(): void
     {
         // Arrange
-        $renderer = new CliRenderer();
+        $formatter = new KeyValueFormatter();
 
         // Act & Assert
-        $this->assertSame('', $renderer->render([]));
+        $this->assertSame('', $formatter->format([]));
     }
 
     // ---------------------------------------------------------------
     // Nested values in key-value mode
     // ---------------------------------------------------------------
 
-    public function testNestedArrayInKeyValueRenderedAsJson(): void
+    public function testNestedArrayInKeyValueFormattedAsJson(): void
     {
         // Arrange
-        $renderer = new CliRenderer();
+        $formatter = new KeyValueFormatter();
 
         // Act
-        $result = $renderer->render(['tags' => ['a', 'b']]);
+        $result = $formatter->format(['tags' => ['a', 'b']]);
 
         // Assert
         $this->assertStringContainsString('["a","b"]', $result);

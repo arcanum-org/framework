@@ -21,9 +21,9 @@ use Arcanum\Rune\Command\ValidateHandlersCommand;
 use Arcanum\Rune\ConsoleOutput;
 use Arcanum\Rune\Output;
 use Arcanum\Shodo\CliFormatRegistry;
-use Arcanum\Shodo\CliJsonRenderer;
-use Arcanum\Shodo\CliRenderer;
-use Arcanum\Shodo\TableRenderer;
+use Arcanum\Shodo\JsonFormatter;
+use Arcanum\Shodo\KeyValueFormatter;
+use Arcanum\Shodo\TableFormatter;
 
 /**
  * Registers CLI routing and output services in the container.
@@ -95,15 +95,15 @@ class CliRouting implements Bootstrapper
     {
         $container->factory(CliFormatRegistry::class, function () use ($container) {
             $registry = new CliFormatRegistry($container);
-            $registry->register('cli', CliRenderer::class);
-            $registry->register('table', TableRenderer::class);
-            $registry->register('json', CliJsonRenderer::class);
+            $registry->register('cli', KeyValueFormatter::class);
+            $registry->register('table', TableFormatter::class);
+            $registry->register('json', JsonFormatter::class);
             return $registry;
         });
 
-        $container->service(CliRenderer::class);
-        $container->service(TableRenderer::class);
-        $container->service(CliJsonRenderer::class);
+        $container->service(KeyValueFormatter::class);
+        $container->service(TableFormatter::class);
+        $container->service(JsonFormatter::class);
     }
 
     private function registerOutput(Application $container, Configuration $config): void

@@ -7,15 +7,15 @@ namespace Arcanum\Shodo;
 use Psr\Container\ContainerInterface;
 
 /**
- * Maps CLI --format values to renderers.
+ * Maps CLI --format values to formatters.
  *
  * Simpler than FormatRegistry — no content types or Format objects,
- * just format name → renderer class. Resolves renderers from the container.
+ * just format name → formatter class. Resolves formatters from the container.
  */
 final class CliFormatRegistry
 {
     /**
-     * @var array<string, class-string<Renderer>>
+     * @var array<string, class-string<Formatter>>
      */
     private array $formats = [];
 
@@ -27,11 +27,11 @@ final class CliFormatRegistry
     /**
      * Register a format.
      *
-     * @param class-string<Renderer> $rendererClass
+     * @param class-string<Formatter> $formatterClass
      */
-    public function register(string $name, string $rendererClass): void
+    public function register(string $name, string $formatterClass): void
     {
-        $this->formats[$name] = $rendererClass;
+        $this->formats[$name] = $formatterClass;
     }
 
     /**
@@ -43,17 +43,17 @@ final class CliFormatRegistry
     }
 
     /**
-     * Resolve the renderer for a given format name.
+     * Resolve the formatter for a given format name.
      *
      * @throws UnsupportedFormat If the format is not registered.
      */
-    public function renderer(string $name): Renderer
+    public function formatter(string $name): Formatter
     {
         if (!isset($this->formats[$name])) {
             throw new UnsupportedFormat($name);
         }
 
-        /** @var Renderer */
+        /** @var Formatter */
         return $this->container->get($this->formats[$name]);
     }
 }

@@ -23,8 +23,8 @@ use Arcanum\Rune\ExitCode;
 use Arcanum\Rune\Input;
 use Arcanum\Rune\Output;
 use Arcanum\Shodo\CliFormatRegistry;
-use Arcanum\Shodo\CliRenderer;
-use Arcanum\Shodo\TableRenderer;
+use Arcanum\Shodo\KeyValueFormatter;
+use Arcanum\Shodo\TableFormatter;
 use Arcanum\Toolkit\Strings;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -32,7 +32,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(RuneKernel::class)]
 #[UsesClass(CliRouter::class)]
-#[UsesClass(CliRenderer::class)]
+#[UsesClass(KeyValueFormatter::class)]
 #[UsesClass(CliFormatRegistry::class)]
 #[UsesClass(ConsoleOutput::class)]
 #[UsesClass(ConventionResolver::class)]
@@ -40,7 +40,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(Input::class)]
 #[UsesClass(Route::class)]
 #[UsesClass(Strings::class)]
-#[UsesClass(TableRenderer::class)]
+#[UsesClass(TableFormatter::class)]
 final class RuneKernelTest extends TestCase
 {
     // ---------------------------------------------------------------
@@ -337,7 +337,7 @@ final class RuneKernelTest extends TestCase
         // Act
         $exitCode = $kernel->handle(['bin/arcanum', 'query:shop:products']);
 
-        // Assert — CliRenderer outputs key-value pairs, not JSON
+        // Assert — KeyValueFormatter outputs key-value pairs, not JSON
         $this->assertSame(ExitCode::Success->value, $exitCode);
         $rendered = $this->readStream($stdout);
         $this->assertStringContainsString('status', $rendered);
@@ -422,16 +422,16 @@ final class RuneKernelTest extends TestCase
 
         $formatRegistry = null;
         if ($withFormatRegistry) {
-            $cliRenderer = new CliRenderer();
+            $kvFormatter = new KeyValueFormatter();
             $formatRegistryContainer = $this->createStub(\Psr\Container\ContainerInterface::class);
             $formatRegistryContainer->method('get')->willReturnCallback(
                 fn(string $id): object => match ($id) {
-                    CliRenderer::class => $cliRenderer,
-                    default => throw new \RuntimeException("Unexpected renderer: $id"),
+                    KeyValueFormatter::class => $kvFormatter,
+                    default => throw new \RuntimeException("Unexpected formatter: $id"),
                 },
             );
             $formatRegistry = new CliFormatRegistry($formatRegistryContainer);
-            $formatRegistry->register('cli', CliRenderer::class);
+            $formatRegistry->register('cli', KeyValueFormatter::class);
         }
 
         $container = $this->createStub(Application::class);

@@ -5,24 +5,22 @@ declare(strict_types=1);
 namespace Arcanum\Shodo;
 
 /**
- * Default CLI output renderer.
+ * Default CLI output formatter.
  *
  * Auto-detects output format from data shape:
  *   - Single object/associative array → key-value pairs
- *   - List of objects/arrays → ASCII table (delegates to TableRenderer)
+ *   - List of objects/arrays → ASCII table (delegates to TableFormatter)
  *   - Scalar → plain text
  *   - Empty → empty string
- *
- * Returns a string. The kernel writes it to Output.
  */
-class CliRenderer implements Renderer
+class KeyValueFormatter implements Formatter
 {
     public function __construct(
-        private readonly TableRenderer $tableRenderer = new TableRenderer(),
+        private readonly TableFormatter $tableFormatter = new TableFormatter(),
     ) {
     }
 
-    public function render(mixed $data, string $dtoClass = ''): string
+    public function format(mixed $data, string $dtoClass = ''): string
     {
         if ($data === null) {
             return '';
@@ -42,7 +40,7 @@ class CliRenderer implements Renderer
 
         // List of arrays/objects — render as table
         if ($this->isTabular($data)) {
-            return $this->tableRenderer->render($data);
+            return $this->tableFormatter->format($data);
         }
 
         // Associative array — render as key-value pairs
