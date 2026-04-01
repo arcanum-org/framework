@@ -77,6 +77,34 @@ final class CacheManager
     }
 
     /**
+     * Get the default store name.
+     */
+    public function defaultStoreName(): string
+    {
+        return $this->defaultStore;
+    }
+
+    /**
+     * Get the driver name for a configured store.
+     */
+    public function driverName(string $storeName): string
+    {
+        $config = $this->stores[$storeName] ?? [];
+        $driver = $config['driver'] ?? 'unknown';
+        return is_string($driver) ? $driver : 'unknown';
+    }
+
+    /**
+     * Get the framework store mapping.
+     *
+     * @return array<string, string>
+     */
+    public function frameworkStoreMapping(): array
+    {
+        return $this->frameworkStores;
+    }
+
+    /**
      * Clear all resolved stores.
      */
     public function clearAll(): void

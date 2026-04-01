@@ -19,6 +19,7 @@ use Arcanum\Rune\Command\HelpCommand;
 use Arcanum\Rune\Command\ListCommand;
 use Arcanum\Ignition\ConfigurationCache;
 use Arcanum\Rune\Command\CacheClearCommand;
+use Arcanum\Rune\Command\CacheStatusCommand;
 use Arcanum\Rune\Command\MakeKeyCommand;
 use Arcanum\Rune\Command\ValidateHandlersCommand;
 use Arcanum\Shodo\TemplateCache;
@@ -175,6 +176,7 @@ class CliRouting implements Bootstrapper
             $registry->register('validate:handlers', ValidateHandlersCommand::class);
             $registry->register('make:key', MakeKeyCommand::class);
             $registry->register('cache:clear', CacheClearCommand::class);
+            $registry->register('cache:status', CacheStatusCommand::class);
             return $registry;
         });
 
@@ -232,6 +234,14 @@ class CliRouting implements Bootstrapper
             /** @var ConfigurationCache|null $configCache */
             /** @var TemplateCache|null $templateCache */
             return new CacheClearCommand($cacheManager, $configCache, $templateCache);
+        });
+
+        $container->factory(CacheStatusCommand::class, function () use ($container) {
+            /** @var CacheManager|null $cacheManager */
+            $cacheManager = $container->has(CacheManager::class)
+                ? $container->get(CacheManager::class)
+                : null;
+            return new CacheStatusCommand($cacheManager);
         });
     }
 

@@ -282,7 +282,7 @@ Downstream consumers:
 #### CLI
 
 - [x] `cache:clear` built-in Rune command — clears all stores + ConfigurationCache + TemplateCache. `--store=NAME` for single store. Registered in `Bootstrap\CliRouting`. 4 tests.
-- [ ] `cache:status` (optional/low priority) — deferred.
+- [x] `cache:status` built-in Rune command — shows configured stores, default store, driver types, and framework store assignments. 3 tests.
 
 #### Documentation
 
