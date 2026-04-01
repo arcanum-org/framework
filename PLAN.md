@@ -343,9 +343,198 @@ php arcanum make:page About
 php arcanum make:middleware RateLimit
 ```
 
-Each generator creates the files in the correct directory following Arcanum's conventions, with proper namespaces, constructor params, and handler stubs. `make:page` also creates the `.html` template. Generators are registered as Rune built-in commands.
-
 This is the single biggest DX improvement for onboarding — new developers go from zero to a working endpoint in seconds without memorizing namespace conventions.
+
+#### Stub Engine
+
+The generators need a lightweight template system for producing PHP source files. This is different from Shodo's runtime template engine — stubs are developer tooling, not user-facing output.
+
+- [ ] `StubRenderer` — takes a stub template string and a `array<string, string>` of replacements, produces the final file content. Stubs use a simple `{{PLACEHOLDER}}` syntax (all-caps, no spaces, no dollar sign — visually distinct from Shodo's `{{ $var }}`). No compilation, no caching, just `str_replace`. Lives in Rune since it's CLI tooling.
+- [ ] Stub templates stored as string constants or embedded files within each generator command class — not separate `.stub` files. Each generator owns its template. This keeps the generator self-contained and avoids a file discovery problem.
+- [ ] Tests: placeholder replacement works, multiple placeholders in one template, unused placeholders are left as-is (not silently swallowed — makes debugging easy).
+
+#### make:command
+
+```
+php arcanum make:command Contact/Submit
+```
+
+Creates two files:
+
+```
+app/Domain/Contact/Command/Submit.php         ← DTO
+app/Domain/Contact/Command/SubmitHandler.php  ← Handler
+```
+
+- [ ] `MakeCommand` — Rune built-in command implementing `BuiltInCommand`. Accepts a single argument: the slash-separated path (`Contact/Submit`). Reads `app.namespace` from config to determine the root namespace (e.g., `App\Domain`). Splits the path: all segments except the last become namespace segments, the last becomes the class name. Converts to PascalCase if needed.
+- [ ] DTO stub — produces a `final class` with `declare(strict_types=1)`, correct namespace, empty constructor with `// TODO: add constructor parameters` comment, `readonly` properties pattern matching existing DTOs.
+  ```php
+  <?php
+
+  declare(strict_types=1);
+
+  namespace App\Domain\Contact\Command;
+
+  final class Submit
+  {
+      public function __construct(
+          // TODO: add constructor parameters
+      ) {
+      }
+  }
+  ```
+- [ ] Handler stub — produces a `final class` with `__invoke` method accepting the DTO, `void` return type (commands default to void), `// TODO: implement` comment.
+  ```php
+  <?php
+
+  declare(strict_types=1);
+
+  namespace App\Domain\Contact\Command;
+
+  final class SubmitHandler
+  {
+      public function __invoke(Submit $command): void
+      {
+          // TODO: implement
+      }
+  }
+  ```
+- [ ] Creates intermediate directories if they don't exist (`app/Domain/Contact/Command/`).
+- [ ] Refuses to overwrite existing files — prints a clear message and exits with code 1. The developer must delete manually to regenerate. No `--force` flag (too dangerous for a code generator).
+- [ ] Prints the created file paths on success.
+- [ ] Tests: generates correct files with correct namespaces, refuses to overwrite, creates directories, handles nested paths (`Users/Admin/BanUser`), reads namespace from config.
+
+#### make:query
+
+```
+php arcanum make:query Users/Find
+```
+
+Creates two files:
+
+```
+app/Domain/Users/Query/Find.php         ← DTO
+app/Domain/Users/Query/FindHandler.php  ← Handler
+```
+
+- [ ] `MakeQuery` — same structure as `MakeCommand`, but inserts `Query` into the namespace instead of `Command`. Handler return type is `array` instead of `void` (queries return data).
+- [ ] Handler stub uses `array` return type with a placeholder return:
+  ```php
+  public function __invoke(Find $query): array
+  {
+      // TODO: implement
+      return [];
+  }
+  ```
+- [ ] Same overwrite protection, directory creation, and output as `MakeCommand`.
+- [ ] Tests: same matrix as `MakeCommand` but verifying `Query` namespace and `array` return type.
+
+#### make:page
+
+```
+php arcanum make:page About
+php arcanum make:page Docs/GettingStarted
+```
+
+Creates two files:
+
+```
+app/Pages/About.php    ← DTO (optional data defaults)
+app/Pages/About.html   ← Template
+```
+
+- [ ] `MakePage` — reads `app.pages_namespace` and `app.pages_directory` from config. Slash-separated path maps to subdirectories under the pages directory. PascalCase class name becomes the filename.
+- [ ] DTO stub — `final class` with a default `$title` property matching the page name (converted to title case):
+  ```php
+  <?php
+
+  declare(strict_types=1);
+
+  namespace App\Pages;
+
+  final class About
+  {
+      public function __construct(
+          public readonly string $title = 'About',
+      ) {
+      }
+  }
+  ```
+- [ ] Template stub — minimal HTML5 boilerplate referencing `{{ $title }}`:
+  ```html
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <title>{{ $title }}</title>
+  </head>
+  <body>
+      <h1>{{ $title }}</h1>
+  </body>
+  </html>
+  ```
+- [ ] Same overwrite protection, directory creation, and output.
+- [ ] Tests: generates both files, correct namespace for nested pages (`Docs/GettingStarted` → `App\Pages\Docs\GettingStarted`), template references `{{ $title }}`.
+
+#### make:middleware
+
+```
+php arcanum make:middleware RateLimit
+```
+
+Creates one file:
+
+```
+app/Http/Middleware/RateLimit.php
+```
+
+- [ ] `MakeMiddleware` — simpler than the others, always creates in `app/Http/Middleware/` (no configurable path — middleware is always HTTP). Produces a PSR-15 `MiddlewareInterface` stub.
+- [ ] Stub implements `MiddlewareInterface` with `process()` method that delegates to `$handler->handle($request)`:
+  ```php
+  <?php
+
+  declare(strict_types=1);
+
+  namespace App\Http\Middleware;
+
+  use Psr\Http\Message\ResponseInterface;
+  use Psr\Http\Message\ServerRequestInterface;
+  use Psr\Http\Server\MiddlewareInterface;
+  use Psr\Http\Server\RequestHandlerInterface;
+
+  final class RateLimit implements MiddlewareInterface
+  {
+      public function process(
+          ServerRequestInterface $request,
+          RequestHandlerInterface $handler,
+      ): ResponseInterface {
+          // TODO: implement
+          return $handler->handle($request);
+      }
+  }
+  ```
+- [ ] Same overwrite protection, directory creation, and output.
+- [ ] Tests: generates correct file, correct namespace, implements MiddlewareInterface.
+
+#### Registration & Config
+
+- [ ] Register all four generators as Rune built-in commands in `Bootstrap\CliRouting`: `make:command`, `make:query`, `make:page`, `make:middleware`.
+- [ ] Each generator reads the app namespace and root directory from the container (via `Kernel` and `Configuration`) so it knows where to create files. Generators receive these via constructor injection, resolved by the built-in registry.
+- [ ] `php arcanum list` shows the generators under "Built-in commands" with `#[Description]` text.
+- [ ] Tests: generators are registered, `list` shows them.
+
+#### Edge Cases & Error Handling
+
+- [ ] Invalid name (empty, contains invalid characters) — print a clear error and exit with code 2.
+- [ ] Name that already matches a framework class — no special handling. The developer's namespace is separate from `Arcanum\`, so collisions are impossible via convention routing.
+- [ ] Single-segment names (`make:command Submit`) — valid. Creates at the root of the domain namespace: `App\Domain\Command\Submit`.
+- [ ] Deeply nested paths (`make:query Admin/Users/Permissions/Check`) — valid. Creates all intermediate directories.
+- [ ] Tests: each edge case.
+
+#### Documentation
+
+- [ ] Update `src/Rune/README.md` — add scaffolding generators section with examples for each generator.
+- [ ] Add `#[Description]` attributes to each generator command class so `php arcanum help make:command` shows useful info.
 
 ### 5. Session Management — needs design discussion
 
