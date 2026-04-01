@@ -83,6 +83,10 @@ abstract class Generator
     /**
      * Render a stub template with variables via Shodo's TemplateCompiler.
      *
+     * Checks for an app-level override at `{rootDirectory}/stubs/{name}.stub`
+     * first, falling back to the framework's built-in stubs. This lets
+     * developers customize generated code without modifying the framework.
+     *
      * Uses the compiler's render() method for direct substitution — stubs
      * contain PHP source code, so compile() (which produces eval-able PHP)
      * would conflict with PHP tags in the output.
@@ -91,7 +95,13 @@ abstract class Generator
      */
     protected function renderStub(string $stubName, array $variables): string
     {
-        $stubPath = __DIR__ . '/stubs/' . $stubName . '.stub';
+        $appStub = $this->rootDirectory . DIRECTORY_SEPARATOR . 'stubs'
+            . DIRECTORY_SEPARATOR . $stubName . '.stub';
+
+        $stubPath = $this->fileSystem->isFile($appStub)
+            ? $appStub
+            : __DIR__ . '/stubs/' . $stubName . '.stub';
+
         $source = $this->reader->read($stubPath);
 
         return $this->compiler->render($source, $variables);

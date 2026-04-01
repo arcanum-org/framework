@@ -125,6 +125,28 @@ final class MakeCommandCommandTest extends TestCase
         $this->assertStringContainsString('Invalid name', $this->readStream($stderr));
     }
 
+    public function testUsesAppStubOverrideWhenPresent(): void
+    {
+        $stubDir = $this->tempDir . '/stubs';
+        mkdir($stubDir, 0777, true);
+
+        $dtoStub = "<?php\n// custom stub\nnamespace {{! \$namespace !}};\n"
+            . "final class {{! \$className !}} {}\n";
+        file_put_contents($stubDir . '/command.stub', $dtoStub);
+
+        $handlerStub = "<?php\nnamespace {{! \$namespace !}};\n"
+            . "final class {{! \$className !}}Handler {}\n";
+        file_put_contents($stubDir . '/command_handler.stub', $handlerStub);
+
+        $command = new MakeCommandCommand($this->tempDir, 'App\\Domain');
+        $output = new ConsoleOutput($this->createStream(), $this->createStream(), ansi: false);
+
+        $command->execute(new Input('make:command', ['Custom/Thing']), $output);
+
+        $dtoContent = (string) file_get_contents($this->tempDir . '/app/Domain/Custom/Command/Thing.php');
+        $this->assertStringContainsString('// custom stub', $dtoContent);
+    }
+
     public function testPrintsCreatedPaths(): void
     {
         $command = new MakeCommandCommand($this->tempDir, 'App\\Domain');
