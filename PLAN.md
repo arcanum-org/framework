@@ -281,8 +281,8 @@ Auto-generated help from DTO reflection and attributes.
 - [x] `Arcanum\Rune\Attribute\Description` — PHP attribute for DTOs and constructor params. Provides help text. Ignored by HTTP.
 - [x] ~~`Arcanum\Rune\Attribute\Example`~~ — dropped. Usage line is auto-generated from constructor signature: required params as `--name=<type>`, optional as `[--name=<type>]`, bools as `[--verbose]`.
 - [x] `HelpWriter` — reads DTO class via reflection: constructor params become documented flags (name, type, required/optional, default value, `#[Description]` text). Auto-generates usage line. Extracted from RuneKernel for independent testability.
-- [ ] `list` built-in command — discovers all available commands and queries by scanning the app namespace. Groups by domain. Shows `#[Description]` text if present. (Deferred to Phase 7 — needs built-in command registry.)
-- [ ] `help` built-in command — alias for `<command> --help`. Example: `php arcanum help query:health`. (Deferred to Phase 7 — needs built-in command registry.)
+- [x] `list` built-in command — discovers all available commands and queries by scanning the app namespace. Groups by domain. Shows `#[Description]` text if present.
+- [x] `help` built-in command — alias for `<command> --help`. Example: `php arcanum help query:health`.
 
 ### Phase 6: Transport Restriction
 
@@ -298,21 +298,21 @@ Middleware that restricts DTOs to specific transports.
 
 Operational commands that ship with Rune (no `command:`/`query:` prefix).
 
-- [ ] `list` — discover and display all registered commands and queries (convention + custom CLI routes)
-- [ ] `validate:handlers` — scan all DTO classes, verify each has a corresponding handler class. Report missing handlers. (The dev tool mentioned in Closed Questions — now has a home.)
-- [ ] Built-in command registry — framework commands registered separately from domain dispatch. `RuneKernel` checks built-ins before routing to `CliRouter`.
-- [ ] Extensible built-in commands — app developers can register custom operational commands (e.g., `cache:clear`, `migrate`) via config or Kernel method, without the `command:` prefix.
+- [x] `list` — discover and display all registered commands and queries (convention + custom CLI routes)
+- [x] `validate:handlers` — scan all DTO classes, verify each has a corresponding handler class. Report missing handlers. (The dev tool mentioned in Closed Questions — now has a home.)
+- [x] Built-in command registry — framework commands registered separately from domain dispatch. `RuneKernel` checks built-ins before routing to `CliRouter`.
+- [x] Extensible built-in commands — app developers can register custom operational commands (e.g., `cache:clear`, `migrate`) via config or Kernel method, without the `command:` prefix.
 
 ### Phase 8: Starter App Integration
 
 Wire Rune into the starter project as a working example.
 
-- [ ] `bin/arcanum` entry point — `#!/usr/bin/env php` script. Loads autoloader, requires `bootstrap/cli.php`, bootstraps, handles `$argv`, exits with code.
-- [ ] `bootstrap/cli.php` — container setup for CLI. Parallels `bootstrap/http.php`. Registers `RuneKernel`, `CliRouter`, `ConsoleOutput`, CLI renderers.
-- [ ] `app/Cli/Kernel.php` — app-level CLI kernel extending `RuneKernel`. Developers customize bootstrappers and built-in commands here.
-- [ ] CLI route config — add `'cli'` key to `config/routes.php` for custom CLI aliases.
-- [ ] Verify existing `Health` query works from CLI — `php arcanum query:health` should dispatch to `HealthHandler` and render the result.
-- [ ] Verify existing `Contact\Submit` command works from CLI — `php arcanum command:contact:submit --name="Jo" --email="jo@test.com"` should dispatch to `SubmitHandler`.
+- [x] `bin/arcanum` entry point — `#!/usr/bin/env php` script. Loads autoloader, requires `bootstrap/cli.php`, bootstraps, handles `$argv`, exits with code.
+- [x] `bootstrap/cli.php` — container setup for CLI. Parallels `bootstrap/http.php`. Registers `RuneKernel`, `CliRouter`, `ConsoleOutput`, CLI renderers.
+- [x] `app/Cli/Kernel.php` — app-level CLI kernel extending `RuneKernel`. Developers customize bootstrappers and built-in commands here.
+- [x] CLI route config — add `'cli'` key to `config/routes.php` for custom CLI aliases.
+- [x] Verify existing `Health` query works from CLI — `php arcanum query:health` dispatches to `HealthHandler`, renders key-value output. `--format=json` and `--format=table` work. `--help` shows parameters and usage.
+- [x] Verify existing `Contact\Submit` command works from CLI — `php arcanum command:contact:submit --name="Jo" --email="jo@test.com"` dispatches to `SubmitHandler`, silent success (exit 0). Built-in `list`, `help`, and `validate:handlers` all work.
 
 ### Phase 9: Documentation
 
@@ -343,6 +343,8 @@ Blocked on persistence layer:
 Items flagged for future discussion. Not blocking.
 
 - ~~Revisit `Renderer` interface return type~~ — resolved by Rune Phase 4. Renderers stay `mixed` return. Each Kernel wraps the result into its transport's response type.
+- [ ] **Shodo renderers are HTTP-specific** — `JsonRenderer`, `CsvRenderer`, `PlainTextRenderer`, and `HtmlRenderer` all return `ResponseInterface`. CLI needs string-returning equivalents. `CliJsonRenderer` was added as a workaround. Long-term, consider splitting each renderer into a pure content formatter (returns string) and an HTTP adapter (wraps string in ResponseInterface). This would let both transports share the same formatting logic.
+- [ ] **CLI debug mode not respecting config** — `CliExceptionWriter` shows stack traces in the starter app even when `app.debug` is `false`. The `Bootstrap\CliRouting` reads the config value and passes it to the writer factory, but the writer appears to render in debug mode anyway. Needs investigation — likely a config value type issue (`false` vs `'false'` vs `null`).
 
 ---
 
