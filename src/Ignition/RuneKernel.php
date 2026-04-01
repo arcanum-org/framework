@@ -15,7 +15,7 @@ use Arcanum\Flow\Conveyor\AcceptedDTO;
 use Arcanum\Flow\Conveyor\Query;
 use Arcanum\Flow\Conveyor\QueryResult;
 use Arcanum\Glitch\ExceptionHandler;
-use Arcanum\Rune\CliExceptionRenderer;
+use Arcanum\Rune\CliExceptionWriter;
 use Arcanum\Rune\ExitCode;
 use Arcanum\Rune\Input;
 use Arcanum\Rune\Output;
@@ -249,9 +249,9 @@ class RuneKernel implements Kernel
             $handler->handleException($e);
         }
 
-        if ($this->container->has(CliExceptionRenderer::class)) {
-            /** @var CliExceptionRenderer $renderer */
-            $renderer = $this->container->get(CliExceptionRenderer::class);
+        if ($this->container->has(CliExceptionWriter::class)) {
+            /** @var CliExceptionWriter $renderer */
+            $renderer = $this->container->get(CliExceptionWriter::class);
             $renderer->render($e);
         } else {
             $output->errorLine('Error: ' . $e->getMessage());

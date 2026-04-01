@@ -260,8 +260,8 @@ The CLI entry point — parallel to `HyperKernel` but without PSR-7/PSR-15 coupl
 - [x] `RuneKernel` extending/implementing `Kernel` — shares `rootDirectory`, `configDirectory`, `filesDirectory`, `requiredEnvironmentVariables`. Has its own `handle(array $argv): int` method returning an exit code.
 - [x] `RuneKernel` bootstrapper list — reuses `Environment`, `Configuration`, `Logger`, `Exceptions`. Skips `Middleware` and `RouteMiddleware` (PSR-15 specific). Adds CLI-specific bootstrappers as needed.
 - [x] `RuneKernel::handle()` flow — parse `Input` → route → hydrate DTO → dispatch through Conveyor → render output → return exit code
-- [x] `RuneKernel` exception handling — catches exceptions, renders to `STDERR` via a `CliExceptionRenderer`, returns appropriate exit codes
-- [x] `CliExceptionRenderer` — renders exceptions as formatted error messages to `Output`. Debug mode shows stack traces, production mode shows clean messages with status context.
+- [x] `RuneKernel` exception handling — catches exceptions, renders to `STDERR` via a `CliExceptionWriter`, returns appropriate exit codes
+- [x] `CliExceptionWriter` — renders exceptions as formatted error messages to `Output`. Debug mode shows stack traces, production mode shows clean messages with status context.
 - [ ] `Bootstrap\CliRouting` bootstrapper — registers `CliRouter`, CLI format registry, and CLI-specific renderers in the container. Parallels `Bootstrap\Routing` for HTTP.
 
 ### Phase 4: Rendering

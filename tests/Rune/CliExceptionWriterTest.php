@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Rune;
 
-use Arcanum\Rune\CliExceptionRenderer;
+use Arcanum\Rune\CliExceptionWriter;
 use Arcanum\Rune\ConsoleOutput;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
-#[CoversClass(CliExceptionRenderer::class)]
+#[CoversClass(CliExceptionWriter::class)]
 #[UsesClass(ConsoleOutput::class)]
-final class CliExceptionRendererTest extends TestCase
+final class CliExceptionWriterTest extends TestCase
 {
     // ---------------------------------------------------------------
     // Production mode
@@ -23,7 +23,7 @@ final class CliExceptionRendererTest extends TestCase
         // Arrange
         $stderr = $this->createStream();
         $output = new ConsoleOutput($this->createStream(), $stderr, ansi: false);
-        $renderer = new CliExceptionRenderer($output, debug: false);
+        $renderer = new CliExceptionWriter($output, debug: false);
 
         // Act
         $renderer->render(new \RuntimeException('Something went wrong'));
@@ -38,7 +38,7 @@ final class CliExceptionRendererTest extends TestCase
         // Arrange
         $stderr = $this->createStream();
         $output = new ConsoleOutput($this->createStream(), $stderr, ansi: false);
-        $renderer = new CliExceptionRenderer($output, debug: false);
+        $renderer = new CliExceptionWriter($output, debug: false);
 
         // Act
         $renderer->render(new \RuntimeException('fail'));
@@ -58,7 +58,7 @@ final class CliExceptionRendererTest extends TestCase
         // Arrange
         $stderr = $this->createStream();
         $output = new ConsoleOutput($this->createStream(), $stderr, ansi: false);
-        $renderer = new CliExceptionRenderer($output, debug: true);
+        $renderer = new CliExceptionWriter($output, debug: true);
 
         // Act
         $renderer->render(new \InvalidArgumentException('bad input'));
@@ -74,14 +74,14 @@ final class CliExceptionRendererTest extends TestCase
         // Arrange
         $stderr = $this->createStream();
         $output = new ConsoleOutput($this->createStream(), $stderr, ansi: false);
-        $renderer = new CliExceptionRenderer($output, debug: true);
+        $renderer = new CliExceptionWriter($output, debug: true);
 
         // Act
         $renderer->render(new \RuntimeException('fail'));
 
         // Assert
         $rendered = $this->readStream($stderr);
-        $this->assertStringContainsString('CliExceptionRendererTest.php', $rendered);
+        $this->assertStringContainsString('CliExceptionWriterTest.php', $rendered);
         $this->assertStringContainsString('  in ', $rendered);
     }
 
@@ -90,7 +90,7 @@ final class CliExceptionRendererTest extends TestCase
         // Arrange
         $stderr = $this->createStream();
         $output = new ConsoleOutput($this->createStream(), $stderr, ansi: false);
-        $renderer = new CliExceptionRenderer($output, debug: true);
+        $renderer = new CliExceptionWriter($output, debug: true);
 
         // Act
         $renderer->render(new \RuntimeException('fail'));
@@ -105,7 +105,7 @@ final class CliExceptionRendererTest extends TestCase
         // Arrange
         $stderr = $this->createStream();
         $output = new ConsoleOutput($this->createStream(), $stderr, ansi: false);
-        $renderer = new CliExceptionRenderer($output, debug: true);
+        $renderer = new CliExceptionWriter($output, debug: true);
         $previous = new \LogicException('root cause');
         $exception = new \RuntimeException('surface error', 0, $previous);
 
@@ -128,7 +128,7 @@ final class CliExceptionRendererTest extends TestCase
         // Arrange
         $stderr = $this->createStream();
         $output = new ConsoleOutput($this->createStream(), $stderr, ansi: false);
-        $renderer = new CliExceptionRenderer($output);
+        $renderer = new CliExceptionWriter($output);
 
         // Act
         $renderer->render(new \RuntimeException('test'));

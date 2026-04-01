@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Arcanum\Rune;
 
 /**
- * Renders exceptions as formatted error messages to CLI output.
+ * Writes exceptions as formatted error messages to CLI output.
  *
  * Debug mode shows the exception class, message, file, line, and stack trace.
  * Production mode shows only the message.
  */
-final class CliExceptionRenderer
+final class CliExceptionWriter
 {
     public function __construct(
         private readonly Output $output,
