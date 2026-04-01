@@ -160,4 +160,19 @@ final class Input
     {
         return $this->flags[$name] ?? false;
     }
+
+    /**
+     * All named options and boolean flags merged into a single array.
+     *
+     * Intended for DTO hydration — the Hydrator takes an associative array
+     * and coerces types, so boolean flags are included as true values.
+     *
+     * Options take precedence over flags when keys collide.
+     *
+     * @return array<string, string|bool>
+     */
+    public function all(): array
+    {
+        return array_merge($this->flags, $this->options);
+    }
 }

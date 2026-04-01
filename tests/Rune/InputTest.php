@@ -285,4 +285,64 @@ final class InputTest extends TestCase
         // Assert
         $this->assertSame('csv', $input->option('format'));
     }
+
+    // ---------------------------------------------------------------
+    // all() — merged options and flags for hydration
+    // ---------------------------------------------------------------
+
+    public function testAllMergesOptionsAndFlags(): void
+    {
+        // Arrange
+        $input = new Input(
+            'query:health',
+            options: ['name' => 'Jo'],
+            flags: ['verbose' => true],
+        );
+
+        // Act
+        $all = $input->all();
+
+        // Assert
+        $this->assertSame('Jo', $all['name']);
+        $this->assertTrue($all['verbose']);
+    }
+
+    public function testAllOptionsOverrideFlags(): void
+    {
+        // Arrange — same key in both, option wins
+        $input = new Input(
+            'command:run',
+            options: ['debug' => 'detailed'],
+            flags: ['debug' => true],
+        );
+
+        // Act
+        $all = $input->all();
+
+        // Assert
+        $this->assertSame('detailed', $all['debug']);
+    }
+
+    public function testAllReturnsEmptyWhenNoOptionsOrFlags(): void
+    {
+        // Arrange
+        $input = new Input('list');
+
+        // Act & Assert
+        $this->assertSame([], $input->all());
+    }
+
+    public function testAllFromParsedArgv(): void
+    {
+        // Arrange
+        $argv = ['bin/arcanum', 'query:health', '--verbose', '--format=json'];
+
+        // Act
+        $input = Input::fromArgv($argv);
+        $all = $input->all();
+
+        // Assert
+        $this->assertTrue($all['verbose']);
+        $this->assertSame('json', $all['format']);
+    }
 }
