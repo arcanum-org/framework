@@ -16,6 +16,7 @@ use Arcanum\Flow\Conveyor\Query;
 use Arcanum\Flow\Conveyor\QueryResult;
 use Arcanum\Glitch\ExceptionHandler;
 use Arcanum\Rune\CliExceptionWriter;
+use Arcanum\Rune\BuiltInRegistry;
 use Arcanum\Rune\ExitCode;
 use Arcanum\Rune\HelpWriter;
 use Arcanum\Rune\Input;
@@ -151,6 +152,15 @@ class RuneKernel implements Kernel
      */
     protected function handleInput(Input $input, Output $output): int
     {
+        // Built-in commands (unprefixed) take priority over domain routing.
+        if ($this->container->has(BuiltInRegistry::class)) {
+            /** @var BuiltInRegistry $builtIns */
+            $builtIns = $this->container->get(BuiltInRegistry::class);
+            if ($builtIns->has($input->command())) {
+                return $builtIns->execute($input->command(), $input, $output);
+            }
+        }
+
         /** @var Router $router */
         $router = $this->container->get(Router::class);
 

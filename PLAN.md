@@ -262,37 +262,37 @@ The CLI entry point — parallel to `HyperKernel` but without PSR-7/PSR-15 coupl
 - [x] `RuneKernel::handle()` flow — parse `Input` → route → hydrate DTO → dispatch through Conveyor → render output → return exit code
 - [x] `RuneKernel` exception handling — catches exceptions, renders to `STDERR` via a `CliExceptionWriter`, returns appropriate exit codes
 - [x] `CliExceptionWriter` — renders exceptions as formatted error messages to `Output`. Debug mode shows stack traces, production mode shows clean messages with status context.
-- [ ] `Bootstrap\CliRouting` bootstrapper — registers `CliRouter`, CLI format registry, and CLI-specific renderers in the container. Parallels `Bootstrap\Routing` for HTTP.
+- [x] `Bootstrap\CliRouting` bootstrapper — registers `CliRouter`, CLI format registry, and CLI-specific renderers in the container. Parallels `Bootstrap\Routing` for HTTP.
 
 ### Phase 4: Rendering
 
 CLI-specific output rendering — tables, key-value pairs, and reuse of existing renderers.
 
-- [ ] Resolve `Renderer` return type — the `mixed` return was deferred for this moment. Renderers stay `mixed` return (string for content renderers), and each Kernel is responsible for wrapping the result into its transport's response type. HTTP kernels wrap into `ResponseInterface`. CLI kernels write to `Output`. The Renderer contract stays transport-agnostic.
-- [ ] `CliRenderer` — default CLI renderer. Single objects render as key-value pairs. Arrays of objects render as tables. Scalars render as plain text. Null/void renders nothing (just exit code).
-- [ ] `TableRenderer` — ASCII table formatting for array/list data. Auto-detects columns from object properties or array keys. Supports column width calculation and truncation.
-- [ ] `CliFormatRegistry` — maps `--format` values to renderers. Built-in: `table` → `TableRenderer`, `json` → existing `JsonRenderer`, `text` → existing `PlainTextRenderer`, `csv` → existing `CsvRenderer`. Default (no `--format`) → `CliRenderer`.
-- [ ] `CliEmptyResponseRenderer` — parallel to HTTP's `EmptyResponseRenderer`. Void commands → silent (exit 0). Null-returning commands → "Accepted." message. DTO-returning commands → render the DTO.
+- [x] Resolve `Renderer` return type — the `mixed` return was deferred for this moment. Renderers stay `mixed` return (string for content renderers), and each Kernel is responsible for wrapping the result into its transport's response type. HTTP kernels wrap into `ResponseInterface`. CLI kernels write to `Output`. The Renderer contract stays transport-agnostic.
+- [x] `CliRenderer` — default CLI renderer. Single objects render as key-value pairs. Arrays of objects render as tables. Scalars render as plain text. Null/void renders nothing (just exit code).
+- [x] `TableRenderer` — ASCII table formatting for array/list data. Auto-detects columns from object properties or array keys. Supports column width calculation and truncation.
+- [x] `CliFormatRegistry` — maps `--format` values to renderers. Built-in: `table` → `TableRenderer`, `json` → existing `JsonRenderer`, `text` → existing `PlainTextRenderer`, `csv` → existing `CsvRenderer`. Default (no `--format`) → `CliRenderer`.
+- [x] `CliEmptyResponseRenderer` — not needed as a separate class. The void/accepted/DTO distinction is handled inline in `RuneKernel::renderResult()`. In HTTP, `EmptyResponseRenderer` exists because building a `ResponseInterface` with status codes is non-trivial. For CLI, it's exit code + optional message — already in the kernel.
 
 ### Phase 5: Help System
 
 Auto-generated help from DTO reflection and attributes.
 
-- [ ] `Arcanum\Rune\Attribute\Description` — PHP attribute for DTOs and constructor params. Provides help text. Ignored by HTTP.
-- [ ] `Arcanum\Rune\Attribute\Example` — PHP attribute for DTOs. Provides usage examples for `--help` output.
-- [ ] Help renderer — reads DTO class via reflection: constructor params become documented flags (name, type, required/optional, default value, `#[Description]` text). Outputs formatted help to `Output`.
-- [ ] `list` built-in command — discovers all available commands and queries by scanning the app namespace. Groups by domain. Shows `#[Description]` text if present.
-- [ ] `help` built-in command — alias for `<command> --help`. Example: `php arcanum help query:health`.
+- [x] `Arcanum\Rune\Attribute\Description` — PHP attribute for DTOs and constructor params. Provides help text. Ignored by HTTP.
+- [x] ~~`Arcanum\Rune\Attribute\Example`~~ — dropped. Usage line is auto-generated from constructor signature: required params as `--name=<type>`, optional as `[--name=<type>]`, bools as `[--verbose]`.
+- [x] `HelpWriter` — reads DTO class via reflection: constructor params become documented flags (name, type, required/optional, default value, `#[Description]` text). Auto-generates usage line. Extracted from RuneKernel for independent testability.
+- [ ] `list` built-in command — discovers all available commands and queries by scanning the app namespace. Groups by domain. Shows `#[Description]` text if present. (Deferred to Phase 7 — needs built-in command registry.)
+- [ ] `help` built-in command — alias for `<command> --help`. Example: `php arcanum help query:health`. (Deferred to Phase 7 — needs built-in command registry.)
 
 ### Phase 6: Transport Restriction
 
 Middleware that restricts DTOs to specific transports.
 
-- [ ] `Arcanum\Rune\Attribute\CliOnly` — PHP attribute on DTOs. Marks a command/query as CLI-only.
-- [ ] `Arcanum\Hyper\Attribute\HttpOnly` — PHP attribute on DTOs. Marks a command/query as HTTP-only.
-- [ ] `TransportGuard` Conveyor middleware — reads transport context from a container-registered value (e.g., `Transport::Http` or `Transport::Cli` enum), checks DTO attributes, throws appropriate error. For HTTP: `HttpException(405)` — the thing exists, wrong transport. For CLI: clear error message with suggestion to use the other transport.
-- [ ] Transport context registration — each Kernel registers its `Transport` enum value in the container during bootstrap so `TransportGuard` can check it.
-- [ ] Tests for cross-transport rejection — HTTP request to `#[CliOnly]` DTO returns 405, CLI call to `#[HttpOnly]` DTO shows error.
+- [x] `Arcanum\Rune\Attribute\CliOnly` — PHP attribute on DTOs. Marks a command/query as CLI-only.
+- [x] `Arcanum\Hyper\Attribute\HttpOnly` — PHP attribute on DTOs. Marks a command/query as HTTP-only.
+- [x] `TransportGuard` Conveyor middleware — reads transport context from a container-registered value (e.g., `Transport::Http` or `Transport::Cli` enum), checks DTO attributes, throws appropriate error. For HTTP: `HttpException(405)` — the thing exists, wrong transport. For CLI: clear error message with suggestion to use the other transport.
+- [x] Transport context registration — each Kernel registers its `Transport` enum value in the container during bootstrap so `TransportGuard` can check it.
+- [x] Tests for cross-transport rejection — HTTP request to `#[CliOnly]` DTO returns 405, CLI call to `#[HttpOnly]` DTO shows error.
 
 ### Phase 7: Built-in Framework Commands
 

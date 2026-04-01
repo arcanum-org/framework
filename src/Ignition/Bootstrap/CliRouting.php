@@ -12,7 +12,12 @@ use Arcanum\Cabinet\Application;
 use Arcanum\Codex\Hydrator;
 use Arcanum\Gather\Configuration;
 use Arcanum\Ignition\Bootstrapper;
+use Arcanum\Ignition\Kernel;
+use Arcanum\Rune\BuiltInRegistry;
 use Arcanum\Rune\CliExceptionWriter;
+use Arcanum\Rune\Command\HelpCommand;
+use Arcanum\Rune\Command\ListCommand;
+use Arcanum\Rune\Command\ValidateHandlersCommand;
 use Arcanum\Rune\ConsoleOutput;
 use Arcanum\Rune\Output;
 use Arcanum\Shodo\CliFormatRegistry;
@@ -46,6 +51,7 @@ class CliRouting implements Bootstrapper
         $this->registerFormats($container);
         $this->registerOutput($container, $config);
         $this->registerHydrator($container);
+        $this->registerBuiltIns($container, $config);
     }
 
     private function registerRouter(Application $container, Configuration $config): void
@@ -127,5 +133,71 @@ class CliRouting implements Bootstrapper
         if (!$container->has(Hydrator::class)) {
             $container->service(Hydrator::class);
         }
+    }
+
+    /**
+     * Resolve the source directory for a namespace using PSR-4 convention.
+     *
+     * Maps the top-level namespace segment to a lowercased directory name
+     * (e.g., "App\Domain" → "app/Domain"). This matches standard Composer
+     * PSR-4 autoload mappings.
+     */
+    private function resolveSourceDirectory(Application $container, string $namespace): string
+    {
+        /** @var Kernel $kernel */
+        $kernel = $container->get(Kernel::class);
+
+        $topLevel = strstr($namespace, '\\', true) ?: $namespace;
+        $subPath = str_replace('\\', DIRECTORY_SEPARATOR, substr($namespace, strlen($topLevel)));
+
+        return $kernel->rootDirectory()
+            . DIRECTORY_SEPARATOR . lcfirst($topLevel)
+            . $subPath;
+    }
+
+    private function registerBuiltIns(Application $container, Configuration $config): void
+    {
+        /** @var mixed $namespace */
+        $namespace = $config->get('app.namespace');
+        $namespace = is_string($namespace) ? $namespace : 'App';
+
+        $container->factory(BuiltInRegistry::class, function () use ($container) {
+            $registry = new BuiltInRegistry($container);
+            $registry->register('list', ListCommand::class);
+            $registry->register('help', HelpCommand::class);
+            $registry->register('validate:handlers', ValidateHandlersCommand::class);
+            return $registry;
+        });
+
+        // Register the built-in command classes.
+        $container->service(HelpCommand::class);
+
+        $container->factory(ListCommand::class, function () use ($container, $namespace) {
+            $sourceDir = $this->resolveSourceDirectory($container, $namespace);
+
+            /** @var CliRouteMap|null $routeMap */
+            $routeMap = $container->has(CliRouteMap::class)
+                ? $container->get(CliRouteMap::class)
+                : null;
+
+            /** @var BuiltInRegistry|null $builtInRegistry */
+            $builtInRegistry = $container->has(BuiltInRegistry::class)
+                ? $container->get(BuiltInRegistry::class)
+                : null;
+
+            return new ListCommand(
+                sourceDirectory: $sourceDir,
+                rootNamespace: $namespace,
+                routeMap: $routeMap,
+                builtInRegistry: $builtInRegistry,
+            );
+        });
+
+        $container->factory(ValidateHandlersCommand::class, function () use ($container, $namespace) {
+            return new ValidateHandlersCommand(
+                sourceDirectory: $this->resolveSourceDirectory($container, $namespace),
+                rootNamespace: $namespace,
+            );
+        });
     }
 }
