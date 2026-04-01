@@ -23,6 +23,8 @@ use Arcanum\Rune\ExitCode;
 use Arcanum\Rune\Input;
 use Arcanum\Rune\Output;
 use Arcanum\Shodo\CliFormatRegistry;
+use Arcanum\Shodo\CsvFormatter;
+use Arcanum\Shodo\JsonFormatter;
 use Arcanum\Shodo\KeyValueFormatter;
 use Arcanum\Shodo\TableFormatter;
 use Arcanum\Toolkit\Strings;
@@ -32,6 +34,8 @@ use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(RuneKernel::class)]
 #[UsesClass(CliRouter::class)]
+#[UsesClass(CsvFormatter::class)]
+#[UsesClass(JsonFormatter::class)]
 #[UsesClass(KeyValueFormatter::class)]
 #[UsesClass(CliFormatRegistry::class)]
 #[UsesClass(ConsoleOutput::class)]
@@ -345,6 +349,63 @@ final class RuneKernelTest extends TestCase
         $this->assertStringNotContainsString('{', $rendered);
     }
 
+    public function testHandleRendersJsonFormatWhenRequested(): void
+    {
+        // Arrange
+        $stdout = $this->createStream();
+        $output = new ConsoleOutput($stdout, $this->createStream(), ansi: false);
+
+        $result = new QueryResult(['status' => 'ok', 'version' => '1.0']);
+
+        $bus = $this->createMock(Bus::class);
+        $bus->expects($this->once())->method('dispatch')->willReturn($result);
+
+        $kernel = $this->bootstrapKernel($this->containerWith(
+            output: $output,
+            bus: $bus,
+            routeFixtureNamespace: 'Arcanum\\Test\\Fixture',
+            withFormatRegistry: true,
+        ));
+
+        // Act
+        $exitCode = $kernel->handle(['bin/arcanum', 'query:shop:products', '--format=json']);
+
+        // Assert — JSON output with braces
+        $this->assertSame(ExitCode::Success->value, $exitCode);
+        $rendered = $this->readStream($stdout);
+        $this->assertStringContainsString('"status"', $rendered);
+        $this->assertStringContainsString('"ok"', $rendered);
+        $this->assertStringContainsString('{', $rendered);
+    }
+
+    public function testHandleRendersCsvFormatWhenRequested(): void
+    {
+        // Arrange
+        $stdout = $this->createStream();
+        $output = new ConsoleOutput($stdout, $this->createStream(), ansi: false);
+
+        $result = new QueryResult(['status' => 'ok', 'version' => '1.0']);
+
+        $bus = $this->createMock(Bus::class);
+        $bus->expects($this->once())->method('dispatch')->willReturn($result);
+
+        $kernel = $this->bootstrapKernel($this->containerWith(
+            output: $output,
+            bus: $bus,
+            routeFixtureNamespace: 'Arcanum\\Test\\Fixture',
+            withFormatRegistry: true,
+        ));
+
+        // Act
+        $exitCode = $kernel->handle(['bin/arcanum', 'query:shop:products', '--format=csv']);
+
+        // Assert — CSV output with key,value header
+        $this->assertSame(ExitCode::Success->value, $exitCode);
+        $rendered = $this->readStream($stdout);
+        $this->assertStringContainsString('key,value', $rendered);
+        $this->assertStringContainsString('status,ok', $rendered);
+    }
+
     public function testHandleReportsExceptionToExceptionHandler(): void
     {
         // Arrange
@@ -423,15 +484,21 @@ final class RuneKernelTest extends TestCase
         $formatRegistry = null;
         if ($withFormatRegistry) {
             $kvFormatter = new KeyValueFormatter();
+            $jsonFormatter = new JsonFormatter();
+            $csvFormatter = new CsvFormatter();
             $formatRegistryContainer = $this->createStub(\Psr\Container\ContainerInterface::class);
             $formatRegistryContainer->method('get')->willReturnCallback(
                 fn(string $id): object => match ($id) {
                     KeyValueFormatter::class => $kvFormatter,
+                    JsonFormatter::class => $jsonFormatter,
+                    CsvFormatter::class => $csvFormatter,
                     default => throw new \RuntimeException("Unexpected formatter: $id"),
                 },
             );
             $formatRegistry = new CliFormatRegistry($formatRegistryContainer);
             $formatRegistry->register('cli', KeyValueFormatter::class);
+            $formatRegistry->register('json', JsonFormatter::class);
+            $formatRegistry->register('csv', CsvFormatter::class);
         }
 
         $container = $this->createStub(Application::class);
