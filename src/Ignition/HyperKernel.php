@@ -122,6 +122,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
         }
 
         $this->container = $container;
+        $container->instance(Transport::class, Transport::Http);
 
         foreach ($this->bootstrappers as $name) {
             /** @var Bootstrapper $bootstrapper */

@@ -107,6 +107,7 @@ class RuneKernel implements Kernel
         }
 
         $this->container = $container;
+        $container->instance(Transport::class, Transport::Cli);
 
         foreach ($this->bootstrappers as $name) {
             /** @var Bootstrapper $bootstrapper */
