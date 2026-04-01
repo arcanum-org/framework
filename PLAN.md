@@ -237,31 +237,31 @@ php arcanum command:contact:submit --name="Jo" --email="jo@example.com"
 
 The foundation — parsing CLI input and writing CLI output.
 
-- [ ] `Input` value object — parses `$argv` into command name, positional arguments, named options (`--key=value`), and boolean flags (`--verbose`)
-- [ ] `Output` interface — `write(string)`, `writeLine(string)`, `error(string)`, `errorLine(string)`
-- [ ] `ConsoleOutput` — concrete `Output` writing to `STDOUT`/`STDERR` with ANSI color support (detect TTY, allow `--no-ansi` flag)
-- [ ] `ExitCode` enum — `Success = 0`, `Failure = 1`, `Invalid = 2` (mirrors standard CLI conventions)
+- [x] `Input` value object — parses `$argv` into command name, positional arguments, named options (`--key=value`), and boolean flags (`--verbose`)
+- [x] `Output` interface — `write(string)`, `writeLine(string)`, `error(string)`, `errorLine(string)`
+- [x] `ConsoleOutput` — concrete `Output` writing to `STDOUT`/`STDERR` with ANSI color support (detect TTY, allow `--no-ansi` flag)
+- [x] `ExitCode` enum — `Success = 0`, `Failure = 1`, `Invalid = 2` (mirrors standard CLI conventions)
 
 ### Phase 2: Routing
 
 Map CLI arguments to Route objects, reusing the convention system.
 
-- [ ] Refactor `ConventionResolver` — extract a lower-level `resolveByType(string $path, string $typeNamespace, string $handlerPrefix, string $format): Route` method that both HTTP method mapping and CLI type prefix can call. No breaking changes to existing `resolve()`.
-- [ ] `CliRouter` implementing `Router` — accepts `Input`, parses `command:`/`query:` prefix, delegates to `ConventionResolver::resolveByType()`. Throws `UnresolvableRoute` for unknown prefixes.
-- [ ] `CliRouteMap` — config-based CLI aliases for non-conventional classes (parallels `RouteMap` for HTTP). Loaded from `config/routes.php` under a `'cli'` key.
-- [ ] 404/405 equivalent for CLI — `UnresolvableRoute` for unknown commands, clear error messages with "did you mean?" suggestions based on registered commands
-- [ ] `--help` flag interception — when present, `CliRouter` returns a special help route instead of dispatching
-- [ ] `--format` flag extraction — passed through to `Route::$format`, defaults to CLI-appropriate format (not JSON)
+- [x] Refactor `ConventionResolver` — extract a lower-level `resolveByType(string $path, string $typeNamespace, string $handlerPrefix, string $format): Route` method that both HTTP method mapping and CLI type prefix can call. No breaking changes to existing `resolve()`.
+- [x] `CliRouter` implementing `Router` — accepts `Input`, parses `command:`/`query:` prefix, delegates to `ConventionResolver::resolveByType()`. Throws `UnresolvableRoute` for unknown prefixes.
+- [x] `CliRouteMap` — config-based CLI aliases for non-conventional classes (parallels `RouteMap` for HTTP). Loaded from `config/routes.php` under a `'cli'` key.
+- [x] 404/405 equivalent for CLI — `UnresolvableRoute` for unknown commands, clear error messages with "did you mean?" suggestions based on registered commands
+- [x] `--help` flag interception — when present, `CliRouter` returns a special help route instead of dispatching
+- [x] `--format` flag extraction — passed through to `Route::$format`, defaults to CLI-appropriate format (not JSON)
 
 ### Phase 3: Kernel
 
 The CLI entry point — parallel to `HyperKernel` but without PSR-7/PSR-15 coupling.
 
-- [ ] `RuneKernel` extending/implementing `Kernel` — shares `rootDirectory`, `configDirectory`, `filesDirectory`, `requiredEnvironmentVariables`. Has its own `handle(array $argv): int` method returning an exit code.
-- [ ] `RuneKernel` bootstrapper list — reuses `Environment`, `Configuration`, `Routing`, `Logger`, `Exceptions`. Skips `Middleware` and `RouteMiddleware` (PSR-15 specific). Adds CLI-specific bootstrappers as needed.
-- [ ] `RuneKernel::handle()` flow — parse `Input` → route → hydrate DTO → dispatch through Conveyor → render output → return exit code
-- [ ] `RuneKernel` exception handling — catches exceptions, renders to `STDERR` via a `CliExceptionRenderer`, returns appropriate exit codes
-- [ ] `CliExceptionRenderer` — renders exceptions as formatted error messages to `Output`. Debug mode shows stack traces, production mode shows clean messages with status context.
+- [x] `RuneKernel` extending/implementing `Kernel` — shares `rootDirectory`, `configDirectory`, `filesDirectory`, `requiredEnvironmentVariables`. Has its own `handle(array $argv): int` method returning an exit code.
+- [x] `RuneKernel` bootstrapper list — reuses `Environment`, `Configuration`, `Logger`, `Exceptions`. Skips `Middleware` and `RouteMiddleware` (PSR-15 specific). Adds CLI-specific bootstrappers as needed.
+- [x] `RuneKernel::handle()` flow — parse `Input` → route → hydrate DTO → dispatch through Conveyor → render output → return exit code
+- [x] `RuneKernel` exception handling — catches exceptions, renders to `STDERR` via a `CliExceptionRenderer`, returns appropriate exit codes
+- [x] `CliExceptionRenderer` — renders exceptions as formatted error messages to `Output`. Debug mode shows stack traces, production mode shows clean messages with status context.
 - [ ] `Bootstrap\CliRouting` bootstrapper — registers `CliRouter`, CLI format registry, and CLI-specific renderers in the container. Parallels `Bootstrap\Routing` for HTTP.
 
 ### Phase 4: Rendering

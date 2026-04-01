@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Rune;
+namespace Arcanum\Ignition;
 
 use Arcanum\Atlas\Router;
 use Arcanum\Atlas\UnresolvableRoute;
@@ -15,9 +15,10 @@ use Arcanum\Flow\Conveyor\AcceptedDTO;
 use Arcanum\Flow\Conveyor\Query;
 use Arcanum\Flow\Conveyor\QueryResult;
 use Arcanum\Glitch\ExceptionHandler;
-use Arcanum\Ignition\Bootstrap;
-use Arcanum\Ignition\Bootstrapper;
-use Arcanum\Ignition\Kernel;
+use Arcanum\Rune\CliExceptionRenderer;
+use Arcanum\Rune\ExitCode;
+use Arcanum\Rune\Input;
+use Arcanum\Rune\Output;
 
 /**
  * The CLI entry point — parallel to HyperKernel for HTTP.

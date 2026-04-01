@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Test\Rune;
+namespace Arcanum\Test\Atlas;
 
+use Arcanum\Atlas\CliRouteMap;
 use Arcanum\Atlas\Route;
 use Arcanum\Atlas\UnresolvableRoute;
-use Arcanum\Rune\CliRouteMap;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;

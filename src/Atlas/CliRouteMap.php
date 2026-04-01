@@ -2,10 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Rune;
-
-use Arcanum\Atlas\Route;
-use Arcanum\Atlas\UnresolvableRoute;
+namespace Arcanum\Atlas;
 
 /**
  * Stores explicit CLI command aliases that bypass convention-based resolution.

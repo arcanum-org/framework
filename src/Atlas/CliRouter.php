@@ -2,12 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Rune;
+namespace Arcanum\Atlas;
 
-use Arcanum\Atlas\ConventionResolver;
-use Arcanum\Atlas\Route;
-use Arcanum\Atlas\Router;
-use Arcanum\Atlas\UnresolvableRoute;
+use Arcanum\Rune\Input;
 
 /**
  * Maps CLI input to Routes using the convention system.

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Test\Rune;
+namespace Arcanum\Test\Ignition;
 
 use Arcanum\Atlas\ConventionResolver;
 use Arcanum\Atlas\Route;
@@ -16,12 +16,12 @@ use Arcanum\Flow\Conveyor\AcceptedDTO;
 use Arcanum\Flow\Conveyor\QueryResult;
 use Arcanum\Glitch\ExceptionHandler;
 use Arcanum\Ignition\Bootstrapper;
-use Arcanum\Rune\CliRouter;
+use Arcanum\Ignition\RuneKernel;
+use Arcanum\Atlas\CliRouter;
 use Arcanum\Rune\ConsoleOutput;
 use Arcanum\Rune\ExitCode;
 use Arcanum\Rune\Input;
 use Arcanum\Rune\Output;
-use Arcanum\Rune\RuneKernel;
 use Arcanum\Toolkit\Strings;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Test\Rune;
+namespace Arcanum\Test\Atlas;
 
+use Arcanum\Atlas\CliRouteMap;
+use Arcanum\Atlas\CliRouter;
 use Arcanum\Atlas\ConventionResolver;
 use Arcanum\Atlas\Route;
 use Arcanum\Atlas\UnresolvableRoute;
-use Arcanum\Rune\CliRouteMap;
-use Arcanum\Rune\CliRouter;
 use Arcanum\Rune\Input;
 use Arcanum\Toolkit\Strings;
 use PHPUnit\Framework\TestCase;
