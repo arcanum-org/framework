@@ -22,6 +22,9 @@ use Arcanum\Rune\ConsoleOutput;
 use Arcanum\Rune\ExitCode;
 use Arcanum\Rune\Input;
 use Arcanum\Rune\Output;
+use Arcanum\Shodo\CliFormatRegistry;
+use Arcanum\Shodo\CliRenderer;
+use Arcanum\Shodo\TableRenderer;
 use Arcanum\Toolkit\Strings;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -29,12 +32,15 @@ use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(RuneKernel::class)]
 #[UsesClass(CliRouter::class)]
+#[UsesClass(CliRenderer::class)]
+#[UsesClass(CliFormatRegistry::class)]
 #[UsesClass(ConsoleOutput::class)]
 #[UsesClass(ConventionResolver::class)]
 #[UsesClass(ExitCode::class)]
 #[UsesClass(Input::class)]
 #[UsesClass(Route::class)]
 #[UsesClass(Strings::class)]
+#[UsesClass(TableRenderer::class)]
 final class RuneKernelTest extends TestCase
 {
     // ---------------------------------------------------------------
@@ -310,6 +316,35 @@ final class RuneKernelTest extends TestCase
         $this->assertStringContainsString('Something broke', $this->readStream($stderr));
     }
 
+    public function testHandleRendersViaCliFormatRegistryWhenAvailable(): void
+    {
+        // Arrange
+        $stdout = $this->createStream();
+        $output = new ConsoleOutput($stdout, $this->createStream(), ansi: false);
+
+        $result = new QueryResult(['status' => 'ok', 'version' => '1.0']);
+
+        $bus = $this->createMock(Bus::class);
+        $bus->expects($this->once())->method('dispatch')->willReturn($result);
+
+        $kernel = $this->bootstrapKernel($this->containerWith(
+            output: $output,
+            bus: $bus,
+            routeFixtureNamespace: 'Arcanum\\Test\\Fixture',
+            withFormatRegistry: true,
+        ));
+
+        // Act
+        $exitCode = $kernel->handle(['bin/arcanum', 'query:shop:products']);
+
+        // Assert — CliRenderer outputs key-value pairs, not JSON
+        $this->assertSame(ExitCode::Success->value, $exitCode);
+        $rendered = $this->readStream($stdout);
+        $this->assertStringContainsString('status', $rendered);
+        $this->assertStringContainsString('ok', $rendered);
+        $this->assertStringNotContainsString('{', $rendered);
+    }
+
     public function testHandleReportsExceptionToExceptionHandler(): void
     {
         // Arrange
@@ -378,28 +413,45 @@ final class RuneKernelTest extends TestCase
         Bus|null $bus = null,
         string $routeFixtureNamespace = 'Arcanum\\Test\\Fixture',
         ExceptionHandler|null $exceptionHandler = null,
+        bool $withFormatRegistry = false,
     ): Application {
         $router = new CliRouter(new ConventionResolver(rootNamespace: $routeFixtureNamespace));
         $hydrator = new Hydrator();
         $bus ??= $this->createStub(Bus::class);
         $output ??= new ConsoleOutput($this->createStream(), $this->createStream(), ansi: false);
 
+        $formatRegistry = null;
+        if ($withFormatRegistry) {
+            $cliRenderer = new CliRenderer();
+            $formatRegistryContainer = $this->createStub(\Psr\Container\ContainerInterface::class);
+            $formatRegistryContainer->method('get')->willReturnCallback(
+                fn(string $id): object => match ($id) {
+                    CliRenderer::class => $cliRenderer,
+                    default => throw new \RuntimeException("Unexpected renderer: $id"),
+                },
+            );
+            $formatRegistry = new CliFormatRegistry($formatRegistryContainer);
+            $formatRegistry->register('cli', CliRenderer::class);
+        }
+
         $container = $this->createStub(Application::class);
 
         $container->method('has')->willReturnCallback(
             fn(string $id): bool => match ($id) {
                 ExceptionHandler::class => $exceptionHandler !== null,
+                CliFormatRegistry::class => $formatRegistry !== null,
                 default => false,
             },
         );
 
         $container->method('get')->willReturnCallback(
-            fn(string $id): object => match ($id) {
+            fn(string $id) => match ($id) {
                 Router::class => $router,
                 Hydrator::class => $hydrator,
                 Bus::class => $bus,
                 Output::class => $output,
                 ExceptionHandler::class => $exceptionHandler ?? throw new \RuntimeException('No handler'),
+                CliFormatRegistry::class => $formatRegistry ?? throw new \RuntimeException('No registry'),
                 default => throw new \RuntimeException("Unexpected service: $id"),
             },
         );

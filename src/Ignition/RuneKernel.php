@@ -19,6 +19,7 @@ use Arcanum\Rune\CliExceptionWriter;
 use Arcanum\Rune\ExitCode;
 use Arcanum\Rune\Input;
 use Arcanum\Rune\Output;
+use Arcanum\Shodo\CliFormatRegistry;
 
 /**
  * The CLI entry point — parallel to HyperKernel for HTTP.
@@ -178,13 +179,13 @@ class RuneKernel implements Kernel
 
         $result = $bus->dispatch($dto, $route->handlerPrefix);
 
-        return $this->renderResult($result, $output);
+        return $this->renderResult($result, $route, $output);
     }
 
     /**
      * Render a dispatch result to output.
      */
-    protected function renderResult(object $result, Output $output): int
+    protected function renderResult(object $result, \Arcanum\Atlas\Route $route, Output $output): int
     {
         if ($result instanceof EmptyDTO) {
             return ExitCode::Success->value;
@@ -199,11 +200,20 @@ class RuneKernel implements Kernel
             $result = $result->data;
         }
 
-        if (is_object($result)) {
-            $result = get_object_vars($result);
+        if ($this->container->has(CliFormatRegistry::class)) {
+            /** @var CliFormatRegistry $formats */
+            $formats = $this->container->get(CliFormatRegistry::class);
+            $rendered = $formats->renderer($route->format)->render($result);
+            if (is_string($rendered) && $rendered !== '') {
+                $output->writeLine($rendered);
+            }
+        } else {
+            if (is_object($result)) {
+                $result = get_object_vars($result);
+            }
+            $output->writeLine((string) json_encode($result, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES));
         }
 
-        $output->writeLine((string) json_encode($result, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES));
         return ExitCode::Success->value;
     }
 

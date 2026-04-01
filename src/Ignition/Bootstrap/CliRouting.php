@@ -15,6 +15,12 @@ use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Rune\CliExceptionWriter;
 use Arcanum\Rune\ConsoleOutput;
 use Arcanum\Rune\Output;
+use Arcanum\Shodo\CliFormatRegistry;
+use Arcanum\Shodo\CliRenderer;
+use Arcanum\Shodo\CsvRenderer;
+use Arcanum\Shodo\JsonRenderer;
+use Arcanum\Shodo\PlainTextRenderer;
+use Arcanum\Shodo\TableRenderer;
 
 /**
  * Registers CLI routing and output services in the container.
@@ -37,6 +43,7 @@ class CliRouting implements Bootstrapper
         $config = $container->get(Configuration::class);
 
         $this->registerRouter($container, $config);
+        $this->registerFormats($container);
         $this->registerOutput($container, $config);
         $this->registerHydrator($container);
     }
@@ -78,6 +85,24 @@ class CliRouting implements Bootstrapper
         $container->factory(Router::class, function () use ($resolver, $routeMap) {
             return new CliRouter($resolver, $routeMap);
         });
+    }
+
+    private function registerFormats(Application $container): void
+    {
+        $container->factory(CliFormatRegistry::class, function () use ($container) {
+            $registry = new CliFormatRegistry($container);
+            $registry->register('cli', CliRenderer::class);
+            $registry->register('table', TableRenderer::class);
+            $registry->register('json', JsonRenderer::class);
+            $registry->register('csv', CsvRenderer::class);
+            $registry->register('text', PlainTextRenderer::class);
+            return $registry;
+        });
+
+        $container->service(CliRenderer::class);
+        $container->service(TableRenderer::class);
+        $container->service(JsonRenderer::class);
+        $container->service(CsvRenderer::class);
     }
 
     private function registerOutput(Application $container, Configuration $config): void
