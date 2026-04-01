@@ -394,7 +394,7 @@ Thin wrappers that compose a Shodo formatter and build ResponseInterface.
 - [x] `PlainTextResponseRenderer` in Hyper — wraps `PlainTextFormatter`, sets `text/plain` content type.
 - [x] Move `EmptyResponseRenderer` to Hyper — purely HTTP (status code + empty body, no formatting).
 - [x] Move `JsonExceptionRenderer` to Hyper — depends on `JsonResponseRenderer` + Glitch. Rename to `JsonExceptionResponseRenderer` for clarity.
-- [ ] Move `UnsupportedFormat` exception — deferred to Phase 4. Changing it now would regress 406 to 500 until the HTTP layer catches it. Will decouple atomically when wiring is updated.
+- [x] Move `UnsupportedFormat` exception — decoupled from HttpException in Phase 3+4. Now a plain RuntimeException. Hyper's FormatRegistry throws HttpException(406) directly.
 - [x] Tests for each adapter — verify Response status code, Content-Type header, body content matches formatter output.
 
 ### Phase 3: Delete Old Shodo Renderers
@@ -422,14 +422,14 @@ Update bootstrappers, registries, and the starter app.
 - [x] Decouple `UnsupportedFormat` from `HttpException` — now a plain `RuntimeException` in Shodo (for CliFormatRegistry).
 - [x] Update starter app `Http\Kernel`, `bootstrap/http.php`, `config/formats.php` — import changes for moved classes.
 - [x] Update integration tests — verify full HTTP pipeline still works with new adapter classes.
-- [ ] Update Shodo README — document the formatter-first architecture.
+- [x] Update Shodo README — document the formatter-first architecture.
 
 ### Phase 5: Verify and Clean Up
 
-- [ ] Run full `composer check` — all tests pass, PHPStan clean, CS clean.
-- [ ] Verify starter app HTTP — `GET /query/health.json` still works through the full pipeline.
-- [ ] Verify starter app CLI — `php arcanum query:health` still works with formatter pipeline.
-- [ ] Remove any unused imports or dead code left over from the migration.
+- [x] Run full `composer check` — all tests pass, PHPStan clean, CS clean.
+- [x] Verify starter app HTTP — FormatRegistry → JsonResponseRenderer → 200 OK, application/json.
+- [x] Verify starter app CLI — `query:health` works with all format flags (cli, json, csv, table).
+- [x] Remove any unused imports or dead code left over from the migration — clean scan, zero issues.
 
 ---
 
