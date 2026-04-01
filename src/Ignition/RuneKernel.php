@@ -59,6 +59,7 @@ class RuneKernel implements Kernel
         Bootstrap\Environment::class,
         Bootstrap\Configuration::class,
         Bootstrap\Security::class,
+        Bootstrap\Cache::class,
         Bootstrap\CliRouting::class,
         Bootstrap\Logger::class,
         Bootstrap\Exceptions::class,

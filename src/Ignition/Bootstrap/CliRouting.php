@@ -17,8 +17,12 @@ use Arcanum\Rune\BuiltInRegistry;
 use Arcanum\Rune\CliExceptionWriter;
 use Arcanum\Rune\Command\HelpCommand;
 use Arcanum\Rune\Command\ListCommand;
+use Arcanum\Ignition\ConfigurationCache;
+use Arcanum\Rune\Command\CacheClearCommand;
 use Arcanum\Rune\Command\MakeKeyCommand;
 use Arcanum\Rune\Command\ValidateHandlersCommand;
+use Arcanum\Shodo\TemplateCache;
+use Arcanum\Vault\CacheManager;
 use Arcanum\Rune\ConsoleOutput;
 use Arcanum\Rune\Output;
 use Arcanum\Shodo\CliFormatRegistry;
@@ -170,6 +174,7 @@ class CliRouting implements Bootstrapper
             $registry->register('help', HelpCommand::class);
             $registry->register('validate:handlers', ValidateHandlersCommand::class);
             $registry->register('make:key', MakeKeyCommand::class);
+            $registry->register('cache:clear', CacheClearCommand::class);
             return $registry;
         });
 
@@ -208,6 +213,25 @@ class CliRouting implements Bootstrapper
             /** @var Kernel $kernel */
             $kernel = $container->get(Kernel::class);
             return new MakeKeyCommand(rootDirectory: $kernel->rootDirectory());
+        });
+
+        $container->factory(CacheClearCommand::class, function () use ($container) {
+            $cacheManager = $container->has(CacheManager::class)
+                ? $container->get(CacheManager::class)
+                : null;
+
+            $configCache = $container->has(ConfigurationCache::class)
+                ? $container->get(ConfigurationCache::class)
+                : null;
+
+            $templateCache = $container->has(TemplateCache::class)
+                ? $container->get(TemplateCache::class)
+                : null;
+
+            /** @var CacheManager|null $cacheManager */
+            /** @var ConfigurationCache|null $configCache */
+            /** @var TemplateCache|null $templateCache */
+            return new CacheClearCommand($cacheManager, $configCache, $templateCache);
         });
     }
 

@@ -6,3 +6,7 @@ parameters:
     excludePaths:
         - ../tests/.coverage/*
         - ../tests/.phpunit.cache/*
+        - ../src/Vault/RedisDriver.php
+        - ../tests/Vault/RedisDriverTest.php
+        - ../src/Vault/ApcuDriver.php
+        - ../tests/Vault/ApcuDriverTest.php

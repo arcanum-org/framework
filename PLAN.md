@@ -232,101 +232,61 @@ Downstream consumers:
 
 #### PSR-16 Interface and Core
 
-PSR-16 defines `CacheInterface` with: `get($key, $default)`, `set($key, $value, $ttl)`, `delete($key)`, `clear()`, `getMultiple()`, `setMultiple()`, `deleteMultiple()`, `has($key)`. Arcanum implements this exactly — no extensions, no extra methods on the interface. App code depends on `CacheInterface`, never a driver class.
-
-- [ ] Add `psr/simple-cache` as a Composer dependency (provides `Psr\SimpleCache\CacheInterface` and the `InvalidArgumentException` interface).
-- [ ] `FileDriver` — file-based cache, one file per key in a configurable directory. Value + expiry serialized together (e.g., `serialize(['expiry' => $ts, 'value' => $data])`). On `get()`, check expiry before returning — expired entries return `$default` and are lazily deleted. `clear()` deletes the entire cache directory. Key sanitization: hash the key to produce a safe filename (`md5($key).cache`). This is the default driver — zero config, works on any PHP installation.
-- [ ] `ArrayDriver` — in-memory cache backed by a plain PHP array. Data lives only for the current process. Respects TTL by storing expiry timestamps alongside values. Intended for testing — inject `ArrayDriver` in tests to avoid filesystem or network calls. Also useful as a per-request cache layer.
-- [ ] `NullDriver` — implements `CacheInterface` but stores nothing. `get()` always returns `$default`, `set()` is a no-op, `has()` returns false. Useful for disabling caching entirely without conditionals (e.g., development mode).
-- [ ] `ApcuDriver` — wraps `apcu_fetch`/`apcu_store`/`apcu_delete`/`apcu_clear_cache`. Extremely fast, single-server only. Guard with `extension_loaded('apcu')` check at construction — throw if APCu isn't available. TTL is native to APCu.
-- [ ] `RedisDriver` — wraps a `\Redis` connection instance. Uses `get`/`setex`/`del`/`flushDb`. TTL is native to Redis. Constructor takes a `\Redis` instance (the app manages the connection). Requires the `phpredis` extension.
-- [ ] Tests for `FileDriver`: set/get round-trip, get returns default for missing key, TTL expiry returns default, delete removes key, clear removes all keys, has() returns true/false correctly, getMultiple/setMultiple/deleteMultiple, invalid key handling, concurrent-safe (file locking or atomic writes).
-- [ ] Tests for `ArrayDriver`: same test matrix as FileDriver (PSR-16 contract is identical), plus verify data doesn't survive between test runs (new instance = empty cache).
-- [ ] Tests for `NullDriver`: get always returns default, set doesn't throw, has always returns false, clear doesn't throw.
-- [ ] Tests for `ApcuDriver`: same PSR-16 test matrix. Skip entire test class if APCu not available (`#[RequiresPhpExtension('apcu')]` or `markTestSkipped`).
-- [ ] Tests for `RedisDriver`: same PSR-16 test matrix. Skip if Redis not available. Consider a mock `\Redis` for unit tests vs. integration tests with a real Redis server.
+- [x] Added `psr/simple-cache` ^3.0 as Composer dependency.
+- [x] `FileDriver` — file-based, one file per key, atomic writes (temp+rename), lazy expiry deletion, md5 key hashing.
+- [x] `ArrayDriver` — in-memory, per-process, TTL via expiry timestamps.
+- [x] `NullDriver` — no-op driver for disabling caching.
+- [x] `ApcuDriver` — wraps APCu, guards with `extension_loaded('apcu')` check.
+- [x] `RedisDriver` — wraps `\Redis` instance, serializes values, native TTL via SETEX.
+- [x] Full PSR-16 test coverage for FileDriver (14 tests), ArrayDriver (16 tests), NullDriver (7 tests). APCu (8 tests, skipped without extension), Redis (10 mock-based tests, skipped without extension).
 
 #### Key Validation
 
-PSR-16 defines key constraints: keys must be strings, at least one character, and must not contain `{}()/\@:` characters. Drivers must throw `Psr\SimpleCache\InvalidArgumentException` for invalid keys.
-
-- [ ] `KeyValidator` — shared static utility or base class method. Validates key against PSR-16 rules. Throws `InvalidArgument` (Arcanum class implementing `Psr\SimpleCache\InvalidArgumentException`) on violation. Called by every driver before any operation.
-- [ ] `InvalidArgument` exception — implements `Psr\SimpleCache\InvalidArgumentException`. This is required by PSR-16 — the spec mandates that implementing libraries throw their own exception class that implements the PSR interface.
-- [ ] Tests: valid keys pass, empty string rejected, keys with reserved characters rejected, non-string keys rejected (in PHP 8 this is a type error, but the PSR-16 spec predates strict types).
+- [x] `KeyValidator` — static utility validating PSR-16 key constraints (`{}()/\@:` rejection, empty rejection).
+- [x] `InvalidArgument` — implements `Psr\SimpleCache\InvalidArgumentException`.
+- [x] Tests: valid keys pass, empty rejected, each reserved character rejected, validateMultiple. 12 tests.
 
 #### Cache Manager
 
-- [ ] `CacheManager` — factory/registry for named cache stores. Reads `config/cache.php` to build driver instances. The app interacts with named stores: `$cache->store('redis')` returns the Redis driver, `$cache->store()` (no argument) returns the default store. Stores are lazily instantiated from config.
-- [ ] Config structure in `config/cache.php`:
-  ```php
-  return [
-      'default' => 'file',
-      'stores' => [
-          'file'  => ['driver' => 'file', 'path' => 'files/cache/app'],
-          'array' => ['driver' => 'array'],
-          'redis' => ['driver' => 'redis', 'host' => '127.0.0.1', 'port' => 6379],
-          'apcu'  => ['driver' => 'apcu'],
-      ],
-  ];
-  ```
-- [ ] Tests: resolves default store, resolves named stores, throws on unknown store name, lazily instantiates (doesn't create Redis connection until requested).
+- [x] `CacheManager` — factory/registry for named stores, lazy instantiation, framework store mapping, relative path resolution.
+- [x] Config structure documented and implemented in starter app `config/cache.php`.
+- [x] Tests: default store, named stores, unknown store, lazy instantiation, framework mapping, fallback, store names, relative paths, unknown driver. 11 tests.
 
 #### Prefix Scoping
 
-- [ ] `PrefixedCache` — decorator that prepends a namespace prefix to all keys. Wraps any `CacheInterface` instance. Useful for isolating framework caches from app caches on the same driver (e.g., `framework:pages:` prefix vs. `app:sessions:` prefix). `clear()` only clears keys with the prefix (for file/array drivers) or delegates to the inner driver's `clear()` (for Redis/APCu where prefix-scoped clearing isn't practical without `SCAN` — document this limitation).
-- [ ] Tests: get/set/delete prepend prefix, clear behavior, inner driver receives prefixed keys.
+- [x] `PrefixedCache` — key-prefix decorator for any `CacheInterface`. `clear()` delegates to inner (documented limitation).
+- [x] Tests: prefix prepending on all operations, isolation between prefixes. 8 tests.
 
 #### Store Assignment — framework and app caches
 
-Different caches have different performance and durability requirements. The config lets both the framework and the app assign specific stores to specific purposes.
-
-- [ ] Framework store mapping in `config/cache.php` — maps framework cache names to store names:
-  ```php
-  'framework' => [
-      'pages'      => 'file',    // page discovery — durable, survives restarts
-      'middleware' => 'file',    // middleware discovery — same
-      'templates'  => 'file',   // template compilation directory (path only, not PSR-16)
-  ],
-  ```
-  Bootstrappers read this mapping and resolve the named store for each framework cache. An app can move discovery caches to APCu for speed (`'pages' => 'apcu'`) or Redis for shared deployments without touching framework code.
-- [ ] App developers use `CacheManager::store($name)` to get different drivers for different concerns:
-  ```php
-  // In a handler or service
-  $userCache = $cache->store('redis');      // fast, distributed
-  $reportCache = $cache->store('file');     // large payloads, durable
-  $requestCache = $cache->store('array');   // per-request only
-  ```
-  The default store (`$cache->store()` or typehinting `CacheInterface`) covers the common case. Named stores cover everything else. No new classes needed — this is just `CacheManager` doing its job.
-- [ ] Tests: framework store mapping resolves correct driver per cache name, falls back to default store when mapping key is absent.
+- [x] Framework store mapping via `config/cache.php` `framework` key.
+- [x] `CacheManager::frameworkStore($purpose)` resolves mapped or default store.
+- [x] Tests: framework mapping resolves correct driver, falls back to default.
 
 #### Bootstrap & Wiring
 
-- [ ] `Bootstrap\Cache` bootstrapper in Ignition — reads `config/cache.php`, builds `CacheManager`, registers it in the container. Also registers the default store as `CacheInterface` so apps can typehint the PSR-16 interface directly. Slot after `Configuration` in both kernel bootstrapper lists.
-- [ ] Add `Bootstrap\Cache` to `HyperKernel::$bootstrappers` and `RuneKernel::$bootstrappers`.
-- [ ] Starter app: update `config/cache.php` with `default`, `stores`, and `framework` mapping structure.
-- [ ] Tests: bootstrapper registers `CacheManager` and `CacheInterface`, default store is resolvable, framework store mapping is respected.
+- [x] `Bootstrap\Cache` — reads `config/cache.php`, registers `CacheManager` and `CacheInterface`. Falls back to file driver if no config.
+- [x] Added to `HyperKernel::$bootstrappers` and `RuneKernel::$bootstrappers` after `Security`, before `Routing`.
+- [x] Starter app `config/cache.php` updated with `default`, `stores`, `framework` structure.
+- [x] Tests: registers CacheManager, registers CacheInterface, default store usable, works with no config. 4 tests.
 
 #### Migrate Framework Ad-hoc Caches
 
-Four existing caches currently use bespoke file-based caching. Once Vault exists, they can optionally use it for unified driver selection and cache clearing.
-
-- [ ] Evaluate `ConfigurationCache` — currently serialized PHP array via Parchment. This cache is special: it must work *before* the container is built (it's read during `Bootstrap\Configuration`). It cannot depend on the CacheManager (which is registered *after* Configuration). **Decision: leave as-is.** ConfigurationCache is a bootstrap primitive, not an app cache. Document why it stays independent.
-- [ ] Evaluate `TemplateCache` — compiled PHP per template, mtime-based freshness. This is content-addressed (key = hash of template path) with file-specific freshness (mtime comparison, not TTL). A generic PSR-16 cache doesn't support mtime freshness natively. **Decision: leave as-is but make the cache directory configurable via the `framework.templates` store mapping in config.** The template cache is a specialized compilation cache, not a generic key-value store. Unify the directory configuration so `cache:clear` knows about it.
-- [ ] Migrate `PageDiscovery` cache — currently a single `var_export`ed file with TTL. This fits PSR-16 well: `$cache->set('page_discovery', $pages, $ttl)`. Refactor to accept `CacheInterface` instead of managing its own file. Use `PrefixedCache` to namespace it. The bootstrapper reads `config.cache.framework.pages` to resolve which store to use.
-- [ ] Migrate `MiddlewareDiscovery` cache — same pattern as PageDiscovery. Reads `config.cache.framework.middleware` for store selection.
-- [ ] Update `Bootstrap\Routing` and `Bootstrap\RouteMiddleware` to resolve the framework store for each cache and pass the `CacheInterface` instance to PageDiscovery and MiddlewareDiscovery.
-- [ ] Tests: PageDiscovery and MiddlewareDiscovery work with ArrayDriver in tests, produce same results as before migration, respect store mapping.
+- [x] `ConfigurationCache` — **left as-is.** Bootstrap primitive that runs before the container is built; cannot depend on CacheManager.
+- [x] `TemplateCache` — **left as-is.** Specialized mtime-based compilation cache; PSR-16 doesn't support mtime freshness natively. `cache:clear` knows about it.
+- [ ] Migrate `PageDiscovery` cache — refactor to accept `CacheInterface`. Deferred to a separate PR.
+- [ ] Migrate `MiddlewareDiscovery` cache — same pattern. Deferred to a separate PR.
+- [ ] Update `Bootstrap\Routing` and `Bootstrap\RouteMiddleware` for store-based discovery caches. Deferred.
 
 #### CLI
 
-- [ ] `cache:clear` built-in Rune command — clears all configured stores via `CacheManager`, plus the framework's independent caches (ConfigurationCache, TemplateCache). Accepts an optional `--store=NAME` flag to clear only a specific store. Prints what was cleared. Registered in `Bootstrap\CliRouting`.
-- [ ] `cache:status` built-in Rune command (optional/low priority) — shows configured stores, default store, framework store assignments, and whether each store's backing service is reachable (Redis ping, APCu enabled, file directory writable). Useful for debugging.
-- [ ] Tests for `cache:clear`: clears all stores, clears single store with `--store` flag, prints confirmation. Tests for `cache:status`: shows store info.
+- [x] `cache:clear` built-in Rune command — clears all stores + ConfigurationCache + TemplateCache. `--store=NAME` for single store. Registered in `Bootstrap\CliRouting`. 4 tests.
+- [ ] `cache:status` (optional/low priority) — deferred.
 
 #### Documentation
 
-- [ ] Write `src/Vault/README.md` — PSR-16 compliance, drivers, configuration, PrefixedCache, CacheManager, migration notes for framework caches, CLI commands.
-- [ ] Update `src/Ignition/README.md` — add `Bootstrap\Cache` to bootstrapper tables.
+- [x] `src/Vault/README.md` — PSR-16 compliance, all drivers, configuration, PrefixedCache, CacheManager, CLI.
+- [x] Updated `src/Ignition/README.md` — `Bootstrap\Cache` in bootstrapper tables for both HTTP and CLI.
 
 ### 4. Scaffolding Generators — Rune built-in commands
 
