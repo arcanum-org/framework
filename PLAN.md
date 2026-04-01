@@ -344,7 +344,7 @@ Items flagged for future discussion. Not blocking.
 
 - ~~Revisit `Renderer` interface return type~~ — resolved by Rune Phase 4. Renderers stay `mixed` return. Each Kernel wraps the result into its transport's response type.
 - ~~**Shodo renderers are HTTP-specific**~~ — addressed by the Shodo/Hyper refactor below.
-- [ ] **CLI debug mode not respecting config** — `CliExceptionWriter` shows stack traces in the starter app even when `app.debug` is `false`. The `Bootstrap\CliRouting` reads the config value and passes it to the writer factory, but the writer appears to render in debug mode anyway. Needs investigation — likely a config value type issue (`false` vs `'false'` vs `null`).
+- [x] **CLI debug mode not respecting config** — investigated and resolved. Not a bug: the starter app's `.env` file sets `APP_DEBUG=true`, so debug mode is correctly enabled. With `APP_DEBUG=false`, the `CliExceptionWriter` correctly shows only the clean error message. The `Bootstrap\CliRouting` check (`$debug === true || $debug === 'true'`) handles both boolean and string values correctly.
 
 ---
 
