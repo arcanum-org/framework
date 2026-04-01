@@ -56,7 +56,8 @@ final class CliRouter implements Router
 
         // Custom routes take priority — check full command name first.
         if ($this->routeMap !== null && $this->routeMap->has($command)) {
-            return $this->routeMap->resolve($command, $format);
+            $route = $this->routeMap->resolve($command, $format);
+            return $input->hasFlag('help') ? $route->withHelp() : $route;
         }
 
         $colonPos = strpos($command, ':');
@@ -101,12 +102,8 @@ final class CliRouter implements Router
             format: $format,
         );
 
-        if (class_exists($route->dtoClass)) {
-            return $route;
-        }
-
-        if (class_exists($route->dtoClass . 'Handler')) {
-            return $route;
+        if (class_exists($route->dtoClass) || class_exists($route->dtoClass . 'Handler')) {
+            return $input->hasFlag('help') ? $route->withHelp() : $route;
         }
 
         throw $this->buildNotFoundError($command, $typeNamespace, $path, $format);

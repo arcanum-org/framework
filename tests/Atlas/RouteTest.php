@@ -179,4 +179,58 @@ final class RouteTest extends TestCase
         $this->assertSame('json', $original->format);
         $this->assertSame('html', $modified->format);
     }
+
+    public function testIsHelpDefaultsFalse(): void
+    {
+        // Arrange & Act
+        $route = new Route(dtoClass: 'App\\Query\\Dashboard');
+
+        // Assert
+        $this->assertFalse($route->isHelp);
+    }
+
+    public function testWithHelpReturnsNewRouteMarkedAsHelp(): void
+    {
+        // Arrange
+        $original = new Route(
+            dtoClass: 'App\\Contact\\Command\\Submit',
+            format: 'cli',
+        );
+
+        // Act
+        $help = $original->withHelp();
+
+        // Assert
+        $this->assertFalse($original->isHelp);
+        $this->assertTrue($help->isHelp);
+        $this->assertSame($original->dtoClass, $help->dtoClass);
+        $this->assertSame($original->format, $help->format);
+        $this->assertSame($original->handlerPrefix, $help->handlerPrefix);
+        $this->assertSame($original->isPage, $help->isPage);
+    }
+
+    public function testWithFormatPreservesIsHelp(): void
+    {
+        // Arrange
+        $original = new Route(dtoClass: 'App\\Query\\Health', isHelp: true);
+
+        // Act
+        $json = $original->withFormat('json');
+
+        // Assert
+        $this->assertTrue($json->isHelp);
+    }
+
+    public function testWithHelpPreservesIsPage(): void
+    {
+        // Arrange
+        $original = new Route(dtoClass: 'App\\Pages\\About', isPage: true);
+
+        // Act
+        $help = $original->withHelp();
+
+        // Assert
+        $this->assertTrue($help->isPage);
+        $this->assertTrue($help->isHelp);
+    }
 }

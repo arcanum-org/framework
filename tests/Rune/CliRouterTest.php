@@ -418,4 +418,67 @@ final class CliRouterTest extends TestCase
         // Assert — falls through to convention routing
         $this->assertSame('Arcanum\\Test\\Fixture\\Shop\\Query\\Products', $route->dtoClass);
     }
+
+    // ---------------------------------------------------------------
+    // --help flag interception
+    // ---------------------------------------------------------------
+
+    public function testHelpFlagReturnsHelpRoute(): void
+    {
+        // Arrange
+        $input = new Input('query:shop:products', flags: ['help' => true]);
+
+        // Act
+        $route = $this->router()->resolve($input);
+
+        // Assert
+        $this->assertTrue($route->isHelp);
+        $this->assertSame('Arcanum\\Test\\Fixture\\Shop\\Query\\Products', $route->dtoClass);
+    }
+
+    public function testNoHelpFlagReturnsNormalRoute(): void
+    {
+        // Arrange
+        $input = new Input('query:shop:products');
+
+        // Act
+        $route = $this->router()->resolve($input);
+
+        // Assert
+        $this->assertFalse($route->isHelp);
+    }
+
+    public function testHelpFlagWorksWithCustomRoutes(): void
+    {
+        // Arrange
+        $routeMap = new CliRouteMap();
+        $routeMap->register('stripe:webhook', 'App\\Integration\\Stripe\\ProcessWebhook');
+
+        $router = new CliRouter(
+            new ConventionResolver(rootNamespace: 'Arcanum\\Test\\Fixture'),
+            $routeMap,
+        );
+
+        $input = new Input('stripe:webhook', flags: ['help' => true]);
+
+        // Act
+        $route = $router->resolve($input);
+
+        // Assert
+        $this->assertTrue($route->isHelp);
+        $this->assertSame('App\\Integration\\Stripe\\ProcessWebhook', $route->dtoClass);
+    }
+
+    public function testHelpFlagWorksWithCommands(): void
+    {
+        // Arrange
+        $input = new Input('command:contact:submit', flags: ['help' => true]);
+
+        // Act
+        $route = $this->router()->resolve($input);
+
+        // Assert
+        $this->assertTrue($route->isHelp);
+        $this->assertSame('Arcanum\\Test\\Fixture\\Contact\\Command\\Submit', $route->dtoClass);
+    }
 }
