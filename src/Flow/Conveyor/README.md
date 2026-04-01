@@ -102,6 +102,15 @@ Each filter is a `Progression` (Continuum middleware). If validation fails, it t
 
 These filters enforce a clean DTO pattern: final classes with only public readonly properties and no methods beyond the constructor. This keeps command/query objects as pure data carriers.
 
+### Framework middleware
+
+Two framework-provided middleware are registered automatically by the bootstrappers:
+
+- **`TransportGuard`** — enforces `#[CliOnly]` and `#[HttpOnly]` attributes. Rejects cross-transport dispatch (e.g., HTTP request to a CLI-only DTO → 405).
+- **`ValidationGuard`** — runs validation rules declared as attributes on DTO constructor parameters. Throws `ValidationException` on failure (rendered as 422 on HTTP, field-level errors on CLI). See the [Validation README](../../../Validation/README.md) for rule reference and examples.
+
+Both are `Progression` middleware registered via `$bus->before()`.
+
 ## Dynamic DTOs
 
 Not every route needs a dedicated DTO class. When only a handler exists (no paired DTO), the framework creates a dynamic DTO that wraps the request data and routes to the correct handler via `HandlerProxy`.

@@ -31,6 +31,11 @@ use Arcanum\Shodo\PlainTextFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Shodo\TemplateResolver;
+use Arcanum\Flow\Conveyor\Bus;
+use Arcanum\Flow\Conveyor\MiddlewareBus;
+use Arcanum\Glitch\ExceptionRenderer;
+use Arcanum\Hyper\ValidationExceptionRenderer;
+use Arcanum\Validation\ValidationGuard;
 
 /**
  * Registers Atlas routing and Shodo format registry in the container.
@@ -57,6 +62,8 @@ class Routing implements Bootstrapper
         $this->registerFormats($container, $config);
         $this->registerRouter($container, $config);
         $this->registerHydrator($container);
+        $this->registerBusMiddleware($container);
+        $this->registerValidationRenderer($container);
 
         // PageHandler is the framework-provided handler for all pages.
         $container->service(PageHandler::class);
@@ -273,5 +280,35 @@ class Routing implements Bootstrapper
     private function registerHydrator(Application $container): void
     {
         $container->service(Hydrator::class);
+    }
+
+    private function registerValidationRenderer(Application $container): void
+    {
+        if (!$container->has(ExceptionRenderer::class)) {
+            return;
+        }
+
+        $container->decorator(
+            ExceptionRenderer::class,
+            function (object $inner) use ($container): object {
+                /** @var JsonResponseRenderer $jsonRenderer */
+                $jsonRenderer = $container->get(JsonResponseRenderer::class);
+                return new ValidationExceptionRenderer($inner, $jsonRenderer);
+            },
+        );
+    }
+
+    private function registerBusMiddleware(Application $container): void
+    {
+        if (!$container->has(Bus::class)) {
+            return;
+        }
+
+        /** @var Bus $bus */
+        $bus = $container->get(Bus::class);
+
+        if ($bus instanceof MiddlewareBus) {
+            $bus->before(new ValidationGuard());
+        }
     }
 }

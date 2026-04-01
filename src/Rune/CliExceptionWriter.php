@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Arcanum\Rune;
 
+use Arcanum\Validation\ValidationException;
+
 /**
  * Writes exceptions as formatted error messages to CLI output.
  *
  * Debug mode shows the exception class, message, file, line, and stack trace.
  * Production mode shows only the message.
+ * ValidationException gets a dedicated format showing field-level errors.
  */
 final class CliExceptionWriter
 {
@@ -20,12 +23,28 @@ final class CliExceptionWriter
 
     public function render(\Throwable $e): void
     {
+        if ($e instanceof ValidationException) {
+            $this->renderValidation($e);
+            return;
+        }
+
         if ($this->debug) {
             $this->renderDebug($e);
             return;
         }
 
         $this->output->errorLine('Error: ' . $e->getMessage());
+    }
+
+    private function renderValidation(ValidationException $e): void
+    {
+        $this->output->errorLine('Validation failed:');
+
+        foreach ($e->errorsByField() as $field => $messages) {
+            foreach ($messages as $message) {
+                $this->output->errorLine(sprintf('  %s: %s', $field, $message));
+            }
+        }
     }
 
     private function renderDebug(\Throwable $e): void

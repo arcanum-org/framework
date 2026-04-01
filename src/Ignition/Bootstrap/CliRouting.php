@@ -26,6 +26,9 @@ use Arcanum\Shodo\CsvFormatter;
 use Arcanum\Shodo\JsonFormatter;
 use Arcanum\Shodo\KeyValueFormatter;
 use Arcanum\Shodo\TableFormatter;
+use Arcanum\Flow\Conveyor\Bus;
+use Arcanum\Flow\Conveyor\MiddlewareBus;
+use Arcanum\Validation\ValidationGuard;
 
 /**
  * Registers CLI routing and output services in the container.
@@ -52,6 +55,7 @@ class CliRouting implements Bootstrapper
         $this->registerOutput($container, $config);
         $this->registerHydrator($container);
         $this->registerBuiltIns($container, $config);
+        $this->registerBusMiddleware($container);
     }
 
     private function registerRouter(Application $container, Configuration $config): void
@@ -205,5 +209,19 @@ class CliRouting implements Bootstrapper
             $kernel = $container->get(Kernel::class);
             return new MakeKeyCommand(rootDirectory: $kernel->rootDirectory());
         });
+    }
+
+    private function registerBusMiddleware(Application $container): void
+    {
+        if (!$container->has(Bus::class)) {
+            return;
+        }
+
+        /** @var Bus $bus */
+        $bus = $container->get(Bus::class);
+
+        if ($bus instanceof MiddlewareBus) {
+            $bus->before(new ValidationGuard());
+        }
     }
 }

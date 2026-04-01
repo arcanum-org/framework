@@ -6,12 +6,16 @@ namespace Arcanum\Test\Rune;
 
 use Arcanum\Rune\CliExceptionWriter;
 use Arcanum\Rune\ConsoleOutput;
+use Arcanum\Validation\ValidationError;
+use Arcanum\Validation\ValidationException;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(CliExceptionWriter::class)]
 #[UsesClass(ConsoleOutput::class)]
+#[UsesClass(ValidationException::class)]
+#[UsesClass(ValidationError::class)]
 final class CliExceptionWriterTest extends TestCase
 {
     // ---------------------------------------------------------------
@@ -117,6 +121,47 @@ final class CliExceptionWriterTest extends TestCase
         $this->assertStringContainsString('Caused by:', $rendered);
         $this->assertStringContainsString('LogicException', $rendered);
         $this->assertStringContainsString('root cause', $rendered);
+    }
+
+    // ---------------------------------------------------------------
+    // Validation exceptions
+    // ---------------------------------------------------------------
+
+    public function testValidationExceptionShowsFieldErrors(): void
+    {
+        $stderr = $this->createStream();
+        $output = new ConsoleOutput($this->createStream(), $stderr, ansi: false);
+        $renderer = new CliExceptionWriter($output, debug: false);
+
+        $exception = new ValidationException([
+            new ValidationError('name', 'The name field is required.'),
+            new ValidationError('email', 'The email field must be a valid email address.'),
+        ]);
+
+        $renderer->render($exception);
+
+        $rendered = $this->readStream($stderr);
+        $this->assertStringContainsString('Validation failed:', $rendered);
+        $this->assertStringContainsString('name: The name field is required.', $rendered);
+        $this->assertStringContainsString('email: The email field must be a valid email address.', $rendered);
+    }
+
+    public function testValidationExceptionInDebugModeStillShowsFieldErrors(): void
+    {
+        $stderr = $this->createStream();
+        $output = new ConsoleOutput($this->createStream(), $stderr, ansi: false);
+        $renderer = new CliExceptionWriter($output, debug: true);
+
+        $exception = new ValidationException([
+            new ValidationError('name', 'The name field is required.'),
+        ]);
+
+        $renderer->render($exception);
+
+        $rendered = $this->readStream($stderr);
+        $this->assertStringContainsString('Validation failed:', $rendered);
+        $this->assertStringContainsString('name: The name field is required.', $rendered);
+        $this->assertStringNotContainsString('#0', $rendered);
     }
 
     // ---------------------------------------------------------------
