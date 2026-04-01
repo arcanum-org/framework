@@ -316,7 +316,7 @@ Wire Rune into the starter project as a working example.
 
 ### Phase 9: Documentation
 
-- [ ] Write `src/Rune/README.md` — package overview, CLI syntax, routing conventions, renderers, transport restriction, built-in commands
+- [x] Write `src/Rune/README.md` — package overview, CLI syntax, routing conventions, renderers, transport restriction, built-in commands
 - [ ] Update `README.md` — add Rune to the package list
 - [ ] Update `src/Atlas/README.md` — document `ConventionResolver` refactoring and shared convention system
 - [x] Update `src/Ignition/README.md` — document `RuneKernel` and shared bootstrapper architecture
