@@ -161,7 +161,66 @@ final class Submit
 
 Validation runs automatically via a Conveyor middleware — if validation fails, an HTTP request gets **422 Unprocessable Entity** with structured error details, and a CLI invocation gets a clear error message with exit code 2. No manual validation calls in handlers.
 
-Design areas: attribute-based rule system, a `Validator` class that inspects DTO constructor params via reflection, a `ValidationError` exception carrying structured field→messages, Conveyor middleware integration, extensible custom rules. The same validation works on both HTTP and CLI because it operates on the DTO, not the transport.
+Key design decisions:
+- Validation runs on the **hydrated DTO**, not raw input — the object already has typed values by the time validation runs.
+- Rules are **PHP attributes on constructor params** — inspected via reflection, same pattern as `#[Description]` and `#[CliOnly]`.
+- Validation is a **Conveyor before-middleware** (`Progression`) — same pattern as `TransportGuard`. Fires before the handler, aborts dispatch on failure.
+- `HandlerProxy` DTOs (dynamic `Command`/`Query`/`Page`) are **skipped** — they don't have constructor params to validate.
+- The `Validator` is a **standalone class** — testable independently of the bus, so apps can also validate manually when needed.
+
+#### Rule Interface and Built-in Rules
+
+- [ ] `Rule` interface — `validate(mixed $value, string $field): ValidationError|null`. Takes a value and the field name. Returns `null` if valid, or a `ValidationError` with a message if invalid. Every built-in rule and every custom rule implements this. The interface is an attribute target (`Attribute::TARGET_PARAMETER`) so rules double as PHP attributes.
+- [ ] `NotEmpty` rule — rejects `null`, `''`, `[]`. Message: `"The {field} field is required."` Handles the most common validation need.
+- [ ] `MinLength(int $min)` / `MaxLength(int $max)` — string length bounds via `mb_strlen`. Messages: `"The {field} field must be at least {min} characters."` / `"...must not exceed {max} characters."` Works on strings only — non-string values skip the check (type enforcement is PHP's job, not validation's).
+- [ ] `Min(int|float $min)` / `Max(int|float $max)` — numeric bounds. Messages: `"The {field} field must be at least {min}."` / `"...must not exceed {max}."` Works on int and float values.
+- [ ] `Email` — validates email format via `filter_var(FILTER_VALIDATE_EMAIL)`. Message: `"The {field} field must be a valid email address."` Does not check deliverability — that's the handler's concern.
+- [ ] `Pattern(string $regex)` — validates against a regex via `preg_match`. Message: `"The {field} field format is invalid."` For phone numbers, slugs, codes, etc.
+- [ ] `In(array $values)` — value must be one of the listed values. Message: `"The {field} field must be one of: {values}."` For enums and fixed sets.
+- [ ] `Url` — validates URL format via `filter_var(FILTER_VALIDATE_URL)`. Message: `"The {field} field must be a valid URL."`
+- [ ] `Uuid` — validates UUID v4 format via regex. Message: `"The {field} field must be a valid UUID."`
+- [ ] Tests for each rule: valid value returns null, invalid value returns `ValidationError` with correct field name and message, edge cases (empty string, null, wrong type, boundary values).
+
+#### Validation Engine
+
+- [ ] `ValidationError` — value object: `field` (string), `message` (string). Represents a single validation failure on a single field.
+- [ ] `ValidationException` — extends `RuntimeException`. Carries a `list<ValidationError>` of all failures. Provides `errors(): array` to retrieve them and `errorsByField(): array<string, list<string>>` to get a field-keyed map of messages. This is what the middleware throws on failure.
+- [ ] `Validator` — the core engine. `validate(object $dto): void` (throws `ValidationException` on failure) and `check(object $dto): list<ValidationError>` (returns errors without throwing). Uses reflection to read constructor params, finds `Rule` attributes on each param, reads the corresponding property value from the DTO, runs each rule. Collects **all** errors before throwing (doesn't stop at the first failure — the developer sees every problem at once).
+- [ ] `Validator` skips `HandlerProxy` instances — dynamic DTOs (Command, Query, Page) carry data in a Registry, not constructor params. They are validated by their underlying DTO class (if one exists) at a higher level.
+- [ ] `Validator` skips params with no `Rule` attributes — no attributes means no validation for that param, not an error.
+- [ ] `Validator` handles nullable params — if a param is nullable and the value is `null`, skip rule checks for that param (null is a valid value for nullable types). Rules only run on non-null values.
+- [ ] Tests: DTO with multiple rules on multiple params collects all errors, DTO with no rules passes, DTO with all valid values passes, nullable null value skips rules, `HandlerProxy` instances are skipped, `check()` returns errors without throwing, `validate()` throws `ValidationException`, error messages contain correct field names.
+
+#### Conveyor Middleware
+
+- [ ] `ValidationGuard` — Conveyor before-middleware (`Progression`). Resolves the DTO class from the payload (same `HandlerProxy` resolution as `TransportGuard`), instantiates `Validator`, calls `validate()`. On failure, the `ValidationException` propagates up — each kernel renders it appropriately. Follows the exact same pattern as `TransportGuard`: constructor takes no container dependency, works purely on the payload object.
+- [ ] Tests: valid DTO passes through and calls `$next()`, invalid DTO throws `ValidationException` before `$next()` is called, `HandlerProxy` payloads are skipped (passed through without validation).
+
+#### Error Rendering
+
+The validation middleware throws `ValidationException`. Each kernel's exception handling renders it for the transport:
+
+- [ ] `ValidationExceptionRenderer` in Hyper — catches `ValidationException`, renders a **422 Unprocessable Entity** JSON response with structured error body: `{"errors": {"name": ["The name field is required."], "email": ["The email field must be a valid email address."]}}`. Registered alongside `JsonExceptionResponseRenderer` in the HTTP exception handling chain.
+- [ ] CLI rendering — `CliExceptionWriter` already handles any `RuntimeException`. For `ValidationException` specifically, format the errors readably: one line per field with its messages. No new class needed if the default `CliExceptionWriter` output is acceptable, but consider a dedicated branch in the writer that checks `instanceof ValidationException` and formats the field→message list cleanly rather than dumping a stack trace.
+- [ ] Tests for `ValidationExceptionRenderer`: returns 422 status code, body contains field-keyed error messages, handles single and multiple errors, handles multiple errors on the same field.
+- [ ] Tests for CLI rendering: validation errors are readable on stderr, includes field names and messages.
+
+#### Bootstrap & Wiring
+
+- [ ] Register `ValidationGuard` as a Conveyor before-middleware — either in `Bootstrap\Routing` / `Bootstrap\CliRouting` (so it's automatic) or document that apps register it in their bootstrap files. Decision: automatic registration is better (validation should be opt-out, not opt-in). Slot after `TransportGuard` (check transport first, then validate).
+- [ ] Register `ValidationExceptionRenderer` in `Bootstrap\Exceptions` or the starter app's `bootstrap/http.php` — it needs to catch `ValidationException` before the generic `JsonExceptionResponseRenderer` turns it into a 500.
+- [ ] Starter app: update the `Contact\Submit` DTO to demonstrate validation attributes.
+- [ ] Tests for bootstrap integration: `ValidationGuard` is registered on the bus, `ValidationExceptionRenderer` catches validation errors correctly.
+
+#### Custom Rules
+
+- [ ] Document how to create custom rules: implement `Rule`, add `#[Attribute(Attribute::TARGET_PARAMETER)]`, use on DTO constructor params. Example: a `#[Unique('users', 'email')]` rule that checks a database (apps implement this, not the framework — it depends on persistence).
+- [ ] `Callback(callable)` rule — escape hatch for one-off validation logic that doesn't warrant a dedicated rule class. The callable receives the value and returns `true` (valid) or a string (error message). Useful during prototyping.
+
+#### Documentation
+
+- [ ] Write validation package `README.md` — overview, built-in rules reference, custom rules, manual validation, Conveyor integration, error rendering on HTTP and CLI. Include examples for each built-in rule.
+- [ ] Update `src/Flow/Conveyor/README.md` — mention `ValidationGuard` alongside `TransportGuard` in the middleware section.
 
 ### 3. Caching — new package (Vault)
 
