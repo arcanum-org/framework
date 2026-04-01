@@ -85,11 +85,12 @@ Bootstrappers run once, in order, the first time `bootstrap()` is called. Each o
 |---|---|---|
 | 1 | `Environment` | Loads `.env` file, validates required vars, registers `Environment` in container |
 | 2 | `Configuration` | Loads `config/*.php` files (or cache), registers `Configuration` in container |
-| 3 | `Routing` | Registers router, format registry, response renderers, page discovery, hydrator |
-| 4 | `RouteMiddleware` | Discovers per-route middleware from attributes and `Middleware.php` files |
-| 5 | `Logger` | Builds Monolog handlers and channels from config |
-| 6 | `Exceptions` | Sets PHP error/exception/shutdown handlers |
-| 7 | `Middleware` | Registers global HTTP middleware from config |
+| 3 | `Security` | Reads `APP_KEY`, registers `Encryptor`, `Signer`, and `Hasher` in container |
+| 4 | `Routing` | Registers router, format registry, response renderers, page discovery, hydrator |
+| 5 | `RouteMiddleware` | Discovers per-route middleware from attributes and `Middleware.php` files |
+| 6 | `Logger` | Builds Monolog handlers and channels from config |
+| 7 | `Exceptions` | Sets PHP error/exception/shutdown handlers |
+| 8 | `Middleware` | Registers global HTTP middleware from config |
 
 ### CLI bootstrappers
 
@@ -97,11 +98,12 @@ Bootstrappers run once, in order, the first time `bootstrap()` is called. Each o
 |---|---|---|
 | 1 | `Environment` | Same as HTTP — shared |
 | 2 | `Configuration` | Same as HTTP — shared |
-| 3 | `CliRouting` | Registers CLI router, format registry, formatters, output, built-in commands |
-| 4 | `Logger` | Same as HTTP — shared |
-| 5 | `Exceptions` | Same as HTTP — shared |
+| 3 | `Security` | Same as HTTP — shared |
+| 4 | `CliRouting` | Registers CLI router, format registry, formatters, output, built-in commands |
+| 5 | `Logger` | Same as HTTP — shared |
+| 6 | `Exceptions` | Same as HTTP — shared |
 
-Notice that `Environment`, `Configuration`, `Logger`, and `Exceptions` are **shared** between both transports. Only the routing and middleware bootstrappers differ — HTTP needs `Routing`, `RouteMiddleware`, and `Middleware`; CLI needs `CliRouting`.
+Notice that `Environment`, `Configuration`, `Security`, `Logger`, and `Exceptions` are **shared** between both transports. Only the routing and middleware bootstrappers differ — HTTP needs `Routing`, `RouteMiddleware`, and `Middleware`; CLI needs `CliRouting`.
 
 ### Customizing bootstrappers
 
@@ -302,7 +304,8 @@ Kernel interface
 Shared bootstrappers:        HTTP-only:            CLI-only:
 ├── Environment              ├── Routing           └── CliRouting
 ├── Configuration            ├── RouteMiddleware
-├── Logger                   └── Middleware
+├── Security                 └── Middleware
+├── Logger
 └── Exceptions
 
 Transport enum: Http | Cli

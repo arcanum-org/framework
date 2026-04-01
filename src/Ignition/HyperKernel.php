@@ -54,6 +54,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
     protected array $bootstrappers = [
         Bootstrap\Environment::class,
         Bootstrap\Configuration::class,
+        Bootstrap\Security::class,
         Bootstrap\Routing::class,
         Bootstrap\RouteMiddleware::class,
         Bootstrap\Logger::class,

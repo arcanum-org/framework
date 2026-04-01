@@ -17,6 +17,7 @@ use Arcanum\Rune\BuiltInRegistry;
 use Arcanum\Rune\CliExceptionWriter;
 use Arcanum\Rune\Command\HelpCommand;
 use Arcanum\Rune\Command\ListCommand;
+use Arcanum\Rune\Command\MakeKeyCommand;
 use Arcanum\Rune\Command\ValidateHandlersCommand;
 use Arcanum\Rune\ConsoleOutput;
 use Arcanum\Rune\Output;
@@ -164,6 +165,7 @@ class CliRouting implements Bootstrapper
             $registry->register('list', ListCommand::class);
             $registry->register('help', HelpCommand::class);
             $registry->register('validate:handlers', ValidateHandlersCommand::class);
+            $registry->register('make:key', MakeKeyCommand::class);
             return $registry;
         });
 
@@ -196,6 +198,12 @@ class CliRouting implements Bootstrapper
                 sourceDirectory: $this->resolveSourceDirectory($container, $namespace),
                 rootNamespace: $namespace,
             );
+        });
+
+        $container->factory(MakeKeyCommand::class, function () use ($container) {
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+            return new MakeKeyCommand(rootDirectory: $kernel->rootDirectory());
         });
     }
 }

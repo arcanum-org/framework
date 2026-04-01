@@ -58,6 +58,7 @@ class RuneKernel implements Kernel
     protected array $bootstrappers = [
         Bootstrap\Environment::class,
         Bootstrap\Configuration::class,
+        Bootstrap\Security::class,
         Bootstrap\CliRouting::class,
         Bootstrap\Logger::class,
         Bootstrap\Exceptions::class,
