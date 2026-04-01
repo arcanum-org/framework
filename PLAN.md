@@ -89,9 +89,56 @@ Scores: Impact (1=niche, 10=affects everyone), Difficulty (1=simple wrapper, 10=
 
 Foundational security utilities that other packages build on. Smallest effort, highest blocking score — sessions, auth, CSRF, and signed URLs all depend on these existing. Lives in Toolkit since these are general-purpose tools, not a standalone package.
 
-- **Encryption** — AES-256-GCM encrypt/decrypt with key management. Used by sessions (cookie encryption), signed URLs, API token generation.
-- **Hashing** — bcrypt and argon2id password hashing with a `Hasher` interface. Used by authentication.
-- **CSRF protection** — Token generation and verification middleware for HTML form submissions. Integrates with sessions (once sessions exist) and the template engine (a `{{ csrf() }}` helper).
+Downstream consumers:
+- **Sessions** need encryption (cookie encryption) and random tokens (session IDs)
+- **Auth** needs hashing (passwords), random tokens (API keys, remember-me), HMAC (signed tokens)
+- **CSRF middleware** needs random tokens (generation) and timing-safe comparison (verification)
+- **Signed URLs** need HMAC signing and verification
+
+#### Encryption
+
+- [ ] `Encryptor` interface — `encrypt(string $plaintext): string`, `decrypt(string $ciphertext): string`. The contract that downstream consumers depend on.
+- [ ] `EncryptionKey` value object — wraps a raw 32-byte key. Constructor validates length, throws `InvalidArgumentException` on wrong size. `fromBase64(string): self` factory for parsing `APP_KEY` from environment (the key is stored base64-encoded in `.env`).
+- [ ] `AesGcmEncryptor` — AES-256-GCM implementation via `openssl_encrypt`/`openssl_decrypt`. Generates a fresh random 12-byte nonce per encryption (nonce reuse with GCM is catastrophic). Produces a self-contained envelope: `base64(nonce || ciphertext || tag)`. On decrypt, splits the envelope, verifies the GCM authentication tag, and returns plaintext. Throws `DecryptionFailed` on any error (tampered data, wrong key, malformed envelope).
+- [ ] `DecryptionFailed` exception — extends `RuntimeException`. Carries no detail about *why* decryption failed (that would leak information to attackers).
+- [ ] Tests: encrypt/decrypt round-trip, tampered ciphertext throws `DecryptionFailed`, wrong key throws `DecryptionFailed`, malformed envelope (truncated, empty, not base64) throws `DecryptionFailed`, empty string encrypts/decrypts correctly, binary data round-trips, two encryptions of the same plaintext produce different envelopes (nonce uniqueness).
+- [ ] Tests for `EncryptionKey`: valid 32-byte key accepted, wrong length rejected, `fromBase64()` decodes correctly, `fromBase64()` rejects invalid base64.
+
+#### Hashing
+
+- [ ] `Hasher` interface — `hash(string $value): string`, `verify(string $value, string $hash): bool`, `needsRehash(string $hash): bool`. The `needsRehash()` method enables transparent algorithm migration: after a successful `verify()`, check if the hash should be upgraded, and if so, re-hash and update storage.
+- [ ] `BcryptHasher` — wraps `password_hash(PASSWORD_BCRYPT)` with configurable cost (default 12). Note: bcrypt silently truncates input at 72 bytes — document this limitation.
+- [ ] `Argon2Hasher` — wraps `password_hash(PASSWORD_ARGON2ID)` with configurable `memory_cost` (default 65536 = 64MB), `time_cost` (default 4), `threads` (default 1). Argon2id is the recommended algorithm when available.
+- [ ] Tests for `BcryptHasher`: hash/verify round-trip, wrong value returns false, `needsRehash()` returns true when cost changes, `needsRehash()` returns false for current params, hash output is a valid bcrypt string.
+- [ ] Tests for `Argon2Hasher`: hash/verify round-trip, wrong value returns false, `needsRehash()` detects stale params, hash output is a valid argon2id string. (Skip if argon2id not available in CI — guard with `extension_loaded` or `PASSWORD_ARGON2ID` constant check.)
+
+#### Random
+
+- [ ] `Random` static utility class — `bytes(int $length): string` (raw random bytes via `random_bytes`), `hex(int $bytes = 32): string` (hex-encoded, 64 chars for 32 bytes), `base64url(int $bytes = 32): string` (URL-safe base64, no padding). These are the building blocks for CSRF tokens, API keys, session IDs, nonces, and any other random value in the framework.
+- [ ] Tests: `bytes()` returns correct length, `hex()` output length is `$bytes * 2`, `hex()` contains only `[0-9a-f]`, `base64url()` contains only `[A-Za-z0-9_-]`, two calls to each method produce different values (probabilistic but effectively guaranteed at 32 bytes).
+
+#### HMAC Signing
+
+- [ ] `Signer` interface — `sign(string $payload): string`, `verify(string $payload, string $signature): bool`. Used by signed URLs, signed cookies, and any tamper-detection scenario.
+- [ ] `HmacSigner` — HMAC-SHA256 via `hash_hmac('sha256', ...)`. Verification uses `hash_equals()` for timing-safe comparison. Constructor takes a string key (the `APP_KEY` or a derived key).
+- [ ] Tests: sign/verify round-trip, tampered payload fails verification, wrong key fails verification, empty payload signs/verifies correctly, signature is a 64-character hex string.
+
+#### Bootstrap & Wiring
+
+- [ ] `Bootstrap\Security` bootstrapper in Ignition — reads `APP_KEY` from the `Environment` registry (set by `Bootstrap\Environment` from `.env`). Decodes the key via `EncryptionKey::fromBase64()`. Registers `Encryptor` (bound to `AesGcmEncryptor`) and `Signer` (bound to `HmacSigner`) in the container. Registers a default `Hasher` (bound to `BcryptHasher` — apps can override to `Argon2Hasher`). Throws `RuntimeException` if `APP_KEY` is missing or invalid.
+- [ ] Add `Bootstrap\Security` to both `HyperKernel::$bootstrappers` and `RuneKernel::$bootstrappers` — slot after `Configuration` (needs config to be loaded) and before `Routing` (so security services are available to middleware).
+- [ ] Starter app: add `APP_KEY=base64:<generated>` to `.env` and `.env.example`.
+- [ ] Tests for `Bootstrap\Security`: registers `Encryptor`, `Signer`, and `Hasher` in container; throws on missing `APP_KEY`; throws on invalid (wrong-length) key.
+
+#### CLI
+
+- [ ] `make:key` built-in Rune command — generates a random 32-byte key, base64-encodes it, prints `APP_KEY=base64:<key>`. Optionally writes directly to `.env` if `--write` flag is passed. Registered in `Bootstrap\CliRouting`.
+- [ ] Tests: output matches `APP_KEY=base64:...` format, `--write` flag modifies `.env` file, generated key decodes to 32 bytes.
+
+#### Documentation
+
+- [ ] Update `src/Toolkit/README.md` — document Encryption, Hashing, Random, and HMAC Signing sections with examples.
+- [ ] Update `src/Ignition/README.md` — add `Bootstrap\Security` to the bootstrapper tables for both HTTP and CLI.
 
 ### 2. Validation — new package
 
