@@ -1,19 +1,31 @@
 # Arcanum Atlas
 
-Atlas is the convention-based CQRS router. It maps HTTP requests to Query and Command handlers by converting URL path segments to PascalCase namespaces — no route files, no annotations, no configuration for the common case. The HTTP method determines intent: GET reads (Queries), PUT/POST/PATCH/DELETE writes (Commands).
+Atlas is Arcanum's convention-based CQRS router. It maps both HTTP requests and CLI commands to Query and Command handlers by converting path segments to PascalCase namespaces — no route files, no annotations, no configuration for the common case.
+
+The same `ConventionResolver` drives both transports. HTTP and CLI routers just differ in how they determine intent:
+
+- **HTTP**: the request method decides — GET → Query, PUT/POST/DELETE → Command
+- **CLI**: an explicit prefix decides — `query:` → Query, `command:` → Command
 
 ## Convention routing
 
-URL path segments map directly to PHP namespaces under a configurable root (default `App\Domain`). The last segment becomes the class name; preceding segments become namespace levels.
+Path segments map directly to PHP namespaces under a configurable root (default `App\Domain`). The last segment becomes the class name; preceding segments become namespace levels.
 
+**HTTP examples:**
 ```
-GET    /shop/products.json     → App\Domain\Shop\Query\Products + ProductsHandler
-PUT    /checkout/submit-payment → App\Domain\Checkout\Command\SubmitPayment + SubmitPaymentHandler
-POST   /checkout/submit-payment → App\Domain\Checkout\Command\SubmitPayment + PostSubmitPaymentHandler
-DELETE /checkout/submit-payment → App\Domain\Checkout\Command\SubmitPayment + DeleteSubmitPaymentHandler
+GET    /shop/products.json      → App\Domain\Shop\Query\Products
+PUT    /checkout/submit-payment  → App\Domain\Checkout\Command\SubmitPayment
+POST   /checkout/submit-payment  → App\Domain\Checkout\Command\SubmitPayment (PostSubmitPaymentHandler)
+DELETE /checkout/submit-payment  → App\Domain\Checkout\Command\SubmitPayment (DeleteSubmitPaymentHandler)
 ```
 
-Kebab-case URL segments are converted to PascalCase automatically: `/submit-payment` → `SubmitPayment`.
+**CLI examples:**
+```
+query:shop:products              → App\Domain\Shop\Query\Products
+command:checkout:submit-payment  → App\Domain\Checkout\Command\SubmitPayment
+```
+
+Kebab-case segments are converted to PascalCase automatically: `submit-payment` → `SubmitPayment`.
 
 ### HTTP method mapping
 
@@ -40,6 +52,50 @@ GET /shop/products       → default format (configured in formats.php)
 ```
 
 The extension is stripped before route matching — all formats resolve to the same handler. Shodo's `FormatRegistry` selects the correct renderer.
+
+## Shared convention system
+
+Under the hood, both `HttpRouter` and `CliRouter` delegate to `ConventionResolver`. It has two entry points:
+
+- `resolve(path, method, format)` — used by `HttpRouter`. The HTTP method determines the CQRS type (GET → Query, POST → Command, etc.).
+- `resolveByType(path, typeNamespace, handlerPrefix, format)` — the transport-agnostic core. The caller provides the CQRS type directly. `CliRouter` uses this, passing `'Query'` or `'Command'` based on the `query:`/`command:` prefix.
+
+This means convention routing is defined once and behaves identically on both transports. A DTO at `App\Domain\Shop\Query\Products` is reachable as both `GET /shop/products` and `query:shop:products`.
+
+## CLI routing
+
+`CliRouter` parses the `command:` or `query:` prefix from the first argument, converts the remaining colon-separated segments to a path, and delegates to `ConventionResolver::resolveByType()`:
+
+```
+command:contact:submit
+  → prefix: command → typeNamespace: Command
+  → path: contact/submit
+  → App\Domain\Contact\Command\Submit
+```
+
+### CLI route map
+
+For DTOs that don't follow the convention, register aliases in `config/routes.php` under the `cli` key:
+
+```php
+return [
+    'cli' => [
+        'deploy' => [
+            'class' => App\Infrastructure\Command\Deploy::class,
+            'type' => 'command',
+        ],
+    ],
+];
+```
+
+Custom CLI routes are checked before convention routing, just like custom HTTP routes.
+
+### CLI-specific flags
+
+- **`--help`** — intercepted before dispatch; returns a help route instead
+- **`--format=FORMAT`** — extracted and passed through to `Route::$format` (default: `cli`)
+
+See the [Rune README](../Rune/README.md) for full CLI documentation.
 
 ## Pages
 
@@ -296,11 +352,16 @@ Each step produces a `Route` value object with `dtoClass`, `handlerPrefix`, `for
 
 ### Error handling
 
-Atlas uses precise HTTP status codes:
+Atlas uses precise error responses on both transports:
 
+**HTTP:**
 - **404 Not Found** — no route matches the path
 - **405 Method Not Allowed** — path exists but HTTP method is wrong (includes `Allow` header)
-- **406 Not Acceptable** — unsupported response format (from Shodo's `FormatRegistry`)
+- **406 Not Acceptable** — unsupported response format
+
+**CLI:**
+- `UnresolvableRoute` exception with a clear message (e.g., "No query found for ...")
+- Exit code 2 (Invalid) for routing errors, exit code 1 for runtime errors
 
 ## Configuration
 
@@ -331,26 +392,36 @@ return [
 ## At a glance
 
 ```
+ConventionResolver (shared core — transport-agnostic)
+├── resolve(path, method, format)        ← called by HttpRouter
+└── resolveByType(path, type, prefix)    ← called by CliRouter
+
 HttpRouter
-|-- RouteMap (custom routes + auto-discovered pages)
-|-- PageResolver (legacy page support)
-\-- ConventionResolver (convention-based path → namespace)
+├── RouteMap (custom routes + auto-discovered pages)
+├── PageResolver (legacy page support)
+└── ConventionResolver
+
+CliRouter
+├── CliRouteMap (custom CLI aliases)
+└── ConventionResolver
 
 PageDiscovery
-|-- Scans app/Pages/ for *.html templates
-|-- Registers as GET-only routes with isPage: true
-\-- Caches discovery results
+├── Scans app/Pages/ for *.html templates
+├── Registers as GET-only routes with isPage: true
+└── Caches discovery results
 
-Route
-|-- dtoClass: string (fully-qualified class name)
-|-- handlerPrefix: string ('', 'Post', 'Patch', 'Delete')
-|-- format: string ('json', 'html', 'csv', 'txt')
-|-- isPage: bool
+Route (shared value object)
+├── dtoClass: string (fully-qualified class name)
+├── handlerPrefix: string ('', 'Post', 'Patch', 'Delete')
+├── format: string ('json', 'html', 'csv', 'txt', 'cli')
+├── isPage: bool
+└── isHelp: bool (CLI --help flag)
 
-Convention mapping:
+HTTP convention mapping:
   GET /shop/new-products.json
-  → path: /shop/new-products
-  → format: json
-  → namespace: App\Domain\Shop\Query\NewProducts
-  → handler: NewProductsHandler
+  → App\Domain\Shop\Query\NewProducts + NewProductsHandler
+
+CLI convention mapping:
+  query:shop:new-products
+  → App\Domain\Shop\Query\NewProducts + NewProductsHandler
 ```
