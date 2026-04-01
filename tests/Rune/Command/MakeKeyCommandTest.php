@@ -20,6 +20,9 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(Input::class)]
 #[UsesClass(Random::class)]
 #[UsesClass(EncryptionKey::class)]
+#[UsesClass(\Arcanum\Parchment\Reader::class)]
+#[UsesClass(\Arcanum\Parchment\Writer::class)]
+#[UsesClass(\Arcanum\Parchment\FileSystem::class)]
 final class MakeKeyCommandTest extends TestCase
 {
     private string $tempDir;

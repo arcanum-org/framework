@@ -14,6 +14,10 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[CoversClass(FileDriver::class)]
 #[UsesClass(KeyValidator::class)]
 #[UsesClass(InvalidArgument::class)]
+#[UsesClass(\Arcanum\Parchment\Reader::class)]
+#[UsesClass(\Arcanum\Parchment\Writer::class)]
+#[UsesClass(\Arcanum\Parchment\FileSystem::class)]
+#[UsesClass(\Arcanum\Parchment\Searcher::class)]
 final class FileDriverTest extends TestCase
 {
     private string $cacheDir;

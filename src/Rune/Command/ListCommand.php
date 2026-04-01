@@ -11,6 +11,7 @@ use Arcanum\Rune\BuiltInRegistry;
 use Arcanum\Rune\ExitCode;
 use Arcanum\Rune\Input;
 use Arcanum\Rune\Output;
+use Arcanum\Toolkit\Strings;
 use Symfony\Component\Finder\Finder;
 
 /**
@@ -109,8 +110,8 @@ final class ListCommand implements BuiltInCommand
             $classParts[$lastIndex] = $file->getFilenameWithoutExtension();
 
             $segments = array_merge(
-                array_map(fn(string $s): string => $this->toKebab($s), $domainParts),
-                array_map(fn(string $s): string => $this->toKebab($s), $classParts),
+                array_map(fn(string $s): string => Strings::kebab($s), $domainParts),
+                array_map(fn(string $s): string => Strings::kebab($s), $classParts),
             );
 
             $name = $type . ':' . implode(':', $segments);
@@ -197,11 +198,5 @@ final class ListCommand implements BuiltInCommand
         }
 
         return $attrs[0]->newInstance()->text;
-    }
-
-    private function toKebab(string $pascal): string
-    {
-        $result = preg_replace('/([a-z])([A-Z])/', '$1-$2', $pascal);
-        return strtolower($result ?? $pascal);
     }
 }

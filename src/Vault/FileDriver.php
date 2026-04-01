@@ -4,22 +4,37 @@ declare(strict_types=1);
 
 namespace Arcanum\Vault;
 
+use Arcanum\Parchment\FileSystem;
+use Arcanum\Parchment\Reader;
+use Arcanum\Parchment\Searcher;
+use Arcanum\Parchment\Writer;
 use Psr\SimpleCache\CacheInterface;
 
 /**
  * File-based cache driver. One file per key.
  *
  * Value and expiry are serialized together. Expired entries are lazily
- * deleted on access. This is the default driver — zero config, works
- * on any PHP installation.
+ * deleted on access. Uses Parchment for all file I/O.
+ * This is the default driver — zero config, works on any PHP installation.
  */
 final class FileDriver implements CacheInterface
 {
+    private readonly Reader $reader;
+    private readonly Writer $writer;
+    private readonly FileSystem $fileSystem;
+
     public function __construct(
         private readonly string $directory,
+        Reader $reader = new Reader(),
+        Writer $writer = new Writer(),
+        FileSystem $fileSystem = new FileSystem(),
     ) {
-        if (!is_dir($this->directory)) {
-            mkdir($this->directory, 0777, true);
+        $this->reader = $reader;
+        $this->writer = $writer;
+        $this->fileSystem = $fileSystem;
+
+        if (!$this->fileSystem->isDirectory($this->directory)) {
+            $this->fileSystem->mkdir($this->directory);
         }
     }
 
@@ -29,19 +44,19 @@ final class FileDriver implements CacheInterface
 
         $path = $this->path($key);
 
-        if (!file_exists($path)) {
+        if (!$this->fileSystem->isFile($path)) {
             return $default;
         }
 
-        $data = @unserialize((string) file_get_contents($path));
+        $data = @unserialize($this->reader->read($path));
 
         if (!is_array($data) || !array_key_exists('value', $data)) {
-            @unlink($path);
+            $this->fileSystem->delete($path);
             return $default;
         }
 
         if (isset($data['expiry']) && is_int($data['expiry']) && $data['expiry'] <= time()) {
-            @unlink($path);
+            $this->fileSystem->delete($path);
             return $default;
         }
 
@@ -59,12 +74,7 @@ final class FileDriver implements CacheInterface
         }
 
         $data = ['value' => $value, 'expiry' => $expiry];
-        $path = $this->path($key);
-
-        // Atomic write via temp file + rename.
-        $tmp = $path . '.' . uniqid('', true) . '.tmp';
-        file_put_contents($tmp, serialize($data), LOCK_EX);
-        rename($tmp, $path);
+        $this->writer->write($this->path($key), serialize($data));
 
         return true;
     }
@@ -75,8 +85,8 @@ final class FileDriver implements CacheInterface
 
         $path = $this->path($key);
 
-        if (file_exists($path)) {
-            @unlink($path);
+        if ($this->fileSystem->isFile($path)) {
+            $this->fileSystem->delete($path);
         }
 
         return true;
@@ -84,16 +94,12 @@ final class FileDriver implements CacheInterface
 
     public function clear(): bool
     {
-        if (!is_dir($this->directory)) {
+        if (!$this->fileSystem->isDirectory($this->directory)) {
             return true;
         }
 
-        $files = glob($this->directory . DIRECTORY_SEPARATOR . '*.cache');
-
-        if ($files !== false) {
-            foreach ($files as $file) {
-                @unlink($file);
-            }
+        foreach (Searcher::findAll('*.cache', $this->directory) as $file) {
+            $this->fileSystem->delete($file->getRealPath());
         }
 
         return true;

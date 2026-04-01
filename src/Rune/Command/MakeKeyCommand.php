@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Arcanum\Rune\Command;
 
+use Arcanum\Parchment\FileSystem;
+use Arcanum\Parchment\Reader;
+use Arcanum\Parchment\Writer;
 use Arcanum\Rune\Attribute\Description;
 use Arcanum\Rune\BuiltInCommand;
 use Arcanum\Rune\ExitCode;
@@ -21,6 +24,9 @@ final class MakeKeyCommand implements BuiltInCommand
 {
     public function __construct(
         private readonly string $rootDirectory,
+        private readonly Reader $reader = new Reader(),
+        private readonly Writer $writer = new Writer(),
+        private readonly FileSystem $fileSystem = new FileSystem(),
     ) {
     }
 
@@ -31,29 +37,24 @@ final class MakeKeyCommand implements BuiltInCommand
         $line = 'APP_KEY=' . $encoded;
 
         if ($input->hasFlag('write')) {
-            return $this->writeToEnv($line, $encoded, $output);
+            return $this->writeToEnv($line, $output);
         }
 
         $output->writeLine($line);
         return ExitCode::Success->value;
     }
 
-    private function writeToEnv(string $line, string $encoded, Output $output): int
+    private function writeToEnv(string $line, Output $output): int
     {
         $envPath = $this->rootDirectory . DIRECTORY_SEPARATOR . '.env';
 
-        if (!file_exists($envPath)) {
-            file_put_contents($envPath, $line . "\n");
+        if (!$this->fileSystem->isFile($envPath)) {
+            $this->writer->write($envPath, $line . "\n");
             $output->writeLine('APP_KEY written to .env');
             return ExitCode::Success->value;
         }
 
-        $contents = file_get_contents($envPath);
-
-        if ($contents === false) {
-            $output->errorLine('Could not read .env file.');
-            return ExitCode::Failure->value;
-        }
+        $contents = $this->reader->read($envPath);
 
         // Replace existing APP_KEY line, or append if not present.
         if (preg_match('/^APP_KEY=.*$/m', $contents)) {
@@ -62,7 +63,7 @@ final class MakeKeyCommand implements BuiltInCommand
             $contents = rtrim($contents, "\n") . "\n" . $line . "\n";
         }
 
-        file_put_contents($envPath, $contents);
+        $this->writer->write($envPath, (string) $contents);
         $output->writeLine('APP_KEY written to .env');
 
         return ExitCode::Success->value;

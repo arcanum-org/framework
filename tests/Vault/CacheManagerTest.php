@@ -20,6 +20,10 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(NullDriver::class)]
 #[UsesClass(KeyValidator::class)]
 #[UsesClass(InvalidArgument::class)]
+#[UsesClass(\Arcanum\Parchment\Reader::class)]
+#[UsesClass(\Arcanum\Parchment\Writer::class)]
+#[UsesClass(\Arcanum\Parchment\FileSystem::class)]
+#[UsesClass(\Arcanum\Parchment\Searcher::class)]
 final class CacheManagerTest extends TestCase
 {
     private string $tempDir;
