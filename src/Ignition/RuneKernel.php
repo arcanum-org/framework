@@ -17,6 +17,7 @@ use Arcanum\Flow\Conveyor\QueryResult;
 use Arcanum\Glitch\ExceptionHandler;
 use Arcanum\Rune\CliExceptionWriter;
 use Arcanum\Rune\ExitCode;
+use Arcanum\Rune\HelpWriter;
 use Arcanum\Rune\Input;
 use Arcanum\Rune\Output;
 use Arcanum\Shodo\CliFormatRegistry;
@@ -155,7 +156,8 @@ class RuneKernel implements Kernel
         $route = $router->resolve($input);
 
         if ($route->isHelp) {
-            $this->renderHelp($input, $route, $output);
+            $helpWriter = new HelpWriter($output);
+            $helpWriter->write($input->command(), $route->dtoClass, $route->isCommand());
             return ExitCode::Success->value;
         }
 
@@ -215,38 +217,6 @@ class RuneKernel implements Kernel
         }
 
         return ExitCode::Success->value;
-    }
-
-    /**
-     * Render help for a command/query DTO.
-     */
-    protected function renderHelp(Input $input, \Arcanum\Atlas\Route $route, Output $output): void
-    {
-        $type = $route->isCommand() ? 'command' : 'query';
-        $output->writeLine(sprintf('%s (%s)', $input->command(), $type));
-        $output->writeLine('');
-
-        if (!class_exists($route->dtoClass)) {
-            $output->writeLine('  No parameters (handler-only route).');
-            return;
-        }
-
-        $ref = new \ReflectionClass($route->dtoClass);
-        $constructor = $ref->getConstructor();
-
-        if ($constructor === null || $constructor->getNumberOfParameters() === 0) {
-            $output->writeLine('  No parameters.');
-            return;
-        }
-
-        foreach ($constructor->getParameters() as $param) {
-            $type = $param->getType();
-            $typeName = $type instanceof \ReflectionNamedType ? $type->getName() : 'mixed';
-            $suffix = $param->isDefaultValueAvailable()
-                ? sprintf(' (default: %s)', json_encode($param->getDefaultValue()))
-                : ' (required)';
-            $output->writeLine(sprintf('  --%-20s %s%s', $param->getName(), $typeName, $suffix));
-        }
     }
 
     /**
