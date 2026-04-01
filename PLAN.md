@@ -127,7 +127,7 @@ Downstream consumers:
 
 - [x] `Bootstrap\Security` bootstrapper in Ignition — reads `APP_KEY` from the `Environment` registry. Decodes the key via `EncryptionKey::fromBase64()`. Registers `Encryptor` (bound to `SodiumEncryptor`) and `Signer` (bound to `SodiumSigner`) in the container. Registers a default `Hasher` (bound to `BcryptHasher`). Throws `RuntimeException` if `APP_KEY` is missing or invalid.
 - [x] Add `Bootstrap\Security` to both `HyperKernel::$bootstrappers` and `RuneKernel::$bootstrappers` — slot after `Configuration` and before `Routing`.
-- [ ] Starter app: add `APP_KEY=base64:<generated>` to `.env` and `.env.example`.
+- [x] Starter app: add `APP_KEY=base64:<generated>` to `.env` and `.env.example`.
 - [x] Tests for `Bootstrap\Security`: registers `Encryptor`, `Signer`, and `Hasher` in container; throws on missing `APP_KEY`; throws on invalid (wrong-length) key; accepts key with and without `base64:` prefix; encryptor and signer are functional.
 
 #### CLI
