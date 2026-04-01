@@ -387,15 +387,15 @@ Extract pure formatting logic from each HTTP renderer into a `Formatter` class.
 
 Thin wrappers that compose a Shodo formatter and build ResponseInterface.
 
-- [ ] `ResponseRenderer` base class or trait in Hyper — shared logic for building a Response from a string body (Content-Type, Content-Length, Stream wrapping). Avoids duplicating the Response construction in every adapter.
-- [ ] `JsonResponseRenderer` in Hyper — wraps `JsonFormatter`, sets `application/json` content type.
-- [ ] `CsvResponseRenderer` in Hyper — wraps `CsvFormatter`, sets `text/csv` content type.
-- [ ] `HtmlResponseRenderer` in Hyper — wraps `HtmlFormatter`, sets `text/html` content type.
-- [ ] `PlainTextResponseRenderer` in Hyper — wraps `PlainTextFormatter`, sets `text/plain` content type.
-- [ ] Move `EmptyResponseRenderer` to Hyper — purely HTTP (status code + empty body, no formatting).
-- [ ] Move `JsonExceptionRenderer` to Hyper — depends on `JsonResponseRenderer` + Glitch. Rename to `JsonExceptionResponseRenderer` for clarity.
-- [ ] Move `UnsupportedFormat` exception — currently extends `HttpException`. Keep in Shodo but decouple: make it a plain `RuntimeException` in Shodo, and have the HTTP layer catch it and convert to 406. Or move to Glitch.
-- [ ] Tests for each adapter — verify Response status code, Content-Type header, body content matches formatter output.
+- [x] `ResponseBuilder` trait in Hyper — shared logic for building a Response from a string body (Content-Type, Content-Length, Stream wrapping). Avoids duplicating the Response construction in every adapter.
+- [x] `JsonResponseRenderer` in Hyper — wraps `JsonFormatter`, sets `application/json` content type.
+- [x] `CsvResponseRenderer` in Hyper — wraps `CsvFormatter`, sets `text/csv` content type.
+- [x] `HtmlResponseRenderer` in Hyper — wraps `HtmlFormatter`, sets `text/html` content type.
+- [x] `PlainTextResponseRenderer` in Hyper — wraps `PlainTextFormatter`, sets `text/plain` content type.
+- [x] Move `EmptyResponseRenderer` to Hyper — purely HTTP (status code + empty body, no formatting).
+- [x] Move `JsonExceptionRenderer` to Hyper — depends on `JsonResponseRenderer` + Glitch. Rename to `JsonExceptionResponseRenderer` for clarity.
+- [ ] Move `UnsupportedFormat` exception — deferred to Phase 4. Changing it now would regress 406 to 500 until the HTTP layer catches it. Will decouple atomically when wiring is updated.
+- [x] Tests for each adapter — verify Response status code, Content-Type header, body content matches formatter output.
 
 ### Phase 3: Delete Old Shodo Renderers
 
