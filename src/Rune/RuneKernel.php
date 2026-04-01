@@ -4,7 +4,17 @@ declare(strict_types=1);
 
 namespace Arcanum\Rune;
 
+use Arcanum\Atlas\Router;
+use Arcanum\Atlas\UnresolvableRoute;
 use Arcanum\Cabinet\Application;
+use Arcanum\Codex\Hydrator;
+use Arcanum\Flow\Conveyor\Bus;
+use Arcanum\Flow\Conveyor\Command;
+use Arcanum\Flow\Conveyor\EmptyDTO;
+use Arcanum\Flow\Conveyor\AcceptedDTO;
+use Arcanum\Flow\Conveyor\Query;
+use Arcanum\Flow\Conveyor\QueryResult;
+use Arcanum\Glitch\ExceptionHandler;
 use Arcanum\Ignition\Bootstrap;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\Kernel;
@@ -106,14 +116,145 @@ class RuneKernel implements Kernel
     /**
      * Handle CLI input and return an exit code.
      *
-     * Override this in your application's CLI Kernel to customize
-     * the dispatch pipeline.
+     * Parses argv, routes to a DTO, hydrates, dispatches through
+     * Conveyor, and renders output. Exceptions are caught and
+     * written to stderr.
      *
      * @param list<string> $argv Raw CLI arguments from $argv.
      */
     public function handle(array $argv): int
     {
+        $input = Input::fromArgv($argv);
+
+        /** @var Output $output */
+        $output = $this->container->get(Output::class);
+
+        if ($input->command() === '') {
+            $output->errorLine('Usage: <script> <command:|query:><name> [--options]');
+            return ExitCode::Invalid->value;
+        }
+
+        try {
+            return $this->handleInput($input, $output);
+        } catch (\Throwable $e) {
+            return $this->handleException($e, $output);
+        }
+    }
+
+    /**
+     * Route, hydrate, dispatch, and render.
+     */
+    protected function handleInput(Input $input, Output $output): int
+    {
+        /** @var Router $router */
+        $router = $this->container->get(Router::class);
+
+        $route = $router->resolve($input);
+
+        if ($route->isHelp) {
+            $this->renderHelp($input, $route, $output);
+            return ExitCode::Success->value;
+        }
+
+        /** @var Hydrator $hydrator */
+        $hydrator = $this->container->get(Hydrator::class);
+
+        /** @var Bus $bus */
+        $bus = $this->container->get(Bus::class);
+
+        $data = $input->all();
+
+        if (class_exists($route->dtoClass)) {
+            /** @var class-string<object> $dtoClass */
+            $dtoClass = $route->dtoClass;
+            $dto = $hydrator->hydrate($dtoClass, $data);
+        } elseif ($route->isCommand()) {
+            $dto = new Command($route->dtoClass, $data);
+        } else {
+            $dto = new Query($route->dtoClass, $data);
+        }
+
+        $result = $bus->dispatch($dto, $route->handlerPrefix);
+
+        return $this->renderResult($result, $output);
+    }
+
+    /**
+     * Render a dispatch result to output.
+     */
+    protected function renderResult(object $result, Output $output): int
+    {
+        if ($result instanceof EmptyDTO) {
+            return ExitCode::Success->value;
+        }
+
+        if ($result instanceof AcceptedDTO) {
+            $output->writeLine('Accepted.');
+            return ExitCode::Success->value;
+        }
+
+        if ($result instanceof QueryResult) {
+            $result = $result->data;
+        }
+
+        if (is_object($result)) {
+            $result = get_object_vars($result);
+        }
+
+        $output->writeLine((string) json_encode($result, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES));
         return ExitCode::Success->value;
+    }
+
+    /**
+     * Render help for a command/query DTO.
+     */
+    protected function renderHelp(Input $input, \Arcanum\Atlas\Route $route, Output $output): void
+    {
+        $type = $route->isCommand() ? 'command' : 'query';
+        $output->writeLine(sprintf('%s (%s)', $input->command(), $type));
+        $output->writeLine('');
+
+        if (!class_exists($route->dtoClass)) {
+            $output->writeLine('  No parameters (handler-only route).');
+            return;
+        }
+
+        $ref = new \ReflectionClass($route->dtoClass);
+        $constructor = $ref->getConstructor();
+
+        if ($constructor === null || $constructor->getNumberOfParameters() === 0) {
+            $output->writeLine('  No parameters.');
+            return;
+        }
+
+        foreach ($constructor->getParameters() as $param) {
+            $type = $param->getType();
+            $typeName = $type instanceof \ReflectionNamedType ? $type->getName() : 'mixed';
+            $suffix = $param->isDefaultValueAvailable()
+                ? sprintf(' (default: %s)', json_encode($param->getDefaultValue()))
+                : ' (required)';
+            $output->writeLine(sprintf('  --%-20s %s%s', $param->getName(), $typeName, $suffix));
+        }
+    }
+
+    /**
+     * Handle an exception during dispatch.
+     */
+    protected function handleException(\Throwable $e, Output $output): int
+    {
+        if ($this->container->has(ExceptionHandler::class)) {
+            /** @var ExceptionHandler $handler */
+            $handler = $this->container->get(ExceptionHandler::class);
+            $handler->handleException($e);
+        }
+
+        if ($e instanceof UnresolvableRoute) {
+            $output->errorLine('Error: ' . $e->getMessage());
+            return ExitCode::Invalid->value;
+        }
+
+        $output->errorLine('Error: ' . $e->getMessage());
+        return ExitCode::Failure->value;
     }
 
     public function terminate(): void
