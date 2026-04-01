@@ -92,6 +92,16 @@ foreach ($errors as $error) {
 
 ## Custom rules
 
+Custom rules live in `app/Validation/Rule/` by convention — mirroring the framework's own `Arcanum\Validation\Rule\` namespace. Rules are cross-cutting (a `#[Unique]` rule might apply to DTOs in any domain), so they belong at the app root, not inside a specific domain directory.
+
+```
+app/
+└── Validation/
+    └── Rule/
+        ├── Unique.php        → App\Validation\Rule\Unique
+        └── Exists.php        → App\Validation\Rule\Exists
+```
+
 Implement the `Rule` interface and add `#[Attribute(Attribute::TARGET_PARAMETER)]`:
 
 ```php
