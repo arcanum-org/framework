@@ -10,37 +10,47 @@ use Arcanum\Atlas\PageDiscovery;
 use Arcanum\Atlas\PageResolver;
 use Arcanum\Atlas\RouteMap;
 use Arcanum\Atlas\Router;
+use Arcanum\Atlas\UrlResolver;
+use Arcanum\Auth\ActiveIdentity;
+use Arcanum\Auth\AuthorizationGuard;
 use Arcanum\Cabinet\Application;
 use Arcanum\Codex\Hydrator;
-use Arcanum\Gather\Configuration;
-use Arcanum\Ignition\Bootstrapper;
-use Arcanum\Ignition\Kernel;
+use Arcanum\Flow\Conveyor\Bus;
+use Arcanum\Flow\Conveyor\MiddlewareBus;
 use Arcanum\Flow\Conveyor\PageHandler;
+use Arcanum\Forge\DomainContext;
+use Arcanum\Forge\DomainContextMiddleware;
+use Arcanum\Gather\Configuration;
+use Arcanum\Glitch\ExceptionRenderer;
 use Arcanum\Hyper\CsvResponseRenderer;
 use Arcanum\Hyper\FormatRegistry;
 use Arcanum\Hyper\HtmlResponseRenderer;
 use Arcanum\Hyper\JsonResponseRenderer;
 use Arcanum\Hyper\PlainTextResponseRenderer;
-use Arcanum\Shodo\Formatters\CsvFormatter;
+use Arcanum\Hyper\ValidationExceptionRenderer;
+use Arcanum\Ignition\Bootstrapper;
+use Arcanum\Ignition\Kernel;
+use Arcanum\Ignition\Transport;
+use Arcanum\Session\ActiveSession;
 use Arcanum\Shodo\Format;
+use Arcanum\Shodo\Formatters\CsvFormatter;
 use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\Formatters\JsonFormatter;
 use Arcanum\Shodo\Formatters\PlainTextFallbackFormatter;
 use Arcanum\Shodo\Formatters\PlainTextFormatter;
+use Arcanum\Shodo\HelperDiscovery;
+use Arcanum\Shodo\HelperRegistry;
+use Arcanum\Shodo\HelperResolver;
+use Arcanum\Shodo\Helpers\ArrHelper;
+use Arcanum\Shodo\Helpers\FormatHelper;
+use Arcanum\Shodo\Helpers\HtmlHelper;
+use Arcanum\Shodo\Helpers\RouteHelper;
+use Arcanum\Shodo\Helpers\StrHelper;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Shodo\TemplateResolver;
-use Arcanum\Flow\Conveyor\Bus;
-use Arcanum\Flow\Conveyor\MiddlewareBus;
-use Arcanum\Glitch\ExceptionRenderer;
-use Arcanum\Hyper\ValidationExceptionRenderer;
-use Arcanum\Auth\ActiveIdentity;
-use Arcanum\Auth\AuthorizationGuard;
-use Arcanum\Ignition\Transport;
 use Arcanum\Validation\ValidationGuard;
-use Arcanum\Forge\DomainContext;
-use Arcanum\Forge\DomainContextMiddleware;
 use Arcanum\Vault\CacheManager;
 use Arcanum\Vault\PrefixedCache;
 
@@ -68,6 +78,7 @@ class Routing implements Bootstrapper
 
         $this->registerFormats($container, $config);
         $this->registerRouter($container, $config);
+        $this->registerHelpers($container, $config);
         $this->registerHydrator($container);
         $this->registerBusMiddleware($container);
         $this->registerValidationRenderer($container);
@@ -129,11 +140,16 @@ class Routing implements Bootstrapper
             /** @var TemplateCache $cache */
             $cache = $container->get(TemplateCache::class);
 
+            $helpers = $container->has(HelperResolver::class)
+                ? $container->get(HelperResolver::class)
+                : null;
+
             return new HtmlFormatter(
                 resolver: $this->createTemplateResolver($container, $config, 'html'),
                 compiler: $compiler,
                 cache: $cache,
                 fallback: new HtmlFallbackFormatter(),
+                helpers: $helpers instanceof HelperResolver ? $helpers : null,
             );
         });
 
@@ -143,11 +159,16 @@ class Routing implements Bootstrapper
             /** @var TemplateCache $cache */
             $cache = $container->get(TemplateCache::class);
 
+            $helpers = $container->has(HelperResolver::class)
+                ? $container->get(HelperResolver::class)
+                : null;
+
             return new PlainTextFormatter(
                 resolver: $this->createTemplateResolver($container, $config, 'txt'),
                 compiler: $compiler,
                 cache: $cache,
                 fallback: new PlainTextFallbackFormatter(),
+                helpers: $helpers instanceof HelperResolver ? $helpers : null,
             );
         });
 
@@ -283,6 +304,67 @@ class Routing implements Bootstrapper
         $container->factory(Router::class, function () use ($resolver, $routeMap, $pages, $defaultFormat) {
             return new HttpRouter($resolver, $routeMap, $pages, $defaultFormat);
         });
+
+        $container->instance(UrlResolver::class, new UrlResolver(
+            rootNamespace: $namespace,
+            routeMap: $routeMap,
+            pagesNamespace: $pagesNamespace,
+        ));
+    }
+
+    private function registerHelpers(Application $container, Configuration $config): void
+    {
+        $global = new HelperRegistry();
+        $global->register('Format', new FormatHelper());
+        $global->register('Str', new StrHelper());
+        $global->register('Arr', new ArrHelper());
+
+        if ($container->has(ActiveSession::class)) {
+            /** @var ActiveSession $session */
+            $session = $container->get(ActiveSession::class);
+            $global->register('Html', new HtmlHelper($session));
+        }
+
+        if ($container->has(UrlResolver::class)) {
+            /** @var UrlResolver $urlResolver */
+            $urlResolver = $container->get(UrlResolver::class);
+            /** @var mixed $baseUrl */
+            $baseUrl = $config->get('app.url');
+            $global->register('Route', new RouteHelper(
+                $urlResolver,
+                is_string($baseUrl) ? $baseUrl : '',
+            ));
+        }
+
+        // Domain-scoped helper discovery
+        /** @var Kernel $kernel */
+        $kernel = $container->get(Kernel::class);
+
+        /** @var string $namespace */
+        $namespace = $config->get('app.namespace');
+
+        $rootDirectory = $kernel->rootDirectory()
+            . DIRECTORY_SEPARATOR . 'app'
+            . DIRECTORY_SEPARATOR . 'Domain';
+
+        $discoveryCache = null;
+        /** @var mixed $cacheEnabled */
+        $cacheEnabled = $config->get('cache.helpers.enabled');
+        if (($cacheEnabled === null || $cacheEnabled === true) && $container->has(CacheManager::class)) {
+            /** @var CacheManager $cacheManager */
+            $cacheManager = $container->get(CacheManager::class);
+            $discoveryCache = new PrefixedCache($cacheManager->frameworkStore('helpers'), 'fw.helpers.');
+        }
+
+        $discovery = new HelperDiscovery(
+            rootNamespace: $namespace,
+            rootDirectory: $rootDirectory,
+            cache: $discoveryCache,
+        );
+
+        $resolver = new HelperResolver($global, $discovery, $container);
+        $container->instance(HelperResolver::class, $resolver);
+        $container->instance(HelperDiscovery::class, $discovery);
     }
 
     private function registerHydrator(Application $container): void
