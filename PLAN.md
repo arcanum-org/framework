@@ -578,20 +578,19 @@ $ php arcanum logout
 
 ##### CliAuthResolver Update
 
-- [ ] Update `CliAuthResolver` to check stored CLI session between `--token` and env var:
+- [x] Update `CliAuthResolver` to check stored CLI session between `--token` and env var:
   1. `--token` flag → call token resolver
   2. `CliSession::load()` → if non-null, call identity resolver (same as `SessionGuard` uses)
   3. `ARCANUM_TOKEN` env var → call token resolver
-- [ ] `CliAuthResolver` constructor gains optional `CliSession` and identity resolver closure.
-- [ ] Tests: stored session resolves, expired session falls through to env, --token overrides stored session, all three sources work in priority order. ~4 tests.
+- [x] `CliAuthResolver` constructor gains optional `CliSession` and identity resolver closure.
+- [x] Tests: stored session resolves, expired session falls through to env, --token overrides stored session. 3 new tests (8 total).
 
 ##### Bootstrap & Wiring
 
-- [ ] `Bootstrap\Auth` registers `CliSession` for CLI kernels (with `Encryptor` and file path from `Kernel::filesDirectory()`).
-- [ ] `Bootstrap\Auth` passes `CliSession` and identity resolver to `CliAuthResolver`.
-- [ ] `Bootstrap\CliRouting` registers `LoginCommand` and `LogoutCommand` in `BuiltInRegistry`.
-- [ ] `LoginCommand` factory provides `Prompter`, `CliSession`, credentials resolver, login config.
-- [ ] Tests: CliSession registered, login/logout commands registered, resolver has session support. ~3 tests.
+- [x] `Bootstrap\Auth` registers `CliSession` for CLI kernels (with `Encryptor` and file path from `Kernel::filesDirectory()`).
+- [x] `Bootstrap\Auth` passes `CliSession` and identity resolver to `CliAuthResolver`.
+- [x] `Bootstrap\CliRouting` registers `LoginCommand` and `LogoutCommand` in `BuiltInRegistry`.
+- [x] `LoginCommand` factory provides `Prompter`, `CliSession`, credentials resolver, login config.
 
 ##### Documentation
 

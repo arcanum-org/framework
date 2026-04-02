@@ -7,6 +7,7 @@ namespace Arcanum\Ignition\Bootstrap;
 use Arcanum\Auth\ActiveIdentity;
 use Arcanum\Auth\AuthMiddleware;
 use Arcanum\Auth\CliAuthResolver;
+use Arcanum\Auth\CliSession;
 use Arcanum\Auth\CompositeGuard;
 use Arcanum\Auth\Guard;
 use Arcanum\Auth\Identity;
@@ -18,6 +19,7 @@ use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\HyperKernel;
 use Arcanum\Ignition\Kernel;
 use Arcanum\Session\ActiveSession;
+use Arcanum\Toolkit\Encryption\Encryptor;
 
 /**
  * Registers authentication infrastructure in the container.
@@ -85,17 +87,42 @@ class Auth implements Bootstrapper
 
     private function registerCliResolver(Application $container, Configuration $config): void
     {
-        $resolver = $config->get('auth.resolvers.token');
-        $resolverFn = $resolver instanceof \Closure
-            ? $resolver
+        $tokenResolver = $config->get('auth.resolvers.token');
+        $tokenResolverFn = $tokenResolver instanceof \Closure
+            ? $tokenResolver
             : fn(string $token) => null;
+
+        $identityResolver = $config->get('auth.resolvers.identity');
+        $identityResolverFn = $identityResolver instanceof \Closure
+            ? $identityResolver
+            : null;
 
         /** @var ActiveIdentity $activeIdentity */
         $activeIdentity = $container->get(ActiveIdentity::class);
 
+        // Register CliSession if Encryptor is available.
+        $session = null;
+        if ($container->has(Encryptor::class)) {
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+            /** @var Encryptor $encryptor */
+            $encryptor = $container->get(Encryptor::class);
+
+            $session = new CliSession(
+                encryptor: $encryptor,
+                path: $kernel->filesDirectory() . DIRECTORY_SEPARATOR . '.cli-session',
+            );
+            $container->instance(CliSession::class, $session);
+        }
+
         $container->instance(
             CliAuthResolver::class,
-            new CliAuthResolver($activeIdentity, $resolverFn),
+            new CliAuthResolver(
+                activeIdentity: $activeIdentity,
+                tokenResolver: $tokenResolverFn,
+                session: $session,
+                identityResolver: $identityResolverFn,
+            ),
         );
     }
 

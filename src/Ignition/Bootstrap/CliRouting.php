@@ -22,6 +22,10 @@ use Arcanum\Rune\Command\CacheClearCommand;
 use Arcanum\Rune\Command\CacheStatusCommand;
 use Arcanum\Rune\Command\DbStatusCommand;
 use Arcanum\Rune\Command\ForgeModelsCommand;
+use Arcanum\Auth\CliSession;
+use Arcanum\Rune\Command\LoginCommand;
+use Arcanum\Rune\Command\LogoutCommand;
+use Arcanum\Rune\Prompter;
 use Arcanum\Rune\Command\MakeCommandCommand;
 use Arcanum\Rune\Command\ValidateModelsCommand;
 use Arcanum\Rune\Command\MakeKeyCommand;
@@ -198,6 +202,8 @@ class CliRouting implements Bootstrapper
             $registry->register('forge:models', ForgeModelsCommand::class);
             $registry->register('validate:models', ValidateModelsCommand::class);
             $registry->register('db:status', DbStatusCommand::class);
+            $registry->register('login', LoginCommand::class);
+            $registry->register('logout', LogoutCommand::class);
             return $registry;
         });
 
@@ -329,6 +335,56 @@ class CliRouting implements Bootstrapper
             return new ValidateModelsCommand(
                 domainRoot: $domainRoot,
                 domainNamespace: $namespace,
+            );
+        });
+
+        $container->factory(LoginCommand::class, function () use ($container, $config) {
+            /** @var CliSession|null $session */
+            $session = $container->has(CliSession::class)
+                ? $container->get(CliSession::class)
+                : null;
+
+            $credentialsResolver = $config->get('auth.resolvers.credentials');
+            $credentialsResolverFn = $credentialsResolver instanceof \Closure
+                ? $credentialsResolver
+                : fn() => null;
+
+            /** @var mixed $fields */
+            $fields = $config->get('auth.login.fields');
+            $ttl = $config->asInt('auth.login.ttl', 86400);
+
+            /** @var Output $output */
+            $output = $container->get(Output::class);
+
+            return new LoginCommand(
+                prompter: new Prompter($output),
+                session: $session ?? new CliSession(
+                    encryptor: new \Arcanum\Toolkit\Encryption\SodiumEncryptor(
+                        new \Arcanum\Toolkit\Encryption\EncryptionKey(random_bytes(32)),
+                    ),
+                    path: sys_get_temp_dir() . '/.arcanum-cli-session',
+                ),
+                credentialsResolver: $credentialsResolverFn,
+                fields: is_array($fields)
+                    ? array_values(array_filter($fields, 'is_string'))
+                    : ['email', 'password'],
+                ttl: $ttl,
+            );
+        });
+
+        $container->factory(LogoutCommand::class, function () use ($container) {
+            /** @var CliSession|null $session */
+            $session = $container->has(CliSession::class)
+                ? $container->get(CliSession::class)
+                : null;
+
+            return new LogoutCommand(
+                session: $session ?? new CliSession(
+                    encryptor: new \Arcanum\Toolkit\Encryption\SodiumEncryptor(
+                        new \Arcanum\Toolkit\Encryption\EncryptionKey(random_bytes(32)),
+                    ),
+                    path: sys_get_temp_dir() . '/.arcanum-cli-session',
+                ),
             );
         });
 
