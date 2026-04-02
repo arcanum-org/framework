@@ -8,6 +8,7 @@ use Arcanum\Atlas\Router;
 use Arcanum\Atlas\UnresolvableRoute;
 use Arcanum\Cabinet\Application;
 use Arcanum\Codex\Hydrator;
+use Arcanum\Gather\Configuration;
 use Arcanum\Flow\Conveyor\Bus;
 use Arcanum\Flow\Conveyor\Command;
 use Arcanum\Flow\Conveyor\EmptyDTO;
@@ -140,8 +141,8 @@ class RuneKernel implements Kernel
         $output = $this->container->get(Output::class);
 
         if ($input->command() === '') {
-            $output->errorLine('Usage: <script> <command:|query:><name> [--options]');
-            return ExitCode::Invalid->value;
+            $this->splash($output);
+            return ExitCode::Success->value;
         }
 
         try {
@@ -269,5 +270,40 @@ class RuneKernel implements Kernel
 
     public function terminate(): void
     {
+    }
+
+    private function splash(Output $output): void
+    {
+        $name = 'Arcanum';
+
+        if ($this->container->has(Configuration::class)) {
+            /** @var Configuration $config */
+            $config = $this->container->get(Configuration::class);
+            $configured = $config->get('app.name');
+            if (is_string($configured) && $configured !== '') {
+                $name = $configured;
+            }
+        }
+
+        $output->writeLine($name);
+        $output->writeLine('');
+        $output->writeLine('Usage:');
+        $output->writeLine('  php arcanum <command>');
+        $output->writeLine('');
+        $output->writeLine('Run a query or command:');
+        $output->writeLine('  php arcanum query:<domain>:<name>');
+        $output->writeLine('  php arcanum command:<domain>:<name>');
+        $output->writeLine('');
+        $output->writeLine('Examples:');
+        $output->writeLine('  php arcanum query:health');
+        $output->writeLine('  php arcanum command:contact:submit --name="Alice"');
+        $output->writeLine('');
+        $output->writeLine('Common commands:');
+        $output->writeLine('  list                 Show all available commands');
+        $output->writeLine('  help <command>       Show help for a command');
+        $output->writeLine('  login                Log in to the CLI session');
+        $output->writeLine('  db:status            Show database connections');
+        $output->writeLine('');
+        $output->writeLine('Run "php arcanum list" for the full command list.');
     }
 }

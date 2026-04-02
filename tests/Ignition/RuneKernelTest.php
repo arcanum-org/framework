@@ -158,11 +158,11 @@ final class RuneKernelTest extends TestCase
     // handle() — empty command
     // ---------------------------------------------------------------
 
-    public function testHandleWithNoCommandReturnsInvalidExitCode(): void
+    public function testHandleWithNoCommandShowsSplash(): void
     {
         // Arrange
-        $stderr = $this->createStream();
-        $output = new ConsoleOutput($this->createStream(), $stderr, ansi: false);
+        $stdout = $this->createStream();
+        $output = new ConsoleOutput($stdout, $this->createStream(), ansi: false);
 
         $kernel = $this->bootstrapKernel($this->containerWith(output: $output));
 
@@ -170,8 +170,10 @@ final class RuneKernelTest extends TestCase
         $exitCode = $kernel->handle(['bin/arcanum']);
 
         // Assert
-        $this->assertSame(ExitCode::Invalid->value, $exitCode);
-        $this->assertStringContainsString('Usage:', $this->readStream($stderr));
+        $this->assertSame(ExitCode::Success->value, $exitCode);
+        $splash = $this->readStream($stdout);
+        $this->assertStringContainsString('Usage:', $splash);
+        $this->assertStringContainsString('php arcanum list', $splash);
     }
 
     // ---------------------------------------------------------------
