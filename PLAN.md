@@ -771,23 +771,21 @@ final class PlaceOrderHandler
 
 #### Database Service
 
-- [ ] `Database` — the developer-facing service. Constructor takes `ConnectionManager` and a `Model` directory root (from Kernel config).
-  - `model` property (via `__get`) — returns a `Model` object scoped to the current domain's Model directory. Resolution: the calling handler's namespace determines the Model path. `App\Domain\Shop\Command\PlaceOrderHandler` → `app/Domain/Shop/Model/`. Uses `debug_backtrace` or an explicit domain context set by the Conveyor dispatch.
+- [ ] `Database` — the developer-facing service. Constructor takes `ConnectionManager` and a domain root path (from Kernel config).
+  - `model` property (via `__get`) — returns a `Model` object scoped to the current domain's `Model/` directory. The domain is determined from the DTO's namespace, set by the Conveyor dispatch pipeline before the handler runs.
   - `transaction(\Closure $callback): mixed` — begins transaction on write connection, calls `$callback($this)`, commits. Rolls back on exception and rethrows.
   - `lastInsertId(): string` — delegates to write connection.
-  - `connection(string $name): Connection` — access a named connection directly (for cross-domain or multi-database scenarios).
-- [ ] **Domain context resolution** — needs design. Options:
-  - **Option A:** The Conveyor dispatch sets the domain context (from the DTO's namespace) before calling the handler. The `Database` service reads it. Automatic but requires Conveyor integration.
-  - **Option B:** The handler declares its Model path explicitly: `$this->db->model('Shop')` or `$this->db->shop` (dynamic property from config). More explicit, less magic.
-  - **Option C:** The `Database` service scans all `Model/` directories at boot and registers them by domain name. `$db->model` is ambiguous if multiple domains exist — need `$db->shop->products(...)` or `$db->orders->insertOrder(...)`.
-  - **Decision needed from user.**
-- [ ] Tests: model property returns Model, transaction commits, transaction rolls back, lastInsertId delegates, connection returns named connection. ~6 tests.
+- [ ] **Domain context: bounded and automatic.** The Conveyor dispatch extracts the domain from the DTO's namespace (`App\Domain\Shop\Command\PlaceOrder` → `Shop`) and sets it on the `Database` service before calling the handler. `$db->model` resolves to `app/Domain/Shop/Model/`. No cross-domain access — a handler in `Shop` cannot call SQL from `Users`. If a handler needs data from another domain, it dispatches a query through the Conveyor bus (the domain's public API).
+- [ ] `DomainContext` — request-scoped value holder (same pattern as `ActiveIdentity`). Set by Conveyor dispatch, read by `Database`. Methods: `set(string $domain)`, `get(): string`, `modelPath(): string`.
+- [ ] Conveyor integration: the `MiddlewareBus` (or a new Conveyor middleware) extracts the domain segment from the DTO's namespace and writes it to `DomainContext` before the handler runs. The domain is the namespace segment after the configured root (`App\Domain\`) and before `Command\`/`Query\` — e.g., `App\Domain\Shop\Command\PlaceOrder` → `Shop`, `App\Domain\Admin\Users\Query\List` → `Admin\Users`.
+- [ ] Tests: model property returns Model scoped to domain, transaction commits, transaction rolls back, lastInsertId delegates, domain context set from DTO namespace, cross-domain access not possible. ~8 tests.
 
 #### Bootstrap & Wiring
 
-- [ ] `Bootstrap\Database` bootstrapper — reads `config/database.php`, creates `ConnectionManager`, registers `Database` in container. Discovers Model directories under the app's domain root. HTTP-only and CLI kernels both get database support.
+- [ ] `Bootstrap\Database` bootstrapper — reads `config/database.php`, creates `ConnectionManager`, `DomainContext`, `Database`. Registers all in container. Configures domain root path from Kernel.
 - [ ] Added to `HyperKernel::$bootstrappers` and `RuneKernel::$bootstrappers` — after `Auth`, before `Routing`.
-- [ ] Tests: registers Database in container, ConnectionManager configured from config, works with no config (skips gracefully for apps without a database). ~4 tests.
+- [ ] Conveyor domain context middleware registered in both `Bootstrap\Routing` and `Bootstrap\CliRouting` — sets `DomainContext` from DTO namespace before handler dispatch.
+- [ ] Tests: registers Database in container, ConnectionManager configured from config, works with no config (skips gracefully for apps without a database), domain context middleware sets domain from DTO. ~5 tests.
 
 #### CLI Commands
 
