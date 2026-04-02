@@ -712,14 +712,15 @@ final class PlaceOrderHandler
 - **Model directory is domain-scoped.** `app/Domain/Shop/Model/` contains all SQL for the Shop bounded context. Shared queries live in a shared domain directory (e.g., `app/Domain/Shared/Model/`). Not table-scoped — a Model directory can query across tables.
 - **Parameters are named arrays.** `$db->model->products(['category' => 'shoes'])` binds `:category` in the SQL. Simple, no reflection on DTO constructors — just an associative array.
 - **Transactions are explicit.** `$db->transaction(fn(Database $db) => ...)` wraps a closure.
-- **Multiple connections out of the box.** `config/database.php` defines named connections with optional read/write split.
+- **Connections are config-driven.** `config/database.php` defines named connections with optional read/write split. One is the default. Domains can override their connection via a `domains` config map. Handlers can override explicitly via `$db->connection('name')->model->...`. Layering: default → domain override → explicit override.
+- **`lastInsertId()` lives on `Result`, not on `Database`.** Eliminates the footgun of calling it at the wrong time. `$db->model->insertOrder([...])->lastInsertId()` is unambiguous.
 
 #### Connection Management
 
 - [ ] `Connection` — thin PDO wrapper. Constructor takes DSN, username, password, options. Lazy-connects on first use. Methods: `run(string $sql, array $params): Result` — executes the SQL, returns a `Result` regardless of query type. `beginTransaction(): void`, `commit(): void`, `rollBack(): void`. Uses PDO named parameters and prepared statements. Sets `ERRMODE_EXCEPTION`, `FETCH_ASSOC` defaults. Tracks `lastInsertId()`.
 - [ ] `ConnectionFactory` — creates `Connection` instances from config arrays. Supports drivers: `mysql` (charset, collation), `pgsql`, `sqlite` (file path or `:memory:`). Builds DSN string from config keys (`host`, `port`, `database`, `unix_socket`, etc.).
-- [ ] `ConnectionManager` — manages named connections. Lazy instantiation (like `CacheManager`). `connection(string $name = ''): Connection` returns named or default. `readConnection(): Connection` returns the read replica if configured, otherwise the default. `writeConnection(): Connection` always returns the write primary.
-- [ ] Tests: Connection run returns Result, prepared statement parameter binding, transaction commit/rollback, lazy connection, ConnectionFactory builds correct DSN for each driver, ConnectionManager named connections, read/write split resolution, default fallback. ~18 tests.
+- [ ] `ConnectionManager` — manages named connections. Lazy instantiation (like `CacheManager`). `connection(string $name = ''): Connection` returns named or default. `connectionForDomain(string $domain): Connection` checks `domains` config map, falls back to default. `readConnection(string $name = ''): Connection` returns the read replica if configured, otherwise the named/default. `writeConnection(string $name = ''): Connection` always returns the write primary for the named/default.
+- [ ] Tests: Connection run returns Result, prepared statement parameter binding, transaction commit/rollback, lazy connection, ConnectionFactory builds correct DSN for each driver, ConnectionManager named connections, read/write split resolution, default fallback, domain-to-connection mapping, domain falls back to default. ~20 tests.
 
 #### Configuration
 
@@ -742,9 +743,20 @@ final class PlaceOrderHandler
               'driver' => 'sqlite',
               'database' => 'database.sqlite',  // relative to files/
           ],
+          'analytics' => [
+              'driver' => 'pgsql',
+              'host' => env('ANALYTICS_DB_HOST', '127.0.0.1'),
+              'database' => env('ANALYTICS_DB_DATABASE', 'analytics'),
+              'username' => env('ANALYTICS_DB_USERNAME', 'root'),
+              'password' => env('ANALYTICS_DB_PASSWORD', ''),
+          ],
       ],
-      'read' => null,   // connection name for read replica, or null
-      'write' => null,   // connection name for write primary, or null
+      'read' => null,    // connection name for read replica, or null
+      'write' => null,    // connection name for write primary, or null
+      'domains' => [
+          // Domain name => connection name. Unlisted domains use default.
+          'Analytics' => 'analytics',
+      ],
   ];
   ```
 
@@ -788,14 +800,14 @@ final class PlaceOrderHandler
 
 #### Database Service
 
-- [ ] `Database` — the developer-facing service. Constructor takes `ConnectionManager` and a domain root path (from Kernel config).
-  - `model` property (via `__get`) — returns a `Model` object scoped to the current domain's `Model/` directory. The domain is determined from the DTO's namespace, set by the Conveyor dispatch pipeline before the handler runs.
+- [ ] `Database` — the developer-facing service. Constructor takes `ConnectionManager`, `DomainContext`, and domain root path (from Kernel config).
+  - `model` property (via `__get`) — returns a `Model` object scoped to the current domain's `Model/` directory. Uses `DomainContext` to determine the path. Connection resolved by: domain config override → default connection.
+  - `connection(string $name): Database` — returns a new `Database` instance bound to the named connection, same domain scope. Allows `$db->connection('legacy')->model->activeUsers([])`. Does not change domain context — same Model directory, different server.
   - `transaction(\Closure $callback): mixed` — begins transaction on write connection, calls `$callback($this)`, commits. Rolls back on exception and rethrows.
-  - `lastInsertId(): string` — delegates to write connection.
 - [ ] **Domain context: bounded and automatic.** The Conveyor dispatch extracts the domain from the DTO's namespace (`App\Domain\Shop\Command\PlaceOrder` → `Shop`) and sets it on the `Database` service before calling the handler. `$db->model` resolves to `app/Domain/Shop/Model/`. No cross-domain access — a handler in `Shop` cannot call SQL from `Users`. If a handler needs data from another domain, it dispatches a query through the Conveyor bus (the domain's public API).
 - [ ] `DomainContext` — request-scoped value holder (same pattern as `ActiveIdentity`). Set by Conveyor dispatch, read by `Database`. Methods: `set(string $domain)`, `get(): string`, `modelPath(): string`.
 - [ ] Conveyor integration: the `MiddlewareBus` (or a new Conveyor middleware) extracts the domain segment from the DTO's namespace and writes it to `DomainContext` before the handler runs. The domain is the namespace segment after the configured root (`App\Domain\`) and before `Command\`/`Query\` — e.g., `App\Domain\Shop\Command\PlaceOrder` → `Shop`, `App\Domain\Admin\Users\Query\List` → `Admin\Users`.
-- [ ] Tests: model property returns Model scoped to domain, transaction commits, transaction rolls back, lastInsertId delegates, domain context set from DTO namespace, cross-domain access not possible. ~8 tests.
+- [ ] Tests: model property returns Model scoped to domain, transaction commits, transaction rolls back, domain context set from DTO namespace, cross-domain access not possible, connection() returns Database with different connection same domain, domain config override selects correct connection. ~9 tests.
 
 #### Bootstrap & Wiring
 
