@@ -14,3 +14,6 @@ parameters:
         - identifier: method.notFound
           path: ../tests/Forge/ModelTest.php
           reportUnmatched: false
+        - identifier: method.notFound
+          path: ../tests/Forge/DatabaseTest.php
+          reportUnmatched: false

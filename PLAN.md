@@ -806,14 +806,14 @@ final class PlaceOrderHandler
 
 #### Database Service
 
-- [ ] `Database` — the developer-facing service. Constructor takes `ConnectionManager`, `DomainContext`, and domain root path (from Kernel config).
+- [x] `Database` — the developer-facing service. Constructor takes `ConnectionManager`, `DomainContext`, and domain root path (from Kernel config).
   - `model` property (via `__get`) — returns a `Model` object scoped to the current domain's `Model/` directory. Uses `DomainContext` to determine the path. Connection resolved by: domain config override → default connection.
   - `connection(string $name): Database` — returns a new `Database` instance bound to the named connection, same domain scope. Allows `$db->connection('legacy')->model->activeUsers([])`. Does not change domain context — same Model directory, different server.
   - `transaction(\Closure $callback): mixed` — begins transaction on write connection, calls `$callback($this)`, commits. Rolls back on exception and rethrows.
-- [ ] **Domain context: bounded and automatic.** The Conveyor dispatch extracts the domain from the DTO's namespace (`App\Domain\Shop\Command\PlaceOrder` → `Shop`) and sets it on the `Database` service before calling the handler. `$db->model` resolves to `app/Domain/Shop/Model/`. No cross-domain access — a handler in `Shop` cannot call SQL from `Users`. If a handler needs data from another domain, it dispatches a query through the Conveyor bus (the domain's public API).
-- [ ] `DomainContext` — request-scoped value holder (same pattern as `ActiveIdentity`). Set by Conveyor dispatch, read by `Database`. Methods: `set(string $domain)`, `get(): string`, `modelPath(): string`.
-- [ ] Conveyor integration: the `MiddlewareBus` (or a new Conveyor middleware) extracts the domain segment from the DTO's namespace and writes it to `DomainContext` before the handler runs. The domain is the namespace segment after the configured root (`App\Domain\`) and before `Command\`/`Query\` — e.g., `App\Domain\Shop\Command\PlaceOrder` → `Shop`, `App\Domain\Admin\Users\Query\List` → `Admin\Users`.
-- [ ] Tests: model property returns Model scoped to domain, transaction commits, transaction rolls back, domain context set from DTO namespace, cross-domain access not possible, connection() returns Database with different connection same domain, domain config override selects correct connection. ~9 tests.
+- [x] **Domain context: bounded and automatic.** The Conveyor dispatch extracts the domain from the DTO's namespace (`App\Domain\Shop\Command\PlaceOrder` → `Shop`) and sets it on the `Database` service before calling the handler. `$db->model` resolves to `app/Domain/Shop/Model/`. No cross-domain access — a handler in `Shop` cannot call SQL from `Users`. If a handler needs data from another domain, it dispatches a query through the Conveyor bus (the domain's public API).
+- [x] `DomainContext` — request-scoped value holder (same pattern as `ActiveIdentity`). Set by Conveyor dispatch, read by `Database`. Methods: `set(string $domain)`, `get(): string`, `modelPath(): string`.
+- [x] Conveyor integration: the `MiddlewareBus` (or a new Conveyor middleware) extracts the domain segment from the DTO's namespace and writes it to `DomainContext` before the handler runs. The domain is the namespace segment after the configured root (`App\Domain\`) and before `Command\`/`Query\` — e.g., `App\Domain\Shop\Command\PlaceOrder` → `Shop`, `App\Domain\Admin\Users\Query\List` → `Admin\Users`.
+- [x] Tests: model property returns Model scoped to domain, transaction commits, transaction rolls back, domain context set from DTO namespace, connection() returns Database with different connection same domain, domain config override selects correct connection. ~9 tests.
 
 #### Bootstrap & Wiring
 
