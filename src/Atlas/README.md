@@ -97,6 +97,37 @@ Custom CLI routes are checked before convention routing, just like custom HTTP r
 
 See the [Rune README](../Rune/README.md) for full CLI documentation.
 
+## Reverse URL resolution
+
+`UrlResolver` converts a DTO class name back into a URL path — the inverse of `ConventionResolver`. This powers template helpers like `{{ Route::url('App\\Domain\\Query\\Health') }}`.
+
+### Convention reversal
+
+The resolver strips the root namespace, removes the `Query`/`Command` type segment, and converts PascalCase to kebab-case:
+
+```
+App\Domain\Shop\Query\ProductsFeatured  → /shop/products-featured
+App\Domain\Query\Health                  → /health
+App\Domain\Contact\Command\Submit        → /contact/submit
+App\Pages\Docs\GettingStarted           → /docs/getting-started
+```
+
+### Custom route lookup
+
+When a `RouteMap` is provided, the resolver checks for custom routes first via a reverse index (DTO class → path). If the DTO has a custom route registered, that path is returned instead of the convention-derived path. Falls back to convention for unregistered DTOs.
+
+### Constructor
+
+```php
+$resolver = new UrlResolver(
+    rootNamespace: 'App\\Domain',
+    routeMap: $routeMap,              // optional — for custom route reverse lookup
+    pagesNamespace: 'App\\Pages',     // optional — for page class resolution
+);
+
+$resolver->resolve('App\\Domain\\Shop\\Query\\Products'); // → '/shop/products'
+```
+
 ## Pages
 
 Pages are template-driven routes that live outside the Domain namespace. A page exists because a **template** exists — no handler needed, no config needed.

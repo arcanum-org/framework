@@ -59,7 +59,7 @@ Arcanum is a collection of packages that work together to create a robust, scala
 
 ### Arcanum Shodo
 
-[Shodo](https://github.com/arcanum-org/framework/tree/main/src/Shodo) (書道, "the way of writing") is the output formatting package. It converts handler results into strings — JSON, CSV, HTML, plain text, key-value pairs, tables — without any knowledge of HTTP or CLI. Formatters produce content; transport layers deliver it. On HTTP, Hyper's response renderers wrap formatter output in a `ResponseInterface` with the correct Content-Type and status code. On CLI, Rune writes formatter output directly to the terminal. The same `JsonFormatter` serves both `GET /health.json` and `php arcanum query:health --format=json`.
+[Shodo](https://github.com/arcanum-org/framework/tree/main/src/Shodo) (書道, "the way of writing") is the output formatting package. It converts handler results into strings — JSON, CSV, HTML, plain text, key-value pairs, tables — without any knowledge of HTTP or CLI. Formatters produce content; transport layers deliver it. On HTTP, Hyper's response renderers wrap formatter output in a `ResponseInterface` with the correct Content-Type and status code. On CLI, Rune writes formatter output directly to the terminal. The same `JsonFormatter` serves both `GET /health.json` and `php arcanum query:health --format=json`. Template helpers provide reusable functions in templates — `{{ Format::number($price, 2) }}`, `{{ Route::url(...) }}`, `{{ @csrf }}` — with domain-scoped registration via co-located `Helpers.php` files.
 
 ### Arcanum Rune
 

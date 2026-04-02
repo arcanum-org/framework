@@ -190,6 +190,71 @@ Caching is controlled via `config/cache.php`:
 ],
 ```
 
+## Template helpers
+
+Template helpers provide reusable functions callable from templates using static-method syntax:
+
+```html
+{{ Format::number($price, 2) }}
+{{ Route::url('App\\Domain\\Query\\Health') }}
+{{ Str::truncate($description, 100) }}
+{{! Html::csrf() !}}
+{{ @csrf }}
+```
+
+The compiler rewrites `Name::method(...)` to `$__helpers['Name']->method(...)`. Escaped output (`{{ }}`) wraps the result in `$__escape`; raw output (`{{! !}}`) does not. The `{{ @csrf }}` directive is shorthand for `{{! Html::csrf() !}}`.
+
+### Built-in helpers
+
+| Alias | Class | Methods |
+|-------|-------|---------|
+| **Format** | `FormatHelper` | `number($value, $decimals, $decSep, $thousandsSep)`, `date($timestamp, $format)` |
+| **Str** | `StrHelper` | `truncate($text, $length, $suffix)`, `lower($str)`, `upper($str)`, `title($str)`, `kebab($str)` |
+| **Arr** | `ArrHelper` | `count($items)`, `join($items, $sep)`, `first($items)`, `last($items)` |
+| **Route** | `RouteHelper` | `url($dtoClass)`, `asset($path)` — requires HTTP bootstrap |
+| **Html** | `HtmlHelper` | `csrf()`, `csrfToken()`, `nonce()`, `classIf($cond, $class)` — requires HTTP bootstrap |
+
+Format, Str, and Arr are always available. Route and Html are registered by the HTTP bootstrap when their dependencies exist (UrlResolver, ActiveSession).
+
+### Domain-scoped helpers
+
+Custom helpers are registered via co-located `Helpers.php` files, following the same convention as `Middleware.php`:
+
+```
+app/Domain/Helpers.php              → available to all domains
+app/Domain/Shop/Helpers.php         → only Shop queries/commands
+app/Domain/Shop/Checkout/Helpers.php → only Checkout subdomain
+```
+
+Each file returns an array mapping aliases to class names:
+
+```php
+<?php
+
+return [
+    'Cart' => \App\Domain\Shop\CartHelper::class,
+];
+```
+
+At format-time, the `HelperResolver` walks from the root to the DTO's domain namespace, accumulating helpers. Deeper domains override shallower ones — a `Cart` alias in `Shop/Checkout/Helpers.php` overrides the same alias in `Shop/Helpers.php`.
+
+Discovery results are cached via PSR-16 (controlled by `cache.helpers.enabled` in `config/cache.php`).
+
+### How it works
+
+```
+TemplateCompiler
+  compiles {{ Route::url(...) }} → $__helpers['Route']->url(...)
+
+HelperResolver
+  for('App\Domain\Shop\Query\Products')
+    → merges global HelperRegistry + domain Helpers.php matches
+    → returns ['Format' => FormatHelper, 'Route' => RouteHelper, 'Cart' => CartHelper, ...]
+
+HtmlFormatter / PlainTextFormatter
+  injects $__helpers into template scope via extract()
+```
+
 ## CLI format registry
 
 The `CliFormatRegistry` maps `--format` values to formatters for CLI output:
@@ -236,15 +301,22 @@ To add a custom format, add an entry and implement `Formatter`. To disable a for
 ```
 Shodo (pure formatting — no transport dependency)
 ├── Formatter interface
-├── JsonFormatter (pure serializer)
-├── CsvFormatter (pure tabular serializer)
-├── HtmlFormatter (template-based, htmlspecialchars escape)
-├── PlainTextFormatter (template-based, identity escape)
-├── KeyValueFormatter (auto-detect: key-value pairs or table)
-├── TableFormatter (ASCII tables)
+├── Formatters/
+│   ├── JsonFormatter (pure serializer)
+│   ├── CsvFormatter (pure tabular serializer)
+│   ├── HtmlFormatter (template-based, htmlspecialchars escape)
+│   ├── PlainTextFormatter (template-based, identity escape)
+│   ├── KeyValueFormatter (auto-detect: key-value pairs or table)
+│   ├── TableFormatter (ASCII tables)
+│   ├── HtmlFallbackFormatter / PlainTextFallbackFormatter
 ├── TemplateCompiler → TemplateCache → TemplateResolver
-├── HtmlFallback / PlainTextFallback
-└── CliFormatRegistry (--format → Formatter)
+├── HelperRegistry → HelperResolver → HelperDiscovery
+├── Helpers/
+│   ├── FormatHelper, StrHelper, ArrHelper (always available)
+│   ├── RouteHelper, HtmlHelper (HTTP bootstrap)
+├── CliFormatRegistry (--format → Formatter)
+├── Format (extension + content type value object)
+└── UnsupportedFormat (exception)
 
 Hyper (HTTP response adapters — compose Shodo formatters)
 ├── ResponseRenderer (abstract base)
