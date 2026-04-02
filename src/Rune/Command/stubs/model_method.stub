@@ -1,0 +1,4 @@
+    public function {{! $methodName !}}({{! $params !}}): Result
+    {
+        return $this->execute('{{! $methodName !}}', {{! $paramsArray !}});
+    }

@@ -20,6 +20,8 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(Reader::class)]
 #[UsesClass(Writer::class)]
 #[UsesClass(Searcher::class)]
+#[UsesClass(\Arcanum\Parchment\FileSystem::class)]
+#[UsesClass(\Arcanum\Shodo\TemplateCompiler::class)]
 final class ModelGeneratorTest extends TestCase
 {
     private string $modelDir;
@@ -138,7 +140,7 @@ final class ModelGeneratorTest extends TestCase
 
         // Assert
         $this->assertStringContainsString(
-            "\$this->__call('getById'",
+            "\$this->execute('getById'",
             $source,
         );
         $this->assertStringContainsString("'id' => \$id", $source);
@@ -158,7 +160,7 @@ final class ModelGeneratorTest extends TestCase
 
         // Assert
         $this->assertStringContainsString('function countAll(): Result', $source);
-        $this->assertStringContainsString("__call('countAll', [])", $source);
+        $this->assertStringContainsString("execute('countAll', [])", $source);
     }
 
     public function testGenerateAndWriteCreatesFile(): void

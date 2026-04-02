@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Arcanum\Forge;
 
+use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Searcher;
 use Arcanum\Parchment\Writer;
+use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Toolkit\Strings;
 
 /**
@@ -16,12 +18,20 @@ use Arcanum\Toolkit\Strings;
  * class that extends Forge\Model with a typed method for each file.
  * This is the engine behind the forge:models Rune command and dev-mode
  * auto-regeneration.
+ *
+ * Uses stub templates (model.stub and model_method.stub) which can be
+ * overridden by the app at {rootDirectory}/stubs/.
  */
 final class ModelGenerator
 {
+    private const string STUBS_DIR = __DIR__ . '/../Rune/Command/stubs';
+
     public function __construct(
+        private readonly string $rootDirectory = '',
         private readonly Reader $reader = new Reader(),
         private readonly Writer $writer = new Writer(),
+        private readonly FileSystem $fileSystem = new FileSystem(),
+        private readonly TemplateCompiler $compiler = new TemplateCompiler(),
     ) {
     }
 
@@ -29,19 +39,19 @@ final class ModelGenerator
      * Generate a model class for a single domain's Model/ directory.
      *
      * @param string $modelDir Absolute path to the Model/ directory containing .sql files.
-     * @param string $namespace The fully qualified namespace for the generated class.
+     * @param string $classNamespace The fully qualified class name for the generated class.
      * @return string The generated PHP source code.
      */
-    public function generate(string $modelDir, string $namespace): string
+    public function generate(string $modelDir, string $classNamespace): string
     {
         $sqlFiles = $this->discoverSqlFiles($modelDir);
 
         $methods = [];
         foreach ($sqlFiles as $file) {
-            $methods[] = $this->buildMethod($file);
+            $methods[] = $this->renderMethod($file);
         }
 
-        return $this->render($namespace, $methods);
+        return $this->renderClass($classNamespace, $methods);
     }
 
     /**
@@ -49,15 +59,18 @@ final class ModelGenerator
      *
      * @return bool True if written, false if no SQL files found.
      */
-    public function generateAndWrite(string $modelDir, string $namespace, string $outputPath): bool
-    {
+    public function generateAndWrite(
+        string $modelDir,
+        string $classNamespace,
+        string $outputPath,
+    ): bool {
         $sqlFiles = $this->discoverSqlFiles($modelDir);
 
         if ($sqlFiles === []) {
             return false;
         }
 
-        $source = $this->generate($modelDir, $namespace);
+        $source = $this->generate($modelDir, $classNamespace);
         $this->writer->write($outputPath, $source);
 
         return true;
@@ -107,7 +120,7 @@ final class ModelGenerator
         return $files;
     }
 
-    private function buildMethod(string $sqlFile): string
+    private function renderMethod(string $sqlFile): string
     {
         $filename = basename($sqlFile, '.sql');
         $methodName = lcfirst($filename);
@@ -116,37 +129,37 @@ final class ModelGenerator
         $paramAnnotations = Sql::parseParams($sql);
         $bindings = Sql::extractBindings($sql);
 
-        $params = $this->buildParams($bindings, $paramAnnotations);
+        $params = $this->buildParamSignature($bindings, $paramAnnotations);
+        $paramsArray = $this->buildParamsArray($bindings);
 
-        $arrayEntries = [];
-        foreach ($bindings as $binding) {
-            $phpName = Strings::camel($binding);
-            $arrayEntries[] = sprintf("            '%s' => \$%s,", $binding, $phpName);
-        }
+        $stub = $this->loadStub('model_method');
 
-        $signature = $params !== [] ? implode(', ', $params) : '';
-        $body = $arrayEntries !== []
-            ? sprintf(
-                "return \$this->__call('%s', [[\n%s\n        ]]);",
-                $methodName,
-                implode("\n", $arrayEntries),
-            )
-            : sprintf("return \$this->__call('%s', []);", $methodName);
+        return $this->compiler->render($stub, [
+            'methodName' => $methodName,
+            'params' => $params,
+            'paramsArray' => $paramsArray,
+        ]);
+    }
 
-        return sprintf(
-            "    public function %s(%s): Result\n    {\n        %s\n    }",
-            $methodName,
-            $signature,
-            $body,
-        );
+    /**
+     * @param list<string> $methods Pre-rendered method strings.
+     */
+    private function renderClass(string $classNamespace, array $methods): string
+    {
+        $stub = $this->loadStub('model');
+
+        return $this->compiler->render($stub, [
+            'namespace' => Strings::classNamespace($classNamespace),
+            'className' => Strings::classBaseName($classNamespace),
+            'methods' => implode("\n\n", $methods),
+        ]);
     }
 
     /**
      * @param list<string> $bindings
      * @param array<string, string> $paramAnnotations
-     * @return list<string>
      */
-    private function buildParams(array $bindings, array $paramAnnotations): array
+    private function buildParamSignature(array $bindings, array $paramAnnotations): string
     {
         $params = [];
 
@@ -156,35 +169,38 @@ final class ModelGenerator
             $params[] = sprintf('%s $%s', $type, $phpName);
         }
 
-        return $params;
+        return implode(', ', $params);
     }
 
     /**
-     * @param list<string> $methods
+     * @param list<string> $bindings
      */
-    private function render(string $namespace, array $methods): string
+    private function buildParamsArray(array $bindings): string
     {
-        $methodBlock = implode("\n\n", $methods);
+        if ($bindings === []) {
+            return '[]';
+        }
 
-        $lines = [
-            '<?php',
-            '',
-            '// This file is auto-generated by forge:models. Do not edit.',
-            '',
-            'declare(strict_types=1);',
-            '',
-            sprintf('namespace %s;', Strings::classNamespace($namespace)),
-            '',
-            'use Arcanum\Forge\Model as BaseModel;',
-            'use Arcanum\Forge\Result;',
-            '',
-            sprintf('final class %s extends BaseModel', Strings::classBaseName($namespace)),
-            '{',
-            $methodBlock,
-            '}',
-            '',
-        ];
+        $entries = [];
+        foreach ($bindings as $binding) {
+            $phpName = Strings::camel($binding);
+            $entries[] = sprintf("'%s' => \$%s", $binding, $phpName);
+        }
 
-        return implode("\n", $lines);
+        return '[' . implode(', ', $entries) . ']';
+    }
+
+    private function loadStub(string $name): string
+    {
+        if ($this->rootDirectory !== '') {
+            $appStub = $this->rootDirectory . DIRECTORY_SEPARATOR
+                . 'stubs' . DIRECTORY_SEPARATOR . $name . '.stub';
+
+            if ($this->fileSystem->isFile($appStub)) {
+                return $this->reader->read($appStub);
+            }
+        }
+
+        return $this->reader->read(self::STUBS_DIR . '/' . $name . '.stub');
     }
 }

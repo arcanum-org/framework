@@ -837,8 +837,9 @@ Generated model classes provide static analysis coverage and typed parameter saf
   - Method names: `PascalCase.sql` → `camelCase()` method.
   - Parameters: from `@param` annotations if present, otherwise auto-discovered `:named` bindings defaulting to `string`.
   - Parameter name conversion: SQL `snake_case` (`:min_price`) → PHP `camelCase` (`$minPrice`). Uses `Toolkit\Strings::camel()`.
-  - Each method delegates to `$this->__call()` — the generated class is a type-safe wrapper, not a reimplementation.
+  - Each method delegates to `$this->execute(string $method, array $params)` — the protected method that `__call` also uses internally. Generated methods skip `resolveArgs` entirely since they already have typed params.
   - Output location: `app/Domain/{Domain}/Model.php` (the class, alongside the `.sql` files in `Model/`).
+  - **Stub templates:** Generation uses `model.stub` (class shell) and `model_method.stub` (per-method body), rendered via `TemplateCompiler`. App-level overrides at `{rootDirectory}/stubs/model.stub` and `{rootDirectory}/stubs/model_method.stub` take precedence — same pattern as `make:*` commands. Developers can customize generated model output without modifying the framework.
 - [x] `Database::model` discovery — checks if a generated model class exists at `{DomainNamespace}\Model` via `class_exists()`. If found, instantiates the generated class. If not, falls back to the magic `Forge\Model`. Both share the same constructor signature (directory, read connection, write connection).
 - [ ] **Drift detection.** SQL files can drift from generated classes in several ways:
   - **New SQL file added** — no generated method. `__call` handles it at runtime. No breakage, just missing type safety.

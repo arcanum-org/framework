@@ -19,6 +19,9 @@ use Arcanum\Parchment\Reader;
  *
  * SQL content is cached in memory per-request. Read/write routing and @cast
  * annotations are handled automatically.
+ *
+ * Generated model classes extend this class and call execute() directly
+ * with pre-resolved parameters, skipping the __call arg resolution.
  */
 class Model
 {
@@ -40,6 +43,8 @@ class Model
     }
 
     /**
+     * Magic method dispatch — resolves named/positional/mixed args then delegates to execute().
+     *
      * @param array<int|string, mixed> $args
      */
     public function __call(string $method, array $args): Result
@@ -47,6 +52,21 @@ class Model
         $sql = $this->loadSql($method);
         $bindings = $this->loadBindings($method, $sql);
         $params = $bindings !== [] ? Sql::resolveArgs($args, $bindings) : [];
+
+        return $this->execute($method, $params);
+    }
+
+    /**
+     * Execute a named SQL method with pre-resolved parameters.
+     *
+     * This is the core execution path. Both __call (after arg resolution)
+     * and generated model methods (with already-typed params) delegate here.
+     *
+     * @param array<string, mixed> $params Named parameters keyed by SQL binding name.
+     */
+    protected function execute(string $method, array $params = []): Result
+    {
+        $sql = $this->loadSql($method);
 
         $isRead = Sql::isRead($sql);
         $connection = $isRead ? $this->readConnection : $this->writeConnection;
