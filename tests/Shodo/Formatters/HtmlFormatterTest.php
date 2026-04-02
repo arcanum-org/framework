@@ -345,4 +345,32 @@ final class HtmlFormatterTest extends TestCase
         // Assert
         $this->assertStringContainsString('<p>Arcanum</p>', $result);
     }
+
+    public function testCsrfDirectiveProducesHiddenInput(): void
+    {
+        // Arrange
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<form>{{ @csrf }}</form>',
+        );
+        $helper = new class {
+            public function csrf(): string
+            {
+                return '<input type="hidden" name="_token" value="abc123">';
+            }
+        };
+        $registry = new HelperRegistry();
+        $registry->register('Html', $helper);
+        $resolver = new HelperResolver($registry);
+        $formatter = $this->createFormatter(helpers: $resolver);
+
+        // Act
+        $result = $formatter->format([], 'App\\Pages\\Index');
+
+        // Assert
+        $this->assertStringContainsString(
+            '<form><input type="hidden" name="_token" value="abc123"></form>',
+            $result,
+        );
+    }
 }

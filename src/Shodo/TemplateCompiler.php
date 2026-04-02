@@ -56,6 +56,13 @@ final class TemplateCompiler
         // otherwise Name::method() would compile as a real PHP static call.
         $compiled = $source;
 
+        // Directives: {{ @csrf }} — raw output, no escape (intentional HTML).
+        $compiled = $this->replace(
+            '/\{\{\s*@csrf\s*\}\}/',
+            '<?= $__helpers[\'Html\']->csrf() ?>',
+            $compiled,
+        );
+
         // Helper calls in raw output: {{! Route::url('x') !}}
         $compiled = $this->replaceCallback(
             '/\{\{!\s*' . self::HELPER_PATTERN . '\s*!\}\}/s',

@@ -446,4 +446,38 @@ final class TemplateCompilerTest extends TestCase
             $result,
         );
     }
+
+    // -----------------------------------------------------------
+    // @csrf directive
+    // -----------------------------------------------------------
+
+    public function testCsrfDirectiveCompilesAsRawHelperCall(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ @csrf }}');
+
+        // Assert — raw output, no $__escape
+        $this->assertSame(
+            '<?= $__helpers[\'Html\']->csrf() ?>',
+            $result,
+        );
+    }
+
+    public function testCsrfDirectiveWithSurroundingContent(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('<form>{{ @csrf }}<button>Submit</button></form>');
+
+        // Assert
+        $this->assertSame(
+            '<form><?= $__helpers[\'Html\']->csrf() ?><button>Submit</button></form>',
+            $result,
+        );
+    }
 }
