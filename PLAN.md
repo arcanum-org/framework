@@ -800,6 +800,8 @@ final class PlaceOrderHandler
   - `json` — `json_decode($value, true)`
   
   Annotations are optional — unannotated columns return whatever PDO gives (strings for most drivers). Parsed once per SQL file and cached with the file content. Applied only to read results (`SELECT`), not to write operations.
+  
+  **Performance TODO:** `Result::rows()` with casts currently uses `array_map`, which copies the entire row array. Investigate lazy iteration (e.g., a `Generator` or `LazyResult` wrapper) to avoid allocating a second copy of large result sets. `first()` and `scalar()` already cast only one row.
 - [x] Tests: method call resolves to correct SQL file, camelCase→PascalCase conversion, parameters bound as `:named`, SELECT uses read connection, INSERT/UPDATE/DELETE use write connection, missing file throws with helpful message, file content cached, parameterless SQL works (empty array), @cast int, @cast float, @cast bool (all driver variants), @cast json, no @cast returns raw PDO values, multiple @cast annotations, @cast on write query ignored. ~16 tests.
 
 #### Database Service
