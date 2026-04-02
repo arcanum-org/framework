@@ -410,50 +410,130 @@ Same handler, same `Identity` type, different transport auth mechanisms. The DTO
 
 - [x] Package README — design philosophy (structured not generic, HTTP-only, no handler access), drivers, CSRF, flash messages, configuration, session lifecycle.
 
-### 6. Authentication & Authorization
+### 6. Authentication & Authorization — new package
 
 Auth splits into two distinct concerns with different architectural homes:
 
-- **Authentication** (who are you?) — transport-layer, resolves `Identity` from the request before routing.
-- **Authorization** (can you do this?) — domain-layer, checks permissions on the DTO before the handler runs.
+- **Authentication** (who are you?) — transport-layer. Resolves `Identity` from the request before routing. Lives in PSR-15 middleware (HTTP) or a resolver (CLI).
+- **Authorization** (can you do this?) — domain-layer. Checks permissions on the DTO before the handler runs. Lives in Conveyor before-middleware, same pattern as `TransportGuard` and `ValidationGuard`.
 
 Depends on: security primitives (hashing, encryption), sessions (for `SessionGuard`), validation. Persistence layer enhances it (user storage) but isn't strictly required — token-based auth works without a database.
 
+**Key design decisions:**
+
+- **`Identity` is a domain interface, guards are transport.** Handlers receive `Identity` via the container. They never know whether it came from a session cookie, JWT, API key, or CLI `--token` flag.
+- **Authentication does NOT reject requests.** The `AuthMiddleware` resolves identity and registers it (or leaves it absent). It never short-circuits with 401. That's authorization's job — some routes are public.
+- **Authorization is a Conveyor `Progression`.** `AuthorizationGuard` reads `#[RequiresAuth]` / `#[RequiresRole]` attributes from the DTO class and checks against the resolved identity. Unauthenticated + `#[RequiresAuth]` → 401. Authenticated but wrong role → 403. No attribute → public, passes through.
+- **`ActiveIdentity` follows the `ActiveSession` pattern.** A request-scoped holder registered as a singleton. Auth middleware writes, authorization guard and handlers read. Same late-binding pattern.
+- **Guards are composable.** `CompositeGuard` tries multiple guards in order (session, then token). Apps configure which guards to use via `config/auth.php`.
+- **CLI auth is token-based only.** No sessions. Reads `--token` flag or `ARCANUM_TOKEN` env var. Resolves via a configurable closure (app provides the lookup). Browser-based CLI auth (OAuth device flow) deferred.
+
+**The layering:**
+
+```
+HTTP Request
+  → SessionMiddleware (reads session)
+  → AuthMiddleware (PSR-15) — calls Guard, writes ActiveIdentity
+  → CsrfMiddleware (validates CSRF)
+  → App middleware
+  → Atlas routes → DTO hydrated → Conveyor dispatches
+    → AuthorizationGuard (Progression) — reads #[RequiresAuth]/#[RequiresRole], checks ActiveIdentity
+    → ValidationGuard → Handler
+```
+
+```
+CLI Command
+  → CliAuthResolver — reads --token/env var, writes ActiveIdentity
+  → Rune routes → DTO hydrated → Conveyor dispatches
+    → AuthorizationGuard — same check, same attributes, same Identity
+    → ValidationGuard → Handler
+```
+
 #### Identity — domain value object
 
-- [ ] `Identity` interface — `id(): string`, `roles(): list<string>`. The domain's representation of "who is making this request." Transport-agnostic. Lives in a top-level package or Toolkit.
-- [ ] Handlers receive `Identity` via container injection. They never know whether it came from a session, JWT, or API key.
+- [ ] `Identity` interface — `id(): string`, `roles(): list<string>`. The domain's representation of "who is making this request." Transport-agnostic.
+- [ ] `SimpleIdentity` — concrete implementation. Constructor takes `string $id, list<string> $roles = []`. Used by guards to return a resolved identity. Apps can implement their own `Identity` with richer data (name, email, permissions) when they have a persistence layer.
+- [ ] `ActiveIdentity` — request-scoped holder, same pattern as `ActiveSession`. Methods: `set(Identity)`, `get(): Identity` (throws if absent), `resolve(): Identity|null` (returns null if absent), `has(): bool`. The `resolve()` method is important — authorization needs to distinguish "no identity" from "identity present" without catching exceptions.
+- [ ] Tests: SimpleIdentity (id, roles, empty roles), ActiveIdentity (set/get round-trip, get throws when empty, resolve returns null when empty, has). ~8 tests.
 
-#### Authentication — transport layer (HTTP)
+#### Guard Interface and Built-in Guards
 
-- [ ] `Guard` interface — `resolve(ServerRequestInterface $request): Identity|null`. Implementations are transport-aware.
-- [ ] `SessionGuard` — reads identity from the `Session`. For HTML apps with login flows.
-- [ ] `TokenGuard` — reads Bearer token from `Authorization` header. For API apps.
-- [ ] `JwtGuard` — decodes and validates JWT from `Authorization` header. Optional, for stateless API auth.
-- [ ] `AuthMiddleware` (PSR-15) — calls configured guard(s), registers resolved `Identity` in container. If no identity and the route requires auth, short-circuits with **401 Unauthorized**.
-- [ ] `CompositeGuard` — tries multiple guards in order (session first, then token). For apps that serve both HTML and API.
+- [ ] `Guard` interface — `resolve(ServerRequestInterface $request): Identity|null`. Single method. Returns null if the guard can't authenticate from this request (no token, no session, etc.). Implementations are transport-aware.
+- [ ] `SessionGuard` — reads `ActiveSession`, gets `identityId()`. If non-empty, calls a configurable `$resolver` closure (`Closure(string $id): Identity|null`) to look up the full identity. The closure is the app's bridge to its user storage (database, cache, config file — doesn't matter). Returns null if session has no identity or resolver returns null.
+- [ ] `TokenGuard` — reads `Authorization: Bearer <token>` header. Calls a configurable `$resolver` closure (`Closure(string $token): Identity|null`). The closure validates the token and returns the identity. Returns null if no Bearer header or resolver returns null.
+- [ ] `CompositeGuard` — takes `Guard ...$guards`. Tries each in order, returns the first non-null `Identity`. Returns null if all guards return null.
+- [ ] Tests: SessionGuard (valid session identity, empty session, resolver returns null, no session), TokenGuard (valid bearer, no auth header, non-bearer auth, resolver returns null), CompositeGuard (first wins, second fallback, all null). ~12 tests.
 
-#### Authentication — transport layer (CLI)
+#### JWT Support — deferred
 
-- [ ] `CliTokenResolver` — reads `--token` flag or `ARCANUM_TOKEN` environment variable. Resolves to `Identity` via a configurable lookup (e.g., database token table, or a simple closure).
-- [ ] Registered in CLI bootstrap. Same `Identity` interface, different resolution mechanism.
-- [ ] Browser-based CLI auth (OAuth device flow) deferred as a future extension.
+JWT (`JwtGuard`) is deferred. It requires decisions about JWT libraries, claim validation, key management, and token refresh that are better made when the persistence layer exists and real API auth patterns emerge. `TokenGuard` with a closure that decodes JWTs is the escape hatch for now — apps bring their own JWT library and wire it in the resolver closure.
 
-#### Authorization — domain layer (Conveyor middleware)
+#### AuthMiddleware — HTTP transport (PSR-15)
 
-- [ ] `RequiresAuth` attribute — DTO must have a resolved `Identity`. No identity → **401 Unauthorized** (HTTP) or exit code 1 (CLI).
-- [ ] `RequiresRole(string ...$roles)` attribute — resolved `Identity` must have at least one of the listed roles. Missing role → **403 Forbidden**.
-- [ ] `AuthorizationGuard` — Conveyor before-middleware (`Progression`), same pattern as `TransportGuard` and `ValidationGuard`. Reads attributes from the DTO class, checks against the resolved `Identity`.
-- [ ] `Policy` interface — invocable classes for complex authorization (e.g., "users can only edit their own posts"). Resolved from the container.
+- [ ] `AuthMiddleware` — takes `Guard` and `ActiveIdentity`. Calls `guard->resolve($request)`. If identity returned, calls `activeIdentity->set($identity)`. Delegates to handler regardless — never short-circuits. Public routes receive no identity and that's fine.
+- [ ] Middleware ordering: runs after `SessionMiddleware` (needs session), before `CsrfMiddleware` (CSRF needs to know if Bearer auth is present, but auth should already be resolved). Actually — CSRF already checks the `Authorization` header directly, so ordering with CSRF is flexible. Auth runs after session, before app middleware.
+- [ ] Tests: resolves identity and sets ActiveIdentity, no identity leaves ActiveIdentity empty, delegates regardless. ~4 tests.
+
+#### CliAuthResolver — CLI transport
+
+- [ ] `CliAuthResolver` — not middleware (CLI has no PSR-15 stack). A service called during CLI bootstrap. Reads token from `--token` argument or `ARCANUM_TOKEN` environment variable. Calls a configurable `$resolver` closure (`Closure(string $token): Identity|null`). Writes to `ActiveIdentity` if resolved.
+- [ ] Wired in `Bootstrap\CliRouting` — if a token is present, resolves identity before the bus dispatches.
+- [ ] Tests: resolves from token, resolves from env var, token flag takes precedence over env, no token leaves ActiveIdentity empty, resolver returns null leaves ActiveIdentity empty. ~5 tests.
+
+#### Authorization Attributes
+
+- [ ] `#[RequiresAuth]` — class-level attribute (`Attribute::TARGET_CLASS`). Marker only, no constructor args. Means: a resolved `Identity` must be present.
+- [ ] `#[RequiresRole(string ...$roles)]` — class-level attribute. Implies `RequiresAuth`. The resolved identity must have at least one of the listed roles.
+- [ ] Tests: attributes are instantiable, RequiresRole stores roles. ~3 tests.
+
+#### AuthorizationGuard — Conveyor before-middleware
+
+- [ ] `AuthorizationGuard` — implements `Progression`. Same pattern as `TransportGuard`: resolves DTO class from payload (handles `HandlerProxy`), reflects on class for auth attributes.
+  - No auth attributes → `$next()`, passes through (public route).
+  - `#[RequiresAuth]` and `ActiveIdentity` has no identity → throws `HttpException(401)` on HTTP, `RuntimeException` on CLI.
+  - `#[RequiresRole('admin')]` and identity lacks the role → throws `HttpException(403)` on HTTP, `RuntimeException` on CLI.
+  - `#[RequiresRole]` on a DTO without `#[RequiresAuth]` → treated as implicitly requiring auth (you can't check roles without an identity).
+- [ ] Needs `ActiveIdentity` and `Transport` injected (same as `TransportGuard` pattern).
+- [ ] Tests: public DTO passes, RequiresAuth passes with identity, RequiresAuth throws 401 without identity, RequiresRole passes with matching role, RequiresRole throws 403 with wrong role, RequiresRole throws 401 with no identity, HandlerProxy resolution, non-existent class skipped. ~8 tests.
+
+#### Policies — complex authorization
+
+- [ ] `Policy` interface — `authorize(Identity $identity, object $dto): bool`. Invocable classes for authorization logic that depends on the DTO's data (e.g., "users can only edit their own posts"). Resolved from the container so they can access repositories/services.
+- [ ] `#[RequiresPolicy(PolicyClass::class)]` — class-level attribute. Points to a `Policy` implementation. `AuthorizationGuard` resolves it from the container and calls `authorize()`. Returns false → 403.
+- [ ] Multiple policies on one DTO are all checked (all must pass).
+- [ ] Tests: policy passes, policy denies with 403, multiple policies all-must-pass, policy resolved from container. ~5 tests.
+
+#### Error Rendering
+
+- [ ] HTTP: `HttpException(401)` and `HttpException(403)` already render correctly through the existing `JsonExceptionResponseRenderer` and other exception renderers. No new rendering code needed — just verify.
+- [ ] CLI: `RuntimeException` is caught by `CliExceptionWriter`. Message should be clear ("Authentication required." / "Access denied: requires role 'admin'.").
+- [ ] Tests: verify 401/403 render correctly in existing exception pipeline. ~2 integration tests.
 
 #### Bootstrap & Wiring
 
-- [ ] `Bootstrap\Auth` — registers guards, `AuthMiddleware`, `AuthorizationGuard` as Conveyor before-middleware.
-- [ ] Starter app: auth example (login flow for HTML, token guard for API), example policies.
+- [ ] `Bootstrap\Auth` bootstrapper — reads `config/auth.php`:
+  - `guard` key: `'session'`, `'token'`, or `'composite'` (default: `'session'`).
+  - `resolvers.identity` key: closure or class that maps session identity ID → `Identity`.
+  - `resolvers.token` key: closure or class that maps bearer token → `Identity`.
+- [ ] Registers `ActiveIdentity` as singleton in container.
+- [ ] Registers configured `Guard` in container.
+- [ ] HTTP: adds `AuthMiddleware` to `Bootstrap\Middleware` — after `SessionMiddleware`, before `CsrfMiddleware`.
+- [ ] CLI: wires `CliAuthResolver` in `Bootstrap\CliRouting`.
+- [ ] Registers `AuthorizationGuard` as Conveyor before-middleware in both `Bootstrap\Routing` and `Bootstrap\CliRouting` — after `TransportGuard`, before `ValidationGuard`.
+- [ ] Added to `HyperKernel::$bootstrappers` and `RuneKernel::$bootstrappers` — after `Sessions`, before `Routing`.
+- [ ] Tests: registers ActiveIdentity, registers Guard, SessionGuard wired by default, TokenGuard wired when configured, CompositeGuard wired when configured, CLI kernel skips HTTP guard, AuthorizationGuard registered on bus. ~7 tests.
+
+#### Starter App
+
+- [ ] `config/auth.php` — default config with session guard and placeholder identity resolver.
+- [ ] Example `#[RequiresAuth]` on a DTO (could be a new `Admin\Dashboard` query or add to existing Contact\Submit command).
+- [ ] Example policy if a natural use case exists in the starter app.
 
 #### Documentation
 
-- [ ] Auth package README — identity model, guards, authorization attributes, policies, CLI auth, transport separation.
+- [ ] Auth package README — design philosophy (authentication vs authorization, transport vs domain), Identity interface, guards (Session, Token, Composite), authorization attributes, policies, CLI auth, configuration, error responses.
+- [ ] Updated `src/Ignition/README.md` — `Bootstrap\Auth` in bootstrapper tables for both HTTP and CLI.
+- [ ] Updated `src/Flow/Conveyor/README.md` — `AuthorizationGuard` alongside `TransportGuard` and `ValidationGuard`.
 
 ### 7. HTTP Client — PSR-18 wrapper
 
