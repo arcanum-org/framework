@@ -8,9 +8,15 @@ namespace Arcanum\Forge;
  * Dynamic object that maps method calls to SQL files.
  *
  * Each method name resolves to a `.sql` file in the Model directory:
- * `$model->insertOrder([...])` reads `InsertOrder.sql`. SQL content is
- * cached in memory per-request. Read/write routing and @cast annotations
- * are handled automatically.
+ * `$model->insertOrder(userId: 1, total: 99.99)` reads `InsertOrder.sql`.
+ *
+ * Supports PHP named arguments, positional arguments, and mixed — the same
+ * calling convention as a native PHP function. Named args match SQL bindings
+ * by name (camelCase → snake_case). Positional args fill remaining bindings
+ * in order of appearance.
+ *
+ * SQL content is cached in memory per-request. Read/write routing and @cast
+ * annotations are handled automatically.
  */
 final class Model
 {
@@ -20,6 +26,9 @@ final class Model
     /** @var array<string, array<string, string>> Parsed @cast annotations keyed by method name. */
     private array $castCache = [];
 
+    /** @var array<string, list<string>> Extracted binding names keyed by method name. */
+    private array $bindingCache = [];
+
     public function __construct(
         private readonly string $directory,
         private readonly Connection $readConnection,
@@ -28,13 +37,13 @@ final class Model
     }
 
     /**
-     * @param array<int, mixed> $args
+     * @param array<int|string, mixed> $args
      */
     public function __call(string $method, array $args): Result
     {
         $sql = $this->loadSql($method);
-        /** @var array<string, mixed> $params */
-        $params = $args[0] ?? [];
+        $bindings = $this->loadBindings($method, $sql);
+        $params = $bindings !== [] ? Sql::resolveArgs($args, $bindings) : [];
 
         $isRead = Sql::isRead($sql);
         $connection = $isRead ? $this->readConnection : $this->writeConnection;
@@ -76,6 +85,20 @@ final class Model
         $this->sqlCache[$method] = file_get_contents($path) ?: '';
 
         return $this->sqlCache[$method];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function loadBindings(string $method, string $sql): array
+    {
+        if (isset($this->bindingCache[$method])) {
+            return $this->bindingCache[$method];
+        }
+
+        $this->bindingCache[$method] = Sql::extractBindings($sql);
+
+        return $this->bindingCache[$method];
     }
 
     /**

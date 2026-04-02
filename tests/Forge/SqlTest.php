@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Arcanum\Test\Forge;
 
 use Arcanum\Forge\Sql;
+use Arcanum\Toolkit\Strings;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(Sql::class)]
+#[UsesClass(Strings::class)]
 final class SqlTest extends TestCase
 {
     // ── Basic reads ──────────────────────────────────────────────
@@ -394,5 +397,186 @@ final class SqlTest extends TestCase
         $rows = [['value' => 'hello']];
 
         $this->assertSame('hello', Sql::applyCasts($rows, ['value' => 'unknown'])[0]['value']);
+    }
+
+    // ── extractBindings ──────────────────────────────────────────
+
+    public function testExtractBindingsFindsNamedPlaceholders(): void
+    {
+        $sql = 'SELECT * FROM users WHERE name = :name AND age > :age';
+
+        $this->assertSame(['name', 'age'], Sql::extractBindings($sql));
+    }
+
+    public function testExtractBindingsReturnsInOrderOfAppearance(): void
+    {
+        $sql = 'INSERT INTO t (c, b, a) VALUES (:c, :b, :a)';
+
+        $this->assertSame(['c', 'b', 'a'], Sql::extractBindings($sql));
+    }
+
+    public function testExtractBindingsDeduplicates(): void
+    {
+        $sql = 'SELECT * FROM t WHERE a = :id OR b = :id';
+
+        $this->assertSame(['id'], Sql::extractBindings($sql));
+    }
+
+    public function testExtractBindingsReturnsEmptyForNoBindings(): void
+    {
+        $this->assertSame([], Sql::extractBindings('SELECT 1'));
+    }
+
+    public function testExtractBindingsIgnoresLineComments(): void
+    {
+        $sql = "-- :not_a_binding\nSELECT * FROM t WHERE id = :id";
+
+        $this->assertSame(['id'], Sql::extractBindings($sql));
+    }
+
+    public function testExtractBindingsIgnoresBlockComments(): void
+    {
+        $sql = '/* :not_a_binding */ SELECT * FROM t WHERE id = :id';
+
+        $this->assertSame(['id'], Sql::extractBindings($sql));
+    }
+
+    public function testExtractBindingsIgnoresStringLiterals(): void
+    {
+        $sql = "SELECT * FROM t WHERE name = ':not_a_binding' AND id = :id";
+
+        $this->assertSame(['id'], Sql::extractBindings($sql));
+    }
+
+    public function testExtractBindingsIgnoresEscapedQuotes(): void
+    {
+        $sql = "SELECT * FROM t WHERE name = 'it''s :not' AND id = :id";
+
+        $this->assertSame(['id'], Sql::extractBindings($sql));
+    }
+
+    public function testExtractBindingsHandlesUnderscoreNames(): void
+    {
+        $sql = 'SELECT * FROM t WHERE min_price = :min_price';
+
+        $this->assertSame(['min_price'], Sql::extractBindings($sql));
+    }
+
+    // ── parseParams ──────────────────────────────────────────────
+
+    public function testParseParamsExtractsAnnotations(): void
+    {
+        $sql = "-- @param name string\n-- @param age int\nSELECT 1";
+
+        $this->assertSame(
+            ['name' => 'string', 'age' => 'int'],
+            Sql::parseParams($sql),
+        );
+    }
+
+    public function testParseParamsReturnsEmptyWhenNone(): void
+    {
+        $this->assertSame([], Sql::parseParams('SELECT 1'));
+    }
+
+    public function testParseParamsIgnoresRegularComments(): void
+    {
+        $sql = "-- just a comment\n-- @param id int\nSELECT 1";
+
+        $this->assertSame(['id' => 'int'], Sql::parseParams($sql));
+    }
+
+    public function testParseParamsAllTypes(): void
+    {
+        $sql = "-- @param a string\n-- @param b int\n"
+            . "-- @param c float\n-- @param d bool\nSELECT 1";
+
+        $this->assertSame(
+            ['a' => 'string', 'b' => 'int', 'c' => 'float', 'd' => 'bool'],
+            Sql::parseParams($sql),
+        );
+    }
+
+    // ── resolveArgs ──────────────────────────────────────────────
+
+    public function testResolveArgsAllNamed(): void
+    {
+        $args = ['name' => 'Alice', 'age' => 30];
+        $bindings = ['name', 'age'];
+
+        $this->assertSame(
+            ['name' => 'Alice', 'age' => 30],
+            Sql::resolveArgs($args, $bindings),
+        );
+    }
+
+    public function testResolveArgsAllPositional(): void
+    {
+        $args = ['Alice', 30];
+        $bindings = ['name', 'age'];
+
+        $this->assertSame(
+            ['name' => 'Alice', 'age' => 30],
+            Sql::resolveArgs($args, $bindings),
+        );
+    }
+
+    public function testResolveArgsMixedPositionalAndNamed(): void
+    {
+        // 'shoes' positional → fills first unmatched (:category)
+        // active: true named → claims :active
+        $args = [0 => 'shoes', 'active' => true];
+        $bindings = ['category', 'min_price', 'active'];
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(':min_price');
+        Sql::resolveArgs($args, $bindings);
+    }
+
+    public function testResolveArgsMixedAllBindingsCovered(): void
+    {
+        $args = [0 => 'shoes', 1 => 10, 'active' => true];
+        $bindings = ['category', 'min_price', 'active'];
+
+        $this->assertSame(
+            ['category' => 'shoes', 'min_price' => 10, 'active' => true],
+            Sql::resolveArgs($args, $bindings),
+        );
+    }
+
+    public function testResolveArgsCamelToSnakeConversion(): void
+    {
+        $args = ['minPrice' => 10, 'maxPrice' => 100];
+        $bindings = ['min_price', 'max_price'];
+
+        $this->assertSame(
+            ['min_price' => 10, 'max_price' => 100],
+            Sql::resolveArgs($args, $bindings),
+        );
+    }
+
+    public function testResolveArgsThrowsOnMissingBinding(): void
+    {
+        $args = ['name' => 'Alice'];
+        $bindings = ['name', 'age'];
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(':age');
+        Sql::resolveArgs($args, $bindings);
+    }
+
+    public function testResolveArgsThrowsOnTooManyPositional(): void
+    {
+        $args = ['Alice', 30, 'extra'];
+        $bindings = ['name', 'age'];
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Too many positional arguments');
+        Sql::resolveArgs($args, $bindings);
+    }
+
+    public function testResolveArgsEmptyBindingsEmptyArgs(): void
+    {
+        $this->assertSame([], Sql::resolveArgs([], []));
     }
 }

@@ -822,10 +822,10 @@ final class PlaceOrderHandler
 
 #### SQL Parameter Annotations
 
-- [ ] `Sql::parseParams(string $sql): array<string, string>` — parses `-- @param name type` annotations from SQL files. Returns a map of parameter name → type. Supported types: `string`, `int`, `float`, `bool`. Works alongside `@cast` — `@param` types what goes *in*, `@cast` types what comes *out*.
-- [ ] `Sql::extractBindings(string $sql): list<string>` — auto-discovers `:named` placeholder names from SQL by scanning for `:word` patterns outside of string literals and comments. Returns binding names in order of first appearance. This order defines the positional argument contract for `Model::__call`.
-- [ ] `Sql::resolveArgs(array $args, list<string> $bindings): array<string, mixed>` — maps `__call` args (mixed positional + named) to SQL binding names. Named args (string keys) are matched by name (camelCase → snake_case). Positional args (integer keys) fill remaining unmatched bindings in order. Throws if any binding has no match.
-- [ ] Tests: parseParams extracts annotations, parseParams returns empty when none, extractBindings finds all named placeholders, extractBindings ignores strings and comments, resolveArgs all-named, resolveArgs all-positional, resolveArgs mixed, resolveArgs throws on missing binding. ~10 tests.
+- [x] `Sql::parseParams(string $sql): array<string, string>` — parses `-- @param name type` annotations from SQL files. Returns a map of parameter name → type. Supported types: `string`, `int`, `float`, `bool`. Works alongside `@cast` — `@param` types what goes *in*, `@cast` types what comes *out*.
+- [x] `Sql::extractBindings(string $sql): list<string>` — auto-discovers `:named` placeholder names from SQL by scanning for `:word` patterns outside of string literals and comments. Returns binding names in order of first appearance. This order defines the positional argument contract for `Model::__call`.
+- [x] `Sql::resolveArgs(array $args, list<string> $bindings): array<string, mixed>` — maps `__call` args (mixed positional + named) to SQL binding names. Named args (string keys) are matched by name (camelCase → snake_case). Positional args (integer keys) fill remaining unmatched bindings in order. Throws if any binding has no match.
+- [x] Tests: parseParams extracts annotations, parseParams returns empty when none, extractBindings finds all named placeholders, extractBindings ignores strings and comments, resolveArgs all-named, resolveArgs all-positional, resolveArgs mixed, resolveArgs throws on missing binding. ~10 tests.
 
 #### Model Generation — `forge:models` Rune Command
 

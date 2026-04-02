@@ -8,6 +8,7 @@ use Arcanum\Forge\Connection;
 use Arcanum\Forge\Model;
 use Arcanum\Forge\Result;
 use Arcanum\Forge\Sql;
+use Arcanum\Toolkit\Strings;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -16,6 +17,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(Connection::class)]
 #[UsesClass(Result::class)]
 #[UsesClass(Sql::class)]
+#[UsesClass(Strings::class)]
 final class ModelTest extends TestCase
 {
     private string $modelDir;
@@ -54,14 +56,18 @@ final class ModelTest extends TestCase
         file_put_contents($this->modelDir . '/' . $filename, $sql);
     }
 
-    private function model(?Connection $read = null, ?Connection $write = null): Model
-    {
+    private function model(
+        ?Connection $read = null,
+        ?Connection $write = null,
+    ): Model {
         return new Model(
             directory: $this->modelDir,
             readConnection: $read ?? $this->connection,
             writeConnection: $write ?? $this->connection,
         );
     }
+
+    // ── Method resolution ────────────────────────────────────────
 
     public function testMethodCallResolvesToSqlFile(): void
     {
@@ -78,77 +84,18 @@ final class ModelTest extends TestCase
 
     public function testCamelCaseToPascalCaseConversion(): void
     {
-        // Arrange — method name "insertProduct" should resolve to "InsertProduct.sql"
-        $this->writeSql('InsertProduct.sql', 'INSERT INTO products (name) VALUES (:name)');
+        // Arrange
+        $this->writeSql(
+            'InsertProduct.sql',
+            'INSERT INTO products (name) VALUES (:name)',
+        );
         $model = $this->model();
 
         // Act
-        $result = $model->insertProduct(['name' => 'Widget']);
+        $result = $model->insertProduct(name: 'Widget');
 
         // Assert
         $this->assertSame('1', $result->lastInsertId());
-    }
-
-    public function testParametersBoundAsNamed(): void
-    {
-        // Arrange
-        $this->writeSql('InsertProduct.sql', 'INSERT INTO products (name, price) VALUES (:name, :price)');
-        $this->writeSql('ProductByName.sql', 'SELECT name, price FROM products WHERE name = :name');
-        $model = $this->model();
-
-        // Act
-        $model->insertProduct(['name' => 'Widget', 'price' => 9.99]);
-        $result = $model->productByName(['name' => 'Widget']);
-
-        // Assert
-        $this->assertNotNull($result->first());
-        $this->assertSame('Widget', $result->first()['name']);
-    }
-
-    public function testSelectUsesReadConnection(): void
-    {
-        // Arrange — separate read and write connections
-        $readConn = new Connection(dsn: 'sqlite::memory:');
-        $writeConn = new Connection(dsn: 'sqlite::memory:');
-        $this->createProductsTable($readConn);
-        $readConn->run('INSERT INTO products (name) VALUES (:name)', ['name' => 'ReadOnly']);
-        $this->createProductsTable($writeConn);
-
-        $this->writeSql('AllProducts.sql', 'SELECT name FROM products');
-        $model = $this->model(read: $readConn, write: $writeConn);
-
-        // Act
-        $result = $model->allProducts();
-
-        // Assert — should read from read connection which has data
-        $this->assertSame(1, $result->count());
-        $this->assertNotNull($result->first());
-        $this->assertSame('ReadOnly', $result->first()['name']);
-    }
-
-    public function testInsertUsesWriteConnection(): void
-    {
-        // Arrange — separate read and write connections
-        $readConn = new Connection(dsn: 'sqlite::memory:');
-        $writeConn = new Connection(dsn: 'sqlite::memory:');
-        $this->createProductsTable($readConn);
-        $this->createProductsTable($writeConn);
-
-        $this->writeSql('InsertProduct.sql', 'INSERT INTO products (name) VALUES (:name)');
-        $this->writeSql('AllProducts.sql', 'SELECT name FROM products');
-        $model = $this->model(read: $readConn, write: $writeConn);
-
-        // Act
-        $model->insertProduct(['name' => 'WriteOnly']);
-
-        // Assert — read connection should be empty, write should have the row
-        $readResult = $readConn->run('SELECT count(*) as cnt FROM products');
-        $this->assertNotNull($readResult->first());
-        $this->assertSame(0, $readResult->first()['cnt']);
-
-        $writeResult = $writeConn->run('SELECT count(*) as cnt FROM products');
-        $this->assertNotNull($writeResult->first());
-        $this->assertSame(1, $writeResult->first()['cnt']);
     }
 
     public function testMissingFileThrowsWithHelpfulMessage(): void
@@ -158,7 +105,9 @@ final class ModelTest extends TestCase
 
         // Act & Assert
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Model method 'findUser' not found — expected file:");
+        $this->expectExceptionMessage(
+            "Model method 'findUser' not found — expected file:",
+        );
         $this->expectExceptionMessage('FindUser.sql');
         $model->findUser();
     }
@@ -166,7 +115,10 @@ final class ModelTest extends TestCase
     public function testSqlFileContentsCached(): void
     {
         // Arrange
-        $this->writeSql('AllProducts.sql', 'SELECT id, name FROM products');
+        $this->writeSql(
+            'AllProducts.sql',
+            'SELECT id, name FROM products',
+        );
         $model = $this->model();
 
         // Act — call twice
@@ -185,8 +137,14 @@ final class ModelTest extends TestCase
     public function testParameterlessSqlWorks(): void
     {
         // Arrange
-        $this->connection->run('INSERT INTO products (name) VALUES (:name)', ['name' => 'Widget']);
-        $this->writeSql('CountProducts.sql', 'SELECT count(*) as cnt FROM products');
+        $this->connection->run(
+            'INSERT INTO products (name) VALUES (:name)',
+            ['name' => 'Widget'],
+        );
+        $this->writeSql(
+            'CountProducts.sql',
+            'SELECT count(*) as cnt FROM products',
+        );
         $model = $this->model();
 
         // Act
@@ -196,20 +154,176 @@ final class ModelTest extends TestCase
         $this->assertSame(1, $result->scalar());
     }
 
+    // ── Calling convention: named args ───────────────────────────
+
+    public function testNamedArgsBoundToSqlBindings(): void
+    {
+        // Arrange
+        $this->writeSql(
+            'InsertProduct.sql',
+            'INSERT INTO products (name, price) VALUES (:name, :price)',
+        );
+        $this->writeSql(
+            'ProductByName.sql',
+            'SELECT name, price FROM products WHERE name = :name',
+        );
+        $model = $this->model();
+
+        // Act
+        $model->insertProduct(name: 'Widget', price: 9.99);
+        $result = $model->productByName(name: 'Widget');
+
+        // Assert
+        $this->assertNotNull($result->first());
+        $this->assertSame('Widget', $result->first()['name']);
+    }
+
+    public function testCamelCaseNamedArgsConvertToSnakeCase(): void
+    {
+        // Arrange
+        $this->writeSql(
+            'InsertProduct.sql',
+            'INSERT INTO products (name, price) VALUES (:name, :price)',
+        );
+        $this->writeSql(
+            'ProductsByMinPrice.sql',
+            'SELECT name FROM products WHERE price >= :min_price',
+        );
+        $model = $this->model();
+
+        // Act
+        $model->insertProduct(name: 'Cheap', price: 5.00);
+        $model->insertProduct(name: 'Expensive', price: 50.00);
+        $result = $model->productsByMinPrice(minPrice: 10.00);
+
+        // Assert
+        $this->assertSame(1, $result->count());
+        $this->assertNotNull($result->first());
+        $this->assertSame('Expensive', $result->first()['name']);
+    }
+
+    // ── Calling convention: positional args ──────────────────────
+
+    public function testPositionalArgsFillBindingsInOrder(): void
+    {
+        // Arrange
+        $this->writeSql(
+            'InsertProduct.sql',
+            'INSERT INTO products (name, price) VALUES (:name, :price)',
+        );
+        $model = $this->model();
+
+        // Act — positional: 'Widget' → :name, 9.99 → :price
+        $result = $model->insertProduct('Widget', 9.99);
+
+        // Assert
+        $this->assertSame('1', $result->lastInsertId());
+    }
+
+    // ── Calling convention: mixed args ───────────────────────────
+
+    public function testMixedPositionalAndNamedArgs(): void
+    {
+        // Arrange
+        $this->writeSql(
+            'InsertProduct.sql',
+            'INSERT INTO products (name, price) VALUES (:name, :price)',
+        );
+        $this->writeSql(
+            'SearchProducts.sql',
+            'SELECT name FROM products'
+            . ' WHERE name = :name AND price >= :min_price'
+            . ' AND active = :active',
+        );
+        $model = $this->model();
+
+        $model->insertProduct(name: 'Widget', price: 9.99);
+        $this->connection->run(
+            'UPDATE products SET active = 1 WHERE name = :name',
+            ['name' => 'Widget'],
+        );
+
+        // Act — 'Widget' and 0 fill positionally (:name, :min_price), active is named
+        $result = $model->searchProducts('Widget', 0, active: 1);
+
+        // Assert
+        $this->assertSame(1, $result->count());
+    }
+
+    // ── Read/write connection routing ────────────────────────────
+
+    public function testSelectUsesReadConnection(): void
+    {
+        // Arrange
+        $readConn = new Connection(dsn: 'sqlite::memory:');
+        $writeConn = new Connection(dsn: 'sqlite::memory:');
+        $this->createProductsTable($readConn);
+        $readConn->run(
+            'INSERT INTO products (name) VALUES (:name)',
+            ['name' => 'ReadOnly'],
+        );
+        $this->createProductsTable($writeConn);
+
+        $this->writeSql('AllProducts.sql', 'SELECT name FROM products');
+        $model = $this->model(read: $readConn, write: $writeConn);
+
+        // Act
+        $result = $model->allProducts();
+
+        // Assert
+        $this->assertSame(1, $result->count());
+        $this->assertNotNull($result->first());
+        $this->assertSame('ReadOnly', $result->first()['name']);
+    }
+
+    public function testInsertUsesWriteConnection(): void
+    {
+        // Arrange
+        $readConn = new Connection(dsn: 'sqlite::memory:');
+        $writeConn = new Connection(dsn: 'sqlite::memory:');
+        $this->createProductsTable($readConn);
+        $this->createProductsTable($writeConn);
+
+        $this->writeSql(
+            'InsertProduct.sql',
+            'INSERT INTO products (name) VALUES (:name)',
+        );
+        $model = $this->model(read: $readConn, write: $writeConn);
+
+        // Act
+        $model->insertProduct(name: 'WriteOnly');
+
+        // Assert
+        $readResult = $readConn->run('SELECT count(*) as cnt FROM products');
+        $this->assertNotNull($readResult->first());
+        $this->assertSame(0, $readResult->first()['cnt']);
+
+        $writeResult = $writeConn->run(
+            'SELECT count(*) as cnt FROM products',
+        );
+        $this->assertNotNull($writeResult->first());
+        $this->assertSame(1, $writeResult->first()['cnt']);
+    }
+
+    // ── @cast annotations ────────────────────────────────────────
+
     public function testCastInt(): void
     {
         // Arrange
-        $this->connection->run('INSERT INTO products (name, quantity) VALUES (:name, :quantity)', [
-            'name' => 'Widget',
-            'quantity' => 5,
-        ]);
-        $this->writeSql('ProductQuantities.sql', "-- @cast quantity int\nSELECT name, quantity FROM products");
+        $this->connection->run(
+            'INSERT INTO products (name, quantity) VALUES (:name, :quantity)',
+            ['name' => 'Widget', 'quantity' => 5],
+        );
+        $this->writeSql(
+            'ProductQuantities.sql',
+            "-- @cast quantity int\nSELECT name, quantity FROM products",
+        );
         $model = $this->model();
 
         // Act
         $result = $model->productQuantities();
 
-        // Assert — SQLite returns strings by default, @cast should convert
+        // Assert
         $this->assertNotNull($result->first());
         $this->assertSame(5, $result->first()['quantity']);
     }
@@ -217,11 +331,14 @@ final class ModelTest extends TestCase
     public function testCastFloat(): void
     {
         // Arrange
-        $this->connection->run('INSERT INTO products (name, price) VALUES (:name, :price)', [
-            'name' => 'Widget',
-            'price' => 19.99,
-        ]);
-        $this->writeSql('ProductPrices.sql', "-- @cast price float\nSELECT name, price FROM products");
+        $this->connection->run(
+            'INSERT INTO products (name, price) VALUES (:name, :price)',
+            ['name' => 'Widget', 'price' => 19.99],
+        );
+        $this->writeSql(
+            'ProductPrices.sql',
+            "-- @cast price float\nSELECT name, price FROM products",
+        );
         $model = $this->model();
 
         // Act
@@ -235,15 +352,19 @@ final class ModelTest extends TestCase
     public function testCastBoolTruthyValues(): void
     {
         // Arrange
-        $this->connection->run('INSERT INTO products (name, active) VALUES (:name, :active)', [
-            'name' => 'Active',
-            'active' => 1,
-        ]);
-        $this->connection->run('INSERT INTO products (name, active) VALUES (:name, :active)', [
-            'name' => 'Inactive',
-            'active' => 0,
-        ]);
-        $this->writeSql('ProductStatus.sql', "-- @cast active bool\nSELECT name, active FROM products ORDER BY name");
+        $this->connection->run(
+            'INSERT INTO products (name, active) VALUES (:name, :active)',
+            ['name' => 'Active', 'active' => 1],
+        );
+        $this->connection->run(
+            'INSERT INTO products (name, active) VALUES (:name, :active)',
+            ['name' => 'Inactive', 'active' => 0],
+        );
+        $this->writeSql(
+            'ProductStatus.sql',
+            "-- @cast active bool\n"
+            . "SELECT name, active FROM products ORDER BY name",
+        );
         $model = $this->model();
 
         // Act
@@ -251,18 +372,21 @@ final class ModelTest extends TestCase
         $rows = $result->rows();
 
         // Assert
-        $this->assertTrue($rows[0]['active']);   // "Active" has active=1
-        $this->assertFalse($rows[1]['active']);   // "Inactive" has active=0
+        $this->assertTrue($rows[0]['active']);
+        $this->assertFalse($rows[1]['active']);
     }
 
     public function testCastJson(): void
     {
         // Arrange
-        $this->connection->run('INSERT INTO products (name, metadata) VALUES (:name, :metadata)', [
-            'name' => 'Widget',
-            'metadata' => '{"color":"blue","weight":1.5}',
-        ]);
-        $this->writeSql('ProductMeta.sql', "-- @cast metadata json\nSELECT name, metadata FROM products");
+        $this->connection->run(
+            'INSERT INTO products (name, metadata) VALUES (:name, :metadata)',
+            ['name' => 'Widget', 'metadata' => '{"color":"blue","weight":1.5}'],
+        );
+        $this->writeSql(
+            'ProductMeta.sql',
+            "-- @cast metadata json\nSELECT name, metadata FROM products",
+        );
         $model = $this->model();
 
         // Act
@@ -270,23 +394,29 @@ final class ModelTest extends TestCase
 
         // Assert
         $this->assertNotNull($result->first());
-        $this->assertSame(['color' => 'blue', 'weight' => 1.5], $result->first()['metadata']);
+        $this->assertSame(
+            ['color' => 'blue', 'weight' => 1.5],
+            $result->first()['metadata'],
+        );
     }
 
     public function testNoCastReturnsRawPdoValues(): void
     {
         // Arrange
-        $this->connection->run('INSERT INTO products (name, quantity) VALUES (:name, :quantity)', [
-            'name' => 'Widget',
-            'quantity' => 5,
-        ]);
-        $this->writeSql('RawProducts.sql', 'SELECT name, quantity FROM products');
+        $this->connection->run(
+            'INSERT INTO products (name, quantity) VALUES (:name, :quantity)',
+            ['name' => 'Widget', 'quantity' => 5],
+        );
+        $this->writeSql(
+            'RawProducts.sql',
+            'SELECT name, quantity FROM products',
+        );
         $model = $this->model();
 
         // Act
         $result = $model->rawProducts();
 
-        // Assert — SQLite returns strings for integers when no @cast
+        // Assert
         $this->assertNotNull($result->first());
         $this->assertIsInt($result->first()['quantity']);
     }
@@ -294,17 +424,15 @@ final class ModelTest extends TestCase
     public function testMultipleCastAnnotations(): void
     {
         // Arrange
-        $sql = 'INSERT INTO products (name, price, quantity, active) '
-            . 'VALUES (:name, :price, :quantity, :active)';
-        $this->connection->run($sql, [
-            'name' => 'Widget',
-            'price' => 9.99,
-            'quantity' => 3,
-            'active' => 1,
-        ]);
+        $this->connection->run(
+            'INSERT INTO products (name, price, quantity, active) '
+            . 'VALUES (:name, :price, :quantity, :active)',
+            ['name' => 'Widget', 'price' => 9.99, 'quantity' => 3, 'active' => 1],
+        );
         $this->writeSql(
             'FullProducts.sql',
-            "-- @cast price float\n-- @cast quantity int\n-- @cast active bool\n"
+            "-- @cast price float\n-- @cast quantity int\n"
+            . "-- @cast active bool\n"
             . "SELECT name, price, quantity, active FROM products",
         );
         $model = $this->model();
@@ -322,14 +450,17 @@ final class ModelTest extends TestCase
 
     public function testCastOnWriteQueryIgnored(): void
     {
-        // Arrange — @cast annotation on an INSERT should be ignored
-        $this->writeSql('InsertProduct.sql', "-- @cast name int\nINSERT INTO products (name) VALUES (:name)");
+        // Arrange
+        $this->writeSql(
+            'InsertProduct.sql',
+            "-- @cast name int\nINSERT INTO products (name) VALUES (:name)",
+        );
         $model = $this->model();
 
         // Act
-        $result = $model->insertProduct(['name' => 'Widget']);
+        $result = $model->insertProduct(name: 'Widget');
 
-        // Assert — returns a normal write result, no cast applied
+        // Assert
         $this->assertSame('1', $result->lastInsertId());
     }
 }
