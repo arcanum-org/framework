@@ -8,6 +8,9 @@ use Arcanum\Forge\Connection;
 use Arcanum\Forge\ConnectionFactory;
 use Arcanum\Forge\ConnectionManager;
 use Arcanum\Forge\Result;
+use Arcanum\Forge\Sql;
+use Arcanum\Gather\Configuration;
+use Arcanum\Gather\Registry;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -15,7 +18,10 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[CoversClass(ConnectionManager::class)]
 #[UsesClass(Connection::class)]
 #[UsesClass(ConnectionFactory::class)]
+#[UsesClass(Configuration::class)]
+#[UsesClass(Registry::class)]
 #[UsesClass(Result::class)]
+#[UsesClass(Sql::class)]
 final class ConnectionManagerTest extends TestCase
 {
     /**

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Forge;
 
+use Arcanum\Gather\Configuration;
+
 /**
  * Creates Connection instances from configuration arrays.
  *
@@ -17,77 +19,69 @@ final class ConnectionFactory
      */
     public function make(array $config): Connection
     {
-        $driver = $this->string($config, 'driver', '');
+        $cfg = new Configuration($config);
+        $driver = $cfg->asString('driver');
 
         return match ($driver) {
-            'mysql' => $this->buildMysql($config),
-            'pgsql' => $this->buildPgsql($config),
-            'sqlite' => $this->buildSqlite($config),
+            'mysql' => $this->buildMysql($cfg),
+            'pgsql' => $this->buildPgsql($cfg),
+            'sqlite' => $this->buildSqlite($cfg),
             default => throw new \RuntimeException(
                 sprintf('Unsupported database driver "%s".', $driver),
             ),
         };
     }
 
-    /**
-     * @param array<string, mixed> $config
-     */
-    private function buildMysql(array $config): Connection
+    private function buildMysql(Configuration $cfg): Connection
     {
-        $socket = $this->string($config, 'unix_socket', '');
+        $socket = $cfg->asString('unix_socket');
 
         if ($socket !== '') {
             $dsn = sprintf(
                 'mysql:unix_socket=%s;dbname=%s',
                 $socket,
-                $this->string($config, 'database', ''),
+                $cfg->asString('database'),
             );
         } else {
             $dsn = sprintf(
                 'mysql:host=%s;port=%s;dbname=%s',
-                $this->string($config, 'host', '127.0.0.1'),
-                $this->string($config, 'port', '3306'),
-                $this->string($config, 'database', ''),
+                $cfg->asString('host', '127.0.0.1'),
+                $cfg->asString('port', '3306'),
+                $cfg->asString('database'),
             );
         }
 
-        $charset = $this->string($config, 'charset', '');
+        $charset = $cfg->asString('charset');
         if ($charset !== '') {
             $dsn .= ';charset=' . $charset;
         }
 
         return new Connection(
             dsn: $dsn,
-            username: $this->string($config, 'username', ''),
-            password: $this->string($config, 'password', ''),
+            username: $cfg->asString('username'),
+            password: $cfg->asString('password'),
         );
     }
 
-    /**
-     * @param array<string, mixed> $config
-     */
-    private function buildPgsql(array $config): Connection
+    private function buildPgsql(Configuration $cfg): Connection
     {
         $dsn = sprintf(
             'pgsql:host=%s;port=%s;dbname=%s',
-            $this->string($config, 'host', '127.0.0.1'),
-            $this->string($config, 'port', '5432'),
-            $this->string($config, 'database', ''),
+            $cfg->asString('host', '127.0.0.1'),
+            $cfg->asString('port', '5432'),
+            $cfg->asString('database'),
         );
 
         return new Connection(
             dsn: $dsn,
-            username: $this->string($config, 'username', ''),
-            password: $this->string($config, 'password', ''),
+            username: $cfg->asString('username'),
+            password: $cfg->asString('password'),
         );
     }
 
-    /**
-     * @param array<string, mixed> $config
-     */
-    private function buildSqlite(array $config): Connection
+    private function buildSqlite(Configuration $cfg): Connection
     {
-        $database = $this->string($config, 'database', ':memory:');
+        $database = $cfg->asString('database', ':memory:');
 
         if ($database === ':memory:') {
             $dsn = 'sqlite::memory:';
@@ -96,19 +90,5 @@ final class ConnectionFactory
         }
 
         return new Connection(dsn: $dsn);
-    }
-
-    /**
-     * @param array<string, mixed> $config
-     */
-    private function string(array $config, string $key, string $default): string
-    {
-        $value = $config[$key] ?? $default;
-
-        if (is_int($value)) {
-            return (string) $value;
-        }
-
-        return is_string($value) ? $value : $default;
     }
 }

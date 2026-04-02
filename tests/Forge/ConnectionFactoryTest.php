@@ -6,12 +6,16 @@ namespace Arcanum\Test\Forge;
 
 use Arcanum\Forge\Connection;
 use Arcanum\Forge\ConnectionFactory;
+use Arcanum\Gather\Configuration;
+use Arcanum\Gather\Registry;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(ConnectionFactory::class)]
 #[UsesClass(Connection::class)]
+#[UsesClass(Configuration::class)]
+#[UsesClass(Registry::class)]
 final class ConnectionFactoryTest extends TestCase
 {
     public function testBuildsSqliteMemory(): void
