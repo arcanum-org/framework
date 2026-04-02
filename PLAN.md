@@ -724,7 +724,7 @@ final class PlaceOrderHandler
 
 #### Configuration
 
-- [ ] `config/database.php` structure:
+- [x] `config/database.php` structure:
   ```php
   return [
       'default' => 'mysql',
@@ -762,7 +762,7 @@ final class PlaceOrderHandler
 
 #### Result
 
-- [ ] `Result` — wraps the raw PDO result with convenience accessors. Constructed with the row data, affected row count, and last insert ID.
+- [x] `Result` — wraps the raw PDO result with convenience accessors. Constructed with the row data, affected row count, and last insert ID.
   - `rows(): array` — all rows as associative arrays.
   - `first(): array|null` — first row or null if empty.
   - `scalar(): mixed` — first column of first row. Throws if empty.
@@ -770,16 +770,16 @@ final class PlaceOrderHandler
   - `affectedRows(): int` — number of rows affected (writes).
   - `lastInsertId(): string` — last auto-increment ID (inserts).
   - `count(): int` — number of rows returned.
-- [ ] Tests: rows returns all, first returns first row, first returns null on empty, scalar returns single value, scalar throws on empty, isEmpty, affectedRows, lastInsertId, count. ~10 tests.
+- [x] Tests: rows returns all, first returns first row, first returns null on empty, scalar returns single value, scalar throws on empty, isEmpty, affectedRows, lastInsertId, count. ~10 tests.
 
 #### Model — SQL File Resolution and Execution
 
-- [ ] `Model` — dynamic object that maps method calls to SQL files. Constructed with a directory path (the Model directory), a `Connection` reference (read and write), and a SQL file reader.
+- [x] `Model` — dynamic object that maps method calls to SQL files. Constructed with a directory path (the Model directory), a `Connection` reference (read and write), and a SQL file reader.
   - `__call(string $method, array $args): Result` — converts method name from camelCase to PascalCase file name (`insertOrder` → `InsertOrder.sql`). Reads the SQL file. Binds named parameters from `$args[0]` (the associative array). Inspects SQL content to determine read vs write connection. Executes. Returns `Result`.
   - Throws `RuntimeException` if the SQL file doesn't exist (clear message: "Model method 'insertOrder' not found — expected file: .../Model/InsertOrder.sql").
   - SQL file contents cached in memory per-request.
-- [ ] SQL content inspection for connection routing: scans first non-comment, non-whitespace SQL token. `SELECT` → read connection. Everything else → write connection. Comment lines (`-- ...`) are skipped when determining the SQL operation type.
-- [ ] **Type casting via SQL file annotations.** The framework parses `-- @cast` comment headers in SQL files and applies type coercion to each result row before returning.
+- [x] SQL content inspection for connection routing: scans first non-comment, non-whitespace SQL token. `SELECT` → read connection. Everything else → write connection. Comment lines (`-- ...`) are skipped when determining the SQL operation type.
+- [x] **Type casting via SQL file annotations.** The framework parses `-- @cast` comment headers in SQL files and applies type coercion to each result row before returning.
   ```sql
   -- @cast price float
   -- @cast in_stock bool
@@ -796,7 +796,7 @@ final class PlaceOrderHandler
   - `json` — `json_decode($value, true)`
   
   Annotations are optional — unannotated columns return whatever PDO gives (strings for most drivers). Parsed once per SQL file and cached with the file content. Applied only to read results (`SELECT`), not to write operations.
-- [ ] Tests: method call resolves to correct SQL file, camelCase→PascalCase conversion, parameters bound as `:named`, SELECT uses read connection, INSERT/UPDATE/DELETE use write connection, missing file throws with helpful message, file content cached, parameterless SQL works (empty array), @cast int, @cast float, @cast bool (all driver variants), @cast json, no @cast returns raw PDO values, multiple @cast annotations, @cast on write query ignored. ~16 tests.
+- [x] Tests: method call resolves to correct SQL file, camelCase→PascalCase conversion, parameters bound as `:named`, SELECT uses read connection, INSERT/UPDATE/DELETE use write connection, missing file throws with helpful message, file content cached, parameterless SQL works (empty array), @cast int, @cast float, @cast bool (all driver variants), @cast json, no @cast returns raw PDO values, multiple @cast annotations, @cast on write query ignored. ~16 tests.
 
 #### Database Service
 

@@ -283,4 +283,116 @@ final class SqlTest extends TestCase
     {
         $this->assertSame('INSERT', Sql::firstKeyword("-- comment\n ( \n --comment\n INSERT INTO users"));
     }
+
+    // ── parseCasts ───────────────────────────────────────────────
+
+    public function testParseCastsExtractsAnnotations(): void
+    {
+        $sql = "-- @cast price float\n-- @cast active bool\nSELECT price, active FROM products";
+
+        $this->assertSame(['price' => 'float', 'active' => 'bool'], Sql::parseCasts($sql));
+    }
+
+    public function testParseCastsReturnsEmptyWhenNone(): void
+    {
+        $this->assertSame([], Sql::parseCasts('SELECT * FROM users'));
+    }
+
+    public function testParseCastsIgnoresRegularComments(): void
+    {
+        $sql = "-- This is a regular comment\n-- @cast id int\nSELECT id FROM users";
+
+        $this->assertSame(['id' => 'int'], Sql::parseCasts($sql));
+    }
+
+    public function testParseCastsAllTypes(): void
+    {
+        $sql = "-- @cast a int\n-- @cast b float\n-- @cast c bool\n-- @cast d json\nSELECT a, b, c, d FROM t";
+
+        $this->assertSame(
+            ['a' => 'int', 'b' => 'float', 'c' => 'bool', 'd' => 'json'],
+            Sql::parseCasts($sql),
+        );
+    }
+
+    // ── applyCasts ───────────────────────────────────────────────
+
+    public function testApplyCastsInt(): void
+    {
+        $rows = [['id' => '42', 'name' => 'Alice']];
+
+        $result = Sql::applyCasts($rows, ['id' => 'int']);
+
+        $this->assertSame(42, $result[0]['id']);
+        $this->assertSame('Alice', $result[0]['name']);
+    }
+
+    public function testApplyCastsFloat(): void
+    {
+        $rows = [['price' => '19.99']];
+
+        $this->assertSame(19.99, Sql::applyCasts($rows, ['price' => 'float'])[0]['price']);
+    }
+
+    public function testApplyCastsBoolVariants(): void
+    {
+        $rows = [
+            ['active' => '1'],
+            ['active' => '0'],
+            ['active' => 't'],
+            ['active' => 'f'],
+            ['active' => 'true'],
+            ['active' => 'yes'],
+            ['active' => 'false'],
+            ['active' => 'no'],
+        ];
+
+        $result = Sql::applyCasts($rows, ['active' => 'bool']);
+
+        $this->assertTrue($result[0]['active']);   // '1'
+        $this->assertFalse($result[1]['active']);  // '0'
+        $this->assertTrue($result[2]['active']);   // 't'
+        $this->assertFalse($result[3]['active']);  // 'f'
+        $this->assertTrue($result[4]['active']);   // 'true'
+        $this->assertTrue($result[5]['active']);   // 'yes'
+        $this->assertFalse($result[6]['active']);  // 'false'
+        $this->assertFalse($result[7]['active']);  // 'no'
+    }
+
+    public function testApplyCastsJson(): void
+    {
+        $rows = [['data' => '{"key":"value"}']];
+
+        $this->assertSame(['key' => 'value'], Sql::applyCasts($rows, ['data' => 'json'])[0]['data']);
+    }
+
+    public function testApplyCastsPreservesNull(): void
+    {
+        $rows = [['value' => null]];
+
+        $this->assertNull(Sql::applyCasts($rows, ['value' => 'int'])[0]['value']);
+    }
+
+    public function testApplyCastsSkipsMissingColumns(): void
+    {
+        $rows = [['name' => 'Alice']];
+
+        $result = Sql::applyCasts($rows, ['missing' => 'int']);
+
+        $this->assertSame('Alice', $result[0]['name']);
+    }
+
+    public function testApplyCastsEmptyCastsReturnsUnchanged(): void
+    {
+        $rows = [['id' => '1']];
+
+        $this->assertSame($rows, Sql::applyCasts($rows, []));
+    }
+
+    public function testApplyCastsUnknownTypePassesThrough(): void
+    {
+        $rows = [['value' => 'hello']];
+
+        $this->assertSame('hello', Sql::applyCasts($rows, ['value' => 'unknown'])[0]['value']);
+    }
 }

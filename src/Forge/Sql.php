@@ -95,4 +95,92 @@ final class Sql
 
         return '';
     }
+
+    /**
+     * Parse `-- @cast column type` annotations from a SQL string.
+     *
+     * Returns a map of column name → cast type. Supported types: int, float, bool, json.
+     * Only `-- @cast` line comments are recognized — block comments are not scanned.
+     *
+     * @return array<string, string>
+     */
+    public static function parseCasts(string $sql): array
+    {
+        $casts = [];
+
+        foreach (explode("\n", $sql) as $line) {
+            $trimmed = ltrim($line);
+
+            if (!str_starts_with($trimmed, '-- @cast ')) {
+                continue;
+            }
+
+            $parts = preg_split('/\s+/', substr($trimmed, 9), 3);
+
+            if ($parts === false || count($parts) < 2) {
+                continue;
+            }
+
+            $casts[$parts[0]] = $parts[1];
+        }
+
+        return $casts;
+    }
+
+    /**
+     * Apply cast annotations to a set of result rows.
+     *
+     * @param list<array<string, mixed>> $rows
+     * @param array<string, string> $casts Column → type map from parseCasts().
+     * @return list<array<string, mixed>>
+     */
+    public static function applyCasts(array $rows, array $casts): array
+    {
+        if ($casts === []) {
+            return $rows;
+        }
+
+        foreach ($rows as $i => $row) {
+            foreach ($casts as $column => $type) {
+                if (!array_key_exists($column, $row)) {
+                    continue;
+                }
+
+                $rows[$i][$column] = self::castValue($row[$column], $type);
+            }
+        }
+
+        return $rows;
+    }
+
+    private static function castValue(mixed $value, string $type): mixed
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (!is_scalar($value)) {
+            return $value;
+        }
+
+        return match ($type) {
+            'int' => (int) $value,
+            'float' => (float) $value,
+            'bool' => self::castBool($value),
+            'json' => json_decode((string) $value, true),
+            default => $value,
+        };
+    }
+
+    private static function castBool(bool|int|float|string $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return match ((string) $value) {
+            't', '1', 'true', 'yes' => true,
+            default => false,
+        };
+    }
 }

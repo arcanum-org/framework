@@ -10,3 +10,7 @@ parameters:
         - ../tests/Vault/RedisDriverTest.php
         - ../src/Vault/ApcuDriver.php
         - ../tests/Vault/ApcuDriverTest.php
+    ignoreErrors:
+        - identifier: method.notFound
+          path: ../tests/Forge/ModelTest.php
+          reportUnmatched: false
