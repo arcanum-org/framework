@@ -20,6 +20,7 @@ use Arcanum\Rune\Command\ListCommand;
 use Arcanum\Ignition\ConfigurationCache;
 use Arcanum\Rune\Command\CacheClearCommand;
 use Arcanum\Rune\Command\CacheStatusCommand;
+use Arcanum\Rune\Command\ForgeModelsCommand;
 use Arcanum\Rune\Command\MakeCommandCommand;
 use Arcanum\Rune\Command\MakeKeyCommand;
 use Arcanum\Rune\Command\MakeMiddlewareCommand;
@@ -42,6 +43,7 @@ use Arcanum\Auth\AuthorizationGuard;
 use Arcanum\Ignition\Transport;
 use Arcanum\Forge\DomainContext;
 use Arcanum\Forge\DomainContextMiddleware;
+use Arcanum\Toolkit\Strings;
 use Arcanum\Validation\ValidationGuard;
 
 /**
@@ -190,6 +192,7 @@ class CliRouting implements Bootstrapper
             $registry->register('make:query', MakeQueryCommand::class);
             $registry->register('make:page', MakePageCommand::class);
             $registry->register('make:middleware', MakeMiddlewareCommand::class);
+            $registry->register('forge:models', ForgeModelsCommand::class);
             return $registry;
         });
 
@@ -299,6 +302,17 @@ class CliRouting implements Bootstrapper
             return new MakeMiddlewareCommand(
                 rootDirectory: $kernel->rootDirectory(),
                 rootNamespace: $namespace,
+            );
+        });
+
+        $container->factory(ForgeModelsCommand::class, function () use ($container, $namespace) {
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+            $domainRoot = $kernel->rootDirectory()
+                . DIRECTORY_SEPARATOR . Strings::namespacePath($namespace);
+            return new ForgeModelsCommand(
+                domainRoot: $domainRoot,
+                domainNamespace: $namespace,
             );
         });
     }

@@ -833,13 +833,13 @@ final class PlaceOrderHandler
 
 Generated model classes provide static analysis coverage and typed parameter safety. They are optional — the magic `Model` with `__call` works without them. The calling convention is identical: `$model->search(category: 'shoes', minPrice: 10)` works the same on both the magic Model (via `__call` with PHP named arguments) and the generated class (via typed method signature). No API change when generating.
 
-- [ ] `forge:models` Rune command — scans each domain's `Model/` directory for `.sql` files and generates a typed PHP model class per domain. The generated class extends `Forge\Model`, adding a typed method for each SQL file.
+- [x] `forge:models` Rune command — scans each domain's `Model/` directory for `.sql` files and generates a typed PHP model class per domain. The generated class extends `Forge\Model`, adding a typed method for each SQL file.
   - Method names: `PascalCase.sql` → `camelCase()` method.
   - Parameters: from `@param` annotations if present, otherwise auto-discovered `:named` bindings defaulting to `string`.
   - Parameter name conversion: SQL `snake_case` (`:min_price`) → PHP `camelCase` (`$minPrice`). Uses `Toolkit\Strings::camel()`.
   - Each method delegates to `$this->__call()` — the generated class is a type-safe wrapper, not a reimplementation.
   - Output location: `app/Domain/{Domain}/Model.php` (the class, alongside the `.sql` files in `Model/`).
-- [ ] `Database::model` discovery — checks if a generated model class exists at `{DomainNamespace}\Model` via `class_exists()`. If found, instantiates the generated class. If not, falls back to the magic `Forge\Model`. Both share the same constructor signature (directory, read connection, write connection).
+- [x] `Database::model` discovery — checks if a generated model class exists at `{DomainNamespace}\Model` via `class_exists()`. If found, instantiates the generated class. If not, falls back to the magic `Forge\Model`. Both share the same constructor signature (directory, read connection, write connection).
 - [ ] **Drift detection.** SQL files can drift from generated classes in several ways:
   - **New SQL file added** — no generated method. `__call` handles it at runtime. No breakage, just missing type safety.
   - **SQL file deleted** — generated method still exists, calls `__call`, which throws RuntimeException (file not found).

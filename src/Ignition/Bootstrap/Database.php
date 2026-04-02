@@ -48,11 +48,14 @@ class Database implements Bootstrapper
         $container->instance(ConnectionManager::class, $manager);
         $container->instance(DomainContext::class, $context);
 
+        $namespace = $config->asString('app.namespace', 'App\\Domain');
+
         $container->instance(
             DatabaseService::class,
             new DatabaseService(
                 connections: $manager,
                 context: $context,
+                domainNamespace: $namespace,
             ),
         );
     }

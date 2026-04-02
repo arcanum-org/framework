@@ -25,6 +25,7 @@ final class Database
     public function __construct(
         private readonly ConnectionManager $connections,
         private readonly DomainContext $context,
+        private readonly string $domainNamespace = '',
         private readonly string|null $connectionOverride = null,
     ) {
     }
@@ -61,6 +62,7 @@ final class Database
         return new self(
             connections: $this->connections,
             context: $this->context,
+            domainNamespace: $this->domainNamespace,
             connectionOverride: $name,
         );
     }
@@ -93,10 +95,29 @@ final class Database
             return $this->modelInstance;
         }
 
+        $modelDir = $this->context->modelPath();
+        $readConn = $this->resolveReadConnection();
+        $writeConn = $this->resolveWriteConnection();
+
+        // Check for a generated model class at {DomainNamespace}\{Domain}\Model.
+        if ($this->domainNamespace !== '') {
+            $generatedClass = $this->domainNamespace . '\\' . $this->context->get() . '\\Model';
+
+            if (class_exists($generatedClass) && is_subclass_of($generatedClass, Model::class)) {
+                $this->modelInstance = new $generatedClass(
+                    directory: $modelDir,
+                    readConnection: $readConn,
+                    writeConnection: $writeConn,
+                );
+
+                return $this->modelInstance;
+            }
+        }
+
         $this->modelInstance = new Model(
-            directory: $this->context->modelPath(),
-            readConnection: $this->resolveReadConnection(),
-            writeConnection: $this->resolveWriteConnection(),
+            directory: $modelDir,
+            readConnection: $readConn,
+            writeConnection: $writeConn,
         );
 
         return $this->modelInstance;

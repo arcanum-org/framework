@@ -1,0 +1,271 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Arcanum\Test\Forge;
+
+use Arcanum\Forge\ModelGenerator;
+use Arcanum\Forge\Sql;
+use Arcanum\Parchment\Reader;
+use Arcanum\Parchment\Searcher;
+use Arcanum\Parchment\Writer;
+use Arcanum\Toolkit\Strings;
+use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
+
+#[CoversClass(ModelGenerator::class)]
+#[UsesClass(Sql::class)]
+#[UsesClass(Strings::class)]
+#[UsesClass(Reader::class)]
+#[UsesClass(Writer::class)]
+#[UsesClass(Searcher::class)]
+final class ModelGeneratorTest extends TestCase
+{
+    private string $modelDir;
+
+    protected function setUp(): void
+    {
+        $this->modelDir = sys_get_temp_dir() . '/arcanum_gen_test_' . uniqid();
+        mkdir($this->modelDir, 0777, true);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->cleanDir($this->modelDir);
+    }
+
+    private function cleanDir(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+        $items = glob($dir . '/*') ?: [];
+        foreach ($items as $item) {
+            is_dir($item) ? $this->cleanDir($item) : @unlink($item);
+        }
+        @rmdir($dir);
+    }
+
+    private function writeSql(string $filename, string $sql): void
+    {
+        file_put_contents($this->modelDir . '/' . $filename, $sql);
+    }
+
+    public function testGeneratesClassWithMethods(): void
+    {
+        // Arrange
+        $this->writeSql('AllProducts.sql', 'SELECT * FROM products');
+        $this->writeSql(
+            'InsertProduct.sql',
+            'INSERT INTO products (name) VALUES (:name)',
+        );
+        $generator = new ModelGenerator();
+
+        // Act
+        $source = $generator->generate(
+            $this->modelDir,
+            'App\\Domain\\Shop\\Model',
+        );
+
+        // Assert
+        $this->assertStringContainsString('namespace App\\Domain\\Shop;', $source);
+        $this->assertStringContainsString('class Model extends BaseModel', $source);
+        $this->assertStringContainsString('function allProducts(', $source);
+        $this->assertStringContainsString('function insertProduct(', $source);
+    }
+
+    public function testMethodHasTypedParamsFromAnnotations(): void
+    {
+        // Arrange
+        $this->writeSql(
+            'Search.sql',
+            "-- @param category string\n-- @param min_price float\n"
+            . "SELECT * FROM products"
+            . " WHERE category = :category AND price >= :min_price",
+        );
+        $generator = new ModelGenerator();
+
+        // Act
+        $source = $generator->generate(
+            $this->modelDir,
+            'App\\Domain\\Shop\\Model',
+        );
+
+        // Assert
+        $this->assertStringContainsString(
+            'function search(string $category, float $minPrice)',
+            $source,
+        );
+    }
+
+    public function testMethodDefaultsToStringWithoutAnnotations(): void
+    {
+        // Arrange
+        $this->writeSql(
+            'GetById.sql',
+            'SELECT * FROM products WHERE id = :id',
+        );
+        $generator = new ModelGenerator();
+
+        // Act
+        $source = $generator->generate(
+            $this->modelDir,
+            'App\\Domain\\Shop\\Model',
+        );
+
+        // Assert
+        $this->assertStringContainsString(
+            'function getById(string $id)',
+            $source,
+        );
+    }
+
+    public function testMethodDelegatesToCall(): void
+    {
+        // Arrange
+        $this->writeSql(
+            'GetById.sql',
+            'SELECT * FROM products WHERE id = :id',
+        );
+        $generator = new ModelGenerator();
+
+        // Act
+        $source = $generator->generate(
+            $this->modelDir,
+            'App\\Domain\\Shop\\Model',
+        );
+
+        // Assert
+        $this->assertStringContainsString(
+            "\$this->__call('getById'",
+            $source,
+        );
+        $this->assertStringContainsString("'id' => \$id", $source);
+    }
+
+    public function testParameterlessSqlGeneratesNoParams(): void
+    {
+        // Arrange
+        $this->writeSql('CountAll.sql', 'SELECT count(*) FROM products');
+        $generator = new ModelGenerator();
+
+        // Act
+        $source = $generator->generate(
+            $this->modelDir,
+            'App\\Domain\\Shop\\Model',
+        );
+
+        // Assert
+        $this->assertStringContainsString('function countAll(): Result', $source);
+        $this->assertStringContainsString("__call('countAll', [])", $source);
+    }
+
+    public function testGenerateAndWriteCreatesFile(): void
+    {
+        // Arrange
+        $this->writeSql('AllProducts.sql', 'SELECT * FROM products');
+        $outputPath = $this->modelDir . '/Model.php';
+        $generator = new ModelGenerator();
+
+        // Act
+        $result = $generator->generateAndWrite(
+            $this->modelDir,
+            'App\\Domain\\Shop\\Model',
+            $outputPath,
+        );
+
+        // Assert
+        $this->assertTrue($result);
+        $this->assertFileExists($outputPath);
+        $this->assertStringContainsString(
+            'class Model extends BaseModel',
+            file_get_contents($outputPath) ?: '',
+        );
+    }
+
+    public function testGenerateAndWriteReturnsFalseForEmptyDir(): void
+    {
+        // Arrange — no SQL files
+        $generator = new ModelGenerator();
+
+        // Act
+        $result = $generator->generateAndWrite(
+            $this->modelDir,
+            'App\\Domain\\Shop\\Model',
+            $this->modelDir . '/Model.php',
+        );
+
+        // Assert
+        $this->assertFalse($result);
+    }
+
+    public function testIsStaleReturnsTrueWhenNoClassFile(): void
+    {
+        // Arrange
+        $this->writeSql('Test.sql', 'SELECT 1');
+        $generator = new ModelGenerator();
+
+        // Act & Assert
+        $this->assertTrue(
+            $generator->isStale($this->modelDir, $this->modelDir . '/Model.php'),
+        );
+    }
+
+    public function testIsStaleReturnsFalseWhenClassIsNewer(): void
+    {
+        // Arrange
+        $this->writeSql('Test.sql', 'SELECT 1');
+        // Write class file after SQL
+        sleep(1);
+        file_put_contents($this->modelDir . '/Model.php', '<?php // generated');
+        $generator = new ModelGenerator();
+
+        // Act & Assert
+        $this->assertFalse(
+            $generator->isStale($this->modelDir, $this->modelDir . '/Model.php'),
+        );
+    }
+
+    public function testSnakeCaseParamsConvertToCamelCase(): void
+    {
+        // Arrange
+        $this->writeSql(
+            'Search.sql',
+            "SELECT * FROM products"
+            . " WHERE min_price = :min_price AND max_price = :max_price",
+        );
+        $generator = new ModelGenerator();
+
+        // Act
+        $source = $generator->generate(
+            $this->modelDir,
+            'App\\Domain\\Shop\\Model',
+        );
+
+        // Assert
+        $this->assertStringContainsString('$minPrice', $source);
+        $this->assertStringContainsString('$maxPrice', $source);
+        $this->assertStringContainsString("'min_price' => \$minPrice", $source);
+        $this->assertStringContainsString("'max_price' => \$maxPrice", $source);
+    }
+
+    public function testGeneratedFileHasAutoGeneratedComment(): void
+    {
+        // Arrange
+        $this->writeSql('Test.sql', 'SELECT 1');
+        $generator = new ModelGenerator();
+
+        // Act
+        $source = $generator->generate(
+            $this->modelDir,
+            'App\\Domain\\Shop\\Model',
+        );
+
+        // Assert
+        $this->assertStringContainsString(
+            'auto-generated by forge:models',
+            $source,
+        );
+    }
+}

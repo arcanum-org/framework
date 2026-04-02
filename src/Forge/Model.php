@@ -20,7 +20,7 @@ use Arcanum\Parchment\Reader;
  * SQL content is cached in memory per-request. Read/write routing and @cast
  * annotations are handled automatically.
  */
-final class Model
+class Model
 {
     /** @var array<string, string> SQL file contents keyed by method name. */
     private array $sqlCache = [];
