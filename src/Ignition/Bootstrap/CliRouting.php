@@ -37,6 +37,9 @@ use Arcanum\Shodo\KeyValueFormatter;
 use Arcanum\Shodo\TableFormatter;
 use Arcanum\Flow\Conveyor\Bus;
 use Arcanum\Flow\Conveyor\MiddlewareBus;
+use Arcanum\Auth\ActiveIdentity;
+use Arcanum\Auth\AuthorizationGuard;
+use Arcanum\Ignition\Transport;
 use Arcanum\Validation\ValidationGuard;
 
 /**
@@ -308,6 +311,11 @@ class CliRouting implements Bootstrapper
         $bus = $container->get(Bus::class);
 
         if ($bus instanceof MiddlewareBus) {
+            /** @var ActiveIdentity $activeIdentity */
+            $activeIdentity = $container->get(ActiveIdentity::class);
+            /** @var Transport $transport */
+            $transport = $container->get(Transport::class);
+            $bus->before(new AuthorizationGuard($activeIdentity, $transport, $container));
             $bus->before(new ValidationGuard());
         }
     }

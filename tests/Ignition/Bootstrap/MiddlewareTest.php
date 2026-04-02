@@ -10,6 +10,7 @@ use Arcanum\Hyper\Middleware\Options;
 use Arcanum\Ignition\Bootstrap\Middleware;
 use Arcanum\Ignition\HyperKernel;
 use Arcanum\Ignition\Kernel;
+use Arcanum\Auth\AuthMiddleware;
 use Arcanum\Session\CsrfMiddleware;
 use Arcanum\Session\SessionMiddleware;
 use PHPUnit\Framework\TestCase;
@@ -34,11 +35,12 @@ final class MiddlewareTest extends TestCase
     {
         // Arrange
         $kernel = $this->createMock(HyperKernel::class);
-        $kernel->expects($this->exactly(5))
+        $kernel->expects($this->exactly(6))
             ->method('middleware')
             ->willReturnCallback(fn(string $class) => match (true) {
                 in_array($class, [
                     SessionMiddleware::class,
+                    AuthMiddleware::class,
                     CsrfMiddleware::class,
                     'App\Http\Middleware\Cors',
                     'App\Http\Middleware\Auth',
@@ -73,11 +75,12 @@ final class MiddlewareTest extends TestCase
     {
         // Arrange
         $kernel = $this->createMock(HyperKernel::class);
-        $kernel->expects($this->exactly(3))
+        $kernel->expects($this->exactly(4))
             ->method('middleware')
             ->willReturnCallback(fn(string $class) => match (true) {
                 in_array($class, [
                     SessionMiddleware::class,
+                    AuthMiddleware::class,
                     CsrfMiddleware::class,
                     Options::class,
                 ]) => null,
@@ -103,11 +106,12 @@ final class MiddlewareTest extends TestCase
     {
         // Arrange
         $kernel = $this->createMock(HyperKernel::class);
-        $kernel->expects($this->exactly(3))
+        $kernel->expects($this->exactly(4))
             ->method('middleware')
             ->willReturnCallback(fn(string $class) => match (true) {
                 in_array($class, [
                     SessionMiddleware::class,
+                    AuthMiddleware::class,
                     CsrfMiddleware::class,
                     Options::class,
                 ]) => null,

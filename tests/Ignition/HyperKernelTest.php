@@ -94,7 +94,7 @@ final class HyperKernelTest extends TestCase
         $kernel = new HyperKernel('/app');
 
         $bootstrapper = $this->createMock(Bootstrapper::class);
-        $bootstrapper->expects($this->exactly(10))->method('bootstrap');
+        $bootstrapper->expects($this->exactly(11))->method('bootstrap');
 
         $container = $this->createStub(Application::class);
         $container->method('get')->willReturn($bootstrapper);
@@ -109,7 +109,7 @@ final class HyperKernelTest extends TestCase
         $kernel = new HyperKernel('/app');
 
         $bootstrapper = $this->createMock(Bootstrapper::class);
-        $bootstrapper->expects($this->exactly(10))->method('bootstrap');
+        $bootstrapper->expects($this->exactly(11))->method('bootstrap');
 
         $container = $this->createStub(Application::class);
         $container->method('get')->willReturn($bootstrapper);

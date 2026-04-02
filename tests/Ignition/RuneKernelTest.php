@@ -116,7 +116,7 @@ final class RuneKernelTest extends TestCase
         $kernel = new RuneKernel('/app');
 
         $bootstrapper = $this->createMock(Bootstrapper::class);
-        $bootstrapper->expects($this->exactly(7))->method('bootstrap');
+        $bootstrapper->expects($this->exactly(8))->method('bootstrap');
 
         $container = $this->createStub(Application::class);
         $container->method('get')->willReturn($bootstrapper);
@@ -131,7 +131,7 @@ final class RuneKernelTest extends TestCase
         $kernel = new RuneKernel('/app');
 
         $bootstrapper = $this->createMock(Bootstrapper::class);
-        $bootstrapper->expects($this->exactly(7))->method('bootstrap');
+        $bootstrapper->expects($this->exactly(8))->method('bootstrap');
 
         $container = $this->createStub(Application::class);
         $container->method('get')->willReturn($bootstrapper);
