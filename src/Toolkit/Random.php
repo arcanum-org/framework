@@ -31,7 +31,7 @@ final class Random
      */
     public static function hex(int $bytes = 32): string
     {
-        return bin2hex(random_bytes($bytes));
+        return Hex::encode(random_bytes($bytes));
     }
 
     /**
@@ -42,15 +42,5 @@ final class Random
     public static function base64url(int $bytes = 32): string
     {
         return rtrim(strtr(base64_encode(random_bytes($bytes)), '+/', '-_'), '=');
-    }
-
-    /**
-     * Check whether a string is valid hex output of the given byte length.
-     *
-     * @param positive-int $bytes Expected byte count (hex length = bytes * 2).
-     */
-    public static function isHex(string $value, int $bytes): bool
-    {
-        return preg_match('/\A[0-9a-f]{' . ($bytes * 2) . '}\z/', $value) === 1;
     }
 }

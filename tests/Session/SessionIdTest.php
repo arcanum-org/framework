@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Arcanum\Test\Session;
 
 use Arcanum\Session\SessionId;
+use Arcanum\Toolkit\Hex;
 use Arcanum\Toolkit\Random;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -12,6 +13,7 @@ use PHPUnit\Framework\TestCase;
 
 #[CoversClass(SessionId::class)]
 #[UsesClass(Random::class)]
+#[UsesClass(Hex::class)]
 final class SessionIdTest extends TestCase
 {
     public function testGenerateProducesValidHexString(): void

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Session;
 
+use Arcanum\Toolkit\Hex;
 use Arcanum\Toolkit\Random;
 
 /**
@@ -38,7 +39,7 @@ final class SessionId
      */
     public static function fromString(string $value): self|null
     {
-        if (!Random::isHex($value, self::BYTES)) {
+        if (!Hex::isValid($value, self::BYTES)) {
             return null;
         }
 

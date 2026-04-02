@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Toolkit;
 
+use Arcanum\Toolkit\Hex;
 use Arcanum\Toolkit\Random;
-use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
+use PHPUnit\Framework\TestCase;
 
 #[CoversClass(Random::class)]
+#[UsesClass(Hex::class)]
 final class RandomTest extends TestCase
 {
     public function testBytesReturnsCorrectLength(): void
@@ -52,28 +55,6 @@ final class RandomTest extends TestCase
         $value = Random::base64url();
 
         $this->assertSame(43, strlen($value));
-    }
-
-    public function testIsHexAcceptsValidHex(): void
-    {
-        $hex = Random::hex(20);
-
-        $this->assertTrue(Random::isHex($hex, 20));
-    }
-
-    public function testIsHexRejectsWrongLength(): void
-    {
-        $this->assertFalse(Random::isHex('abcd', 20));
-    }
-
-    public function testIsHexRejectsNonHexCharacters(): void
-    {
-        $this->assertFalse(Random::isHex(str_repeat('zz', 20), 20));
-    }
-
-    public function testIsHexRejectsEmptyString(): void
-    {
-        $this->assertFalse(Random::isHex('', 20));
     }
 
     public function testTwoCallsProduceDifferentValues(): void
