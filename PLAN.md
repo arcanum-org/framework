@@ -604,8 +604,8 @@ $ php arcanum logout
 
 #### Starter App
 
-- [ ] `config/auth.php` — default config with session guard, token guard, placeholder resolvers, login fields.
-- [ ] Example `#[RequiresAuth]` on a DTO.
+- [x] `config/auth.php` — updated with identity resolver, credentials resolver, and login fields config.
+- [x] Example `#[RequiresAuth]` on a DTO — already exists (Whoami query). `#[RequiresRole]` example on AdminOnly query.
 
 #### Documentation
 
