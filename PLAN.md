@@ -510,9 +510,102 @@ JWT (`JwtGuard`) is deferred. `TokenGuard` with a closure that decodes JWTs is t
 - [x] Added to both `HyperKernel::$bootstrappers` and `RuneKernel::$bootstrappers` after `Cache`/`Sessions`, before `Routing`.
 - [x] Existing kernel and middleware tests updated for new counts.
 
+#### CLI Sessions — persistent login
+
+CLI users shouldn't need to pass `--token` on every command. `php arcanum login` authenticates once and persists the credential, just like `gh auth login` or `gcloud auth login`.
+
+**The flow:**
+
+```
+$ php arcanum login
+Email: stephen@example.com
+Password: ••••••••
+✓ Authenticated as stephen. Session expires in 24 hours.
+
+$ php arcanum query:auth:whoami          ← no --token needed
+{"id":"user-1","roles":["admin"]}
+
+$ php arcanum logout
+✓ CLI session cleared.
+```
+
+**Priority chain for `CliAuthResolver`:**
+1. `--token` flag (explicit override for scripts, always wins)
+2. Stored CLI session file (persistent login)
+3. `ARCANUM_TOKEN` env var (CI/automation)
+
+**Design decisions:**
+
+- **Credential file is project-local** (`files/.cli-session`), not user-home. Different projects have different users. Gitignored automatically (lives inside `files/`).
+- **Encrypted at rest** via the framework's `Encryptor` (APP_KEY). Contains the identity ID + expiry timestamp, not the raw credentials.
+- **`login` accepts credentials, not tokens.** The app provides a `credentials` resolver closure that takes input fields and returns `Identity|null`. The `login` command prompts for those fields, validates via the resolver, and stores the result. `--token` remains the escape hatch for scripts.
+- **Interactive input is new to Rune.** The `Prompter` is a minimal stdin reader: `ask(string $label): string` and `secret(string $label): string` (disables echo). Not a full TUI — just enough for login.
+
+##### Rune Interactive Input
+
+- [ ] `Prompter` — reads from stdin. `ask(string $label): string` writes label to output, reads line from stdin. `secret(string $label): string` same but disables terminal echo (`stty -echo` / restore). Constructor takes `Output` and optional stdin stream for testing.
+- [ ] Tests: ask returns trimmed input, secret disables echo (mock-based, since stty isn't testable in PHPUnit), empty input returns empty string. ~4 tests.
+
+##### CLI Session Storage
+
+- [ ] `CliSession` — encrypted file-based credential store. Constructor takes `Encryptor`, `string $path` (default `files/.cli-session`), plus Parchment `Reader`/`Writer`/`FileSystem` for I/O.
+  - `store(string $identityId, int $ttl): void` — encrypts `{id, expiry}` as JSON, writes to file.
+  - `load(): string|null` — reads file, decrypts, checks expiry. Returns identity ID or null. Deletes file if expired or corrupt.
+  - `clear(): void` — deletes the file.
+- [ ] Tests: store/load round-trip, expired returns null and deletes file, corrupt file returns null, clear deletes file, missing file returns null. ~6 tests.
+
+##### Login Command
+
+- [ ] `LoginCommand` — built-in Rune command. Reads `config/auth.php` key `login.fields` (default: `['email', 'password']`). For each field, prompts via `Prompter` (fields named `password`, `secret`, or `token` use `secret()`). Calls `resolvers.credentials` closure with the collected fields. On success: stores identity ID via `CliSession`, prints confirmation. On failure: prints error, exit code 1.
+- [ ] Config structure for login:
+  ```php
+  // config/auth.php
+  'login' => [
+      'fields' => ['email', 'password'],  // prompt labels, in order
+      'ttl' => 86400,                      // 24 hours
+  ],
+  'resolvers' => [
+      'credentials' => fn(string $email, string $password) => /* validate, return Identity|null */,
+  ],
+  ```
+- [ ] The credentials resolver receives positional args matching the field order. `fn(string $email, string $password)` maps to `fields: ['email', 'password']`.
+- [ ] Tests: successful login stores session and prints confirmation, failed login prints error with exit code 1, fields are prompted in order, password fields use secret(). ~5 tests.
+
+##### Logout Command
+
+- [ ] `LogoutCommand` — built-in Rune command. Calls `CliSession::clear()`. Prints confirmation. Always exit code 0.
+- [ ] Tests: clears session, prints message. ~2 tests.
+
+##### CliAuthResolver Update
+
+- [ ] Update `CliAuthResolver` to check stored CLI session between `--token` and env var:
+  1. `--token` flag → call token resolver
+  2. `CliSession::load()` → if non-null, call identity resolver (same as `SessionGuard` uses)
+  3. `ARCANUM_TOKEN` env var → call token resolver
+- [ ] `CliAuthResolver` constructor gains optional `CliSession` and identity resolver closure.
+- [ ] Tests: stored session resolves, expired session falls through to env, --token overrides stored session, all three sources work in priority order. ~4 tests.
+
+##### Bootstrap & Wiring
+
+- [ ] `Bootstrap\Auth` registers `CliSession` for CLI kernels (with `Encryptor` and file path from `Kernel::filesDirectory()`).
+- [ ] `Bootstrap\Auth` passes `CliSession` and identity resolver to `CliAuthResolver`.
+- [ ] `Bootstrap\CliRouting` registers `LoginCommand` and `LogoutCommand` in `BuiltInRegistry`.
+- [ ] `LoginCommand` factory provides `Prompter`, `CliSession`, credentials resolver, login config.
+- [ ] Tests: CliSession registered, login/logout commands registered, resolver has session support. ~3 tests.
+
+##### Documentation
+
+- [ ] Update Auth README — CLI sessions section: login/logout flow, credential config, TTL, priority chain.
+- [ ] Update Rune README — Prompter, login/logout in built-in commands list.
+
+##### Deferred
+
+- Browser-based login (`php arcanum login --browser` → opens OAuth flow, local callback server). Complex, niche. The credential-based flow covers the common case.
+- Interactive credential types beyond string fields (MFA codes, key files). Can extend `login.fields` config later.
+
 #### Starter App
 
-- [ ] `config/auth.php` — default config with session guard and placeholder identity resolver.
+- [ ] `config/auth.php` — default config with session guard, token guard, placeholder resolvers, login fields.
 - [ ] Example `#[RequiresAuth]` on a DTO.
 
 #### Documentation
