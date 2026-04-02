@@ -54,6 +54,28 @@ final class RandomTest extends TestCase
         $this->assertSame(43, strlen($value));
     }
 
+    public function testIsHexAcceptsValidHex(): void
+    {
+        $hex = Random::hex(20);
+
+        $this->assertTrue(Random::isHex($hex, 20));
+    }
+
+    public function testIsHexRejectsWrongLength(): void
+    {
+        $this->assertFalse(Random::isHex('abcd', 20));
+    }
+
+    public function testIsHexRejectsNonHexCharacters(): void
+    {
+        $this->assertFalse(Random::isHex(str_repeat('zz', 20), 20));
+    }
+
+    public function testIsHexRejectsEmptyString(): void
+    {
+        $this->assertFalse(Random::isHex('', 20));
+    }
+
     public function testTwoCallsProduceDifferentValues(): void
     {
         $this->assertNotSame(Random::bytes(32), Random::bytes(32));

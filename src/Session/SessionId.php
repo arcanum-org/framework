@@ -38,7 +38,7 @@ final class SessionId
      */
     public static function fromString(string $value): self|null
     {
-        if (preg_match('/\A[0-9a-f]{' . (self::BYTES * 2) . '}\z/', $value) !== 1) {
+        if (!Random::isHex($value, self::BYTES)) {
             return null;
         }
 

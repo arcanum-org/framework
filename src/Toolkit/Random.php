@@ -43,4 +43,14 @@ final class Random
     {
         return rtrim(strtr(base64_encode(random_bytes($bytes)), '+/', '-_'), '=');
     }
+
+    /**
+     * Check whether a string is valid hex output of the given byte length.
+     *
+     * @param positive-int $bytes Expected byte count (hex length = bytes * 2).
+     */
+    public static function isHex(string $value, int $bytes): bool
+    {
+        return preg_match('/\A[0-9a-f]{' . ($bytes * 2) . '}\z/', $value) === 1;
+    }
 }
