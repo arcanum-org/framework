@@ -164,13 +164,13 @@ Transport-agnostic helper classes in Shodo. No dependencies on HTTP, session, or
 
 #### 10.5 Reverse URL resolver
 
-- [ ] **10.5a** Create `Atlas\UrlResolver`. Constructor takes `string $rootNamespace` (e.g. `'App'`). Method: `resolve(string $dtoClass): string`. Strips `$rootNamespace\Domain\` prefix, identifies and strips `Query\` or `Command\` type namespace, converts remaining PascalCase segments to kebab-case via `Strings::kebab()`, joins with `/`, prepends `/`. Example: `App\Domain\Shop\Query\ProductsFeatured` → `/shop/products-featured`.
-- [ ] **10.5b** Handle root-level DTOs (no domain segments): `App\Domain\Query\Health` → `/health`.
-- [ ] **10.5c** Handle command handler prefixes: POST/PATCH/DELETE prefixes (`PostSubmit`, `PatchUpdate`, `DeleteRemove`) strip the prefix from the URL. The resolver doesn't need to handle these — it resolves the DTO class to the canonical path, not the HTTP method. Document this decision.
-- [ ] **10.5d** Add optional `RouteMap` parameter to constructor. When present, `resolve()` first checks a reverse index (DTO class → path) built from the RouteMap. If found, returns the custom path. Falls back to convention.
-- [ ] **10.5e** Build the reverse index: add `RouteMap::reverseLookup(string $dtoClass): ?string` method that iterates registered routes and returns the path for a matching DTO class. Cache the reverse map on first call.
-- [ ] **10.5f** Handle Pages namespace: `App\Pages\Docs\GettingStarted` → `/docs/getting-started`. Detect by checking if class starts with pages namespace (needs `string $pagesNamespace` constructor param, nullable).
-- [ ] **10.5g** Unit tests: convention query, convention command, root-level DTO, custom route override, pages namespace, unknown class outside root namespace throws exception.
+- [x] **10.5a** Create `Atlas\UrlResolver`. Constructor takes `string $rootNamespace` (e.g. `'App\\Domain'`). Method: `resolve(string $dtoClass): string`. Strips root namespace prefix, identifies and strips `Query\` or `Command\` type namespace, converts remaining PascalCase segments to kebab-case via `Strings::kebab()`, joins with `/`, prepends `/`. Example: `App\Domain\Shop\Query\ProductsFeatured` → `/shop/products-featured`.
+- [x] **10.5b** Handle root-level DTOs (no domain segments): `App\Domain\Query\Health` → `/health`.
+- [x] **10.5c** Handle command handler prefixes: POST/PATCH/DELETE prefixes (`PostSubmit`, `PatchUpdate`, `DeleteRemove`) strip the prefix from the URL. The resolver doesn't need to handle these — it resolves the DTO class to the canonical path, not the HTTP method.
+- [x] **10.5d** Add optional `RouteMap` parameter to constructor. When present, `resolve()` first checks a reverse index (DTO class → path) built from the RouteMap. If found, returns the custom path. Falls back to convention.
+- [x] **10.5e** Build the reverse index: add `RouteMap::reverseLookup(string $dtoClass): ?string` method that iterates registered routes and returns the path for a matching DTO class. Cache the reverse map on first call. Invalidated on register().
+- [x] **10.5f** Handle Pages namespace: `App\Pages\Docs\GettingStarted` → `/docs/getting-started`. Detect by checking if class starts with pages namespace (needs `string $pagesNamespace` constructor param, nullable).
+- [x] **10.5g** Unit tests: convention query, convention command, root-level DTO, deep domain, kebab-case, custom route override, fallback when not in RouteMap, pages namespace, pages root-level, unknown namespace throws, missing type namespace throws.
 
 #### 10.6 HTTP-aware helpers and Bootstrap wiring
 
