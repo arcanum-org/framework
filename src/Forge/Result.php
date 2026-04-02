@@ -12,6 +12,9 @@ namespace Arcanum\Forge;
  */
 final class Result
 {
+    /** @var array<string, string> */
+    private array $casts = [];
+
     /**
      * @param list<array<string, mixed>> $rows
      */
@@ -23,13 +26,32 @@ final class Result
     }
 
     /**
+     * Return a new Result that applies type casts when rows are accessed.
+     *
+     * Casts are applied lazily per-row — the underlying row data is not copied.
+     *
+     * @param array<string, string> $casts Column → type map from Sql::parseCasts().
+     */
+    public function withCasts(array $casts): self
+    {
+        $result = clone $this;
+        $result->casts = $casts;
+
+        return $result;
+    }
+
+    /**
      * All rows as associative arrays.
      *
      * @return list<array<string, mixed>>
      */
     public function rows(): array
     {
-        return $this->rows;
+        if ($this->casts === []) {
+            return $this->rows;
+        }
+
+        return array_map($this->castRow(...), $this->rows);
     }
 
     /**
@@ -39,7 +61,11 @@ final class Result
      */
     public function first(): array|null
     {
-        return $this->rows[0] ?? null;
+        if (!isset($this->rows[0])) {
+            return null;
+        }
+
+        return $this->casts !== [] ? $this->castRow($this->rows[0]) : $this->rows[0];
     }
 
     /**
@@ -49,11 +75,13 @@ final class Result
      */
     public function scalar(): mixed
     {
-        if ($this->rows === []) {
+        $row = $this->first();
+
+        if ($row === null) {
             throw new \RuntimeException('Cannot get scalar value from an empty result set.');
         }
 
-        return array_values($this->rows[0])[0];
+        return array_values($row)[0];
     }
 
     /**
@@ -86,5 +114,20 @@ final class Result
     public function count(): int
     {
         return count($this->rows);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function castRow(array $row): array
+    {
+        foreach ($this->casts as $column => $type) {
+            if (array_key_exists($column, $row)) {
+                $row[$column] = Sql::castValue($row[$column], $type);
+            }
+        }
+
+        return $row;
     }
 }

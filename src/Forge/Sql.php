@@ -328,7 +328,7 @@ final class Sql
         return $ordered;
     }
 
-    private static function castValue(mixed $value, string $type): mixed
+    public static function castValue(mixed $value, string $type): mixed
     {
         if ($value === null) {
             return null;

@@ -57,11 +57,7 @@ final class Model
             $casts = $this->loadCasts($method, $sql);
 
             if ($casts !== []) {
-                return new Result(
-                    rows: Sql::applyCasts($result->rows(), $casts),
-                    affectedRows: $result->affectedRows(),
-                    lastInsertId: $result->lastInsertId(),
-                );
+                return $result->withCasts($casts);
             }
         }
 
