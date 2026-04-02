@@ -192,9 +192,9 @@ Transport-agnostic helper classes in Shodo. No dependencies on HTTP, session, or
 
 #### 10.8 README updates
 
-- [ ] **10.8a** Update Shodo README: explain helper syntax (`{{ Name::method() }}`), document `HelperRegistry`/`HelperResolver`/`HelperDiscovery`, list built-in helpers with signatures and examples, show `Helpers.php` convention for domain-scoped custom helpers.
-- [ ] **10.8b** Update Atlas README: document `UrlResolver`, explain the reverse convention (DTO class → URL path), show examples for queries, commands, custom routes, and pages.
-- [ ] **10.8c** Update root README: add brief mention of template helpers in the Shodo package description.
+- [x] **10.8a** Update Shodo README: helper syntax, built-in helpers table, domain-scoped `Helpers.php` convention, HelperResolver architecture, updated at-a-glance diagram.
+- [x] **10.8b** Update Atlas README: `UrlResolver` section with convention reversal examples, custom route lookup, constructor usage.
+- [x] **10.8c** Update root README: brief mention of template helpers in Shodo package description.
 
 #### 10.9 Starter app demo
 
