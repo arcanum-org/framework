@@ -73,8 +73,8 @@ Items are ordered by priority. The dependency chain drives the order: **Security
 | 2 | Validation | 10 | 4 | 8 | — |
 | 3 | Caching (Vault) | 7 | 4 | 7 | — |
 | 4 | Scaffolding generators | 8 | 3 | 1 | — |
-| 5 | Session management | 7 | 5 | 8 | Security, Caching |
-| 6 | Auth & Authorization | 9 | 7 | 4 | Security, Validation, Sessions |
+| 5 | Sessions (HTTP-only) | 5 | 4 | 8 | Security, Caching |
+| 6 | Auth & Authorization | 9 | 6 | 4 | Security, Validation, Sessions |
 | 7 | HTTP client | 5 | 2 | 1 | — |
 | 8 | Custom app scripts | 5 | 2 | 1 | — |
 | 9 | Persistence layer | 10 | 9 | 6 | — (but Auth benefits from it) |
@@ -343,44 +343,118 @@ This is the single biggest DX improvement for onboarding — new developers go f
 
 - [x] Updated `src/Rune/README.md` — scaffolding generators, custom stubs, cache commands, updated built-in command list and at-a-glance.
 
-### 5. Session Management — needs design discussion
+### 5. Session Management — new package
 
-⚠️ **Needs careful design before implementation.** Sessions have CQRS ramifications.
+Depends on: security primitives (encryption for cookie sessions), caching (driver reuse for server-side storage).
 
-Depends on: security primitives (encryption for cookie sessions), caching (driver reuse).
+Sessions are an **HTTP-only transport concern**. They exist to support three specific purposes: identity persistence (remembering that a user already authenticated), CSRF protection, and flash messages. Sessions are **not** a general-purpose key-value store for application state.
 
-Sessions are required for HTML-serving apps (login state, flash messages, CSRF tokens). Drivers: file, database (once persistence exists), Redis (once caching exists).
+**Design decisions (resolved):**
 
-**Key constraint:** Commands must be session-independent. Sessions carry user identity context for authentication (read-only access to "who is making this request"), but command behavior must never vary based on arbitrary session state. The session is a read-side concern — it informs *authorization* (can this user do this?) but never *logic* (what does this command do?). The design must enforce this boundary, possibly by making the session available to HTTP middleware and query handlers but not to command handlers.
+- **Auth is a transport concern; identity is a domain concern.** A session cookie and a Bearer token are two different transport mechanisms that both resolve to the same `Identity` value object. By the time a command or query handler runs, auth is already done — the handler receives a typed `Identity`, never a session.
+- **Commands stay stateless.** The session lives in PSR-15 middleware, not in the Conveyor bus. Handlers never see it. A command handler receiving `BanUser($userId, $actor)` is stateless — given the same inputs, it does the same thing regardless of whether `$actor` was resolved from a session cookie or a JWT.
+- **No generic key-value session API.** Sessions expose purpose-built methods (`flash()`, `csrf()`, identity storage) — not `get('arbitrary_key')`/`set('arbitrary_key', $value)`. Domain state (shopping carts, wizard progress, drafts) belongs in the domain layer (persistence), not in sessions. This is an opinionated stance: sessions are structured, not junk drawers.
+- **Own package, not part of Hyper.** Sessions have their own storage drivers, middleware, and concerns (CSRF, flash) that are distinct from PSR-7 messages. Auth consumes sessions, so they must be independent of auth.
+- **CLI does not use sessions.** CLI has no cookies. CLI auth uses tokens — `--token` flag, environment variable, or stored config file. Cross-transport browser auth (like `gh auth login` opening a browser) is a real pattern but niche — it results in a stored token, not a session. Deferred as a future CLI auth extension.
 
-This also affects authentication and authorization (below) since both depend on session infrastructure. Needs discussion before building.
+**The layering:**
+
+```
+HTTP Request
+  → SessionMiddleware (PSR-15) — reads/writes encrypted session cookie, hydrates Session object
+  → AuthMiddleware (PSR-15) — calls Guard to resolve Identity from session/token/API key
+  → Identity registered in container
+  → Atlas routes → DTO hydrated (Identity injected via container) → Conveyor dispatches
+  → Handler receives typed Identity, never touches Session
+```
+
+```
+CLI Command
+  → TokenResolver — reads --token flag or environment variable
+  → Identity registered in container
+  → Rune routes → DTO hydrated → Conveyor dispatches
+  → Handler receives same typed Identity
+```
+
+Same handler, same `Identity` type, different transport auth mechanisms. The DTO doesn't know or care how identity was resolved.
+
+#### Session Storage
+
+- [x] `Session` — structured object with `identityId()`, `flash()`, `csrfToken()`, `regenerate()`, `invalidate()`. Not a key-value bag. Includes `SessionId` (crypto-secure hex ID) and `CsrfToken` (constant-time comparison) value objects.
+- [x] `SessionDriver` interface — `read(string $id): array`, `write(string $id, array $data, int $ttl): void`, `destroy(string $id): void`, `gc(int $maxLifetime): void`.
+- [x] `FileSessionDriver` — file-based storage, one file per session. Lazy expiry deletion, GC via glob.
+- [x] `CacheSessionDriver` — delegates to any `CacheInterface` (Vault). Prefixed keys. Enables Redis/APCu session storage via existing cache drivers.
+- [x] `CookieSessionDriver` — encrypted client-side sessions via `Encryptor`. In-memory buffer + encrypt/decrypt for cookie transport.
+- [x] `SessionConfig` — value object holding cookie name, lifetime, path, domain, Secure, HttpOnly, SameSite. Builds Set-Cookie headers.
+- [x] `SessionRegistry` — request-scoped holder. Middleware writes, downstream reads.
+- [x] Tests: SessionId (7), CsrfToken (6), Flash (8), Session (14), SessionRegistry (3), SessionConfig (5), FileSessionDriver (7), CacheSessionDriver (5), CookieSessionDriver (7). 62 core tests.
+
+#### HTTP Middleware
+
+- [x] `SessionMiddleware` (PSR-15) — reads session ID from cookie, hydrates `Session` via driver, writes back on response. Handles ID generation, regeneration, invalidation, cookie attributes. Probabilistic GC (1% per request). Cookie driver handled specially (encrypt/decrypt).
+- [x] `CsrfMiddleware` (PSR-15) — validates CSRF token on POST/PUT/PATCH/DELETE. Reads from `_token` body field or `X-CSRF-TOKEN` header. Skips Bearer token requests. Rejects with **403 Forbidden**.
+- [x] Tests: SessionMiddleware (7), CsrfMiddleware (12). 19 middleware tests.
+
+#### Flash Messages
+
+- [x] `Flash` — write-once read-once message bag. Constructor receives "next" data from previous request as "current". `set()` queues for next request. `pending()` returns data to persist.
+- [x] Available to query/page handlers via `SessionRegistry` container injection.
+
+#### Bootstrap & Wiring
+
+- [x] `Bootstrap\Sessions` — reads `config/session.php`, registers `SessionDriver`, `SessionConfig`, `SessionRegistry` in container. Supports file/cache/cookie drivers. CLI kernels skip entirely.
+- [x] `SessionMiddleware` and `CsrfMiddleware` registered in `Bootstrap\Middleware` as outermost framework middleware.
+- [x] Added `Bootstrap\Sessions` to `HyperKernel::$bootstrappers` after Cache, before Routing.
+- [x] Tests: Bootstrap\Sessions (6). Existing MiddlewareTest and HyperKernelTest updated.
+
+#### Documentation
+
+- [x] Package README — design philosophy (structured not generic, HTTP-only, no handler access), drivers, CSRF, flash messages, configuration, session lifecycle.
 
 ### 6. Authentication & Authorization
 
-The capstone that ties security + sessions + validation together. Highest complexity of the dependency chain, but correctly positioned after its prerequisites.
+Auth splits into two distinct concerns with different architectural homes:
 
-Depends on: security primitives (hashing, encryption), sessions, validation. Persistence layer enhances it (user storage) but isn't strictly required (token-based auth can work without a database).
+- **Authentication** (who are you?) — transport-layer, resolves `Identity` from the request before routing.
+- **Authorization** (can you do this?) — domain-layer, checks permissions on the DTO before the handler runs.
 
-**Authentication** (who are you?) — Guards that check credentials via different strategies: session-based (HTML apps), token-based (API apps, including optional JWT support), API key. A `Guard` interface with swappable implementations. The guard resolves a `User` (or similar identity object) from the request and makes it available to the rest of the pipeline.
+Depends on: security primitives (hashing, encryption), sessions (for `SessionGuard`), validation. Persistence layer enhances it (user storage) but isn't strictly required — token-based auth works without a database.
 
-**Authorization** (can you do this?) — CQRS-native approach: authorization as Conveyor middleware, similar to `TransportGuard`. Attributes on DTOs declare permission requirements:
+#### Identity — domain value object
 
-```php
-#[RequiresAuth]
-#[RequiresRole('admin')]
-final class BanUser
-{
-    public function __construct(
-        public readonly string $userId,
-    ) {}
-}
-```
+- [ ] `Identity` interface — `id(): string`, `roles(): list<string>`. The domain's representation of "who is making this request." Transport-agnostic. Lives in a top-level package or Toolkit.
+- [ ] Handlers receive `Identity` via container injection. They never know whether it came from a session, JWT, or API key.
 
-The middleware checks the authenticated user against the DTO's requirements before the handler runs. Works on both HTTP and CLI (CLI could authenticate via a `--token` flag or environment variable).
+#### Authentication — transport layer (HTTP)
 
-Policies for complex authorization logic (e.g., "users can only edit their own posts") as invocable classes resolved from the container.
+- [ ] `Guard` interface — `resolve(ServerRequestInterface $request): Identity|null`. Implementations are transport-aware.
+- [ ] `SessionGuard` — reads identity from the `Session`. For HTML apps with login flows.
+- [ ] `TokenGuard` — reads Bearer token from `Authorization` header. For API apps.
+- [ ] `JwtGuard` — decodes and validates JWT from `Authorization` header. Optional, for stateless API auth.
+- [ ] `AuthMiddleware` (PSR-15) — calls configured guard(s), registers resolved `Identity` in container. If no identity and the route requires auth, short-circuits with **401 Unauthorized**.
+- [ ] `CompositeGuard` — tries multiple guards in order (session first, then token). For apps that serve both HTML and API.
 
-The starter app should ship with an auth example (login flow or API token guard) and example middleware (rate limiting, request logging) once this is complete.
+#### Authentication — transport layer (CLI)
+
+- [ ] `CliTokenResolver` — reads `--token` flag or `ARCANUM_TOKEN` environment variable. Resolves to `Identity` via a configurable lookup (e.g., database token table, or a simple closure).
+- [ ] Registered in CLI bootstrap. Same `Identity` interface, different resolution mechanism.
+- [ ] Browser-based CLI auth (OAuth device flow) deferred as a future extension.
+
+#### Authorization — domain layer (Conveyor middleware)
+
+- [ ] `RequiresAuth` attribute — DTO must have a resolved `Identity`. No identity → **401 Unauthorized** (HTTP) or exit code 1 (CLI).
+- [ ] `RequiresRole(string ...$roles)` attribute — resolved `Identity` must have at least one of the listed roles. Missing role → **403 Forbidden**.
+- [ ] `AuthorizationGuard` — Conveyor before-middleware (`Progression`), same pattern as `TransportGuard` and `ValidationGuard`. Reads attributes from the DTO class, checks against the resolved `Identity`.
+- [ ] `Policy` interface — invocable classes for complex authorization (e.g., "users can only edit their own posts"). Resolved from the container.
+
+#### Bootstrap & Wiring
+
+- [ ] `Bootstrap\Auth` — registers guards, `AuthMiddleware`, `AuthorizationGuard` as Conveyor before-middleware.
+- [ ] Starter app: auth example (login flow for HTML, token guard for API), example policies.
+
+#### Documentation
+
+- [ ] Auth package README — identity model, guards, authorization attributes, policies, CLI auth, transport separation.
 
 ### 7. HTTP Client — PSR-18 wrapper
 

@@ -10,6 +10,8 @@ use Arcanum\Hyper\Middleware\Options;
 use Arcanum\Ignition\Bootstrap\Middleware;
 use Arcanum\Ignition\HyperKernel;
 use Arcanum\Ignition\Kernel;
+use Arcanum\Session\CsrfMiddleware;
+use Arcanum\Session\SessionMiddleware;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -32,10 +34,12 @@ final class MiddlewareTest extends TestCase
     {
         // Arrange
         $kernel = $this->createMock(HyperKernel::class);
-        $kernel->expects($this->exactly(3))
+        $kernel->expects($this->exactly(5))
             ->method('middleware')
             ->willReturnCallback(fn(string $class) => match (true) {
                 in_array($class, [
+                    SessionMiddleware::class,
+                    CsrfMiddleware::class,
                     'App\Http\Middleware\Cors',
                     'App\Http\Middleware\Auth',
                     Options::class,
@@ -69,9 +73,16 @@ final class MiddlewareTest extends TestCase
     {
         // Arrange
         $kernel = $this->createMock(HyperKernel::class);
-        $kernel->expects($this->once())
+        $kernel->expects($this->exactly(3))
             ->method('middleware')
-            ->with(Options::class);
+            ->willReturnCallback(fn(string $class) => match (true) {
+                in_array($class, [
+                    SessionMiddleware::class,
+                    CsrfMiddleware::class,
+                    Options::class,
+                ]) => null,
+                default => $this->fail("Unexpected middleware class: $class"),
+            });
 
         $container = new Container();
         $container->instance(\Arcanum\Cabinet\Application::class, $container);
@@ -92,9 +103,16 @@ final class MiddlewareTest extends TestCase
     {
         // Arrange
         $kernel = $this->createMock(HyperKernel::class);
-        $kernel->expects($this->once())
+        $kernel->expects($this->exactly(3))
             ->method('middleware')
-            ->with(Options::class);
+            ->willReturnCallback(fn(string $class) => match (true) {
+                in_array($class, [
+                    SessionMiddleware::class,
+                    CsrfMiddleware::class,
+                    Options::class,
+                ]) => null,
+                default => $this->fail("Unexpected middleware class: $class"),
+            });
 
         $container = new Container();
         $container->instance(\Arcanum\Cabinet\Application::class, $container);

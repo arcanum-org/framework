@@ -56,6 +56,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
         Bootstrap\Configuration::class,
         Bootstrap\Security::class,
         Bootstrap\Cache::class,
+        Bootstrap\Sessions::class,
         Bootstrap\Routing::class,
         Bootstrap\RouteMiddleware::class,
         Bootstrap\Logger::class,

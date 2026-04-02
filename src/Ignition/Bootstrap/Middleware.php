@@ -10,6 +10,8 @@ use Arcanum\Hyper\Middleware\Options;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\HyperKernel;
 use Arcanum\Ignition\Kernel;
+use Arcanum\Session\CsrfMiddleware;
+use Arcanum\Session\SessionMiddleware;
 
 /**
  * Registers global HTTP middleware from config/middleware.php.
@@ -36,6 +38,11 @@ class Middleware implements Bootstrapper
         /** @var list<class-string<\Psr\Http\Server\MiddlewareInterface>>|null $middleware */
         $middleware = $config->get('middleware.global');
 
+        // Session middleware — outermost framework layer, wraps everything.
+        $kernel->middleware(SessionMiddleware::class);
+        $kernel->middleware(CsrfMiddleware::class);
+
+        // App middleware from config.
         foreach ($middleware ?? [] as $class) {
             $kernel->middleware($class);
         }
