@@ -207,6 +207,11 @@ Built-in commands:
   make:query
   make:page
   make:middleware
+  forge:models
+  validate:models
+  db:status
+  login
+  logout
 
 Queries:
   query:health        Check application status
@@ -237,6 +242,26 @@ $ php arcanum validate:handlers
 ```
 
 If any handlers are missing, it reports which DTOs are missing them and exits with code 1. This is useful in CI pipelines to catch missing handlers before deployment.
+
+### `login` / `logout`
+
+Interactive authentication for CLI sessions. `login` prompts for credentials (configurable in `config/auth.php`), validates them, and stores an encrypted session. `logout` clears it.
+
+```bash
+$ php arcanum login
+Email: alice@example.com
+Password:
+Logged in as user-42.
+
+$ php arcanum logout
+Logged out.
+```
+
+See the [Auth README](../Auth/README.md) for configuration details.
+
+### `forge:models` / `validate:models` / `db:status`
+
+Database commands. See the [Forge README](../Forge/README.md) for details.
 
 ### Adding your own built-in commands
 
@@ -462,6 +487,9 @@ Built-in commands:
   make:page, make:middleware           — generate page & middleware stubs
   make:key                             — generate APP_KEY
   cache:clear, cache:status            — cache management
+  forge:models, validate:models        — model generation & validation
+  db:status                            — database connectivity
+  login, logout                        — CLI authentication
 
 Help:
   HelpWriter → reflection on DTO constructor + #[Description] attributes

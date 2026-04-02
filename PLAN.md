@@ -594,8 +594,8 @@ $ php arcanum logout
 
 ##### Documentation
 
-- [ ] Update Auth README — CLI sessions section: login/logout flow, credential config, TTL, priority chain.
-- [ ] Update Rune README — Prompter, login/logout in built-in commands list.
+- [x] Update Auth README — CLI sessions section: login/logout flow, credential config, TTL, priority chain, Prompter.
+- [x] Update Rune README — Prompter, login/logout, forge:models, validate:models, db:status in built-in commands list.
 
 ##### Deferred
 
@@ -610,8 +610,8 @@ $ php arcanum logout
 #### Documentation
 
 - [x] Auth package README — design philosophy, Identity, guards, authorization attributes, policies, CLI auth, configuration.
-- [ ] Updated `src/Ignition/README.md` — `Bootstrap\Auth` in bootstrapper tables.
-- [ ] Updated `src/Flow/Conveyor/README.md` — `AuthorizationGuard` alongside `TransportGuard` and `ValidationGuard`.
+- [x] Updated `src/Ignition/README.md` — `Bootstrap\Auth` and `Bootstrap\Database` in bootstrapper tables.
+- [x] Updated `src/Flow/Conveyor/README.md` — `AuthorizationGuard` and `DomainContextMiddleware` alongside `TransportGuard` and `ValidationGuard`.
 
 ### 7. HTTP Client — PSR-18 wrapper
 
@@ -841,7 +841,7 @@ Generated model classes provide static analysis coverage and typed parameter saf
   - Output location: `app/Domain/{Domain}/Model.php` (the class, alongside the `.sql` files in `Model/`).
   - **Stub templates:** Generation uses `model.stub` (class shell) and `model_method.stub` (per-method body), rendered via `TemplateCompiler`. App-level overrides at `{rootDirectory}/stubs/model.stub` and `{rootDirectory}/stubs/model_method.stub` take precedence — same pattern as `make:*` commands. Developers can customize generated model output without modifying the framework.
 - [x] `Database::model` discovery — checks if a generated model class exists at `{DomainNamespace}\Model` via `class_exists()`. If found, instantiates the generated class. If not, falls back to the magic `Forge\Model`. Both share the same constructor signature (directory, read connection, write connection).
-- [ ] **Drift detection.** SQL files can drift from generated classes in several ways:
+- [x] **Drift detection.** SQL files can drift from generated classes in several ways:
   - **New SQL file added** — no generated method. `__call` handles it at runtime. No breakage, just missing type safety.
   - **SQL file deleted** — generated method still exists, calls `__call`, which throws RuntimeException (file not found).
   - **New `:param` added to SQL** — generated method has old signature. Caller doesn't pass new param → PDO binding error at runtime.

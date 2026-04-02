@@ -104,12 +104,14 @@ These filters enforce a clean DTO pattern: final classes with only public readon
 
 ### Framework middleware
 
-Two framework-provided middleware are registered automatically by the bootstrappers:
+Framework-provided middleware are registered automatically by the bootstrappers:
 
+- **`AuthorizationGuard`** — checks `#[RequiresAuth]`, `#[RequiresRole]`, and `#[RequiresPolicy]` attributes on DTOs. Throws 401/403 on HTTP, `RuntimeException` on CLI. See the [Auth README](../../Auth/README.md).
 - **`TransportGuard`** — enforces `#[CliOnly]` and `#[HttpOnly]` attributes. Rejects cross-transport dispatch (e.g., HTTP request to a CLI-only DTO → 405).
-- **`ValidationGuard`** — runs validation rules declared as attributes on DTO constructor parameters. Throws `ValidationException` on failure (rendered as 422 on HTTP, field-level errors on CLI). See the [Validation README](../../../Validation/README.md) for rule reference and examples.
+- **`ValidationGuard`** — runs validation rules declared as attributes on DTO constructor parameters. Throws `ValidationException` on failure (rendered as 422 on HTTP, field-level errors on CLI). See the [Validation README](../../Validation/README.md).
+- **`DomainContextMiddleware`** — sets the domain context from the DTO's namespace for database scoping. Only registered when a database is configured. See the [Forge README](../../Forge/README.md).
 
-Both are `Progression` middleware registered via `$bus->before()`.
+All are `Progression` middleware registered via `$bus->before()`.
 
 ## Dynamic DTOs
 
