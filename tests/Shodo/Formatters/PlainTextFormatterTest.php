@@ -8,7 +8,7 @@ use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Writer;
 use Arcanum\Shodo\HelperRegistry;
-use Arcanum\Shodo\Helpers\HelperResolver;
+use Arcanum\Shodo\HelperResolver;
 use Arcanum\Shodo\Formatters\PlainTextFallbackFormatter;
 use Arcanum\Shodo\Formatters\PlainTextFormatter;
 use Arcanum\Shodo\TemplateCache;
