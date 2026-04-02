@@ -278,4 +278,9 @@ final class SqlTest extends TestCase
     {
         $this->assertSame('SELECT', Sql::firstKeyword('(SELECT 1)'));
     }
+
+    public function testFirstKeywordSkipsCommentsInterleavedWithParentheses(): void
+    {
+        $this->assertSame('INSERT', Sql::firstKeyword("-- comment\n ( \n --comment\n INSERT INTO users"));
+    }
 }
