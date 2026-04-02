@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Forge;
 
+use Arcanum\Parchment\Reader;
+
 /**
  * Dynamic object that maps method calls to SQL files.
  *
@@ -33,6 +35,7 @@ final class Model
         private readonly string $directory,
         private readonly Connection $readConnection,
         private readonly Connection $writeConnection,
+        private readonly Reader $reader = new Reader(),
     ) {
     }
 
@@ -74,15 +77,15 @@ final class Model
         $filename = ucfirst($method) . '.sql';
         $path = $this->directory . DIRECTORY_SEPARATOR . $filename;
 
-        if (!is_file($path)) {
+        try {
+            $this->sqlCache[$method] = $this->reader->read($path);
+        } catch (\RuntimeException) {
             throw new \RuntimeException(sprintf(
                 "Model method '%s' not found — expected file: %s",
                 $method,
                 $path,
             ));
         }
-
-        $this->sqlCache[$method] = file_get_contents($path) ?: '';
 
         return $this->sqlCache[$method];
     }

@@ -18,6 +18,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(Result::class)]
 #[UsesClass(Sql::class)]
 #[UsesClass(Strings::class)]
+#[UsesClass(\Arcanum\Parchment\Reader::class)]
 final class ModelTest extends TestCase
 {
     private string $modelDir;
