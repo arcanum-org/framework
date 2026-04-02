@@ -22,10 +22,15 @@ final class Database
 {
     private Model|null $modelInstance = null;
 
+    /**
+     * @param bool|null $autoForge True = auto-regenerate stale models, false = throw, null = skip.
+     */
     public function __construct(
         private readonly ConnectionManager $connections,
         private readonly DomainContext $context,
         private readonly string $domainNamespace = '',
+        private readonly bool|null $autoForge = null,
+        private readonly ModelGenerator|null $generator = null,
         private readonly string|null $connectionOverride = null,
     ) {
     }
@@ -63,6 +68,8 @@ final class Database
             connections: $this->connections,
             context: $this->context,
             domainNamespace: $this->domainNamespace,
+            autoForge: $this->autoForge,
+            generator: $this->generator,
             connectionOverride: $name,
         );
     }
@@ -102,6 +109,10 @@ final class Database
         // Check for a generated model class at {DomainNamespace}\{Domain}\Model.
         if ($this->domainNamespace !== '') {
             $generatedClass = $this->domainNamespace . '\\' . $this->context->get() . '\\Model';
+            $classFile = $modelDir . DIRECTORY_SEPARATOR . '..'
+                . DIRECTORY_SEPARATOR . 'Model.php';
+
+            $this->handleStaleness($modelDir, $classFile, $generatedClass);
 
             if (class_exists($generatedClass) && is_subclass_of($generatedClass, Model::class)) {
                 $this->modelInstance = new $generatedClass(
@@ -121,6 +132,35 @@ final class Database
         );
 
         return $this->modelInstance;
+    }
+
+    private function handleStaleness(
+        string $modelDir,
+        string $classFile,
+        string $generatedClass,
+    ): void {
+        if ($this->autoForge === null || $this->generator === null) {
+            return;
+        }
+
+        if (!$this->generator->isStale($modelDir, $classFile)) {
+            return;
+        }
+
+        if ($this->autoForge) {
+            $realPath = is_file($classFile)
+                ? (realpath(dirname($classFile)) ?: dirname($classFile))
+                : dirname($classFile);
+            $outputPath = $realPath . DIRECTORY_SEPARATOR . 'Model.php';
+
+            $this->generator->generateAndWrite($modelDir, $generatedClass, $outputPath);
+            return;
+        }
+
+        throw new \RuntimeException(sprintf(
+            "Model class '%s' is stale — run 'php arcanum forge:models' to regenerate.",
+            $generatedClass,
+        ));
     }
 
     private function resolveReadConnection(): Connection

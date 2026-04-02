@@ -22,6 +22,7 @@ use Arcanum\Rune\Command\CacheClearCommand;
 use Arcanum\Rune\Command\CacheStatusCommand;
 use Arcanum\Rune\Command\ForgeModelsCommand;
 use Arcanum\Rune\Command\MakeCommandCommand;
+use Arcanum\Rune\Command\ValidateModelsCommand;
 use Arcanum\Rune\Command\MakeKeyCommand;
 use Arcanum\Rune\Command\MakeMiddlewareCommand;
 use Arcanum\Rune\Command\MakePageCommand;
@@ -193,6 +194,7 @@ class CliRouting implements Bootstrapper
             $registry->register('make:page', MakePageCommand::class);
             $registry->register('make:middleware', MakeMiddlewareCommand::class);
             $registry->register('forge:models', ForgeModelsCommand::class);
+            $registry->register('validate:models', ValidateModelsCommand::class);
             return $registry;
         });
 
@@ -311,6 +313,17 @@ class CliRouting implements Bootstrapper
             $domainRoot = $kernel->rootDirectory()
                 . DIRECTORY_SEPARATOR . Strings::namespacePath($namespace);
             return new ForgeModelsCommand(
+                domainRoot: $domainRoot,
+                domainNamespace: $namespace,
+            );
+        });
+
+        $container->factory(ValidateModelsCommand::class, function () use ($container, $namespace) {
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+            $domainRoot = $kernel->rootDirectory()
+                . DIRECTORY_SEPARATOR . Strings::namespacePath($namespace);
+            return new ValidateModelsCommand(
                 domainRoot: $domainRoot,
                 domainNamespace: $namespace,
             );

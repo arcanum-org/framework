@@ -9,6 +9,7 @@ use Arcanum\Forge\ConnectionFactory;
 use Arcanum\Forge\ConnectionManager;
 use Arcanum\Forge\Database as DatabaseService;
 use Arcanum\Forge\DomainContext;
+use Arcanum\Forge\ModelGenerator;
 use Arcanum\Gather\Configuration;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\Kernel;
@@ -50,12 +51,20 @@ class Database implements Bootstrapper
 
         $namespace = $config->asString('app.namespace', 'App\\Domain');
 
+        $debug = $config->asBool('app.debug');
+        $autoForgeRaw = $config->get('database.auto_forge');
+        $autoForge = is_bool($autoForgeRaw) ? $autoForgeRaw : ($debug ? true : null);
+
         $container->instance(
             DatabaseService::class,
             new DatabaseService(
                 connections: $manager,
                 context: $context,
                 domainNamespace: $namespace,
+                autoForge: $autoForge,
+                generator: $autoForge !== null
+                    ? new ModelGenerator(rootDirectory: $kernel->rootDirectory())
+                    : null,
             ),
         );
     }

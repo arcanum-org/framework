@@ -849,9 +849,9 @@ Generated model classes provide static analysis coverage and typed parameter saf
   - **`@param` type changed** — generated method has stale type. Subtle coercion issues possible.
   
   Mitigations:
-  - [ ] `validate:models` Rune command — compares SQL files against generated classes. Reports: missing methods, stale methods (deleted SQL), parameter mismatches, type mismatches. CI-friendly.
-  - [ ] Dev-mode auto-regeneration — at Model construction time, compares `filemtime()` of SQL files vs generated class file. If any SQL file is newer, automatically re-runs `forge:models` for that domain. Zero-friction in development. Configurable: `config/database.php` key `auto_forge` (default `true` in debug mode). Set to `false` to throw an exception instead of regenerating.
-- [ ] Tests: generated class has correct methods, generated methods delegate to __call, Database discovers generated class, Database falls back to magic Model, validate:models detects drift, dev-mode auto-regeneration fires, auto-regeneration disabled throws exception. ~12 tests.
+  - [x] `validate:models` Rune command — compares SQL files against generated classes. Reports: missing methods, stale methods (deleted SQL), parameter count mismatches, parameter name mismatches, type mismatches. CI-friendly exit code.
+  - [x] Dev-mode auto-regeneration — at Model resolution time, compares `filemtime()` of SQL files vs generated class file. If any SQL file is newer, automatically re-runs `ModelGenerator` for that domain. Zero-friction in development. Configurable: `config/database.php` key `auto_forge` (default `true` in debug mode). Set to `false` to throw an exception instead of regenerating. Set to `null` (production default) to skip staleness checks entirely.
+- [x] Tests: generated class has correct methods, generated methods delegate to execute(), Database discovers generated class, Database falls back to magic Model, staleness detection, auto-generation via stubs. ~12 tests.
 
 #### CLI Commands
 
