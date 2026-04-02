@@ -20,6 +20,7 @@ use Arcanum\Rune\Command\ListCommand;
 use Arcanum\Ignition\ConfigurationCache;
 use Arcanum\Rune\Command\CacheClearCommand;
 use Arcanum\Rune\Command\CacheStatusCommand;
+use Arcanum\Rune\Command\DbStatusCommand;
 use Arcanum\Rune\Command\ForgeModelsCommand;
 use Arcanum\Rune\Command\MakeCommandCommand;
 use Arcanum\Rune\Command\ValidateModelsCommand;
@@ -42,6 +43,7 @@ use Arcanum\Flow\Conveyor\MiddlewareBus;
 use Arcanum\Auth\ActiveIdentity;
 use Arcanum\Auth\AuthorizationGuard;
 use Arcanum\Ignition\Transport;
+use Arcanum\Forge\ConnectionManager;
 use Arcanum\Forge\DomainContext;
 use Arcanum\Forge\DomainContextMiddleware;
 use Arcanum\Toolkit\Strings;
@@ -195,6 +197,7 @@ class CliRouting implements Bootstrapper
             $registry->register('make:middleware', MakeMiddlewareCommand::class);
             $registry->register('forge:models', ForgeModelsCommand::class);
             $registry->register('validate:models', ValidateModelsCommand::class);
+            $registry->register('db:status', DbStatusCommand::class);
             return $registry;
         });
 
@@ -326,6 +329,21 @@ class CliRouting implements Bootstrapper
             return new ValidateModelsCommand(
                 domainRoot: $domainRoot,
                 domainNamespace: $namespace,
+            );
+        });
+
+        $container->factory(DbStatusCommand::class, function () use ($container, $namespace) {
+            /** @var ConnectionManager|null $connections */
+            $connections = $container->has(ConnectionManager::class)
+                ? $container->get(ConnectionManager::class)
+                : null;
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+            $domainRoot = $kernel->rootDirectory()
+                . DIRECTORY_SEPARATOR . Strings::namespacePath($namespace);
+            return new DbStatusCommand(
+                connections: $connections,
+                domainRoot: $domainRoot,
             );
         });
     }

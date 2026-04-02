@@ -855,8 +855,8 @@ Generated model classes provide static analysis coverage and typed parameter saf
 
 #### CLI Commands
 
-- [ ] `db:status` built-in Rune command — shows configured connections, default connection, read/write split, tests connectivity (tries to connect, reports success or error), lists discovered Model directories and SQL file counts.
-- [ ] Tests: shows connection info, reports connection error gracefully. ~2 tests.
+- [x] `db:status` built-in Rune command — shows configured connections, default connection, read/write split, tests connectivity (tries to connect, reports success or error), lists discovered Model directories and SQL file counts.
+- [x] Tests: shows connection info, reports connection error gracefully. 2 tests.
 
 #### Migrations — deferred (needs design discussion)
 
