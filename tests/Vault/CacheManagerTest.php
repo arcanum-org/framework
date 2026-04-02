@@ -24,6 +24,8 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(\Arcanum\Parchment\Writer::class)]
 #[UsesClass(\Arcanum\Parchment\FileSystem::class)]
 #[UsesClass(\Arcanum\Parchment\Searcher::class)]
+#[UsesClass(\Arcanum\Gather\Configuration::class)]
+#[UsesClass(\Arcanum\Gather\Registry::class)]
 final class CacheManagerTest extends TestCase
 {
     private string $tempDir;

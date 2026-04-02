@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Vault;
 
+use Arcanum\Gather\Configuration;
 use Psr\SimpleCache\CacheInterface;
 
 /**
@@ -89,9 +90,8 @@ final class CacheManager
      */
     public function driverName(string $storeName): string
     {
-        $config = $this->stores[$storeName] ?? [];
-        $driver = $config['driver'] ?? 'unknown';
-        return is_string($driver) ? $driver : 'unknown';
+        $config = new Configuration($this->stores[$storeName] ?? []);
+        return $config->asString('driver', 'unknown');
     }
 
     /**
@@ -126,26 +126,24 @@ final class CacheManager
      */
     private function buildDriver(array $config): CacheInterface
     {
-        $driver = is_string($config['driver'] ?? '') ? ($config['driver'] ?? '') : '';
+        $cfg = new Configuration($config);
+        $driver = $cfg->asString('driver');
 
         return match ($driver) {
-            'file' => new FileDriver($this->resolveFilePath($config)),
+            'file' => new FileDriver($this->resolveFilePath($cfg)),
             'array' => new ArrayDriver(),
             'null' => new NullDriver(),
             'apcu' => new ApcuDriver(),
-            'redis' => $this->buildRedisDriver($config),
+            'redis' => $this->buildRedisDriver($cfg),
             default => throw new \RuntimeException(
                 sprintf('Unknown cache driver "%s".', $driver),
             ),
         };
     }
 
-    /**
-     * @param array<string, mixed> $config
-     */
-    private function resolveFilePath(array $config): string
+    private function resolveFilePath(Configuration $cfg): string
     {
-        $path = is_string($config['path'] ?? null) ? $config['path'] : 'cache';
+        $path = $cfg->asString('path', 'cache');
 
         // If the path is relative, prepend the files directory.
         if (!str_starts_with($path, DIRECTORY_SEPARATOR)) {
@@ -155,15 +153,13 @@ final class CacheManager
         return $path;
     }
 
-    /**
-     * @param array<string, mixed> $config
-     */
-    private function buildRedisDriver(array $config): RedisDriver
+    private function buildRedisDriver(Configuration $cfg): RedisDriver
     {
         $redis = new \Redis();
-        $host = is_string($config['host'] ?? null) ? $config['host'] : '127.0.0.1';
-        $port = is_int($config['port'] ?? null) ? $config['port'] : 6379;
-        $redis->connect($host, $port);
+        $redis->connect(
+            $cfg->asString('host', '127.0.0.1'),
+            $cfg->asInt('port', 6379),
+        );
 
         return new RedisDriver($redis);
     }
