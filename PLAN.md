@@ -198,10 +198,10 @@ Transport-agnostic helper classes in Shodo. No dependencies on HTTP, session, or
 
 #### 10.9 Starter app demo
 
-- [ ] **10.9a** Update `../arcanum/app/Pages/Index.html` to use at least one helper — e.g., `{{ Format::date('now') }}` or `{{ Route::url('App\\Domain\\Query\\Health') }}`.
-- [ ] **10.9b** Add a simple form page (`../arcanum/app/Pages/Contact.html`) demonstrating `{{ @csrf }}` inside a `<form>`.
-- [ ] **10.9c** Add a domain-scoped `Helpers.php` example in the starter app (e.g., `app/Domain/Contact/Helpers.php` registering a helper only used by Contact templates).
-- [ ] **10.9d** Verify the starter app boots and renders the updated pages without errors.
+- [x] **10.9a** Update `../arcanum/app/Pages/Index.html` — uses `Format::date('now')` and `Route::url('App\\Domain\\Query\\Health')`.
+- [x] **10.9b** Add `../arcanum/app/Pages/Contact.html` — form with `{{ @csrf }}` and `Route::url()` for the action.
+- [x] **10.9c** Add `../arcanum/app/Domain/Contact/Helpers.php` — registers `ContactHelper` with `supportEmail()` method, demonstrating domain-scoped helpers.
+- [x] **10.9d** Verified starter app boots (`bin/arcanum list` runs cleanly), PHPStan clean, all new files lint clean.
 
 ### 11. Starter App Polish
 
