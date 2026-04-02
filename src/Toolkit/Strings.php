@@ -80,6 +80,39 @@ final class Strings
     }
 
     /**
+     * Truncate a string to the given length, appending a suffix.
+     *
+     * Returns the original string if it fits within the limit.
+     * Uses multibyte-safe functions.
+     *
+     *   Strings::truncate('Hello, world!', 10) → 'Hello, ...'
+     */
+    public static function truncate(string $text, int $length, string $suffix = '...'): string
+    {
+        if (mb_strlen($text) <= $length) {
+            return $text;
+        }
+
+        return mb_substr($text, 0, $length - mb_strlen($suffix)) . $suffix;
+    }
+
+    /**
+     * Convert a string to lower case (multibyte-safe).
+     */
+    public static function lower(string $string): string
+    {
+        return mb_strtolower($string, 'UTF-8');
+    }
+
+    /**
+     * Convert a string to upper case (multibyte-safe).
+     */
+    public static function upper(string $string): string
+    {
+        return mb_strtoupper($string, 'UTF-8');
+    }
+
+    /**
      * Get the namespace portion of a fully qualified class name.
      *
      * Returns empty string if the class has no namespace.

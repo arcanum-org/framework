@@ -47,6 +47,61 @@ final class StringsTest extends TestCase
         $this->assertSame('Foo Bar Q', Strings::title('foo bar q'));
     }
 
+    public function testTruncateShorterThanLimit(): void
+    {
+        $this->assertSame('hello', Strings::truncate('hello', 10));
+    }
+
+    public function testTruncateExactlyAtLimit(): void
+    {
+        $this->assertSame('hello', Strings::truncate('hello', 5));
+    }
+
+    public function testTruncateWithDefaultSuffix(): void
+    {
+        $result = Strings::truncate('Hello, world!', 10);
+        $this->assertSame('Hello, ...', $result);
+        $this->assertSame(10, mb_strlen($result));
+    }
+
+    public function testTruncateWithCustomSuffix(): void
+    {
+        $result = Strings::truncate('Hello, world!', 10, '~');
+        $this->assertSame('Hello, wo~', $result);
+    }
+
+    public function testTruncateWithMultibyte(): void
+    {
+        $result = Strings::truncate('こんにちは世界', 5, '…');
+        $this->assertSame('こんにち…', $result);
+        $this->assertSame(5, mb_strlen($result));
+    }
+
+    public function testTruncateEmptyString(): void
+    {
+        $this->assertSame('', Strings::truncate('', 10));
+    }
+
+    public function testLower(): void
+    {
+        $this->assertSame('hello world', Strings::lower('Hello WORLD'));
+    }
+
+    public function testLowerMultibyte(): void
+    {
+        $this->assertSame('äöü', Strings::lower('ÄÖÜ'));
+    }
+
+    public function testUpper(): void
+    {
+        $this->assertSame('HELLO WORLD', Strings::upper('Hello world'));
+    }
+
+    public function testUpperMultibyte(): void
+    {
+        $this->assertSame('STRASSE', Strings::upper('strasse'));
+    }
+
     public function testClassNamespace(): void
     {
         $this->assertSame(

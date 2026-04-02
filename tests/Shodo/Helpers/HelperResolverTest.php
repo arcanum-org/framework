@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Arcanum\Test\Shodo\Helpers;
 
 use Arcanum\Shodo\Helpers\HelperDiscovery;
-use Arcanum\Shodo\Helpers\HelperRegistry;
+use Arcanum\Shodo\HelperRegistry;
 use Arcanum\Shodo\Helpers\HelperResolver;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;

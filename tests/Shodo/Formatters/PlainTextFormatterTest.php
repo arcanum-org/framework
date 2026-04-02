@@ -7,7 +7,7 @@ namespace Arcanum\Test\Shodo\Formatters;
 use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Writer;
-use Arcanum\Shodo\Helpers\HelperRegistry;
+use Arcanum\Shodo\HelperRegistry;
 use Arcanum\Shodo\Helpers\HelperResolver;
 use Arcanum\Shodo\Formatters\PlainTextFallback;
 use Arcanum\Shodo\Formatters\PlainTextFormatter;

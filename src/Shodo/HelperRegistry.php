@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Shodo\Helpers;
+namespace Arcanum\Shodo;
 
 /**
  * Maps template helper aliases to helper class instances.

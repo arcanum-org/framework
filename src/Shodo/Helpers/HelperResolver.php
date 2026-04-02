@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Shodo\Helpers;
 
+use Arcanum\Shodo\HelperRegistry;
 use Psr\Container\ContainerInterface;
 
 /**
