@@ -63,7 +63,7 @@ final class LoginCommandTest extends TestCase
     public function testFailedLoginPrintsErrorWithExitCode1(): void
     {
         // Arrange
-        $prompter = $this->createMock(Prompter::class);
+        $prompter = $this->createStub(Prompter::class);
         $prompter->method('ask')->willReturn('bad@example.com');
         $prompter->method('secret')->willReturn('wrong');
 
@@ -109,7 +109,7 @@ final class LoginCommandTest extends TestCase
         $session = $this->createMock(CliSession::class);
         $session->expects($this->once())->method('store');
 
-        $output = $this->createMock(Output::class);
+        $output = $this->createStub(Output::class);
 
         $command = new LoginCommand(
             prompter: $prompter,
@@ -133,7 +133,7 @@ final class LoginCommandTest extends TestCase
         // Arrange
         $collected = [];
 
-        $prompter = $this->createMock(Prompter::class);
+        $prompter = $this->createStub(Prompter::class);
         $prompter->method('ask')->willReturnCallback(
             function (string $label) use (&$collected) {
                 $collected[] = $label;
@@ -141,8 +141,8 @@ final class LoginCommandTest extends TestCase
             },
         );
 
-        $session = $this->createMock(CliSession::class);
-        $output = $this->createMock(Output::class);
+        $session = $this->createStub(CliSession::class);
+        $output = $this->createStub(Output::class);
 
         $command = new LoginCommand(
             prompter: $prompter,

@@ -209,7 +209,7 @@ final class FormatRegistryTest extends TestCase
     public function testAppDefinedCustomFormatWithCustomRenderer(): void
     {
         // Arrange — simulate an app registering a custom "yaml" format
-        $yamlRenderer = $this->createMock(ResponseRenderer::class);
+        $yamlRenderer = $this->createStub(ResponseRenderer::class);
 
         /** @var ContainerInterface&\PHPUnit\Framework\MockObject\MockObject */
         $container = $this->getMockBuilder(ContainerInterface::class)
@@ -253,7 +253,7 @@ final class FormatRegistryTest extends TestCase
     public function testOverridingBuiltInFormatRendererViaConfig(): void
     {
         // Arrange — register built-in JSON, then override with custom renderer
-        $customRenderer = $this->createMock(ResponseRenderer::class);
+        $customRenderer = $this->createStub(ResponseRenderer::class);
 
         /** @var ContainerInterface&\PHPUnit\Framework\MockObject\MockObject */
         $container = $this->getMockBuilder(ContainerInterface::class)

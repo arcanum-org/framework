@@ -32,7 +32,7 @@ final class DatabaseTest extends TestCase
 {
     private function kernelStub(string $rootDir = '/app'): Kernel
     {
-        $kernel = $this->createMock(Kernel::class);
+        $kernel = $this->createStub(Kernel::class);
         $kernel->method('rootDirectory')->willReturn($rootDir);
 
         return $kernel;

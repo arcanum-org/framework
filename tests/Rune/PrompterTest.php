@@ -45,7 +45,7 @@ final class PrompterTest extends TestCase
     public function testAskTrimsWhitespace(): void
     {
         // Arrange
-        $output = $this->createMock(Output::class);
+        $output = $this->createStub(Output::class);
         $prompter = new Prompter($output, $this->fakeStdin("  Bob  \n"));
 
         // Act
@@ -58,7 +58,7 @@ final class PrompterTest extends TestCase
     public function testAskReturnsEmptyOnEof(): void
     {
         // Arrange
-        $output = $this->createMock(Output::class);
+        $output = $this->createStub(Output::class);
         $prompter = new Prompter($output, $this->fakeStdin(''));
 
         // Act
@@ -88,7 +88,7 @@ final class PrompterTest extends TestCase
     public function testSecretReturnsEmptyOnEof(): void
     {
         // Arrange
-        $output = $this->createMock(Output::class);
+        $output = $this->createStub(Output::class);
         $prompter = new Prompter($output, $this->fakeStdin(''));
 
         // Act

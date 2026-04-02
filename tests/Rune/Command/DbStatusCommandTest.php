@@ -65,7 +65,7 @@ final class DbStatusCommandTest extends TestCase
             factory: new ConnectionFactory(),
         );
 
-        $output = $this->createMock(Output::class);
+        $output = $this->createStub(Output::class);
         $lines = [];
         $output->method('writeLine')->willReturnCallback(
             function (string $line) use (&$lines) {
@@ -106,7 +106,7 @@ final class DbStatusCommandTest extends TestCase
             factory: new ConnectionFactory(),
         );
 
-        $output = $this->createMock(Output::class);
+        $output = $this->createStub(Output::class);
         $lines = [];
         $output->method('writeLine')->willReturnCallback(
             function (string $line) use (&$lines) {

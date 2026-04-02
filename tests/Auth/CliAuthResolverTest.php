@@ -121,7 +121,7 @@ final class CliAuthResolverTest extends TestCase
     {
         // Arrange
         $active = new ActiveIdentity();
-        $session = $this->createMock(CliSession::class);
+        $session = $this->createStub(CliSession::class);
         $session->method('load')->willReturn('user-42');
 
         $resolver = new CliAuthResolver(
@@ -152,7 +152,7 @@ final class CliAuthResolverTest extends TestCase
     {
         // Arrange
         $active = new ActiveIdentity();
-        $session = $this->createMock(CliSession::class);
+        $session = $this->createStub(CliSession::class);
         $session->method('load')->willReturn(null);
 
         $resolver = new CliAuthResolver(

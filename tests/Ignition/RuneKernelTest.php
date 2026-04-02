@@ -305,7 +305,7 @@ final class RuneKernelTest extends TestCase
         $stderr = $this->createStream();
         $output = new ConsoleOutput($this->createStream(), $stderr, ansi: false);
 
-        $bus = $this->createMock(Bus::class);
+        $bus = $this->createStub(Bus::class);
         $bus->method('dispatch')->willThrowException(new \RuntimeException('Something broke'));
 
         $kernel = $this->bootstrapKernel($this->containerWith(
@@ -413,7 +413,7 @@ final class RuneKernelTest extends TestCase
         // Arrange
         $output = new ConsoleOutput($this->createStream(), $this->createStream(), ansi: false);
 
-        $bus = $this->createMock(Bus::class);
+        $bus = $this->createStub(Bus::class);
         $bus->method('dispatch')->willThrowException(new \RuntimeException('boom'));
 
         $exceptionHandler = $this->createMock(ExceptionHandler::class);
