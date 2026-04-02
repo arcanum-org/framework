@@ -381,13 +381,12 @@ Same handler, same `Identity` type, different transport auth mechanisms. The DTO
 #### Session Storage
 
 - [x] `Session` — structured object with `identityId()`, `flash()`, `csrfToken()`, `regenerate()`, `invalidate()`. Not a key-value bag. Includes `SessionId` (crypto-secure hex ID) and `CsrfToken` (constant-time comparison) value objects.
-- [x] `SessionDriver` interface — `read(string $id): array`, `write(string $id, array $data, int $ttl): void`, `destroy(string $id): void`, `gc(int $maxLifetime): void`.
-- [x] `FileSessionDriver` — file-based storage, one file per session. Lazy expiry deletion, GC via glob.
-- [x] `CacheSessionDriver` — delegates to any `CacheInterface` (Vault). Prefixed keys. Enables Redis/APCu session storage via existing cache drivers.
+- [x] `SessionDriver` interface — `read(string $id): array`, `write(string $id, array $data, int $ttl): void`, `destroy(string $id): void`.
+- [x] `CacheSessionDriver` — delegates to any `CacheInterface` (Vault). Prefixed keys. Enables Redis/APCu/file session storage via existing cache drivers. The `file` driver config wires Vault's `FileDriver` under the hood.
 - [x] `CookieSessionDriver` — encrypted client-side sessions via `Encryptor`. In-memory buffer + encrypt/decrypt for cookie transport.
 - [x] `SessionConfig` — value object holding cookie name, lifetime, path, domain, Secure, HttpOnly, SameSite. Builds Set-Cookie headers.
 - [x] `ActiveSession` — request-scoped holder. Middleware writes, downstream reads.
-- [x] Tests: SessionId (7), CsrfToken (6), Flash (8), Session (14), ActiveSession (3), SessionConfig (5), FileSessionDriver (7), CacheSessionDriver (5), CookieSessionDriver (7). 62 core tests.
+- [x] Tests: SessionId (7), CsrfToken (6), Flash (8), Session (14), ActiveSession (3), SessionConfig (5), CacheSessionDriver (4), CookieSessionDriver (6). 53 core tests.
 
 #### HTTP Middleware
 

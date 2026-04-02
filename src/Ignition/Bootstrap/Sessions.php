@@ -9,14 +9,14 @@ use Arcanum\Gather\Configuration;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\HyperKernel;
 use Arcanum\Ignition\Kernel;
+use Arcanum\Session\ActiveSession;
 use Arcanum\Session\CacheSessionDriver;
 use Arcanum\Session\CookieSessionDriver;
-use Arcanum\Session\FileSessionDriver;
 use Arcanum\Session\SessionConfig;
 use Arcanum\Session\SessionDriver;
-use Arcanum\Session\ActiveSession;
 use Arcanum\Toolkit\Encryption\Encryptor;
 use Arcanum\Vault\CacheManager;
+use Arcanum\Vault\FileDriver;
 
 /**
  * Registers session infrastructure in the container.
@@ -67,8 +67,10 @@ class Sessions implements Bootstrapper
         match ($driver) {
             'file' => $container->factory(
                 SessionDriver::class,
-                fn() => new FileSessionDriver(
-                    $kernel->filesDirectory() . DIRECTORY_SEPARATOR . 'sessions',
+                fn() => new CacheSessionDriver(
+                    new FileDriver(
+                        $kernel->filesDirectory() . DIRECTORY_SEPARATOR . 'sessions',
+                    ),
                 ),
             ),
             'cache' => $container->factory(

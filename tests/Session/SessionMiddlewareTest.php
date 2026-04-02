@@ -6,7 +6,6 @@ namespace Arcanum\Test\Session;
 
 use Arcanum\Session\CookieSessionDriver;
 use Arcanum\Session\CsrfToken;
-use Arcanum\Session\FileSessionDriver;
 use Arcanum\Session\Flash;
 use Arcanum\Session\Session;
 use Arcanum\Session\SessionConfig;

@@ -30,9 +30,11 @@ The `SessionMiddleware` is the outermost framework middleware. It reads the sess
 
 | Driver | Class | Storage | Use case |
 |---|---|---|---|
-| `file` | `FileSessionDriver` | One file per session | Default, zero config |
+| `file` | `CacheSessionDriver` + Vault `FileDriver` | One file per session | Default, zero config |
 | `cache` | `CacheSessionDriver` | Any PSR-16 cache (Vault) | Redis, APCu via existing cache drivers |
 | `cookie` | `CookieSessionDriver` | Encrypted client cookie | Zero server storage, ~4KB limit |
+
+All server-side session storage goes through `CacheSessionDriver`, which wraps any PSR-16 `CacheInterface`. The `file` and `cache` drivers differ only in which Vault driver is underneath.
 
 ### File Driver
 
@@ -44,7 +46,7 @@ return [
 ];
 ```
 
-Sessions are stored as serialized files in `files/sessions/`. Expired sessions are lazily deleted on read and garbage-collected probabilistically (1% chance per request).
+Sessions are stored via Vault's `FileDriver` in `files/sessions/`. Expired sessions are lazily deleted on read via Vault's TTL handling.
 
 ### Cache Driver
 

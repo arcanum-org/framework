@@ -12,7 +12,6 @@ use Arcanum\Ignition\Kernel;
 use Arcanum\Ignition\RuneKernel;
 use Arcanum\Session\CacheSessionDriver;
 use Arcanum\Session\CookieSessionDriver;
-use Arcanum\Session\FileSessionDriver;
 use Arcanum\Session\SessionConfig;
 use Arcanum\Session\SessionDriver;
 use Arcanum\Session\ActiveSession;
@@ -37,8 +36,9 @@ use Psr\SimpleCache\CacheInterface;
 #[UsesClass(\Arcanum\Gather\Registry::class)]
 #[UsesClass(SessionConfig::class)]
 #[UsesClass(ActiveSession::class)]
-#[UsesClass(FileSessionDriver::class)]
 #[UsesClass(CacheSessionDriver::class)]
+#[UsesClass(\Arcanum\Vault\FileDriver::class)]
+#[UsesClass(\Arcanum\Vault\InvalidArgument::class)]
 #[UsesClass(CookieSessionDriver::class)]
 #[UsesClass(ArrayDriver::class)]
 #[UsesClass(KeyValidator::class)]
@@ -116,7 +116,7 @@ final class SessionsTest extends TestCase
 
         (new Sessions())->bootstrap($container);
 
-        $this->assertInstanceOf(FileSessionDriver::class, $container->get(SessionDriver::class));
+        $this->assertInstanceOf(CacheSessionDriver::class, $container->get(SessionDriver::class));
     }
 
     public function testRegistersCacheDriver(): void
