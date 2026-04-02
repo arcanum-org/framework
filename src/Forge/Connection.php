@@ -35,7 +35,7 @@ final class Connection
         $statement = $pdo->prepare($sql);
         $statement->execute($params);
 
-        $isRead = $this->isReadQuery($sql);
+        $isRead = Sql::isRead($sql);
 
         /** @var list<array<string, mixed>> $rows */
         $rows = $isRead ? $statement->fetchAll() : [];
@@ -96,24 +96,5 @@ final class Connection
         }
 
         return $this->pdo;
-    }
-
-    /**
-     * Determine if a SQL string is a read query by inspecting the first keyword.
-     */
-    private function isReadQuery(string $sql): bool
-    {
-        $trimmed = ltrim($sql);
-
-        // Skip leading comments.
-        while (str_starts_with($trimmed, '--')) {
-            $newline = strpos($trimmed, "\n");
-            if ($newline === false) {
-                return false;
-            }
-            $trimmed = ltrim(substr($trimmed, $newline + 1));
-        }
-
-        return str_starts_with(strtoupper($trimmed), 'SELECT');
     }
 }

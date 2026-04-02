@@ -6,12 +6,14 @@ namespace Arcanum\Test\Forge;
 
 use Arcanum\Forge\Connection;
 use Arcanum\Forge\Result;
+use Arcanum\Forge\Sql;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(Connection::class)]
 #[UsesClass(Result::class)]
+#[UsesClass(Sql::class)]
 final class ConnectionTest extends TestCase
 {
     private function sqlite(): Connection
