@@ -26,7 +26,7 @@ final class SessionMiddleware implements MiddlewareInterface
     public function __construct(
         private readonly SessionDriver $driver,
         private readonly SessionConfig $config,
-        private readonly SessionRegistry $registry,
+        private readonly ActiveSession $registry,
     ) {
     }
 

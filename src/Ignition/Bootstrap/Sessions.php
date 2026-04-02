@@ -14,7 +14,7 @@ use Arcanum\Session\CookieSessionDriver;
 use Arcanum\Session\FileSessionDriver;
 use Arcanum\Session\SessionConfig;
 use Arcanum\Session\SessionDriver;
-use Arcanum\Session\SessionRegistry;
+use Arcanum\Session\ActiveSession;
 use Arcanum\Toolkit\Encryption\Encryptor;
 use Arcanum\Vault\CacheManager;
 
@@ -22,7 +22,7 @@ use Arcanum\Vault\CacheManager;
  * Registers session infrastructure in the container.
  *
  * Reads `config/session.php` for driver and cookie configuration.
- * Registers SessionDriver, SessionConfig, and SessionRegistry.
+ * Registers SessionDriver, SessionConfig, and ActiveSession.
  *
  * Session middleware is registered in Bootstrap\Middleware — this
  * bootstrapper only prepares the services.
@@ -55,8 +55,8 @@ class Sessions implements Bootstrapper
 
         $container->instance(SessionConfig::class, $sessionConfig);
 
-        $registry = new SessionRegistry();
-        $container->instance(SessionRegistry::class, $registry);
+        $registry = new ActiveSession();
+        $container->instance(ActiveSession::class, $registry);
 
         $driverName = $this->string($config, 'session.driver', 'file');
         $this->registerDriver($container, $driverName, $kernel);

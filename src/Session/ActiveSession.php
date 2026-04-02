@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Arcanum\Session;
 
 /**
- * Request-scoped holder for the active Session.
+ * Request-scoped holder for the current Session.
  *
  * Registered as a singleton in the container. The SessionMiddleware
  * writes the Session on the way in; downstream code reads it.
  * This avoids circular dependency issues with the container
  * (the Session doesn't exist until middleware runs).
  */
-final class SessionRegistry
+final class ActiveSession
 {
     private Session|null $session = null;
 

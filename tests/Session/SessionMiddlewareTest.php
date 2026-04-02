@@ -13,7 +13,7 @@ use Arcanum\Session\SessionConfig;
 use Arcanum\Session\SessionDriver;
 use Arcanum\Session\SessionId;
 use Arcanum\Session\SessionMiddleware;
-use Arcanum\Session\SessionRegistry;
+use Arcanum\Session\ActiveSession;
 use Arcanum\Toolkit\Encryption\EncryptionKey;
 use Arcanum\Toolkit\Encryption\SodiumEncryptor;
 use Arcanum\Toolkit\Random;
@@ -31,7 +31,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 #[UsesClass(Session::class)]
 #[UsesClass(SessionId::class)]
 #[UsesClass(SessionConfig::class)]
-#[UsesClass(SessionRegistry::class)]
+#[UsesClass(ActiveSession::class)]
 #[UsesClass(CsrfToken::class)]
 #[UsesClass(Flash::class)]
 #[UsesClass(Random::class)]
@@ -68,7 +68,7 @@ final class SessionMiddlewareTest extends TestCase
     {
         $driver = new CacheSessionDriver(new ArrayDriver());
         $config = new SessionConfig();
-        $registry = new SessionRegistry();
+        $registry = new ActiveSession();
         $middleware = new SessionMiddleware($driver, $config, $registry);
 
         $middleware->process(
@@ -85,7 +85,7 @@ final class SessionMiddlewareTest extends TestCase
         $cache = new ArrayDriver();
         $driver = new CacheSessionDriver($cache);
         $config = new SessionConfig();
-        $registry = new SessionRegistry();
+        $registry = new ActiveSession();
 
         // Pre-populate a session.
         $sessionId = SessionId::generate();
@@ -106,7 +106,7 @@ final class SessionMiddlewareTest extends TestCase
     {
         $driver = new CacheSessionDriver(new ArrayDriver());
         $config = new SessionConfig();
-        $registry = new SessionRegistry();
+        $registry = new ActiveSession();
         $middleware = new SessionMiddleware($driver, $config, $registry);
 
         $middleware->process(
@@ -123,7 +123,7 @@ final class SessionMiddlewareTest extends TestCase
     {
         $driver = new CacheSessionDriver(new ArrayDriver());
         $config = new SessionConfig(cookieName: 'test_sess');
-        $registry = new SessionRegistry();
+        $registry = new ActiveSession();
         $middleware = new SessionMiddleware($driver, $config, $registry);
 
         $response = $this->createMock(ResponseInterface::class);
@@ -143,7 +143,7 @@ final class SessionMiddlewareTest extends TestCase
         $cache = new ArrayDriver();
         $driver = new CacheSessionDriver($cache);
         $config = new SessionConfig();
-        $registry = new SessionRegistry();
+        $registry = new ActiveSession();
 
         $oldId = SessionId::generate();
         $driver->write($oldId->value, ['_identity' => 'user-1', '_csrf' => str_repeat('ab', 32), '_flash' => []], 3600);
@@ -173,7 +173,7 @@ final class SessionMiddlewareTest extends TestCase
         $cache = new ArrayDriver();
         $driver = new CacheSessionDriver($cache);
         $config = new SessionConfig();
-        $registry = new SessionRegistry();
+        $registry = new ActiveSession();
 
         $oldId = SessionId::generate();
         $driver->write($oldId->value, ['_identity' => 'user-1', '_csrf' => str_repeat('ab', 32), '_flash' => []], 3600);
@@ -201,7 +201,7 @@ final class SessionMiddlewareTest extends TestCase
         $cache = new ArrayDriver();
         $driver = new CacheSessionDriver($cache);
         $config = new SessionConfig();
-        $registry = new SessionRegistry();
+        $registry = new ActiveSession();
         $middleware = new SessionMiddleware($driver, $config, $registry);
 
         $handler = $this->createStub(RequestHandlerInterface::class);

@@ -24,7 +24,7 @@ HTTP Request
   ← SessionMiddleware — persists session, sets cookie on response
 ```
 
-The `SessionMiddleware` is the outermost framework middleware. It reads the session ID from the cookie, loads session data from the configured driver, and makes the `Session` available via the `SessionRegistry`. On the way out, it persists any changes back to the driver and sets the `Set-Cookie` header.
+The `SessionMiddleware` is the outermost framework middleware. It reads the session ID from the cookie, loads session data from the configured driver, and makes the `Session` available via the `ActiveSession`. On the way out, it persists any changes back to the driver and sets the `Set-Cookie` header.
 
 ## Session Drivers
 
@@ -145,7 +145,7 @@ $session->flash()->all();          // ['success' => 'Contact form submitted.']
 
 ## Bootstrap
 
-The `Bootstrap\Sessions` bootstrapper registers `SessionDriver`, `SessionConfig`, and `SessionRegistry` in the container. It runs after `Bootstrap\Security` and `Bootstrap\Cache` (sessions may need encryption and cache drivers).
+The `Bootstrap\Sessions` bootstrapper registers `SessionDriver`, `SessionConfig`, and `ActiveSession` in the container. It runs after `Bootstrap\Security` and `Bootstrap\Cache` (sessions may need encryption and cache drivers).
 
 Session middleware (`SessionMiddleware` and `CsrfMiddleware`) is registered in `Bootstrap\Middleware` as the outermost framework middleware — app middleware runs inside the session layer.
 

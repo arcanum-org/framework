@@ -11,7 +11,7 @@ use Arcanum\Session\CsrfToken;
 use Arcanum\Session\Flash;
 use Arcanum\Session\Session;
 use Arcanum\Session\SessionId;
-use Arcanum\Session\SessionRegistry;
+use Arcanum\Session\ActiveSession;
 use Arcanum\Toolkit\Random;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -23,7 +23,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 #[CoversClass(CsrfMiddleware::class)]
 #[UsesClass(Session::class)]
 #[UsesClass(SessionId::class)]
-#[UsesClass(SessionRegistry::class)]
+#[UsesClass(ActiveSession::class)]
 #[UsesClass(CsrfToken::class)]
 #[UsesClass(Flash::class)]
 #[UsesClass(Random::class)]
@@ -31,9 +31,9 @@ use Psr\Http\Server\RequestHandlerInterface;
 #[UsesClass(StatusCode::class)]
 final class CsrfMiddlewareTest extends TestCase
 {
-    private function registryWithSession(): SessionRegistry
+    private function registryWithSession(): ActiveSession
     {
-        $registry = new SessionRegistry();
+        $registry = new ActiveSession();
         $registry->set(new Session(SessionId::generate()));
         return $registry;
     }

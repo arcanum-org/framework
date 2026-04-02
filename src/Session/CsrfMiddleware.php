@@ -28,7 +28,7 @@ final class CsrfMiddleware implements MiddlewareInterface
     private const TOKEN_FIELD = '_token';
     private const TOKEN_HEADER = 'X-CSRF-TOKEN';
 
-    public function __construct(private readonly SessionRegistry $registry)
+    public function __construct(private readonly ActiveSession $registry)
     {
     }
 

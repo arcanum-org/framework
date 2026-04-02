@@ -386,8 +386,8 @@ Same handler, same `Identity` type, different transport auth mechanisms. The DTO
 - [x] `CacheSessionDriver` — delegates to any `CacheInterface` (Vault). Prefixed keys. Enables Redis/APCu session storage via existing cache drivers.
 - [x] `CookieSessionDriver` — encrypted client-side sessions via `Encryptor`. In-memory buffer + encrypt/decrypt for cookie transport.
 - [x] `SessionConfig` — value object holding cookie name, lifetime, path, domain, Secure, HttpOnly, SameSite. Builds Set-Cookie headers.
-- [x] `SessionRegistry` — request-scoped holder. Middleware writes, downstream reads.
-- [x] Tests: SessionId (7), CsrfToken (6), Flash (8), Session (14), SessionRegistry (3), SessionConfig (5), FileSessionDriver (7), CacheSessionDriver (5), CookieSessionDriver (7). 62 core tests.
+- [x] `ActiveSession` — request-scoped holder. Middleware writes, downstream reads.
+- [x] Tests: SessionId (7), CsrfToken (6), Flash (8), Session (14), ActiveSession (3), SessionConfig (5), FileSessionDriver (7), CacheSessionDriver (5), CookieSessionDriver (7). 62 core tests.
 
 #### HTTP Middleware
 
@@ -398,11 +398,11 @@ Same handler, same `Identity` type, different transport auth mechanisms. The DTO
 #### Flash Messages
 
 - [x] `Flash` — write-once read-once message bag. Constructor receives "next" data from previous request as "current". `set()` queues for next request. `pending()` returns data to persist.
-- [x] Available to query/page handlers via `SessionRegistry` container injection.
+- [x] Available to query/page handlers via `ActiveSession` container injection.
 
 #### Bootstrap & Wiring
 
-- [x] `Bootstrap\Sessions` — reads `config/session.php`, registers `SessionDriver`, `SessionConfig`, `SessionRegistry` in container. Supports file/cache/cookie drivers. CLI kernels skip entirely.
+- [x] `Bootstrap\Sessions` — reads `config/session.php`, registers `SessionDriver`, `SessionConfig`, `ActiveSession` in container. Supports file/cache/cookie drivers. CLI kernels skip entirely.
 - [x] `SessionMiddleware` and `CsrfMiddleware` registered in `Bootstrap\Middleware` as outermost framework middleware.
 - [x] Added `Bootstrap\Sessions` to `HyperKernel::$bootstrappers` after Cache, before Routing.
 - [x] Tests: Bootstrap\Sessions (6). Existing MiddlewareTest and HyperKernelTest updated.

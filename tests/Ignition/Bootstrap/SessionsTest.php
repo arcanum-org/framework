@@ -15,7 +15,7 @@ use Arcanum\Session\CookieSessionDriver;
 use Arcanum\Session\FileSessionDriver;
 use Arcanum\Session\SessionConfig;
 use Arcanum\Session\SessionDriver;
-use Arcanum\Session\SessionRegistry;
+use Arcanum\Session\ActiveSession;
 use Arcanum\Toolkit\Encryption\EncryptionKey;
 use Arcanum\Toolkit\Encryption\Encryptor;
 use Arcanum\Toolkit\Encryption\SodiumEncryptor;
@@ -36,7 +36,7 @@ use Psr\SimpleCache\CacheInterface;
 #[UsesClass(Configuration::class)]
 #[UsesClass(\Arcanum\Gather\Registry::class)]
 #[UsesClass(SessionConfig::class)]
-#[UsesClass(SessionRegistry::class)]
+#[UsesClass(ActiveSession::class)]
 #[UsesClass(FileSessionDriver::class)]
 #[UsesClass(CacheSessionDriver::class)]
 #[UsesClass(CookieSessionDriver::class)]
@@ -101,13 +101,13 @@ final class SessionsTest extends TestCase
         $this->assertSame(1800, $config->lifetime);
     }
 
-    public function testRegistersSessionRegistry(): void
+    public function testRegistersActiveSession(): void
     {
         $container = $this->buildContainer();
 
         (new Sessions())->bootstrap($container);
 
-        $this->assertInstanceOf(SessionRegistry::class, $container->get(SessionRegistry::class));
+        $this->assertInstanceOf(ActiveSession::class, $container->get(ActiveSession::class));
     }
 
     public function testRegistersFileDriverByDefault(): void
