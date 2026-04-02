@@ -24,7 +24,7 @@ class HtmlFormatter implements Formatter
         private readonly TemplateResolver $resolver,
         private readonly TemplateCompiler $compiler,
         private readonly TemplateCache $cache,
-        private readonly HtmlFallback $fallback,
+        private readonly HtmlFallbackFormatter $fallback,
         private readonly Reader $reader = new Reader(),
         private readonly ?HelperResolver $helpers = null,
     ) {
@@ -35,7 +35,7 @@ class HtmlFormatter implements Formatter
         $templatePath = $this->resolver->resolve($dtoClass);
 
         if ($templatePath === null) {
-            return $this->fallback->render($data);
+            return $this->fallback->format($data);
         }
 
         return $this->renderTemplate($templatePath, $data, $dtoClass);

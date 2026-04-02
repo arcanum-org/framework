@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Shodo\Formatters;
 
+use Arcanum\Shodo\Formatter;
+
 /**
  * Generates a simple valid HTML document from arbitrary data.
  *
@@ -12,9 +14,9 @@ namespace Arcanum\Shodo\Formatters;
  * unordered lists, objects by their public properties, and scalars as
  * paragraphs. All output is HTML-escaped.
  */
-final class HtmlFallback
+final class HtmlFallbackFormatter implements Formatter
 {
-    public function render(mixed $data): string
+    public function format(mixed $data, string $dtoClass = ''): string
     {
         $body = $this->renderValue($data);
 

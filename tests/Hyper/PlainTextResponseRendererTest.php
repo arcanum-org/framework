@@ -18,7 +18,7 @@ use Arcanum\Hyper\Version;
 use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Writer;
-use Arcanum\Shodo\Formatters\PlainTextFallback;
+use Arcanum\Shodo\Formatters\PlainTextFallbackFormatter;
 use Arcanum\Shodo\Formatters\PlainTextFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
@@ -33,7 +33,7 @@ use Psr\Http\Message\ResponseInterface;
 #[UsesClass(TemplateResolver::class)]
 #[UsesClass(TemplateCompiler::class)]
 #[UsesClass(TemplateCache::class)]
-#[UsesClass(PlainTextFallback::class)]
+#[UsesClass(PlainTextFallbackFormatter::class)]
 #[UsesClass(Response::class)]
 #[UsesClass(Message::class)]
 #[UsesClass(Headers::class)]
@@ -91,7 +91,7 @@ final class PlainTextResponseRendererTest extends TestCase
             resolver: new TemplateResolver($this->rootDir, 'App', extension: 'txt'),
             compiler: new TemplateCompiler(),
             cache: new TemplateCache($this->cacheDir),
-            fallback: new PlainTextFallback(),
+            fallback: new PlainTextFallbackFormatter(),
         );
         return new PlainTextResponseRenderer($formatter);
     }
@@ -187,7 +187,7 @@ final class PlainTextResponseRendererTest extends TestCase
             resolver: new TemplateResolver($this->rootDir, 'App', extension: 'txt'),
             compiler: new TemplateCompiler(),
             cache: new TemplateCache($this->cacheDir),
-            fallback: new PlainTextFallback(),
+            fallback: new PlainTextFallbackFormatter(),
         );
         $renderer = new PlainTextResponseRenderer($formatter);
         $data = ['version' => '1.0'];

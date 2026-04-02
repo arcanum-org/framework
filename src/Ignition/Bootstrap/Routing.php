@@ -23,10 +23,10 @@ use Arcanum\Hyper\JsonResponseRenderer;
 use Arcanum\Hyper\PlainTextResponseRenderer;
 use Arcanum\Shodo\Formatters\CsvFormatter;
 use Arcanum\Shodo\Formatters\Format;
-use Arcanum\Shodo\Formatters\HtmlFallback;
+use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\Formatters\JsonFormatter;
-use Arcanum\Shodo\Formatters\PlainTextFallback;
+use Arcanum\Shodo\Formatters\PlainTextFallbackFormatter;
 use Arcanum\Shodo\Formatters\PlainTextFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
@@ -133,7 +133,7 @@ class Routing implements Bootstrapper
                 resolver: $this->createTemplateResolver($container, $config, 'html'),
                 compiler: $compiler,
                 cache: $cache,
-                fallback: new HtmlFallback(),
+                fallback: new HtmlFallbackFormatter(),
             );
         });
 
@@ -147,7 +147,7 @@ class Routing implements Bootstrapper
                 resolver: $this->createTemplateResolver($container, $config, 'txt'),
                 compiler: $compiler,
                 cache: $cache,
-                fallback: new PlainTextFallback(),
+                fallback: new PlainTextFallbackFormatter(),
             );
         });
 

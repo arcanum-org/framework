@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Shodo\Formatters;
 
-use Arcanum\Shodo\Formatters\HtmlFallback;
+use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 
-#[CoversClass(HtmlFallback::class)]
-final class HtmlFallbackTest extends TestCase
+#[CoversClass(HtmlFallbackFormatter::class)]
+final class HtmlFallbackFormatterTest extends TestCase
 {
     public function testRendersScalarString(): void
     {
         // Arrange
-        $fallback = new HtmlFallback();
+        $fallback = new HtmlFallbackFormatter();
 
         // Act
-        $html = $fallback->render('Hello world');
+        $html = $fallback->format('Hello world');
 
         // Assert
         $this->assertStringContainsString('<p>Hello world</p>', $html);
@@ -26,10 +26,10 @@ final class HtmlFallbackTest extends TestCase
     public function testRendersScalarInteger(): void
     {
         // Arrange
-        $fallback = new HtmlFallback();
+        $fallback = new HtmlFallbackFormatter();
 
         // Act
-        $html = $fallback->render(42);
+        $html = $fallback->format(42);
 
         // Assert
         $this->assertStringContainsString('<p>42</p>', $html);
@@ -38,10 +38,10 @@ final class HtmlFallbackTest extends TestCase
     public function testEscapesHtmlInScalar(): void
     {
         // Arrange
-        $fallback = new HtmlFallback();
+        $fallback = new HtmlFallbackFormatter();
 
         // Act
-        $html = $fallback->render('<script>alert("xss")</script>');
+        $html = $fallback->format('<script>alert("xss")</script>');
 
         // Assert
         $this->assertStringContainsString(
@@ -54,10 +54,10 @@ final class HtmlFallbackTest extends TestCase
     public function testRendersAssociativeArray(): void
     {
         // Arrange
-        $fallback = new HtmlFallback();
+        $fallback = new HtmlFallbackFormatter();
 
         // Act
-        $html = $fallback->render(['name' => 'Arcanum', 'version' => '1.0']);
+        $html = $fallback->format(['name' => 'Arcanum', 'version' => '1.0']);
 
         // Assert
         $this->assertStringContainsString('<dl>', $html);
@@ -70,10 +70,10 @@ final class HtmlFallbackTest extends TestCase
     public function testRendersSequentialArray(): void
     {
         // Arrange
-        $fallback = new HtmlFallback();
+        $fallback = new HtmlFallbackFormatter();
 
         // Act
-        $html = $fallback->render(['apple', 'banana', 'cherry']);
+        $html = $fallback->format(['apple', 'banana', 'cherry']);
 
         // Assert
         $this->assertStringContainsString('<ul>', $html);
@@ -85,10 +85,10 @@ final class HtmlFallbackTest extends TestCase
     public function testRendersNestedStructure(): void
     {
         // Arrange
-        $fallback = new HtmlFallback();
+        $fallback = new HtmlFallbackFormatter();
 
         // Act
-        $html = $fallback->render([
+        $html = $fallback->format([
             'user' => [
                 'name' => 'Alice',
                 'roles' => ['admin', 'editor'],
@@ -107,14 +107,14 @@ final class HtmlFallbackTest extends TestCase
     public function testRendersObjectPublicProperties(): void
     {
         // Arrange
-        $fallback = new HtmlFallback();
+        $fallback = new HtmlFallbackFormatter();
         $obj = new class {
             public string $name = 'Arcanum';
             public int $version = 1;
         };
 
         // Act
-        $html = $fallback->render($obj);
+        $html = $fallback->format($obj);
 
         // Assert
         $this->assertStringContainsString('<dt>name</dt>', $html);
@@ -126,10 +126,10 @@ final class HtmlFallbackTest extends TestCase
     public function testRendersEmptyArray(): void
     {
         // Arrange
-        $fallback = new HtmlFallback();
+        $fallback = new HtmlFallbackFormatter();
 
         // Act
-        $html = $fallback->render([]);
+        $html = $fallback->format([]);
 
         // Assert
         $this->assertStringContainsString('<body></body>', $html);
@@ -138,10 +138,10 @@ final class HtmlFallbackTest extends TestCase
     public function testRendersNull(): void
     {
         // Arrange
-        $fallback = new HtmlFallback();
+        $fallback = new HtmlFallbackFormatter();
 
         // Act
-        $html = $fallback->render(null);
+        $html = $fallback->format(null);
 
         // Assert
         $this->assertStringContainsString('<body></body>', $html);
@@ -150,10 +150,10 @@ final class HtmlFallbackTest extends TestCase
     public function testOutputIsValidHtmlDocument(): void
     {
         // Arrange
-        $fallback = new HtmlFallback();
+        $fallback = new HtmlFallbackFormatter();
 
         // Act
-        $html = $fallback->render(['key' => 'value']);
+        $html = $fallback->format(['key' => 'value']);
 
         // Assert
         $this->assertStringStartsWith('<!DOCTYPE html>', $html);
@@ -165,10 +165,10 @@ final class HtmlFallbackTest extends TestCase
     public function testEscapesKeysInAssociativeArray(): void
     {
         // Arrange
-        $fallback = new HtmlFallback();
+        $fallback = new HtmlFallbackFormatter();
 
         // Act
-        $html = $fallback->render(['<b>key</b>' => 'value']);
+        $html = $fallback->format(['<b>key</b>' => 'value']);
 
         // Assert
         $this->assertStringContainsString('<dt>&lt;b&gt;key&lt;/b&gt;</dt>', $html);
@@ -177,10 +177,10 @@ final class HtmlFallbackTest extends TestCase
     public function testRendersBooleanValues(): void
     {
         // Arrange
-        $fallback = new HtmlFallback();
+        $fallback = new HtmlFallbackFormatter();
 
         // Act
-        $html = $fallback->render(['enabled' => true, 'disabled' => false]);
+        $html = $fallback->format(['enabled' => true, 'disabled' => false]);
 
         // Assert
         $this->assertStringContainsString('<dd><p>1</p></dd>', $html);

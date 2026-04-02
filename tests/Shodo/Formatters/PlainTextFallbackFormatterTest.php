@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Shodo\Formatters;
 
-use Arcanum\Shodo\Formatters\PlainTextFallback;
+use Arcanum\Shodo\Formatters\PlainTextFallbackFormatter;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 
-#[CoversClass(PlainTextFallback::class)]
-final class PlainTextFallbackTest extends TestCase
+#[CoversClass(PlainTextFallbackFormatter::class)]
+final class PlainTextFallbackFormatterTest extends TestCase
 {
     public function testRendersScalarString(): void
     {
         // Arrange
-        $fallback = new PlainTextFallback();
+        $fallback = new PlainTextFallbackFormatter();
 
         // Act
-        $text = $fallback->render('Hello world');
+        $text = $fallback->format('Hello world');
 
         // Assert
         $this->assertSame('Hello world', $text);
@@ -26,10 +26,10 @@ final class PlainTextFallbackTest extends TestCase
     public function testRendersScalarInteger(): void
     {
         // Arrange
-        $fallback = new PlainTextFallback();
+        $fallback = new PlainTextFallbackFormatter();
 
         // Act
-        $text = $fallback->render(42);
+        $text = $fallback->format(42);
 
         // Assert
         $this->assertSame('42', $text);
@@ -38,10 +38,10 @@ final class PlainTextFallbackTest extends TestCase
     public function testRendersBooleanTrue(): void
     {
         // Arrange
-        $fallback = new PlainTextFallback();
+        $fallback = new PlainTextFallbackFormatter();
 
         // Act
-        $text = $fallback->render(true);
+        $text = $fallback->format(true);
 
         // Assert
         $this->assertSame('true', $text);
@@ -50,10 +50,10 @@ final class PlainTextFallbackTest extends TestCase
     public function testRendersBooleanFalse(): void
     {
         // Arrange
-        $fallback = new PlainTextFallback();
+        $fallback = new PlainTextFallbackFormatter();
 
         // Act
-        $text = $fallback->render(false);
+        $text = $fallback->format(false);
 
         // Assert
         $this->assertSame('false', $text);
@@ -62,10 +62,10 @@ final class PlainTextFallbackTest extends TestCase
     public function testRendersAssociativeArray(): void
     {
         // Arrange
-        $fallback = new PlainTextFallback();
+        $fallback = new PlainTextFallbackFormatter();
 
         // Act
-        $text = $fallback->render(['name' => 'Arcanum', 'version' => '1.0']);
+        $text = $fallback->format(['name' => 'Arcanum', 'version' => '1.0']);
 
         // Assert
         $this->assertSame("name: Arcanum\nversion: 1.0", $text);
@@ -74,10 +74,10 @@ final class PlainTextFallbackTest extends TestCase
     public function testRendersSequentialArray(): void
     {
         // Arrange
-        $fallback = new PlainTextFallback();
+        $fallback = new PlainTextFallbackFormatter();
 
         // Act
-        $text = $fallback->render(['apple', 'banana', 'cherry']);
+        $text = $fallback->format(['apple', 'banana', 'cherry']);
 
         // Assert
         $this->assertSame("- apple\n- banana\n- cherry", $text);
@@ -86,10 +86,10 @@ final class PlainTextFallbackTest extends TestCase
     public function testRendersNestedStructure(): void
     {
         // Arrange
-        $fallback = new PlainTextFallback();
+        $fallback = new PlainTextFallbackFormatter();
 
         // Act
-        $text = $fallback->render([
+        $text = $fallback->format([
             'user' => [
                 'name' => 'Alice',
                 'roles' => ['admin', 'editor'],
@@ -107,14 +107,14 @@ final class PlainTextFallbackTest extends TestCase
     public function testRendersObjectPublicProperties(): void
     {
         // Arrange
-        $fallback = new PlainTextFallback();
+        $fallback = new PlainTextFallbackFormatter();
         $obj = new class {
             public string $name = 'Arcanum';
             public int $version = 1;
         };
 
         // Act
-        $text = $fallback->render($obj);
+        $text = $fallback->format($obj);
 
         // Assert
         $this->assertSame("name: Arcanum\nversion: 1", $text);
@@ -123,10 +123,10 @@ final class PlainTextFallbackTest extends TestCase
     public function testRendersEmptyArray(): void
     {
         // Arrange
-        $fallback = new PlainTextFallback();
+        $fallback = new PlainTextFallbackFormatter();
 
         // Act
-        $text = $fallback->render([]);
+        $text = $fallback->format([]);
 
         // Assert
         $this->assertSame('', $text);
@@ -135,10 +135,10 @@ final class PlainTextFallbackTest extends TestCase
     public function testRendersNull(): void
     {
         // Arrange
-        $fallback = new PlainTextFallback();
+        $fallback = new PlainTextFallbackFormatter();
 
         // Act
-        $text = $fallback->render(null);
+        $text = $fallback->format(null);
 
         // Assert
         $this->assertSame('', $text);

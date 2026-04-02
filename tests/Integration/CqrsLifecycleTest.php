@@ -20,7 +20,7 @@ use Arcanum\Hyper\FormatRegistry;
 use Arcanum\Hyper\HtmlResponseRenderer;
 use Arcanum\Hyper\JsonResponseRenderer;
 use Arcanum\Shodo\Formatters\Format;
-use Arcanum\Shodo\Formatters\HtmlFallback;
+use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
@@ -342,13 +342,13 @@ final class CqrsLifecycleTest extends TestCase
         $formats->register(new Format('html', 'text/html', HtmlResponseRenderer::class));
 
         // Wire up HtmlResponseRenderer — TemplateResolver points at a nonexistent dir
-        // so it falls back to HtmlFallback for a generic HTML representation.
+        // so it falls back to HtmlFallbackFormatter for a generic HTML representation.
         $container->factory(HtmlResponseRenderer::class, function () {
             $formatter = new HtmlFormatter(
                 resolver: new TemplateResolver('/nonexistent', 'Arcanum\Test'),
                 compiler: new TemplateCompiler(),
                 cache: new TemplateCache(''),
-                fallback: new HtmlFallback(),
+                fallback: new HtmlFallbackFormatter(),
             );
             return new HtmlResponseRenderer($formatter);
         });

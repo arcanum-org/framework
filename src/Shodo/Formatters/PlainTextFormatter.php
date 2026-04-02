@@ -26,7 +26,7 @@ class PlainTextFormatter implements Formatter
         private readonly TemplateResolver $resolver,
         private readonly TemplateCompiler $compiler,
         private readonly TemplateCache $cache,
-        private readonly PlainTextFallback $fallback,
+        private readonly PlainTextFallbackFormatter $fallback,
         private readonly Reader $reader = new Reader(),
         private readonly ?HelperResolver $helpers = null,
     ) {
@@ -37,7 +37,7 @@ class PlainTextFormatter implements Formatter
         $templatePath = $this->resolver->resolve($dtoClass);
 
         if ($templatePath === null) {
-            return $this->fallback->render($data);
+            return $this->fallback->format($data);
         }
 
         return $this->renderTemplate($templatePath, $data, $dtoClass);

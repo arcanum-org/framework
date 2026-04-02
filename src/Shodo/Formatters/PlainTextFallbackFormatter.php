@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Shodo\Formatters;
 
+use Arcanum\Shodo\Formatter;
+
 /**
  * Generates a plain text representation of arbitrary data.
  *
@@ -11,9 +13,9 @@ namespace Arcanum\Shodo\Formatters;
  * Renders associative arrays as "key: value" lines, sequential arrays
  * as one value per line, and nested structures with indentation.
  */
-final class PlainTextFallback
+final class PlainTextFallbackFormatter implements Formatter
 {
-    public function render(mixed $data): string
+    public function format(mixed $data, string $dtoClass = ''): string
     {
         return rtrim($this->renderValue($data, 0));
     }
