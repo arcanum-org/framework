@@ -30,6 +30,13 @@ final class RouteMap
     private array $routes = [];
 
     /**
+     * Reverse map: DTO class → path. Built lazily on first reverseLookup().
+     *
+     * @var array<string, string>|null
+     */
+    private ?array $reverseMap = null;
+
+    /**
      * Register a custom route.
      *
      * @param string $path The URL path (e.g., '/this/is/custom').
@@ -51,6 +58,7 @@ final class RouteMap
             'format' => $format,
             'isPage' => $isPage,
         ];
+        $this->reverseMap = null;
     }
 
     /**
@@ -110,6 +118,23 @@ final class RouteMap
         }
 
         return $this->routes[$normalized]['methods'];
+    }
+
+    /**
+     * Look up the path for a DTO class.
+     *
+     * Returns null if no custom route is registered for the class.
+     */
+    public function reverseLookup(string $dtoClass): ?string
+    {
+        if ($this->reverseMap === null) {
+            $this->reverseMap = [];
+            foreach ($this->routes as $path => $entry) {
+                $this->reverseMap[$entry['dtoClass']] = $path;
+            }
+        }
+
+        return $this->reverseMap[$dtoClass] ?? null;
     }
 
     private function normalize(string $path): string
