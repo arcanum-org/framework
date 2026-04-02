@@ -182,7 +182,7 @@ Transport-agnostic helper classes in Shodo. No dependencies on HTTP, session, or
 - [x] **10.6f** Bootstrap `HelperResolver` wiring: `registerHelpers()` creates `HelperRegistry` with framework helpers (Format, Str, Arr always; Html if ActiveSession exists; Route if UrlResolver exists). `HelperDiscovery` scans `app/Domain/` for `Helpers.php` files with PSR-16 cache. `HelperResolver` registered as singleton with global registry + discovery + container.
 - [x] **10.6g** Update `HtmlFormatter` and `PlainTextFormatter` factory registrations in `Bootstrap\Routing` to resolve `HelperResolver` from container and pass to constructors.
 - [x] **10.6h** In `Bootstrap\Routing::registerRouter()`, after creating `ConventionResolver` and `RouteMap`, create `UrlResolver` and register as instance. Pass it the root namespace, RouteMap, and pages namespace.
-- [ ] **10.6i** Integration test: bootstrap a container with Routing bootstrapper, verify `HelperResolver` returns correct helpers, verify domain-scoped helpers from `Helpers.php` are included for matching DTOs.
+- [x] **10.6i** Integration test: bootstrap a container with Routing bootstrapper, verify `HelperResolver` returns correct helpers, verify domain-scoped helpers from `Helpers.php` are included for matching DTOs.
 
 #### 10.7 @csrf compiler directive
 
