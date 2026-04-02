@@ -817,10 +817,10 @@ final class PlaceOrderHandler
 
 #### Bootstrap & Wiring
 
-- [ ] `Bootstrap\Database` bootstrapper — reads `config/database.php`, creates `ConnectionManager`, `DomainContext`, `Database`. Registers all in container. Configures domain root path from Kernel.
-- [ ] Added to `HyperKernel::$bootstrappers` and `RuneKernel::$bootstrappers` — after `Auth`, before `Routing`.
-- [ ] Conveyor domain context middleware registered in both `Bootstrap\Routing` and `Bootstrap\CliRouting` — sets `DomainContext` from DTO namespace before handler dispatch.
-- [ ] Tests: registers Database in container, ConnectionManager configured from config, works with no config (skips gracefully for apps without a database), domain context middleware sets domain from DTO. ~5 tests.
+- [x] `Bootstrap\Database` bootstrapper — reads `config/database.php`, creates `ConnectionManager`, `DomainContext`, `Database`. Registers all in container. Configures domain root path from Kernel.
+- [x] Added to `HyperKernel::$bootstrappers` and `RuneKernel::$bootstrappers` — after `Cache`, before `Sessions`/`Auth`.
+- [x] Conveyor domain context middleware registered in both `Bootstrap\Routing` and `Bootstrap\CliRouting` — sets `DomainContext` from DTO namespace before handler dispatch. Conditional on `DomainContext` being in the container (apps without database skip it).
+- [x] Tests: registers Database in container, ConnectionManager configured from config, works with no config (skips gracefully for apps without a database), domain context path correct, defaults to sqlite with empty connections. 5 tests.
 
 #### SQL Parameter Annotations
 

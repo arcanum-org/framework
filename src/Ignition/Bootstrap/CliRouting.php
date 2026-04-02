@@ -40,6 +40,8 @@ use Arcanum\Flow\Conveyor\MiddlewareBus;
 use Arcanum\Auth\ActiveIdentity;
 use Arcanum\Auth\AuthorizationGuard;
 use Arcanum\Ignition\Transport;
+use Arcanum\Forge\DomainContext;
+use Arcanum\Forge\DomainContextMiddleware;
 use Arcanum\Validation\ValidationGuard;
 
 /**
@@ -317,6 +319,15 @@ class CliRouting implements Bootstrapper
             $transport = $container->get(Transport::class);
             $bus->before(new AuthorizationGuard($activeIdentity, $transport, $container));
             $bus->before(new ValidationGuard());
+
+            if ($container->has(DomainContext::class)) {
+                /** @var DomainContext $context */
+                $context = $container->get(DomainContext::class);
+                /** @var Configuration $config */
+                $config = $container->get(Configuration::class);
+                $namespace = $config->asString('app.namespace', 'App\\Domain');
+                $bus->before(new DomainContextMiddleware($context, $namespace));
+            }
         }
     }
 }

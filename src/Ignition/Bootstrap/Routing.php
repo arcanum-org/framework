@@ -39,6 +39,8 @@ use Arcanum\Auth\ActiveIdentity;
 use Arcanum\Auth\AuthorizationGuard;
 use Arcanum\Ignition\Transport;
 use Arcanum\Validation\ValidationGuard;
+use Arcanum\Forge\DomainContext;
+use Arcanum\Forge\DomainContextMiddleware;
 use Arcanum\Vault\CacheManager;
 use Arcanum\Vault\PrefixedCache;
 
@@ -320,6 +322,15 @@ class Routing implements Bootstrapper
             $transport = $container->get(Transport::class);
             $bus->before(new AuthorizationGuard($activeIdentity, $transport, $container));
             $bus->before(new ValidationGuard());
+
+            if ($container->has(DomainContext::class)) {
+                /** @var DomainContext $context */
+                $context = $container->get(DomainContext::class);
+                /** @var Configuration $config */
+                $config = $container->get(Configuration::class);
+                $namespace = $config->asString('app.namespace', 'App\\Domain');
+                $bus->before(new DomainContextMiddleware($context, $namespace));
+            }
         }
     }
 }
