@@ -65,6 +65,10 @@ Arcanum is a collection of packages that work together to create a robust, scala
 
 [Rune](https://github.com/arcanum-org/framework/tree/main/src/Rune) is Arcanum's CLI transport layer. It lets you run the same Commands and Queries from the terminal that you run over HTTP — same DTOs, same handlers, same Conveyor bus. Where Atlas maps HTTP requests to routes, Rune maps CLI arguments. Where Hyper renders responses for browsers, Rune renders tables and key-value output for terminals. Built-in commands (`list`, `help`, `validate:handlers`) ship with every app, and you can add your own. Mark DTOs with `#[CliOnly]` or `#[HttpOnly]` to restrict them to a single transport.
 
+### Arcanum Forge
+
+[Forge](https://github.com/arcanum-org/framework/tree/main/src/Forge) is Arcanum's persistence layer. There's no ORM, no query builder, and no SQL strings in PHP. You write `.sql` files in domain `Model/` directories and call them as methods — `$db->model->products(category: 'shoes')`. Forge handles connections, parameter binding, read/write routing, and result shaping. Type-cast results with `@cast` annotations, declare parameter types with `@param`, and generate typed model classes with `forge:models` for full PHPStan coverage. The `Connection` interface lets you bring your own database abstraction layer if the built-in PDO wrapper isn't enough.
+
 ### Arcanum Toolkit
 
 [Toolkit](https://github.com/arcanum-org/framework/tree/main/src/Toolkit) is a collection of utilities, like string manipulation, etc.

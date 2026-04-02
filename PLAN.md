@@ -873,9 +873,9 @@ Key questions for the migration design conversation:
 
 #### Documentation
 
-- [ ] `src/Forge/README.md` — philosophy (SQL as first-class citizen, no ORM, no query builder, no raw strings), Database/Model API, SQL file conventions, Result shaping, parameter binding, transactions, connections, configuration.
-- [ ] Updated `src/Ignition/README.md` — `Bootstrap\Database` in bootstrapper tables.
-- [ ] Updated root `README.md` — Forge package description.
+- [x] `src/Forge/README.md` — philosophy (SQL as first-class citizen, no ORM, no query builder, no raw strings), Database/Model API, SQL file conventions, Result shaping, parameter binding, transactions, connections, configuration, model generation, DBAL extensibility.
+- [x] Updated `src/Ignition/README.md` — `Bootstrap\Database` in bootstrapper tables, updated both HTTP and CLI tables to include all current bootstrappers.
+- [x] Updated root `README.md` — Forge package description.
 
 ### 10. Template Helpers — Shodo extension
 

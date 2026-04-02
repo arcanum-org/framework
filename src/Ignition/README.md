@@ -87,11 +87,14 @@ Bootstrappers run once, in order, the first time `bootstrap()` is called. Each o
 | 2 | `Configuration` | Loads `config/*.php` files (or cache), registers `Configuration` in container |
 | 3 | `Security` | Reads `APP_KEY`, registers `Encryptor`, `Signer`, and `Hasher` in container |
 | 4 | `Cache` | Reads `config/cache.php`, registers `CacheManager` and default `CacheInterface` |
-| 5 | `Routing` | Registers router, format registry, response renderers, page discovery, hydrator |
-| 6 | `RouteMiddleware` | Discovers per-route middleware from attributes and `Middleware.php` files |
-| 7 | `Logger` | Builds Monolog handlers and channels from config |
-| 8 | `Exceptions` | Sets PHP error/exception/shutdown handlers |
-| 9 | `Middleware` | Registers global HTTP middleware from config |
+| 5 | `Database` | Reads `config/database.php`, registers `ConnectionManager`, `DomainContext`, `Database`. Skips if no config |
+| 6 | `Sessions` | Reads `config/session.php`, registers session handler and `ActiveSession` |
+| 7 | `Auth` | Reads `config/auth.php`, registers guards, `ActiveIdentity` |
+| 8 | `Routing` | Registers router, format registry, response renderers, page discovery, hydrator, Conveyor middleware |
+| 9 | `RouteMiddleware` | Discovers per-route middleware from attributes and `Middleware.php` files |
+| 10 | `Logger` | Builds Monolog handlers and channels from config |
+| 11 | `Exceptions` | Sets PHP error/exception/shutdown handlers |
+| 12 | `Middleware` | Registers global HTTP middleware from config |
 
 ### CLI bootstrappers
 
@@ -101,11 +104,13 @@ Bootstrappers run once, in order, the first time `bootstrap()` is called. Each o
 | 2 | `Configuration` | Same as HTTP — shared |
 | 3 | `Security` | Same as HTTP — shared |
 | 4 | `Cache` | Same as HTTP — shared |
-| 5 | `CliRouting` | Registers CLI router, format registry, formatters, output, built-in commands |
-| 6 | `Logger` | Same as HTTP — shared |
-| 7 | `Exceptions` | Same as HTTP — shared |
+| 5 | `Database` | Same as HTTP — shared. Skips if no config |
+| 6 | `Auth` | Same as HTTP — shared |
+| 7 | `CliRouting` | Registers CLI router, format registry, formatters, output, built-in commands, Conveyor middleware |
+| 8 | `Logger` | Same as HTTP — shared |
+| 9 | `Exceptions` | Same as HTTP — shared |
 
-Notice that `Environment`, `Configuration`, `Security`, `Cache`, `Logger`, and `Exceptions` are **shared** between both transports. Only the routing and middleware bootstrappers differ — HTTP needs `Routing`, `RouteMiddleware`, and `Middleware`; CLI needs `CliRouting`.
+Notice that `Environment`, `Configuration`, `Security`, `Cache`, `Database`, `Auth`, `Logger`, and `Exceptions` are **shared** between both transports. Only the routing and middleware bootstrappers differ — HTTP needs `Routing`, `RouteMiddleware`, `Sessions`, and `Middleware`; CLI needs `CliRouting`.
 
 ### Customizing bootstrappers
 
