@@ -19,7 +19,7 @@ use Arcanum\Ignition\HyperKernel;
 use Arcanum\Ignition\Kernel;
 use Arcanum\Hyper\FormatRegistry;
 use Arcanum\Hyper\JsonResponseRenderer;
-use Arcanum\Shodo\Formatters\Format;
+use Arcanum\Shodo\Format;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;

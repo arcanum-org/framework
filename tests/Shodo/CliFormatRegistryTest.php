@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Test\Shodo\Formatters;
+namespace Arcanum\Test\Shodo;
 
-use Arcanum\Shodo\Formatters\CliFormatRegistry;
+use Arcanum\Shodo\CliFormatRegistry;
 use Arcanum\Shodo\Formatters\JsonFormatter;
 use Arcanum\Shodo\Formatters\KeyValueFormatter;
 use Arcanum\Shodo\Formatters\TableFormatter;
-use Arcanum\Shodo\Formatters\UnsupportedFormat;
+use Arcanum\Shodo\UnsupportedFormat;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;

@@ -19,7 +19,7 @@ use Arcanum\Hyper\CsvResponseRenderer;
 use Arcanum\Hyper\FormatRegistry;
 use Arcanum\Hyper\HtmlResponseRenderer;
 use Arcanum\Hyper\JsonResponseRenderer;
-use Arcanum\Shodo\Formatters\Format;
+use Arcanum\Shodo\Format;
 use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\TemplateCache;

@@ -22,7 +22,7 @@ use Arcanum\Hyper\HtmlResponseRenderer;
 use Arcanum\Hyper\JsonResponseRenderer;
 use Arcanum\Hyper\PlainTextResponseRenderer;
 use Arcanum\Shodo\Formatters\CsvFormatter;
-use Arcanum\Shodo\Formatters\Format;
+use Arcanum\Shodo\Format;
 use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\Formatters\JsonFormatter;

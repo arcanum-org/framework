@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Shodo\Formatters;
+namespace Arcanum\Shodo;
 
 /**
  * Maps a file extension to a content type and renderer class.

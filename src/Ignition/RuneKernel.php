@@ -22,7 +22,7 @@ use Arcanum\Rune\ExitCode;
 use Arcanum\Rune\HelpWriter;
 use Arcanum\Rune\Input;
 use Arcanum\Rune\Output;
-use Arcanum\Shodo\Formatters\CliFormatRegistry;
+use Arcanum\Shodo\CliFormatRegistry;
 
 /**
  * The CLI entry point — parallel to HyperKernel for HTTP.

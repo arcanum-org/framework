@@ -22,7 +22,7 @@ use Arcanum\Rune\ConsoleOutput;
 use Arcanum\Rune\ExitCode;
 use Arcanum\Rune\Input;
 use Arcanum\Rune\Output;
-use Arcanum\Shodo\Formatters\CliFormatRegistry;
+use Arcanum\Shodo\CliFormatRegistry;
 use Arcanum\Shodo\Formatters\CsvFormatter;
 use Arcanum\Shodo\Formatters\JsonFormatter;
 use Arcanum\Shodo\Formatters\KeyValueFormatter;

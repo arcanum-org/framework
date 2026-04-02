@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Arcanum\Hyper;
 
 use Arcanum\Glitch\HttpException;
-use Arcanum\Shodo\Formatters\Format;
+use Arcanum\Shodo\Format;
 use Psr\Container\ContainerInterface;
 
 /**

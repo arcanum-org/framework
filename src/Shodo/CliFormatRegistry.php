@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Shodo\Formatters;
+namespace Arcanum\Shodo;
 
-use Arcanum\Shodo\Formatter;
 use Psr\Container\ContainerInterface;
 
 /**
