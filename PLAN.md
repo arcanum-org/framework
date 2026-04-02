@@ -766,8 +766,25 @@ final class PlaceOrderHandler
   - `__call(string $method, array $args): Result` — converts method name from camelCase to PascalCase file name (`insertOrder` → `InsertOrder.sql`). Reads the SQL file. Binds named parameters from `$args[0]` (the associative array). Inspects SQL content to determine read vs write connection. Executes. Returns `Result`.
   - Throws `RuntimeException` if the SQL file doesn't exist (clear message: "Model method 'insertOrder' not found — expected file: .../Model/InsertOrder.sql").
   - SQL file contents cached in memory per-request.
-- [ ] SQL content inspection for connection routing: scans first non-comment, non-whitespace SQL token. `SELECT` → read connection. Everything else → write connection. Simple regex, not a full parser.
-- [ ] Tests: method call resolves to correct SQL file, camelCase→PascalCase conversion, parameters bound as `:named`, SELECT uses read connection, INSERT/UPDATE/DELETE use write connection, missing file throws with helpful message, file content cached, parameterless SQL works (empty array). ~10 tests.
+- [ ] SQL content inspection for connection routing: scans first non-comment, non-whitespace SQL token. `SELECT` → read connection. Everything else → write connection. Comment lines (`-- ...`) are skipped when determining the SQL operation type.
+- [ ] **Type casting via SQL file annotations.** The framework parses `-- @cast` comment headers in SQL files and applies type coercion to each result row before returning.
+  ```sql
+  -- @cast price float
+  -- @cast in_stock bool
+  -- @cast quantity int
+  -- @cast metadata json
+  SELECT id, name, price, in_stock, quantity, metadata
+  FROM products
+  WHERE category = :category
+  ```
+  Supported casts:
+  - `int` — `(int)` cast
+  - `float` — `(float)` cast
+  - `bool` — truthy/falsy normalization (`'t'`/`'f'`, `'1'`/`'0'`, `1`/`0` → `true`/`false`)
+  - `json` — `json_decode($value, true)`
+  
+  Annotations are optional — unannotated columns return whatever PDO gives (strings for most drivers). Parsed once per SQL file and cached with the file content. Applied only to read results (`SELECT`), not to write operations.
+- [ ] Tests: method call resolves to correct SQL file, camelCase→PascalCase conversion, parameters bound as `:named`, SELECT uses read connection, INSERT/UPDATE/DELETE use write connection, missing file throws with helpful message, file content cached, parameterless SQL works (empty array), @cast int, @cast float, @cast bool (all driver variants), @cast json, no @cast returns raw PDO values, multiple @cast annotations, @cast on write query ignored. ~16 tests.
 
 #### Database Service
 
