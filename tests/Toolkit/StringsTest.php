@@ -46,4 +46,59 @@ final class StringsTest extends TestCase
     {
         $this->assertSame('Foo Bar Q', Strings::title('foo bar q'));
     }
+
+    public function testClassNamespace(): void
+    {
+        $this->assertSame(
+            'App\\Domain\\Shop',
+            Strings::classNamespace('App\\Domain\\Shop\\PlaceOrder'),
+        );
+    }
+
+    public function testClassNamespaceReturnsEmptyForUnqualified(): void
+    {
+        $this->assertSame('', Strings::classNamespace('PlaceOrder'));
+    }
+
+    public function testClassBaseName(): void
+    {
+        $this->assertSame(
+            'PlaceOrder',
+            Strings::classBaseName('App\\Domain\\Shop\\PlaceOrder'),
+        );
+    }
+
+    public function testClassBaseNameReturnsFullForUnqualified(): void
+    {
+        $this->assertSame('PlaceOrder', Strings::classBaseName('PlaceOrder'));
+    }
+
+    public function testStripNamespacePrefix(): void
+    {
+        $this->assertSame(
+            'Shop\\Command\\PlaceOrder',
+            Strings::stripNamespacePrefix(
+                'App\\Domain\\Shop\\Command\\PlaceOrder',
+                'App\\Domain',
+            ),
+        );
+    }
+
+    public function testStripNamespacePrefixWithTrailingBackslash(): void
+    {
+        $this->assertSame(
+            'Shop\\PlaceOrder',
+            Strings::stripNamespacePrefix(
+                'App\\Domain\\Shop\\PlaceOrder',
+                'App\\Domain\\',
+            ),
+        );
+    }
+
+    public function testStripNamespacePrefixThrowsOnMismatch(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('is not under namespace prefix');
+        Strings::stripNamespacePrefix('Other\\Foo', 'App\\Domain');
+    }
 }

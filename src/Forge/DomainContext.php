@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Forge;
 
+use Arcanum\Toolkit\Strings;
+
 /**
  * Request-scoped holder for the current domain.
  *
@@ -82,20 +84,10 @@ final class DomainContext
      */
     public static function extractDomain(string $class, string $namespace): string
     {
-        $namespace = rtrim($namespace, '\\') . '\\';
-
-        if (!str_starts_with($class, $namespace)) {
-            throw new \RuntimeException(sprintf(
-                "Class '%s' is not under the domain namespace '%s'.",
-                $class,
-                $namespace,
-            ));
-        }
-
-        $relative = substr($class, strlen($namespace));
+        $relative = Strings::stripNamespacePrefix($class, $namespace);
         $segments = explode('\\', $relative);
 
-        // Remove the final segment(s): Command\ClassName, Query\ClassName, or just ClassName.
+        // Collect segments until we hit a CQRS boundary (Command/Query).
         $domain = [];
         $hitBoundary = false;
         foreach ($segments as $segment) {

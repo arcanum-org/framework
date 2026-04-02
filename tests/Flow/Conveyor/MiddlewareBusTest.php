@@ -46,6 +46,7 @@ use Arcanum\Flow\Continuum\Continuum;
 #[UsesClass(\Arcanum\Quill\Channel::class)]
 #[UsesClass(EmptyDTO::class)]
 #[UsesClass(AcceptedDTO::class)]
+#[UsesClass(\Arcanum\Toolkit\Strings::class)]
 final class MiddlewareBusTest extends TestCase
 {
     public function testDispatchHappyPath(): void

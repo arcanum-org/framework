@@ -78,4 +78,56 @@ final class Strings
     {
         return mb_convert_case($string, \MB_CASE_TITLE, 'UTF-8');
     }
+
+    /**
+     * Get the namespace portion of a fully qualified class name.
+     *
+     * Returns empty string if the class has no namespace.
+     *
+     *   Strings::classNamespace('App\Domain\Shop\PlaceOrder') → 'App\Domain\Shop'
+     *   Strings::classNamespace('PlaceOrder') → ''
+     */
+    public static function classNamespace(string $class): string
+    {
+        $pos = strrpos($class, '\\');
+
+        return $pos === false ? '' : substr($class, 0, $pos);
+    }
+
+    /**
+     * Get the short class name without the namespace.
+     *
+     *   Strings::classBaseName('App\Domain\Shop\PlaceOrder') → 'PlaceOrder'
+     *   Strings::classBaseName('PlaceOrder') → 'PlaceOrder'
+     */
+    public static function classBaseName(string $class): string
+    {
+        $pos = strrpos($class, '\\');
+
+        return $pos === false ? $class : substr($class, $pos + 1);
+    }
+
+    /**
+     * Strip a namespace prefix from a fully qualified class name.
+     *
+     * Returns the relative portion after the prefix. Throws if the
+     * class is not under the given prefix.
+     *
+     *   Strings::stripNamespacePrefix('App\Domain\Shop\Command\PlaceOrder', 'App\Domain')
+     *   → 'Shop\Command\PlaceOrder'
+     */
+    public static function stripNamespacePrefix(string $class, string $prefix): string
+    {
+        $prefix = rtrim($prefix, '\\') . '\\';
+
+        if (!str_starts_with($class, $prefix)) {
+            throw new \RuntimeException(sprintf(
+                "Class '%s' is not under namespace prefix '%s'.",
+                $class,
+                rtrim($prefix, '\\'),
+            ));
+        }
+
+        return substr($class, strlen($prefix));
+    }
 }

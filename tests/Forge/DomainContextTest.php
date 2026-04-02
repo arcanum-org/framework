@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Arcanum\Test\Forge;
 
 use Arcanum\Forge\DomainContext;
+use Arcanum\Toolkit\Strings;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(DomainContext::class)]
+#[UsesClass(Strings::class)]
 final class DomainContextTest extends TestCase
 {
     public function testSetAndGet(): void
@@ -108,7 +111,7 @@ final class DomainContextTest extends TestCase
     public function testExtractDomainThrowsOnWrongNamespace(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('is not under the domain namespace');
+        $this->expectExceptionMessage('is not under namespace prefix');
         DomainContext::extractDomain(
             'Other\\Namespace\\Foo',
             'App\\Domain',

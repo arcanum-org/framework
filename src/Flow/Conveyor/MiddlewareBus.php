@@ -10,6 +10,7 @@ use Arcanum\Flow\Continuum\Continuum;
 use Arcanum\Flow\Continuum\Continuation;
 use Arcanum\Flow\Continuum\Progression;
 use Arcanum\Flow\Pipeline\Pipeline;
+use Arcanum\Toolkit\Strings;
 
 class MiddlewareBus implements Bus
 {
@@ -142,16 +143,15 @@ class MiddlewareBus implements Bus
             return $className . 'Handler';
         }
 
-        $lastBackslash = strrpos($className, '\\');
-        if ($lastBackslash === false) {
+        $namespace = Strings::classNamespace($className);
+        $shortName = Strings::classBaseName($className);
+
+        if ($namespace === '') {
             /** @var class-string */
-            return $prefix . $className . 'Handler';
+            return $prefix . $shortName . 'Handler';
         }
 
-        $namespace = substr($className, 0, $lastBackslash + 1);
-        $shortName = substr($className, $lastBackslash + 1);
-
         /** @var class-string */
-        return $namespace . $prefix . $shortName . 'Handler';
+        return $namespace . '\\' . $prefix . $shortName . 'Handler';
     }
 }
