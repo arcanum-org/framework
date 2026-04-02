@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Shodo\Helper;
+namespace Arcanum\Shodo\Helpers;
 
 use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;

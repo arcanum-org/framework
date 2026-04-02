@@ -6,7 +6,7 @@ namespace Arcanum\Shodo\Formatters;
 
 use Arcanum\Parchment\Reader;
 use Arcanum\Shodo\Formatter;
-use Arcanum\Shodo\Helper\HelperResolver;
+use Arcanum\Shodo\Helpers\HelperResolver;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Shodo\TemplateResolver;

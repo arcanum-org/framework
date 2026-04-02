@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Shodo\Helper;
+namespace Arcanum\Shodo\Helpers;
 
 /**
  * Thrown when a requested template helper alias is not registered.

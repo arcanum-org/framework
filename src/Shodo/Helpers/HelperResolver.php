@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Shodo\Helper;
+namespace Arcanum\Shodo\Helpers;
 
 use Psr\Container\ContainerInterface;
 

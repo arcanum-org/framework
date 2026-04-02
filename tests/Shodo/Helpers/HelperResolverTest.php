@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Test\Shodo\Helper;
+namespace Arcanum\Test\Shodo\Helpers;
 
-use Arcanum\Shodo\Helper\HelperDiscovery;
-use Arcanum\Shodo\Helper\HelperRegistry;
-use Arcanum\Shodo\Helper\HelperResolver;
+use Arcanum\Shodo\Helpers\HelperDiscovery;
+use Arcanum\Shodo\Helpers\HelperRegistry;
+use Arcanum\Shodo\Helpers\HelperResolver;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
