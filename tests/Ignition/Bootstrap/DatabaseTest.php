@@ -25,7 +25,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(ConnectionFactory::class)]
 #[UsesClass(DatabaseService::class)]
 #[UsesClass(DomainContext::class)]
-#[UsesClass(\Arcanum\Forge\Connection::class)]
+#[UsesClass(\Arcanum\Forge\PdoConnection::class)]
 #[UsesClass(\Arcanum\Cabinet\PrototypeProvider::class)]
 #[UsesClass(\Arcanum\Toolkit\Strings::class)]
 final class DatabaseTest extends TestCase

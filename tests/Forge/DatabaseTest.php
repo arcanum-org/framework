@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Forge;
 
-use Arcanum\Forge\Connection;
 use Arcanum\Forge\ConnectionFactory;
+use Arcanum\Forge\PdoConnection;
 use Arcanum\Forge\ConnectionManager;
 use Arcanum\Forge\Database;
 use Arcanum\Forge\DomainContext;
@@ -20,7 +20,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(Database::class)]
-#[UsesClass(Connection::class)]
+#[UsesClass(PdoConnection::class)]
 #[UsesClass(ConnectionFactory::class)]
 #[UsesClass(ConnectionManager::class)]
 #[UsesClass(Configuration::class)]
@@ -111,7 +111,7 @@ final class DatabaseTest extends TestCase
     public function testModelExecutesSqlFromDomainDirectory(): void
     {
         // Arrange
-        $conn = new Connection(dsn: 'sqlite::memory:');
+        $conn = new PdoConnection(dsn: 'sqlite::memory:');
         $conn->run('CREATE TABLE t (id INTEGER PRIMARY KEY, val TEXT)');
         $conn->run('INSERT INTO t (val) VALUES (:val)', ['val' => 'hello']);
 

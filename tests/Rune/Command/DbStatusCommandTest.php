@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Rune\Command;
 
-use Arcanum\Forge\Connection;
 use Arcanum\Forge\ConnectionFactory;
+use Arcanum\Forge\PdoConnection;
 use Arcanum\Forge\ConnectionManager;
 use Arcanum\Gather\Configuration;
 use Arcanum\Gather\Registry;
@@ -18,7 +18,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(DbStatusCommand::class)]
-#[UsesClass(Connection::class)]
+#[UsesClass(PdoConnection::class)]
 #[UsesClass(ConnectionFactory::class)]
 #[UsesClass(ConnectionManager::class)]
 #[UsesClass(Configuration::class)]

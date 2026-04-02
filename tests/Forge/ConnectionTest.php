@@ -4,21 +4,21 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Forge;
 
-use Arcanum\Forge\Connection;
+use Arcanum\Forge\PdoConnection;
 use Arcanum\Forge\Result;
 use Arcanum\Forge\Sql;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
-#[CoversClass(Connection::class)]
+#[CoversClass(PdoConnection::class)]
 #[UsesClass(Result::class)]
 #[UsesClass(Sql::class)]
 final class ConnectionTest extends TestCase
 {
-    private function sqlite(): Connection
+    private function sqlite(): PdoConnection
     {
-        return new Connection(dsn: 'sqlite::memory:');
+        return new PdoConnection(dsn: 'sqlite::memory:');
     }
 
     public function testRunReturnsResultForSelect(): void

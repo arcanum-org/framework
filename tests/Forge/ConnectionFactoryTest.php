@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Forge;
 
-use Arcanum\Forge\Connection;
 use Arcanum\Forge\ConnectionFactory;
+use Arcanum\Forge\PdoConnection;
 use Arcanum\Gather\Configuration;
 use Arcanum\Gather\Registry;
 use PHPUnit\Framework\TestCase;
@@ -13,7 +13,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(ConnectionFactory::class)]
-#[UsesClass(Connection::class)]
+#[UsesClass(PdoConnection::class)]
 #[UsesClass(Configuration::class)]
 #[UsesClass(Registry::class)]
 final class ConnectionFactoryTest extends TestCase
@@ -27,7 +27,7 @@ final class ConnectionFactoryTest extends TestCase
         $conn = $factory->make(['driver' => 'sqlite', 'database' => ':memory:']);
 
         // Assert — connection works
-        $this->assertInstanceOf(Connection::class, $conn);
+        $this->assertInstanceOf(PdoConnection::class, $conn);
         $this->assertFalse($conn->isConnected());
     }
 
@@ -41,8 +41,8 @@ final class ConnectionFactoryTest extends TestCase
         $conn = $factory->make(['driver' => 'sqlite', 'database' => $path]);
 
         // Assert — verify it can connect and create tables
-        $conn->run('CREATE TABLE test (id INTEGER PRIMARY KEY)');
-        $this->assertTrue($conn->isConnected());
+        $result = $conn->run('CREATE TABLE test (id INTEGER PRIMARY KEY)');
+        $this->assertInstanceOf(\Arcanum\Forge\Result::class, $result);
 
         // Cleanup
         @unlink($path);
@@ -57,8 +57,8 @@ final class ConnectionFactoryTest extends TestCase
         $conn = $factory->make(['driver' => 'sqlite']);
 
         // Assert — in-memory databases connect and work
-        $conn->run('CREATE TABLE test (id INTEGER PRIMARY KEY)');
-        $this->assertTrue($conn->isConnected());
+        $result = $conn->run('CREATE TABLE test (id INTEGER PRIMARY KEY)');
+        $this->assertInstanceOf(\Arcanum\Forge\Result::class, $result);
     }
 
     public function testBuildsMysqlDsn(): void
@@ -78,7 +78,7 @@ final class ConnectionFactoryTest extends TestCase
         ]);
 
         // Assert — connection is created (lazy, won't actually connect)
-        $this->assertInstanceOf(Connection::class, $conn);
+        $this->assertInstanceOf(PdoConnection::class, $conn);
         $this->assertFalse($conn->isConnected());
     }
 
@@ -97,7 +97,7 @@ final class ConnectionFactoryTest extends TestCase
         ]);
 
         // Assert
-        $this->assertInstanceOf(Connection::class, $conn);
+        $this->assertInstanceOf(PdoConnection::class, $conn);
         $this->assertFalse($conn->isConnected());
     }
 
@@ -117,7 +117,7 @@ final class ConnectionFactoryTest extends TestCase
         ]);
 
         // Assert
-        $this->assertInstanceOf(Connection::class, $conn);
+        $this->assertInstanceOf(PdoConnection::class, $conn);
         $this->assertFalse($conn->isConnected());
     }
 
@@ -157,7 +157,7 @@ final class ConnectionFactoryTest extends TestCase
         ]);
 
         // Assert — Connection created with defaults (127.0.0.1:3306)
-        $this->assertInstanceOf(Connection::class, $conn);
+        $this->assertInstanceOf(PdoConnection::class, $conn);
     }
 
     public function testPgsqlDefaultsHostAndPort(): void
@@ -174,6 +174,6 @@ final class ConnectionFactoryTest extends TestCase
         ]);
 
         // Assert — Connection created with defaults (127.0.0.1:5432)
-        $this->assertInstanceOf(Connection::class, $conn);
+        $this->assertInstanceOf(PdoConnection::class, $conn);
     }
 }

@@ -56,7 +56,7 @@ final class ConnectionFactory
             $dsn .= ';charset=' . $charset;
         }
 
-        return new Connection(
+        return new PdoConnection(
             dsn: $dsn,
             username: $cfg->asString('username'),
             password: $cfg->asString('password'),
@@ -72,7 +72,7 @@ final class ConnectionFactory
             $cfg->asString('database'),
         );
 
-        return new Connection(
+        return new PdoConnection(
             dsn: $dsn,
             username: $cfg->asString('username'),
             password: $cfg->asString('password'),
@@ -89,6 +89,6 @@ final class ConnectionFactory
             $dsn = 'sqlite:' . $database;
         }
 
-        return new Connection(dsn: $dsn);
+        return new PdoConnection(dsn: $dsn);
     }
 }

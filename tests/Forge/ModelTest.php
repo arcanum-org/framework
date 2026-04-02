@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Forge;
 
-use Arcanum\Forge\Connection;
 use Arcanum\Forge\Model;
+use Arcanum\Forge\PdoConnection;
 use Arcanum\Forge\Result;
 use Arcanum\Forge\Sql;
 use Arcanum\Toolkit\Strings;
@@ -14,7 +14,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(Model::class)]
-#[UsesClass(Connection::class)]
+#[UsesClass(PdoConnection::class)]
 #[UsesClass(Result::class)]
 #[UsesClass(Sql::class)]
 #[UsesClass(Strings::class)]
@@ -22,14 +22,14 @@ use PHPUnit\Framework\Attributes\UsesClass;
 final class ModelTest extends TestCase
 {
     private string $modelDir;
-    private Connection $connection;
+    private PdoConnection $connection;
 
     protected function setUp(): void
     {
         $this->modelDir = sys_get_temp_dir() . '/arcanum_model_test_' . uniqid();
         mkdir($this->modelDir, 0777, true);
 
-        $this->connection = new Connection(dsn: 'sqlite::memory:');
+        $this->connection = new PdoConnection(dsn: 'sqlite::memory:');
         $this->createProductsTable($this->connection);
     }
 
@@ -42,7 +42,7 @@ final class ModelTest extends TestCase
         @rmdir($this->modelDir);
     }
 
-    private function createProductsTable(Connection $conn): void
+    private function createProductsTable(PdoConnection $conn): void
     {
         $conn->run(
             'CREATE TABLE products ('
@@ -58,8 +58,8 @@ final class ModelTest extends TestCase
     }
 
     private function model(
-        ?Connection $read = null,
-        ?Connection $write = null,
+        ?PdoConnection $read = null,
+        ?PdoConnection $write = null,
     ): Model {
         return new Model(
             directory: $this->modelDir,
@@ -256,8 +256,8 @@ final class ModelTest extends TestCase
     public function testSelectUsesReadConnection(): void
     {
         // Arrange
-        $readConn = new Connection(dsn: 'sqlite::memory:');
-        $writeConn = new Connection(dsn: 'sqlite::memory:');
+        $readConn = new PdoConnection(dsn: 'sqlite::memory:');
+        $writeConn = new PdoConnection(dsn: 'sqlite::memory:');
         $this->createProductsTable($readConn);
         $readConn->run(
             'INSERT INTO products (name) VALUES (:name)',
@@ -280,8 +280,8 @@ final class ModelTest extends TestCase
     public function testInsertUsesWriteConnection(): void
     {
         // Arrange
-        $readConn = new Connection(dsn: 'sqlite::memory:');
-        $writeConn = new Connection(dsn: 'sqlite::memory:');
+        $readConn = new PdoConnection(dsn: 'sqlite::memory:');
+        $writeConn = new PdoConnection(dsn: 'sqlite::memory:');
         $this->createProductsTable($readConn);
         $this->createProductsTable($writeConn);
 

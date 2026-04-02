@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Forge;
 
-use Arcanum\Forge\Connection;
 use Arcanum\Forge\ConnectionFactory;
 use Arcanum\Forge\ConnectionManager;
+use Arcanum\Forge\PdoConnection;
 use Arcanum\Forge\Result;
 use Arcanum\Forge\Sql;
 use Arcanum\Gather\Configuration;
@@ -16,7 +16,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(ConnectionManager::class)]
-#[UsesClass(Connection::class)]
+#[UsesClass(PdoConnection::class)]
 #[UsesClass(ConnectionFactory::class)]
 #[UsesClass(Configuration::class)]
 #[UsesClass(Registry::class)]
@@ -66,7 +66,7 @@ final class ConnectionManagerTest extends TestCase
         $conn = $manager->connection();
 
         // Assert
-        $this->assertInstanceOf(Connection::class, $conn);
+        $this->assertInstanceOf(PdoConnection::class, $conn);
     }
 
     public function testResolvesNamedConnection(): void
@@ -84,8 +84,8 @@ final class ConnectionManagerTest extends TestCase
         $secondary = $manager->connection('secondary');
 
         // Assert
-        $this->assertInstanceOf(Connection::class, $main);
-        $this->assertInstanceOf(Connection::class, $secondary);
+        $this->assertInstanceOf(PdoConnection::class, $main);
+        $this->assertInstanceOf(PdoConnection::class, $secondary);
         $this->assertNotSame($main, $secondary);
     }
 
