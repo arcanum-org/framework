@@ -186,9 +186,9 @@ Transport-agnostic helper classes in Shodo. No dependencies on HTTP, session, or
 
 #### 10.7 @csrf compiler directive
 
-- [ ] **10.7a** Add compiler pass for `{{ @csrf }}` — emits `<?= $__helpers['Html']->csrf() ?>` (raw output, no escape — it's intentional HTML). Must run before both the raw-output and escaped-output passes.
-- [ ] **10.7b** Unit test: `{{ @csrf }}` compiles to the raw helper call, not wrapped in `$__escape`.
-- [ ] **10.7c** Integration test: template with `{{ @csrf }}` produces a hidden input when `HtmlHelper` is in the registry.
+- [x] **10.7a** Add compiler pass for `{{ @csrf }}` — emits `<?= $__helpers['Html']->csrf() ?>` (raw output, no escape — it's intentional HTML). Runs as the very first pass.
+- [x] **10.7b** Unit tests: `{{ @csrf }}` compiles to raw helper call without `$__escape`, works with surrounding content.
+- [x] **10.7c** Integration test: template with `{{ @csrf }}` produces a hidden input when `HtmlHelper` is in the registry.
 
 #### 10.8 README updates
 
