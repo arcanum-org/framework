@@ -775,7 +775,11 @@ final class PlaceOrderHandler
 #### Model — SQL File Resolution and Execution
 
 - [x] `Model` — dynamic object that maps method calls to SQL files. Constructed with a directory path (the Model directory), a `Connection` reference (read and write), and a SQL file reader.
-  - `__call(string $method, array $args): Result` — converts method name from camelCase to PascalCase file name (`insertOrder` → `InsertOrder.sql`). Reads the SQL file. Binds named parameters from `$args[0]` (the associative array). Inspects SQL content to determine read vs write connection. Executes. Returns `Result`.
+  - `__call(string $method, array $args): Result` — converts method name from camelCase to PascalCase file name (`insertOrder` → `InsertOrder.sql`). Reads the SQL file. Resolves parameters (see calling convention below). Inspects SQL content to determine read vs write connection. Executes. Returns `Result`.
+  - **Calling convention:** Supports PHP named arguments, positional arguments, and mixed — mirroring native PHP function call semantics. `__call` receives `$args` with string keys (named) and/or integer keys (positional). Named args are matched to SQL bindings by name (camelCase → snake_case: `minPrice` → `:min_price`). Positional args fill the remaining unmatched bindings in order of first appearance in the SQL. Missing bindings throw. Examples:
+    - `$model->search(category: 'shoes', minPrice: 10)` — all named
+    - `$model->search('shoes', 10)` — all positional (maps to `:category`, `:min_price` by SQL order)
+    - `$model->search('shoes', active: true)` — mixed (`:active` claimed by name, `'shoes'` fills first remaining)
   - Throws `RuntimeException` if the SQL file doesn't exist (clear message: "Model method 'insertOrder' not found — expected file: .../Model/InsertOrder.sql").
   - SQL file contents cached in memory per-request.
 - [x] SQL content inspection for connection routing: scans first non-comment, non-whitespace SQL token. `SELECT` → read connection. Everything else → write connection. Comment lines (`-- ...`) are skipped when determining the SQL operation type.
@@ -815,6 +819,36 @@ final class PlaceOrderHandler
 - [ ] Added to `HyperKernel::$bootstrappers` and `RuneKernel::$bootstrappers` — after `Auth`, before `Routing`.
 - [ ] Conveyor domain context middleware registered in both `Bootstrap\Routing` and `Bootstrap\CliRouting` — sets `DomainContext` from DTO namespace before handler dispatch.
 - [ ] Tests: registers Database in container, ConnectionManager configured from config, works with no config (skips gracefully for apps without a database), domain context middleware sets domain from DTO. ~5 tests.
+
+#### SQL Parameter Annotations
+
+- [ ] `Sql::parseParams(string $sql): array<string, string>` — parses `-- @param name type` annotations from SQL files. Returns a map of parameter name → type. Supported types: `string`, `int`, `float`, `bool`. Works alongside `@cast` — `@param` types what goes *in*, `@cast` types what comes *out*.
+- [ ] `Sql::extractBindings(string $sql): list<string>` — auto-discovers `:named` placeholder names from SQL by scanning for `:word` patterns outside of string literals and comments. Returns binding names in order of first appearance. This order defines the positional argument contract for `Model::__call`.
+- [ ] `Sql::resolveArgs(array $args, list<string> $bindings): array<string, mixed>` — maps `__call` args (mixed positional + named) to SQL binding names. Named args (string keys) are matched by name (camelCase → snake_case). Positional args (integer keys) fill remaining unmatched bindings in order. Throws if any binding has no match.
+- [ ] Tests: parseParams extracts annotations, parseParams returns empty when none, extractBindings finds all named placeholders, extractBindings ignores strings and comments, resolveArgs all-named, resolveArgs all-positional, resolveArgs mixed, resolveArgs throws on missing binding. ~10 tests.
+
+#### Model Generation — `forge:models` Rune Command
+
+Generated model classes provide static analysis coverage and typed parameter safety. They are optional — the magic `Model` with `__call` works without them. The calling convention is identical: `$model->search(category: 'shoes', minPrice: 10)` works the same on both the magic Model (via `__call` with PHP named arguments) and the generated class (via typed method signature). No API change when generating.
+
+- [ ] `forge:models` Rune command — scans each domain's `Model/` directory for `.sql` files and generates a typed PHP model class per domain. The generated class extends `Forge\Model`, adding a typed method for each SQL file.
+  - Method names: `PascalCase.sql` → `camelCase()` method.
+  - Parameters: from `@param` annotations if present, otherwise auto-discovered `:named` bindings defaulting to `string`.
+  - Parameter name conversion: SQL `snake_case` (`:min_price`) → PHP `camelCase` (`$minPrice`). Uses `Toolkit\Strings::camel()`.
+  - Each method delegates to `$this->__call()` — the generated class is a type-safe wrapper, not a reimplementation.
+  - Output location: `app/Domain/{Domain}/Model.php` (the class, alongside the `.sql` files in `Model/`).
+- [ ] `Database::model` discovery — checks if a generated model class exists at `{DomainNamespace}\Model` via `class_exists()`. If found, instantiates the generated class. If not, falls back to the magic `Forge\Model`. Both share the same constructor signature (directory, read connection, write connection).
+- [ ] **Drift detection.** SQL files can drift from generated classes in several ways:
+  - **New SQL file added** — no generated method. `__call` handles it at runtime. No breakage, just missing type safety.
+  - **SQL file deleted** — generated method still exists, calls `__call`, which throws RuntimeException (file not found).
+  - **New `:param` added to SQL** — generated method has old signature. Caller doesn't pass new param → PDO binding error at runtime.
+  - **`:param` removed from SQL** — generated method still accepts it. PDO ignores extra bound params. Harmless.
+  - **`@param` type changed** — generated method has stale type. Subtle coercion issues possible.
+  
+  Mitigations:
+  - [ ] `validate:models` Rune command — compares SQL files against generated classes. Reports: missing methods, stale methods (deleted SQL), parameter mismatches, type mismatches. CI-friendly.
+  - [ ] Dev-mode auto-regeneration — at Model construction time, compares `filemtime()` of SQL files vs generated class file. If any SQL file is newer, automatically re-runs `forge:models` for that domain. Zero-friction in development. Configurable: `config/database.php` key `auto_forge` (default `true` in debug mode). Set to `false` to throw an exception instead of regenerating.
+- [ ] Tests: generated class has correct methods, generated methods delegate to __call, Database discovers generated class, Database falls back to magic Model, validate:models detects drift, dev-mode auto-regeneration fires, auto-regeneration disabled throws exception. ~12 tests.
 
 #### CLI Commands
 
