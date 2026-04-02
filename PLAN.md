@@ -543,21 +543,21 @@ $ php arcanum logout
 
 ##### Rune Interactive Input
 
-- [ ] `Prompter` — reads from stdin. `ask(string $label): string` writes label to output, reads line from stdin. `secret(string $label): string` same but disables terminal echo (`stty -echo` / restore). Constructor takes `Output` and optional stdin stream for testing.
-- [ ] Tests: ask returns trimmed input, secret disables echo (mock-based, since stty isn't testable in PHPUnit), empty input returns empty string. ~4 tests.
+- [x] `Prompter` — reads from stdin. `ask(string $label): string` writes label to output, reads line from stdin. `secret(string $label): string` same but disables terminal echo (`stty -echo` / restore). Constructor takes `Output` and optional stdin stream for testing.
+- [x] Tests: ask returns trimmed input, secret returns input, empty input returns empty string. 5 tests.
 
 ##### CLI Session Storage
 
-- [ ] `CliSession` — encrypted file-based credential store. Constructor takes `Encryptor`, `string $path` (default `files/.cli-session`), plus Parchment `Reader`/`Writer`/`FileSystem` for I/O.
+- [x] `CliSession` — encrypted file-based credential store. Constructor takes `Encryptor`, `string $path` (default `files/.cli-session`), plus Parchment `Reader`/`Writer`/`FileSystem` for I/O.
   - `store(string $identityId, int $ttl): void` — encrypts `{id, expiry}` as JSON, writes to file.
   - `load(): string|null` — reads file, decrypts, checks expiry. Returns identity ID or null. Deletes file if expired or corrupt.
   - `clear(): void` — deletes the file.
-- [ ] Tests: store/load round-trip, expired returns null and deletes file, corrupt file returns null, clear deletes file, missing file returns null. ~6 tests.
+- [x] Tests: store/load round-trip, expired returns null and deletes file, corrupt file returns null, clear deletes file, missing file returns null. 6 tests.
 
 ##### Login Command
 
-- [ ] `LoginCommand` — built-in Rune command. Reads `config/auth.php` key `login.fields` (default: `['email', 'password']`). For each field, prompts via `Prompter` (fields named `password`, `secret`, or `token` use `secret()`). Calls `resolvers.credentials` closure with the collected fields. On success: stores identity ID via `CliSession`, prints confirmation. On failure: prints error, exit code 1.
-- [ ] Config structure for login:
+- [x] `LoginCommand` — built-in Rune command. Reads `config/auth.php` key `login.fields` (default: `['email', 'password']`). For each field, prompts via `Prompter` (fields named `password`, `secret`, or `token` use `secret()`). Calls `resolvers.credentials` closure with the collected fields. On success: stores identity ID via `CliSession`, prints confirmation. On failure: prints error, exit code 1.
+- [x] Config structure for login:
   ```php
   // config/auth.php
   'login' => [
@@ -568,13 +568,13 @@ $ php arcanum logout
       'credentials' => fn(string $email, string $password) => /* validate, return Identity|null */,
   ],
   ```
-- [ ] The credentials resolver receives positional args matching the field order. `fn(string $email, string $password)` maps to `fields: ['email', 'password']`.
-- [ ] Tests: successful login stores session and prints confirmation, failed login prints error with exit code 1, fields are prompted in order, password fields use secret(). ~5 tests.
+- [x] The credentials resolver receives positional args matching the field order. `fn(string $email, string $password)` maps to `fields: ['email', 'password']`.
+- [x] Tests: successful login stores session and prints confirmation, failed login prints error with exit code 1, fields are prompted in order, password fields use secret(). 4 tests.
 
 ##### Logout Command
 
-- [ ] `LogoutCommand` — built-in Rune command. Calls `CliSession::clear()`. Prints confirmation. Always exit code 0.
-- [ ] Tests: clears session, prints message. ~2 tests.
+- [x] `LogoutCommand` — built-in Rune command. Calls `CliSession::clear()`. Prints confirmation. Always exit code 0.
+- [x] Tests: clears session, prints message. 1 test.
 
 ##### CliAuthResolver Update
 
