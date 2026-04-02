@@ -155,12 +155,12 @@ Follows the `MiddlewareDiscovery` pattern: scans `Helpers.php` files co-located 
 
 Transport-agnostic helper classes in Shodo. No dependencies on HTTP, session, or container.
 
-- [ ] **10.4a** Create `Shodo\Helper\FormatHelper` with methods: `number(float|int $value, int $decimals = 0, string $decimalSeparator = '.', string $thousandsSeparator = ','): string` (wraps `number_format`), `date(int|string|\DateTimeInterface $timestamp, string $format = 'M j, Y'): string` (accepts unix timestamp, date string, or DateTimeInterface).
-- [ ] **10.4b** Unit tests for `FormatHelper`: number with defaults, number with custom separators, number with negative values, date from int timestamp, date from string, date from DateTimeInterface, date with custom format.
-- [ ] **10.4c** Create `Shodo\Helper\StrHelper` with method: `truncate(string $text, int $length, string $suffix = '...'): string`. Returns original if shorter than length. Truncates to `$length - strlen($suffix)` and appends suffix. Respects multibyte strings.
-- [ ] **10.4d** Unit tests for `StrHelper`: text shorter than limit unchanged, exact limit unchanged, truncation with default suffix, truncation with custom suffix, multibyte text, empty string.
-- [ ] **10.4e** Create `Shodo\Helper\ArrHelper` with methods: `count(array|\Countable $items): int`, `join(array $items, string $separator): string`, `first(array $items): mixed` (returns null for empty), `last(array $items): mixed` (returns null for empty).
-- [ ] **10.4f** Unit tests for `ArrHelper`: count array, count Countable, join with separator, first/last of populated array, first/last of empty array returns null.
+- [x] **10.4a** Create `Shodo\Helpers\FormatHelper` with methods: `number(float|int $value, int $decimals = 0, string $decimalSeparator = '.', string $thousandsSeparator = ','): string` (wraps `number_format`), `date(int|string|\DateTimeInterface $timestamp, string $format = 'M j, Y'): string` (accepts unix timestamp, date string, or DateTimeInterface).
+- [x] **10.4b** Unit tests for `FormatHelper`: number with defaults, number with custom separators, number with negative values, date from int timestamp, date from string, date from DateTimeInterface, date with custom format.
+- [x] **10.4c** Create `Shodo\Helpers\StrHelper` with method: `truncate(string $text, int $length, string $suffix = '...'): string`. Returns original if shorter than length. Truncates to `$length - strlen($suffix)` and appends suffix. Respects multibyte strings.
+- [x] **10.4d** Unit tests for `StrHelper`: text shorter than limit unchanged, exact limit unchanged, truncation with default suffix, truncation with custom suffix, multibyte text, empty string.
+- [x] **10.4e** Create `Shodo\Helpers\ArrHelper` with methods: `count(array|\Countable $items): int`, `join(array $items, string $separator): string`, `first(array $items): mixed` (returns null for empty), `last(array $items): mixed` (returns null for empty).
+- [x] **10.4f** Unit tests for `ArrHelper`: count array, count Countable, join with separator, first/last of populated array, first/last of empty array returns null.
 
 #### 10.5 Reverse URL resolver
 
