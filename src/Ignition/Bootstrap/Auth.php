@@ -6,6 +6,7 @@ namespace Arcanum\Ignition\Bootstrap;
 
 use Arcanum\Auth\ActiveIdentity;
 use Arcanum\Auth\AuthMiddleware;
+use Arcanum\Auth\CliAuthResolver;
 use Arcanum\Auth\CompositeGuard;
 use Arcanum\Auth\Guard;
 use Arcanum\Auth\Identity;
@@ -47,6 +48,8 @@ class Auth implements Bootstrapper
 
         if ($kernel instanceof HyperKernel) {
             $this->registerHttpGuard($container, $config);
+        } else {
+            $this->registerCliResolver($container, $config);
         }
     }
 
@@ -77,6 +80,22 @@ class Auth implements Bootstrapper
                 $activeIdentity = $container->get(ActiveIdentity::class);
                 return new AuthMiddleware($guard, $activeIdentity);
             },
+        );
+    }
+
+    private function registerCliResolver(Application $container, Configuration $config): void
+    {
+        $resolver = $config->get('auth.resolvers.token');
+        $resolverFn = $resolver instanceof \Closure
+            ? $resolver
+            : fn(string $token) => null;
+
+        /** @var ActiveIdentity $activeIdentity */
+        $activeIdentity = $container->get(ActiveIdentity::class);
+
+        $container->instance(
+            CliAuthResolver::class,
+            new CliAuthResolver($activeIdentity, $resolverFn),
         );
     }
 

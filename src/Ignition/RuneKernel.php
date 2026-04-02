@@ -164,6 +164,13 @@ class RuneKernel implements Kernel
             }
         }
 
+        // Resolve CLI authentication before domain dispatch.
+        if ($this->container->has(\Arcanum\Auth\CliAuthResolver::class)) {
+            /** @var \Arcanum\Auth\CliAuthResolver $authResolver */
+            $authResolver = $this->container->get(\Arcanum\Auth\CliAuthResolver::class);
+            $authResolver->resolve($input);
+        }
+
         /** @var Router $router */
         $router = $this->container->get(Router::class);
 
