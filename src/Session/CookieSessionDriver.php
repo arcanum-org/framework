@@ -53,11 +53,6 @@ final class CookieSessionDriver implements SessionDriver
         unset($this->pending[$id]);
     }
 
-    public function gc(int $maxLifetime): void
-    {
-        // Client-side storage — no server-side garbage to collect.
-    }
-
     /**
      * Decrypt a cookie value into session data and load it into the buffer.
      *

@@ -15,7 +15,7 @@ use Arcanum\Parchment\Writer;
  * Session data is serialized with its expiry timestamp. Expired sessions
  * are lazily deleted on read and batch-deleted during garbage collection.
  */
-final class FileSessionDriver implements SessionDriver
+final class FileSessionDriver implements SessionDriver, GarbageCollectable
 {
     private readonly Reader $reader;
     private readonly Writer $writer;

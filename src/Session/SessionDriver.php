@@ -34,11 +34,4 @@ interface SessionDriver
      * Destroy a session by ID.
      */
     public function destroy(string $id): void;
-
-    /**
-     * Garbage-collect expired sessions.
-     *
-     * @param positive-int $maxLifetime Sessions older than this (seconds) should be removed.
-     */
-    public function gc(int $maxLifetime): void;
 }

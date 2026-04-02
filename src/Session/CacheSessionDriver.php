@@ -36,9 +36,4 @@ final class CacheSessionDriver implements SessionDriver
     {
         $this->cache->delete(self::KEY_PREFIX . $id);
     }
-
-    public function gc(int $maxLifetime): void
-    {
-        // Cache drivers handle TTL-based expiry natively.
-    }
 }

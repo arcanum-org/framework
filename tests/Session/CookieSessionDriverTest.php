@@ -89,13 +89,4 @@ final class CookieSessionDriverTest extends TestCase
 
         $this->assertSame([], $data);
     }
-
-    public function testGcDoesNotThrow(): void
-    {
-        $driver = new CookieSessionDriver($this->encryptor());
-
-        $driver->gc(3600);
-
-        $this->addToAssertionCount(1);
-    }
 }

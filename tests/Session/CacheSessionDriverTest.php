@@ -45,15 +45,6 @@ final class CacheSessionDriverTest extends TestCase
         $this->assertSame([], $driver->read('to-destroy'));
     }
 
-    public function testGcDoesNotThrow(): void
-    {
-        $driver = new CacheSessionDriver(new ArrayDriver());
-
-        $driver->gc(3600);
-
-        $this->addToAssertionCount(1);
-    }
-
     public function testKeysPrefixedToAvoidCollisions(): void
     {
         $cache = new ArrayDriver();

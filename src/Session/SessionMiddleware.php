@@ -48,9 +48,8 @@ final class SessionMiddleware implements MiddlewareInterface
         $this->registry->set($session);
 
         // Probabilistic garbage collection (1% chance per request).
-        $lifetime = max(1, $this->config->lifetime);
-        if (random_int(1, 100) === 1) {
-            $this->driver->gc($lifetime);
+        if ($this->driver instanceof GarbageCollectable && random_int(1, 100) === 1) {
+            $this->driver->gc(max(1, $this->config->lifetime));
         }
 
         // Delegate to the next middleware / handler.
