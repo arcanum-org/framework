@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Shodo;
+namespace Arcanum\Shodo\Formatters;
 
 /**
  * Generates a plain text representation of arbitrary data.

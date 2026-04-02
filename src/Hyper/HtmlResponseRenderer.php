@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Hyper;
 
-use Arcanum\Shodo\HtmlFormatter;
+use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Psr\Http\Message\ResponseInterface;
 
 /**

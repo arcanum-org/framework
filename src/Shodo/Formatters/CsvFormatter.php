@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Shodo;
+namespace Arcanum\Shodo\Formatters;
+
+use Arcanum\Shodo\Formatter;
 
 /**
  * Formats data as a CSV string.

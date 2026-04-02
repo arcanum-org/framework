@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Test\Shodo;
+namespace Arcanum\Test\Shodo\Formatters;
 
 use Arcanum\Hyper\JsonResponseRenderer;
-use Arcanum\Shodo\Format;
+use Arcanum\Shodo\Formatters\Format;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 

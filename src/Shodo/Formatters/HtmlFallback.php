@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Shodo;
+namespace Arcanum\Shodo\Formatters;
 
 /**
  * Generates a simple valid HTML document from arbitrary data.

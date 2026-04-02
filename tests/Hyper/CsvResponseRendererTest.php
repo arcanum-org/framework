@@ -15,7 +15,7 @@ use Arcanum\Hyper\Message;
 use Arcanum\Hyper\Response;
 use Arcanum\Hyper\StatusCode;
 use Arcanum\Hyper\Version;
-use Arcanum\Shodo\CsvFormatter;
+use Arcanum\Shodo\Formatters\CsvFormatter;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Test\Shodo;
+namespace Arcanum\Test\Shodo\Formatters;
 
-use Arcanum\Shodo\PlainTextFallback;
+use Arcanum\Shodo\Formatters\PlainTextFallback;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 

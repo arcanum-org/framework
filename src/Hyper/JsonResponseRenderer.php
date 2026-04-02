@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Hyper;
 
-use Arcanum\Shodo\JsonFormatter;
+use Arcanum\Shodo\Formatters\JsonFormatter;
 use Psr\Http\Message\ResponseInterface;
 
 /**

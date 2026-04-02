@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Shodo;
+namespace Arcanum\Shodo\Formatters;
 
 /**
  * Thrown when a requested format is not registered.

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Test\Shodo;
+namespace Arcanum\Test\Shodo\Helper;
 
-use Arcanum\Shodo\HelperRegistry;
-use Arcanum\Shodo\UnknownHelper;
+use Arcanum\Shodo\Helper\HelperRegistry;
+use Arcanum\Shodo\Helper\UnknownHelper;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;

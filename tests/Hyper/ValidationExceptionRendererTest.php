@@ -18,7 +18,7 @@ use Arcanum\Hyper\Response;
 use Arcanum\Hyper\StatusCode;
 use Arcanum\Hyper\ValidationExceptionRenderer;
 use Arcanum\Hyper\Version;
-use Arcanum\Shodo\JsonFormatter;
+use Arcanum\Shodo\Formatters\JsonFormatter;
 use Arcanum\Validation\ValidationError;
 use Arcanum\Validation\ValidationException;
 use PHPUnit\Framework\TestCase;

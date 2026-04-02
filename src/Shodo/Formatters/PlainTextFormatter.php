@@ -2,24 +2,31 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Shodo;
+namespace Arcanum\Shodo\Formatters;
 
 use Arcanum\Parchment\Reader;
+use Arcanum\Shodo\Formatter;
+use Arcanum\Shodo\Helper\HelperResolver;
+use Arcanum\Shodo\TemplateCache;
+use Arcanum\Shodo\TemplateCompiler;
+use Arcanum\Shodo\TemplateResolver;
 
 /**
- * Formats data as an HTML string using co-located templates.
+ * Formats data as a plain text string using co-located templates.
  *
  * Template discovery follows PSR-4 convention: the DTO class name maps
- * to a .html file in the same directory as the class. When no template
- * exists, falls back to a generic HTML representation of the data.
+ * to a .txt file in the same directory as the class. When no template
+ * exists, falls back to a structured plain text representation.
+ *
+ * Uses an identity escape function — no escaping is needed for plain text.
  */
-class HtmlFormatter implements Formatter
+class PlainTextFormatter implements Formatter
 {
     public function __construct(
         private readonly TemplateResolver $resolver,
         private readonly TemplateCompiler $compiler,
         private readonly TemplateCache $cache,
-        private readonly HtmlFallback $fallback,
+        private readonly PlainTextFallback $fallback,
         private readonly Reader $reader = new Reader(),
         private readonly ?HelperResolver $helpers = null,
     ) {
@@ -47,8 +54,7 @@ class HtmlFormatter implements Formatter
         }
 
         $variables = $this->extractVariables($data);
-        $variables['__escape'] = static fn(string $value): string =>
-            htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+        $variables['__escape'] = static fn(string $value): string => $value;
         $variables['__helpers'] = $this->helpers !== null ? $this->helpers->for($dtoClass) : [];
 
         return $this->execute($compiled, $variables);
@@ -76,7 +82,6 @@ class HtmlFormatter implements Formatter
      */
     private function execute(string $compiledPhp, array $variables): string
     {
-        // Use a static closure to prevent $this leakage into template scope.
         $executor = static function (string $__compiled, array $__vars): string {
             extract($__vars);
             ob_start();

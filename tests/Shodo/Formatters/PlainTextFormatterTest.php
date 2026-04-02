@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Test\Shodo;
+namespace Arcanum\Test\Shodo\Formatters;
 
 use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Writer;
-use Arcanum\Shodo\HelperRegistry;
-use Arcanum\Shodo\HelperResolver;
-use Arcanum\Shodo\PlainTextFallback;
-use Arcanum\Shodo\PlainTextFormatter;
+use Arcanum\Shodo\Helper\HelperRegistry;
+use Arcanum\Shodo\Helper\HelperResolver;
+use Arcanum\Shodo\Formatters\PlainTextFallback;
+use Arcanum\Shodo\Formatters\PlainTextFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Shodo\TemplateResolver;

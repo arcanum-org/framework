@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Shodo;
+namespace Arcanum\Shodo\Formatters;
+
+use Arcanum\Shodo\Formatter;
 
 /**
  * Default CLI output formatter.
