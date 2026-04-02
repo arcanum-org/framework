@@ -15,9 +15,15 @@ namespace Arcanum\Shodo;
  * injected by the renderer. This keeps the compiler format-agnostic —
  * HtmlRenderer provides htmlspecialchars, PlainTextRenderer provides
  * an identity function, etc.
+ *
+ * Helper calls use static-method syntax: {{ Route::url('x') }} compiles
+ * to $__helpers['Route']->url('x'). The alias must start with an uppercase
+ * letter; fully-qualified static calls (with backslashes) are left alone.
  */
 final class TemplateCompiler
 {
+    private const HELPER_PATTERN = '([A-Z][a-zA-Z0-9]*)::(\w+)((?:\((?:[^()]*+|\((?:[^()]*+|\([^()]*+\))*\))*\)))';
+
     /**
      * Render a template with variables using direct substitution.
      *
@@ -46,7 +52,16 @@ final class TemplateCompiler
     public function compile(string $source): string
     {
         // Order matters: raw output before escaped output to avoid double-matching.
+        // Helper calls must be rewritten before the raw/escaped passes consume them,
+        // otherwise Name::method() would compile as a real PHP static call.
         $compiled = $source;
+
+        // Helper calls in raw output: {{! Route::url('x') !}}
+        $compiled = $this->replaceCallback(
+            '/\{\{!\s*' . self::HELPER_PATTERN . '\s*!\}\}/s',
+            fn (array $m) => '<?= $__helpers[\'' . $m[1] . '\']->' . $m[2] . $m[3] . ' ?>',
+            $compiled,
+        );
 
         // Raw output: {{! $expr !}}
         $compiled = $this->replace(
@@ -77,6 +92,13 @@ final class TemplateCompiler
             $compiled,
         );
 
+        // Helper calls in escaped output: {{ Route::url('x') }}
+        $compiled = $this->replaceCallback(
+            '/\{\{\s*' . self::HELPER_PATTERN . '\s*\}\}/s',
+            fn (array $m) => '<?= $__escape((string)($__helpers[\'' . $m[1] . '\']->' . $m[2] . $m[3] . ')) ?>',
+            $compiled,
+        );
+
         // Escaped output: {{ $expr }} — calls $__escape provided by the renderer
         $compiled = $this->replace(
             '/\{\{\s*(.+?)\s*\}\}/s',
@@ -90,6 +112,17 @@ final class TemplateCompiler
     private function replace(string $pattern, string $replacement, string $subject): string
     {
         $result = preg_replace($pattern, $replacement, $subject);
+
+        if ($result === null) {
+            throw new \RuntimeException("Template compilation failed for pattern: $pattern");
+        }
+
+        return $result;
+    }
+
+    private function replaceCallback(string $pattern, callable $callback, string $subject): string
+    {
+        $result = preg_replace_callback($pattern, $callback, $subject);
 
         if ($result === null) {
             throw new \RuntimeException("Template compilation failed for pattern: $pattern");

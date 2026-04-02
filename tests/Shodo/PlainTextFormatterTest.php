@@ -7,6 +7,8 @@ namespace Arcanum\Test\Shodo;
 use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Writer;
+use Arcanum\Shodo\HelperRegistry;
+use Arcanum\Shodo\HelperResolver;
 use Arcanum\Shodo\PlainTextFallback;
 use Arcanum\Shodo\PlainTextFormatter;
 use Arcanum\Shodo\TemplateCache;
@@ -17,6 +19,8 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(PlainTextFormatter::class)]
+#[UsesClass(HelperRegistry::class)]
+#[UsesClass(HelperResolver::class)]
 #[UsesClass(TemplateResolver::class)]
 #[UsesClass(TemplateCompiler::class)]
 #[UsesClass(TemplateCache::class)]
@@ -63,14 +67,14 @@ final class PlainTextFormatterTest extends TestCase
         rmdir($dir);
     }
 
-    private function createFormatter(): PlainTextFormatter
+    private function createFormatter(?HelperResolver $helpers = null): PlainTextFormatter
     {
         $resolver = new TemplateResolver($this->rootDir, 'App', extension: 'txt');
         $compiler = new TemplateCompiler();
         $cache = new TemplateCache($this->cacheDir);
         $fallback = new PlainTextFallback();
 
-        return new PlainTextFormatter($resolver, $compiler, $cache, $fallback);
+        return new PlainTextFormatter($resolver, $compiler, $cache, $fallback, helpers: $helpers);
     }
 
     public function testFormatReturnsNonEmptyOutput(): void
@@ -176,5 +180,59 @@ final class PlainTextFormatterTest extends TestCase
 
         // Assert
         $this->assertSame('Arcanum v1', $result);
+    }
+
+    // -----------------------------------------------------------
+    // Template helpers
+    // -----------------------------------------------------------
+
+    public function testHelperCallResolvesFromResolver(): void
+    {
+        // Arrange
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.txt',
+            'URL: {{ Route::url(\'health\') }}',
+        );
+        $helper = new class {
+            public function url(string $name): string
+            {
+                return '/api/' . $name;
+            }
+        };
+        $registry = new HelperRegistry();
+        $registry->register('Route', $helper);
+        $resolver = new HelperResolver($registry);
+        $formatter = $this->createFormatter(helpers: $resolver);
+
+        // Act
+        $result = $formatter->format([], 'App\\Pages\\Index');
+
+        // Assert
+        $this->assertSame('URL: /api/health', $result);
+    }
+
+    public function testHelperOutputUsesIdentityEscape(): void
+    {
+        // Arrange
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.txt',
+            '{{ Str::value() }}',
+        );
+        $helper = new class {
+            public function value(): string
+            {
+                return '<b>bold</b>';
+            }
+        };
+        $registry = new HelperRegistry();
+        $registry->register('Str', $helper);
+        $resolver = new HelperResolver($registry);
+        $formatter = $this->createFormatter(helpers: $resolver);
+
+        // Act
+        $result = $formatter->format([], 'App\\Pages\\Index');
+
+        // Assert — no HTML encoding in plain text
+        $this->assertSame('<b>bold</b>', $result);
     }
 }

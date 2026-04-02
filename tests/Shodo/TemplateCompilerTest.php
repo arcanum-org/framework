@@ -322,4 +322,128 @@ final class TemplateCompilerTest extends TestCase
 
         $this->assertSame('no placeholders here', $result);
     }
+
+    // -----------------------------------------------------------
+    // Helper call compilation: {{ Name::method() }} syntax
+    // -----------------------------------------------------------
+
+    public function testHelperCallCompilesWithEscape(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ Route::url(\'query:health\') }}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__escape((string)($__helpers[\'Route\']->url(\'query:health\'))) ?>',
+            $result,
+        );
+    }
+
+    public function testHelperCallWithNoArgs(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ Html::csrf() }}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__escape((string)($__helpers[\'Html\']->csrf())) ?>',
+            $result,
+        );
+    }
+
+    public function testHelperCallWithMultipleArgs(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ Format::number($price, 2, \'.\', \',\') }}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__escape((string)($__helpers[\'Format\']->number($price, 2, \'.\', \',\'))) ?>',
+            $result,
+        );
+    }
+
+    public function testHelperCallWithNestedExpression(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ Format::number($item->price, 2) }}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__escape((string)($__helpers[\'Format\']->number($item->price, 2))) ?>',
+            $result,
+        );
+    }
+
+    public function testHelperCallInRawOutput(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{! Html::csrf() !}}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__helpers[\'Html\']->csrf() ?>',
+            $result,
+        );
+    }
+
+    public function testRegularVariableStillCompilesNormally(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ $name }} and {{ Route::url(\'x\') }}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__escape((string)($name)) ?> and <?= $__escape((string)($__helpers[\'Route\']->url(\'x\'))) ?>',
+            $result,
+        );
+    }
+
+    public function testFullyQualifiedStaticCallIsLeftAlone(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act — backslash in class name means it's a real static call, not a helper
+        $result = $compiler->compile('{{ \App\Foo::bar() }}');
+
+        // Assert — compiled as a regular expression, not rewritten to $__helpers
+        $this->assertSame(
+            '<?= $__escape((string)(\App\Foo::bar())) ?>',
+            $result,
+        );
+    }
+
+    public function testHelperCallWithNestedParentheses(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ Format::number(count($items), 0) }}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__escape((string)($__helpers[\'Format\']->number(count($items), 0))) ?>',
+            $result,
+        );
+    }
 }

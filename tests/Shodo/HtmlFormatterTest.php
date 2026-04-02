@@ -7,6 +7,8 @@ namespace Arcanum\Test\Shodo;
 use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Writer;
+use Arcanum\Shodo\HelperRegistry;
+use Arcanum\Shodo\HelperResolver;
 use Arcanum\Shodo\HtmlFallback;
 use Arcanum\Shodo\HtmlFormatter;
 use Arcanum\Shodo\TemplateCache;
@@ -17,6 +19,8 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(HtmlFormatter::class)]
+#[UsesClass(HelperRegistry::class)]
+#[UsesClass(HelperResolver::class)]
 #[UsesClass(TemplateResolver::class)]
 #[UsesClass(TemplateCompiler::class)]
 #[UsesClass(TemplateCache::class)]
@@ -63,14 +67,16 @@ final class HtmlFormatterTest extends TestCase
         rmdir($dir);
     }
 
-    private function createFormatter(string $cacheDir = ''): HtmlFormatter
-    {
+    private function createFormatter(
+        string $cacheDir = '',
+        ?HelperResolver $helpers = null,
+    ): HtmlFormatter {
         $resolver = new TemplateResolver($this->rootDir, 'App');
         $compiler = new TemplateCompiler();
         $cache = new TemplateCache($cacheDir ?: $this->cacheDir);
         $fallback = new HtmlFallback();
 
-        return new HtmlFormatter($resolver, $compiler, $cache, $fallback);
+        return new HtmlFormatter($resolver, $compiler, $cache, $fallback, helpers: $helpers);
     }
 
     public function testFormatReturnsNonEmptyOutput(): void
@@ -261,6 +267,77 @@ final class HtmlFormatterTest extends TestCase
             '<p>{{ $name }}</p>',
         );
         $formatter = $this->createFormatter(cacheDir: '');
+
+        // Act
+        $result = $formatter->format(['name' => 'Arcanum'], 'App\\Pages\\Index');
+
+        // Assert
+        $this->assertStringContainsString('<p>Arcanum</p>', $result);
+    }
+
+    // -----------------------------------------------------------
+    // Template helpers
+    // -----------------------------------------------------------
+
+    public function testHelperCallResolvesFromResolver(): void
+    {
+        // Arrange
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<a href="{{ Route::url(\'health\') }}">Health</a>',
+        );
+        $helper = new class {
+            public function url(string $name): string
+            {
+                return '/api/' . $name;
+            }
+        };
+        $registry = new HelperRegistry();
+        $registry->register('Route', $helper);
+        $resolver = new HelperResolver($registry);
+        $formatter = $this->createFormatter(helpers: $resolver);
+
+        // Act
+        $result = $formatter->format([], 'App\\Pages\\Index');
+
+        // Assert
+        $this->assertStringContainsString('<a href="/api/health">Health</a>', $result);
+    }
+
+    public function testHelperOutputIsHtmlEscaped(): void
+    {
+        // Arrange
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<p>{{ Str::value() }}</p>',
+        );
+        $helper = new class {
+            public function value(): string
+            {
+                return '<script>xss</script>';
+            }
+        };
+        $registry = new HelperRegistry();
+        $registry->register('Str', $helper);
+        $resolver = new HelperResolver($registry);
+        $formatter = $this->createFormatter(helpers: $resolver);
+
+        // Act
+        $result = $formatter->format([], 'App\\Pages\\Index');
+
+        // Assert
+        $this->assertStringContainsString('&lt;script&gt;xss&lt;/script&gt;', $result);
+        $this->assertStringNotContainsString('<script>', $result);
+    }
+
+    public function testTemplateWithoutHelpersStillWorks(): void
+    {
+        // Arrange — no resolver passed (null)
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<p>{{ $name }}</p>',
+        );
+        $formatter = $this->createFormatter();
 
         // Act
         $result = $formatter->format(['name' => 'Arcanum'], 'App\\Pages\\Index');

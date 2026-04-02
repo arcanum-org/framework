@@ -21,6 +21,7 @@ class HtmlFormatter implements Formatter
         private readonly TemplateCache $cache,
         private readonly HtmlFallback $fallback,
         private readonly Reader $reader = new Reader(),
+        private readonly ?HelperResolver $helpers = null,
     ) {
     }
 
@@ -32,10 +33,10 @@ class HtmlFormatter implements Formatter
             return $this->fallback->render($data);
         }
 
-        return $this->renderTemplate($templatePath, $data);
+        return $this->renderTemplate($templatePath, $data, $dtoClass);
     }
 
-    private function renderTemplate(string $templatePath, mixed $data): string
+    private function renderTemplate(string $templatePath, mixed $data, string $dtoClass): string
     {
         if ($this->cache->isFresh($templatePath)) {
             $compiled = $this->cache->load($templatePath);
@@ -48,6 +49,7 @@ class HtmlFormatter implements Formatter
         $variables = $this->extractVariables($data);
         $variables['__escape'] = static fn(string $value): string =>
             htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+        $variables['__helpers'] = $this->helpers !== null ? $this->helpers->for($dtoClass) : [];
 
         return $this->execute($compiled, $variables);
     }
