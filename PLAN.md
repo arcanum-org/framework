@@ -638,34 +638,88 @@ This is distinct from built-in framework commands (which ship with Rune) and dom
 
 ### 9. Persistence Layer — Forge
 
-SQL is a first-class citizen in Arcanum. There is no ORM, no query builder, no active record. `.sql` files are code — they live in the domain alongside DTOs, are resolved by convention, and are executed by the framework. The developer writes SQL and typed DTOs; the framework handles connections, parameter binding, and execution.
+SQL is a first-class citizen in Arcanum. There is no ORM, no query builder, no active record, and no SQL strings in PHP. `.sql` files are code — they live in domain `Model/` directories and become methods on a dynamic `Model` object. The developer writes SQL files and calls them as methods; the framework handles connections, parameter binding, execution, and result shaping.
 
 **What the developer writes:**
 
 ```
-app/Domain/Shop/Query/Products.php     ← DTO (typed input)
-app/Domain/Shop/Query/Products.sql     ← SQL file (the actual query)
+app/Domain/Shop/Model/
+    Products.sql              ← $db->model->products([...])
+    ProductById.sql           ← $db->model->productById([...])
+    InsertOrder.sql           ← $db->model->insertOrder([...])
+    UpdateOrderStatus.sql     ← $db->model->updateOrderStatus([...])
+    DeductInventory.sql       ← $db->model->deductInventory([...])
+
+app/Domain/Shop/Query/
+    Products.php              ← route DTO
+    ProductsHandler.php       ← handler (uses $db->model)
+
+app/Domain/Shop/Command/
+    PlaceOrder.php            ← route DTO
+    PlaceOrderHandler.php     ← handler (uses $db->model)
 ```
 
-If no handler class exists, the framework executes the SQL file automatically — the `.sql` file *is* the handler. When a handler is needed for composition or logic, the developer injects `Database` and calls `$this->db->query(new SomeDto(...))` — still backed by `.sql` files, still typed, still convention-resolved.
+```php
+final class ProductsHandler
+{
+    public function __construct(private readonly Database $db) {}
 
-**What the developer never writes:** connection strings, repository classes, model classes, query builder chains, SQL strings in PHP, or migration PHP classes.
+    public function __invoke(Products $dto): array
+    {
+        return $this->db->model->products([
+            'category' => $dto->category,
+        ])->rows();
+    }
+}
+```
+
+```php
+final class PlaceOrderHandler
+{
+    public function __construct(private readonly Database $db) {}
+
+    public function __invoke(PlaceOrder $dto): void
+    {
+        $this->db->transaction(function (Database $db) use ($dto) {
+            $db->model->insertOrder([
+                'userId' => $dto->userId,
+                'total' => $dto->total,
+            ]);
+
+            $db->model->insertOrderItem([
+                'orderId' => $db->lastInsertId(),
+                'productId' => $dto->productId,
+                'quantity' => $dto->quantity,
+            ]);
+
+            $db->model->deductInventory([
+                'productId' => $dto->productId,
+                'quantity' => $dto->quantity,
+            ]);
+        });
+    }
+}
+```
+
+**What the developer never writes:** connection strings, repository classes, model/entity classes, query builder chains, SQL strings in PHP, or migration PHP classes.
 
 **Design decisions:**
 
-- **No raw SQL strings in the API.** `Database::query()` and `Database::execute()` accept objects only. Every query is a `.sql` file with a co-located DTO. No `$db->query('SELECT ...')` escape hatch. If you need SQL, make a file.
-- **SQL file resolution follows handler convention.** `Products.php` → `Products.sql` in the same directory. Same convention that maps `Products` → `ProductsHandler`, extended to look for `.sql` when no handler exists.
-- **Parameter binding is always DTO properties → `:named` SQL parameters.** Reflected from the constructor, same mechanism everywhere.
-- **`Database` service has two methods:** `query(object): array` (returns rows as associative arrays) and `execute(object): int` (returns affected row count). That's the entire read/write surface.
-- **Transactions are explicit.** `$db->transaction(fn(Database $db) => ...)` wraps a closure. Synthetic handlers (standalone `.sql` commands) do not auto-wrap.
-- **Multiple connections out of the box.** `config/database.php` defines named connections. Default connection for general use, optional read/write split. The `Database` service resolves the right connection transparently.
+- **SQL file names are method names.** `Products.sql` → `$db->model->products(...)`. `InsertOrder.sql` → `$db->model->insertOrder(...)`. PascalCase file names become camelCase methods. The directory is the object, the file is the method.
+- **No raw SQL strings in the API.** The `Database` service never accepts SQL strings. Every query is a `.sql` file called as a method. If you need SQL, make a file.
+- **Every call returns a `Result`.** The developer picks the shape: `->rows()`, `->first()`, `->scalar()`, `->isEmpty()`, `->affectedRows()`, `->lastInsertId()`. No return-type guessing from file name prefixes.
+- **Read/write routing from SQL content.** The framework inspects the SQL to determine which connection to use. `SELECT` → read connection. `INSERT`/`UPDATE`/`DELETE` → write connection. The developer doesn't think about it.
+- **Model directory is domain-scoped.** `app/Domain/Shop/Model/` contains all SQL for the Shop bounded context. Shared queries live in a shared domain directory (e.g., `app/Domain/Shared/Model/`). Not table-scoped — a Model directory can query across tables.
+- **Parameters are named arrays.** `$db->model->products(['category' => 'shoes'])` binds `:category` in the SQL. Simple, no reflection on DTO constructors — just an associative array.
+- **Transactions are explicit.** `$db->transaction(fn(Database $db) => ...)` wraps a closure.
+- **Multiple connections out of the box.** `config/database.php` defines named connections with optional read/write split.
 
 #### Connection Management
 
-- [ ] `Connection` — thin PDO wrapper. Constructor takes DSN, username, password, options. Lazy-connects on first use. Methods: `select(string $sql, array $params): array` (returns associative arrays), `statement(string $sql, array $params): int` (returns affected rows), `beginTransaction(): void`, `commit(): void`, `rollBack(): void`. Uses PDO named parameters and prepared statements. Sets `ERRMODE_EXCEPTION`, `FETCH_ASSOC` defaults.
+- [ ] `Connection` — thin PDO wrapper. Constructor takes DSN, username, password, options. Lazy-connects on first use. Methods: `run(string $sql, array $params): Result` — executes the SQL, returns a `Result` regardless of query type. `beginTransaction(): void`, `commit(): void`, `rollBack(): void`. Uses PDO named parameters and prepared statements. Sets `ERRMODE_EXCEPTION`, `FETCH_ASSOC` defaults. Tracks `lastInsertId()`.
 - [ ] `ConnectionFactory` — creates `Connection` instances from config arrays. Supports drivers: `mysql` (charset, collation), `pgsql`, `sqlite` (file path or `:memory:`). Builds DSN string from config keys (`host`, `port`, `database`, `unix_socket`, etc.).
 - [ ] `ConnectionManager` — manages named connections. Lazy instantiation (like `CacheManager`). `connection(string $name = ''): Connection` returns named or default. `readConnection(): Connection` returns the read replica if configured, otherwise the default. `writeConnection(): Connection` always returns the write primary.
-- [ ] Tests: Connection select/statement round-trip (SQLite in-memory), prepared statement parameter binding, transaction commit/rollback, lazy connection, ConnectionFactory builds correct DSN for each driver, ConnectionManager named connections, read/write split resolution, default fallback. ~18 tests.
+- [ ] Tests: Connection run returns Result, prepared statement parameter binding, transaction commit/rollback, lazy connection, ConnectionFactory builds correct DSN for each driver, ConnectionManager named connections, read/write split resolution, default fallback. ~18 tests.
 
 #### Configuration
 
@@ -689,55 +743,60 @@ If no handler class exists, the framework executes the SQL file automatically �
               'database' => 'database.sqlite',  // relative to files/
           ],
       ],
-      'read' => null,   // connection name for read replica, or null for same as default
-      'write' => null,  // connection name for write primary, or null for same as default
+      'read' => null,   // connection name for read replica, or null
+      'write' => null,   // connection name for write primary, or null
   ];
   ```
 
-#### SQL File Resolution
+#### Result
 
-- [ ] `SqlResolver` — given an object, finds the co-located `.sql` file. Reflects the class name, converts to file path (same namespace-to-directory convention as handler resolution), replaces `.php` extension with `.sql`. Returns the file path or null if not found.
-- [ ] Resolution is relative to a configurable root (app directory). `App\Domain\Shop\Query\Products` → `app/Domain/Shop/Query/Products.sql`.
-- [ ] SQL file contents are cached in memory per-request (read once, reuse if the same DTO type is queried multiple times).
-- [ ] Tests: resolves co-located .sql file, returns null when no .sql exists, caches file reads, handles nested namespaces. ~5 tests.
+- [ ] `Result` — wraps the raw PDO result with convenience accessors. Constructed with the row data, affected row count, and last insert ID.
+  - `rows(): array` — all rows as associative arrays.
+  - `first(): array|null` — first row or null if empty.
+  - `scalar(): mixed` — first column of first row. Throws if empty.
+  - `isEmpty(): bool` — whether zero rows were returned/affected.
+  - `affectedRows(): int` — number of rows affected (writes).
+  - `lastInsertId(): string` — last auto-increment ID (inserts).
+  - `count(): int` — number of rows returned.
+- [ ] Tests: rows returns all, first returns first row, first returns null on empty, scalar returns single value, scalar throws on empty, isEmpty, affectedRows, lastInsertId, count. ~10 tests.
 
-#### Parameter Binding
+#### Model — SQL File Resolution and Execution
 
-- [ ] `ParameterBinder` — reflects on an object's constructor parameters, reads their values, builds a `[':name' => $value]` map for PDO binding. Handles: string, int, float, bool (cast to int for PDO), null. Skips parameters that don't appear in the SQL as `:paramName` (allows DTOs with extra properties used for routing but not in the query).
-- [ ] Tests: binds all scalar types, skips parameters not in SQL, handles null, handles bool→int cast, handles DTO with no matching params (empty bind). ~7 tests.
+- [ ] `Model` — dynamic object that maps method calls to SQL files. Constructed with a directory path (the Model directory), a `Connection` reference (read and write), and a SQL file reader.
+  - `__call(string $method, array $args): Result` — converts method name from camelCase to PascalCase file name (`insertOrder` → `InsertOrder.sql`). Reads the SQL file. Binds named parameters from `$args[0]` (the associative array). Inspects SQL content to determine read vs write connection. Executes. Returns `Result`.
+  - Throws `RuntimeException` if the SQL file doesn't exist (clear message: "Model method 'insertOrder' not found — expected file: .../Model/InsertOrder.sql").
+  - SQL file contents cached in memory per-request.
+- [ ] SQL content inspection for connection routing: scans first non-comment, non-whitespace SQL token. `SELECT` → read connection. Everything else → write connection. Simple regex, not a full parser.
+- [ ] Tests: method call resolves to correct SQL file, camelCase→PascalCase conversion, parameters bound as `:named`, SELECT uses read connection, INSERT/UPDATE/DELETE use write connection, missing file throws with helpful message, file content cached, parameterless SQL works (empty array). ~10 tests.
 
 #### Database Service
 
-- [ ] `Database` — the developer-facing service. Constructor takes `ConnectionManager`, `SqlResolver`, `ParameterBinder`.
-  - `query(object $dto): array` — resolves `.sql` file, reads SQL, binds DTO properties, executes via `readConnection()->select()`. Returns array of associative arrays.
-  - `execute(object $dto): int` — resolves `.sql` file, reads SQL, binds DTO properties, executes via `writeConnection()->statement()`. Returns affected row count.
+- [ ] `Database` — the developer-facing service. Constructor takes `ConnectionManager` and a `Model` directory root (from Kernel config).
+  - `model` property (via `__get`) — returns a `Model` object scoped to the current domain's Model directory. Resolution: the calling handler's namespace determines the Model path. `App\Domain\Shop\Command\PlaceOrderHandler` → `app/Domain/Shop/Model/`. Uses `debug_backtrace` or an explicit domain context set by the Conveyor dispatch.
   - `transaction(\Closure $callback): mixed` — begins transaction on write connection, calls `$callback($this)`, commits. Rolls back on exception and rethrows.
-  - Throws `RuntimeException` if no `.sql` file found for the given object.
-- [ ] Tests: query returns rows, execute returns affected count, transaction commits, transaction rolls back on exception, missing .sql file throws, DTO properties bound correctly, read/write connection routing. ~9 tests.
-
-#### Synthetic SQL Handlers — Conveyor Integration
-
-- [ ] `SqlQueryHandler` — a generic handler registered with the Conveyor bus as a fallback. When the bus can't find a `ProductsHandler` class, it checks for a co-located `.sql` file via `SqlResolver`. If found, it executes the query via `Database::query()` and returns the result.
-- [ ] `SqlCommandHandler` — same pattern for commands. Executes via `Database::execute()`. Returns void (the bus already handles void → 204).
-- [ ] Integration point: the Conveyor `MiddlewareBus` handler resolution is extended. Current flow: look for `{Name}Handler` class. New flow: look for `{Name}Handler` class → if not found, look for `{Name}.sql` → if found, use synthetic handler. If neither exists, throw handler-not-found as before.
-- [ ] The synthetic handler is transparent — middleware (auth, validation, transport guard) all run before it, same as a real handler. The DTO is validated, auth is checked, and only then does the SQL execute.
-- [ ] Tests: synthetic query handler returns rows, synthetic command handler returns void, real handler takes precedence over .sql file, missing both throws handler-not-found, middleware still runs before synthetic handler. ~7 tests.
+  - `lastInsertId(): string` — delegates to write connection.
+  - `connection(string $name): Connection` — access a named connection directly (for cross-domain or multi-database scenarios).
+- [ ] **Domain context resolution** — needs design. Options:
+  - **Option A:** The Conveyor dispatch sets the domain context (from the DTO's namespace) before calling the handler. The `Database` service reads it. Automatic but requires Conveyor integration.
+  - **Option B:** The handler declares its Model path explicitly: `$this->db->model('Shop')` or `$this->db->shop` (dynamic property from config). More explicit, less magic.
+  - **Option C:** The `Database` service scans all `Model/` directories at boot and registers them by domain name. `$db->model` is ambiguous if multiple domains exist — need `$db->shop->products(...)` or `$db->orders->insertOrder(...)`.
+  - **Decision needed from user.**
+- [ ] Tests: model property returns Model, transaction commits, transaction rolls back, lastInsertId delegates, connection returns named connection. ~6 tests.
 
 #### Bootstrap & Wiring
 
-- [ ] `Bootstrap\Database` bootstrapper — reads `config/database.php`, creates `ConnectionManager`, `SqlResolver`, `ParameterBinder`, `Database`. Registers all in container. `Database` also registered as the default database interface.
+- [ ] `Bootstrap\Database` bootstrapper — reads `config/database.php`, creates `ConnectionManager`, registers `Database` in container. Discovers Model directories under the app's domain root. HTTP-only and CLI kernels both get database support.
 - [ ] Added to `HyperKernel::$bootstrappers` and `RuneKernel::$bootstrappers` — after `Auth`, before `Routing`.
-- [ ] Conveyor handler resolution extended in `Bootstrap\Routing` and `Bootstrap\CliRouting` — synthetic SQL handlers registered as fallback.
-- [ ] Tests: registers Database in container, ConnectionManager configured from config, works with no config (skips gracefully for apps without a database), SqlResolver gets correct root path. ~5 tests.
+- [ ] Tests: registers Database in container, ConnectionManager configured from config, works with no config (skips gracefully for apps without a database). ~4 tests.
 
 #### CLI Commands
 
-- [ ] `db:status` built-in Rune command — shows configured connections, default connection, read/write split, and tests connectivity (tries to connect, reports success or error). Useful for debugging connection issues.
+- [ ] `db:status` built-in Rune command — shows configured connections, default connection, read/write split, tests connectivity (tries to connect, reports success or error), lists discovered Model directories and SQL file counts.
 - [ ] Tests: shows connection info, reports connection error gracefully. ~2 tests.
 
 #### Migrations — deferred (needs design discussion)
 
-⚠️ **Not part of the MVP.** Migrations are a different beast — they're about schema evolution, not runtime queries. The Forge MVP focuses on making SQL-file-driven reads and writes work. Migrations will be designed separately.
+⚠️ **Not part of the MVP.** Migrations are about schema evolution, not runtime queries. The Forge MVP focuses on making SQL-file-driven reads and writes work. Migrations will be designed separately.
 
 Key questions for the migration design conversation:
 - **File naming:** timestamp-based (`2026_04_02_001_create_products.sql`) vs sequential?
@@ -749,9 +808,8 @@ Key questions for the migration design conversation:
 
 #### Documentation
 
-- [ ] `src/Forge/README.md` — philosophy (SQL as first-class citizen, no ORM, no query builder, no raw strings), Database API, SQL file conventions, parameter binding, transactions, connections, synthetic handlers, configuration.
+- [ ] `src/Forge/README.md` — philosophy (SQL as first-class citizen, no ORM, no query builder, no raw strings), Database/Model API, SQL file conventions, Result shaping, parameter binding, transactions, connections, configuration.
 - [ ] Updated `src/Ignition/README.md` — `Bootstrap\Database` in bootstrapper tables.
-- [ ] Updated `src/Flow/Conveyor/README.md` — synthetic SQL handler fallback in handler resolution.
 - [ ] Updated root `README.md` — Forge package description.
 
 ### 10. Template Helpers — Shodo extension
