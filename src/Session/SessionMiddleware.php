@@ -82,24 +82,11 @@ final class SessionMiddleware implements MiddlewareInterface
         }
 
         // Persist session data under the (possibly new) ID.
-        $this->persistSession($session);
+        $this->driver->write($session->id()->value, $session->toArray(), max(1, $this->config->lifetime));
 
         // Set the session cookie.
         $cookieHeader = $this->buildCookieHeader($session);
         return $response->withAddedHeader('Set-Cookie', $cookieHeader);
-    }
-
-    private function persistSession(Session $session): void
-    {
-        $lifetime = max(1, $this->config->lifetime);
-
-        if ($this->driver instanceof CookieSessionDriver) {
-            // Cookie driver buffers data; middleware will encrypt it in buildCookieHeader.
-            $this->driver->write($session->id()->value, $session->toArray(), $lifetime);
-            return;
-        }
-
-        $this->driver->write($session->id()->value, $session->toArray(), $lifetime);
     }
 
     private function buildCookieHeader(Session $session): string
