@@ -101,4 +101,25 @@ final class StringsTest extends TestCase
         $this->expectExceptionMessage('is not under namespace prefix');
         Strings::stripNamespacePrefix('Other\\Foo', 'App\\Domain');
     }
+
+    public function testNamespacePath(): void
+    {
+        $this->assertSame(
+            'app' . DIRECTORY_SEPARATOR . 'Domain',
+            Strings::namespacePath('App\\Domain'),
+        );
+    }
+
+    public function testNamespacePathNested(): void
+    {
+        $this->assertSame(
+            'app' . DIRECTORY_SEPARATOR . 'Domain' . DIRECTORY_SEPARATOR . 'Shop',
+            Strings::namespacePath('App\\Domain\\Shop'),
+        );
+    }
+
+    public function testNamespacePathSingleSegment(): void
+    {
+        $this->assertSame('vendor', Strings::namespacePath('Vendor'));
+    }
 }

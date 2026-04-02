@@ -130,4 +130,26 @@ final class Strings
 
         return substr($class, strlen($prefix));
     }
+
+    /**
+     * Convert a PHP namespace to a PSR-4 directory path.
+     *
+     * Lowercases the first segment to match the conventional directory
+     * layout (App\Domain → app/Domain, not App/Domain).
+     *
+     *   Strings::namespacePath('App\Domain') → 'app/Domain'
+     *   Strings::namespacePath('App\Domain\Shop') → 'app/Domain/Shop'
+     *   Strings::namespacePath('Vendor') → 'vendor'
+     */
+    public static function namespacePath(string $namespace): string
+    {
+        $path = str_replace('\\', DIRECTORY_SEPARATOR, $namespace);
+
+        $firstSep = strpos($path, DIRECTORY_SEPARATOR);
+        if ($firstSep !== false) {
+            return lcfirst(substr($path, 0, $firstSep)) . substr($path, $firstSep);
+        }
+
+        return lcfirst($path);
+    }
 }

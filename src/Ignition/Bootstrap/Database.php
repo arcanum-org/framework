@@ -12,6 +12,7 @@ use Arcanum\Forge\DomainContext;
 use Arcanum\Gather\Configuration;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\Kernel;
+use Arcanum\Toolkit\Strings;
 
 /**
  * Registers the Database service, ConnectionManager, and DomainContext.
@@ -92,20 +93,8 @@ class Database implements Bootstrapper
     private function buildDomainContext(Configuration $config, Kernel $kernel): DomainContext
     {
         $namespace = $config->asString('app.namespace', 'App\\Domain');
-
-        // Convert namespace to directory path: App\Domain → app/Domain
-        $relativePath = str_replace('\\', DIRECTORY_SEPARATOR, $namespace);
-
-        // Lowercase the first segment to match PSR-4 directory convention.
-        $firstSep = strpos($relativePath, DIRECTORY_SEPARATOR);
-        if ($firstSep !== false) {
-            $relativePath = lcfirst(substr($relativePath, 0, $firstSep))
-                . substr($relativePath, $firstSep);
-        } else {
-            $relativePath = lcfirst($relativePath);
-        }
-
-        $domainRoot = $kernel->rootDirectory() . DIRECTORY_SEPARATOR . $relativePath;
+        $domainRoot = $kernel->rootDirectory()
+            . DIRECTORY_SEPARATOR . Strings::namespacePath($namespace);
 
         return new DomainContext(domainRoot: $domainRoot);
     }

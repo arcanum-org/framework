@@ -27,6 +27,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(DomainContext::class)]
 #[UsesClass(\Arcanum\Forge\Connection::class)]
 #[UsesClass(\Arcanum\Cabinet\PrototypeProvider::class)]
+#[UsesClass(\Arcanum\Toolkit\Strings::class)]
 final class DatabaseTest extends TestCase
 {
     private function kernelStub(string $rootDir = '/app'): Kernel
