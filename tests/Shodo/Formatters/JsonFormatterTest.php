@@ -96,6 +96,25 @@ final class JsonFormatterTest extends TestCase
         $this->assertSame('{"key":"value"}', $result);
     }
 
+    public function testFormatEscapesHtmlTags(): void
+    {
+        // Arrange
+        $formatter = new JsonFormatter();
+
+        // Act
+        $result = $formatter->format(['html' => '</script><script>alert(1)</script>']);
+
+        // Assert — < and > are escaped as unicode, preventing XSS in HTML contexts
+        $this->assertStringNotContainsString('<', $result);
+        $this->assertStringNotContainsString('>', $result);
+        $this->assertStringContainsString('\u003C', $result);
+
+        // Verify the value round-trips correctly
+        $decoded = json_decode($result, true, 512, \JSON_THROW_ON_ERROR);
+        $this->assertIsArray($decoded);
+        $this->assertSame('</script><script>alert(1)</script>', $decoded['html']);
+    }
+
     public function testFormatThrowsOnUnencodableData(): void
     {
         // Arrange
