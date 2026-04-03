@@ -11,15 +11,11 @@ use Arcanum\Flow\Continuum\Continuation;
 use Arcanum\Flow\Continuum\Progression;
 use Arcanum\Flow\Pipeline\Pipeline;
 use Arcanum\Toolkit\Strings;
-use Arcanum\Validation\Rule;
 use Arcanum\Validation\ValidationGuard;
 
 class MiddlewareBus implements Bus
 {
     private bool $hasValidationGuard = false;
-
-    /** @var array<class-string, bool> */
-    private array $validationAttrCache = [];
 
     /**
      * @param bool $debug When true, log a warning when a prefixed handler
@@ -149,16 +145,14 @@ class MiddlewareBus implements Bus
             return;
         }
 
-        $class = get_class($object);
-
-        if (!$this->hasValidationAttributes($class)) {
+        if (!ValidationGuard::dtoHasRules(get_class($object))) {
             return;
         }
 
         $message = sprintf(
             'DTO "%s" has validation rules but no ValidationGuard is registered. '
             . 'Validation will not run. Register ValidationGuard as before-middleware on the bus.',
-            $class,
+            get_class($object),
         );
 
         if ($this->debug) {
@@ -166,36 +160,6 @@ class MiddlewareBus implements Bus
         }
 
         $this->logger?->warning($message);
-    }
-
-    /**
-     * Check if a class has any Rule attributes on its constructor parameters.
-     *
-     * @param class-string $class
-     */
-    private function hasValidationAttributes(string $class): bool
-    {
-        if (isset($this->validationAttrCache[$class])) {
-            return $this->validationAttrCache[$class];
-        }
-
-        try {
-            $constructor = (new \ReflectionClass($class))->getConstructor();
-        } catch (\ReflectionException) {
-            return $this->validationAttrCache[$class] = false;
-        }
-
-        if ($constructor === null) {
-            return $this->validationAttrCache[$class] = false;
-        }
-
-        foreach ($constructor->getParameters() as $param) {
-            if ($param->getAttributes(Rule::class, \ReflectionAttribute::IS_INSTANCEOF) !== []) {
-                return $this->validationAttrCache[$class] = true;
-            }
-        }
-
-        return $this->validationAttrCache[$class] = false;
     }
 
     /**

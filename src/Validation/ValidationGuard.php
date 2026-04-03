@@ -19,9 +19,45 @@ use Arcanum\Flow\Conveyor\HandlerProxy;
  */
 final class ValidationGuard implements Progression
 {
+    /** @var array<class-string, bool> */
+    private static array $ruleCache = [];
+
     public function __construct(
         private readonly Validator $validator = new Validator(),
     ) {
+    }
+
+    /**
+     * Check if a DTO class has any Rule attributes on its constructor parameters.
+     *
+     * Results are cached per class. Used by MiddlewareBus to detect when
+     * validation rules exist but no guard is registered.
+     *
+     * @param class-string $class
+     */
+    public static function dtoHasRules(string $class): bool
+    {
+        if (isset(self::$ruleCache[$class])) {
+            return self::$ruleCache[$class];
+        }
+
+        try {
+            $constructor = (new \ReflectionClass($class))->getConstructor();
+        } catch (\ReflectionException) {
+            return self::$ruleCache[$class] = false;
+        }
+
+        if ($constructor === null) {
+            return self::$ruleCache[$class] = false;
+        }
+
+        foreach ($constructor->getParameters() as $param) {
+            if ($param->getAttributes(Rule::class, \ReflectionAttribute::IS_INSTANCEOF) !== []) {
+                return self::$ruleCache[$class] = true;
+            }
+        }
+
+        return self::$ruleCache[$class] = false;
     }
 
     public function __invoke(object $payload, callable $next): void
