@@ -100,8 +100,18 @@ class MiddlewareBus implements Bus
             }
         }
 
-        /** @var callable */
-        return $this->container->get($this->handlerNameFor($object));
+        $handlerName = $this->handlerNameFor($object);
+
+        try {
+            /** @var callable */
+            return $this->container->get($handlerName);
+        } catch (\Throwable $e) {
+            throw new \RuntimeException(sprintf(
+                'No handler found for %s — expected class %s with an __invoke() method.',
+                get_class($object),
+                $handlerName,
+            ), 0, $e);
+        }
     }
 
     /**

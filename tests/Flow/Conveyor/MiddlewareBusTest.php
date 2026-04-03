@@ -226,7 +226,8 @@ final class MiddlewareBusTest extends TestCase
         $bus = new MiddlewareBus(new Container());
 
         // Act & Assert
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('No handler found for');
         $bus->dispatch(new EmptyDTO(), prefix: 'Delete');
     }
 
@@ -236,7 +237,8 @@ final class MiddlewareBusTest extends TestCase
         $bus = new MiddlewareBus(new Container());
 
         // Act & Assert
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('No handler found for');
         $bus->dispatch(new EmptyDTO());
     }
 
