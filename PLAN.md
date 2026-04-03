@@ -108,7 +108,7 @@ Shodo decoupled from Hyper — formatters produce strings, response renderers bu
 
 ### DX guardrails (framework fixes)
 
-- [ ] **Validation rules silently ignored without ValidationGuard** — If `ValidationGuard` isn't in the Conveyor middleware, `#[NotEmpty]`, `#[Email]` etc. do nothing with zero indication. Fix: detect validation attributes on a DTO at dispatch time and warn (or throw) if no ValidationGuard is registered.
+- [x] **Validation rules silently ignored without ValidationGuard** — If `ValidationGuard` isn't in the Conveyor middleware, `#[NotEmpty]`, `#[Email]` etc. do nothing with zero indication. Fix: detect validation attributes on a DTO at dispatch time and warn (or throw) if no ValidationGuard is registered.
 - [ ] **Template silently falls back to generic HTML** — If a template file doesn't match the DTO namespace (wrong directory, wrong case), the formatter silently renders a generic HTML dump. Fix: log a warning when fallback is used, or add a dev-mode strict option that throws instead.
 - [ ] **Handler errors say "class not found" not "handler not found"** — When `ProductsHandler` doesn't exist, the error is `"Cannot resolve service ... with non-existent class"`. Fix: catch this in MiddlewareBus and throw a clearer exception like `"No handler found for App\Domain\Shop\Query\Products — expected class App\Domain\Shop\Query\ProductsHandler with __invoke()"`.
 - [ ] **Promote `validate:handlers` in dev workflow** — The command exists but nobody knows about it. Fix: mention it in the starter app README, and consider running it automatically during bootstrap in dev mode (or as a pre-commit hook suggestion).
