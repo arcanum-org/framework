@@ -208,6 +208,38 @@ final class CsrfMiddlewareTest extends TestCase
         $this->assertInstanceOf(ResponseInterface::class, $response);
     }
 
+    public function testEmptyBearerTokenDoesNotBypassCsrf(): void
+    {
+        // Arrange — "Bearer " with no actual token should NOT skip CSRF
+        $registry = $this->registryWithSession();
+        $middleware = new CsrfMiddleware($registry);
+
+        // Act & Assert
+        $this->expectException(HttpException::class);
+        $this->expectExceptionCode(403);
+
+        $middleware->process(
+            $this->stubRequest('POST', [], ['Authorization' => 'Bearer ']),
+            $this->stubHandler(),
+        );
+    }
+
+    public function testWhitespaceBearerTokenDoesNotBypassCsrf(): void
+    {
+        // Arrange — "Bearer   " (whitespace only) should NOT skip CSRF
+        $registry = $this->registryWithSession();
+        $middleware = new CsrfMiddleware($registry);
+
+        // Act & Assert
+        $this->expectException(HttpException::class);
+        $this->expectExceptionCode(403);
+
+        $middleware->process(
+            $this->stubRequest('POST', [], ['Authorization' => 'Bearer   ']),
+            $this->stubHandler(),
+        );
+    }
+
     public function testBodyTokenTakesPriorityOverHeader(): void
     {
         $registry = $this->registryWithSession();

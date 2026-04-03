@@ -41,8 +41,9 @@ final class CsrfMiddleware implements MiddlewareInterface
         }
 
         // API clients using Bearer tokens don't need CSRF protection.
+        // Require a non-empty token — "Bearer " alone is not valid.
         $authorization = $request->getHeaderLine('Authorization');
-        if (str_starts_with($authorization, 'Bearer ')) {
+        if (str_starts_with($authorization, 'Bearer ') && trim(substr($authorization, 7)) !== '') {
             return $handler->handle($request);
         }
 
