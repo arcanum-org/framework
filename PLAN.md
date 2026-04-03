@@ -129,6 +129,10 @@ Shodo decoupled from Hyper — formatters produce strings, response renderers bu
 - [ ] **Add comments to magic attributes** — `#[RequiresAuth]`, `#[HttpOnly]`, `#[NotEmpty]` etc. are used in DTO examples with no comments. Add brief explanations of what they do and that they're automatic.
 - [ ] **Add example test** — `tests/` is empty. Add at least one example test showing how to test a Query handler.
 
+### Error message personality pass
+
+Full pass across every package to make error messages helpful, friendly, and fun. Developers are our primary audience — when things go wrong, the framework should feel like a knowledgeable friend, not a stack trace. Every message should: (1) say what went wrong clearly, (2) suggest what to do about it, (3) have personality without sacrificing precision. Scan all `throw new`, `RuntimeException`, `InvalidArgumentException`, `HttpException`, `LogicException`, and custom exception classes across `src/`. Rewrite dry messages, add "did you mean?" hints where possible, and ensure every error points the developer toward a fix.
+
 ### 10. Template Helpers — Shodo extension
 
 Template helpers use static-method-call syntax in templates: `{{ Route::url('query:health') }}`, `{{ Format::number($price, 2) }}`. Each helper group is a plain class with public methods, registered under a short alias. The compiler recognizes `Name::method(...)` patterns and rewrites them to `$__helpers['Name']->method(...)`.
