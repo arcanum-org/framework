@@ -106,6 +106,27 @@ Shodo decoupled from Hyper — formatters produce strings, response renderers bu
 - [ ] **Document template eval() security** — Shodo README should note that `{{! !}}` raw output bypasses escaping and must only be used with trusted content. The default `{{ }}` syntax is safe.
 - [ ] **Document Pattern regex ReDoS risk** — Validation README should note that `#[Pattern]` regexes run against user input and developers must avoid catastrophic backtracking patterns (nested quantifiers).
 
+### DX guardrails (framework fixes)
+
+- [ ] **Validation rules silently ignored without ValidationGuard** — If `ValidationGuard` isn't in the Conveyor middleware, `#[NotEmpty]`, `#[Email]` etc. do nothing with zero indication. Fix: detect validation attributes on a DTO at dispatch time and warn (or throw) if no ValidationGuard is registered.
+- [ ] **Template silently falls back to generic HTML** — If a template file doesn't match the DTO namespace (wrong directory, wrong case), the formatter silently renders a generic HTML dump. Fix: log a warning when fallback is used, or add a dev-mode strict option that throws instead.
+- [ ] **Handler errors say "class not found" not "handler not found"** — When `ProductsHandler` doesn't exist, the error is `"Cannot resolve service ... with non-existent class"`. Fix: catch this in MiddlewareBus and throw a clearer exception like `"No handler found for App\Domain\Shop\Query\Products — expected class App\Domain\Shop\Query\ProductsHandler with __invoke()"`.
+- [ ] **Promote `validate:handlers` in dev workflow** — The command exists but nobody knows about it. Fix: mention it in the starter app README, and consider running it automatically during bootstrap in dev mode (or as a pre-commit hook suggestion).
+- [ ] **Container has no circular dependency detection** — `A → B → A` causes a stack overflow with no useful message. Fix: track the resolution stack in `Container::get()` and throw `CircularDependencyException` with the full chain.
+- [ ] **Template undefined variables render as empty** — `{{ $missing }}` silently produces empty output. Fix: in dev mode, throw or warn on undefined template variables instead of silent empty.
+- [ ] **`service()` and `factory()` both cache after first call** — Developers expect `factory()` to create new instances each time, but it caches like a singleton. Fix: either rename to clarify semantics, document prominently, or make `factory()` actually create new instances (use `prototype()` for that currently).
+- [ ] **Bootstrapper ordering not enforced** — Auth depends on Sessions depends on Security. If a developer customizes their Kernel and reorders, they get `"Cannot resolve service 'ActiveSession'"` with no hint about ordering. Fix: have bootstrappers declare dependencies and validate the order at boot.
+- [ ] **Page discovery finds zero pages silently** — If `pages_directory` config points to a nonexistent path, no error, just no pages. Fix: warn at bootstrap if the configured pages directory doesn't exist.
+
+### Starter app improvements
+
+- [ ] **Add a getting-started README** — The starter app README is 3 lines. Needs: how to run the app, directory structure explanation, how to create a Query/Command/Page, how conventions work.
+- [ ] **Clean up config/auth.php placeholder credentials** — Hardcoded `"admin-token"` resolvers look like production code. Add clear `// TODO: Replace with real authentication` warnings.
+- [ ] **Simplify config/log.php** — Currently 200+ lines with 5 handler types. Replace with a minimal default (file logging) and comments pointing to Quill README for advanced config.
+- [ ] **Add database example to starter app** — Forge is a major feature but the starter app doesn't demonstrate it. Add a Model/ directory with example SQL files.
+- [ ] **Add comments to magic attributes** — `#[RequiresAuth]`, `#[HttpOnly]`, `#[NotEmpty]` etc. are used in DTO examples with no comments. Add brief explanations of what they do and that they're automatic.
+- [ ] **Add example test** — `tests/` is empty. Add at least one example test showing how to test a Query handler.
+
 ### 10. Template Helpers — Shodo extension
 
 Template helpers use static-method-call syntax in templates: `{{ Route::url('query:health') }}`, `{{ Format::number($price, 2) }}`. Each helper group is a plain class with public methods, registered under a short alias. The compiler recognizes `Name::method(...)` patterns and rewrites them to `$__helpers['Name']->method(...)`.
