@@ -464,4 +464,27 @@ final class ModelTest extends TestCase
         // Assert
         $this->assertSame('1', $result->lastInsertId());
     }
+
+    public function testRejectsPathTraversalInMethodName(): void
+    {
+        // Arrange
+        $model = $this->model();
+
+        // Act & Assert
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Invalid model method name");
+
+        $model->{'../../etc/passwd'}();
+    }
+
+    public function testRejectsDotsInMethodName(): void
+    {
+        // Arrange
+        $model = $this->model();
+
+        // Act & Assert
+        $this->expectException(\InvalidArgumentException::class);
+
+        $model->{'some.file'}();
+    }
 }

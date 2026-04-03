@@ -49,6 +49,12 @@ class Model
      */
     public function __call(string $method, array $args): Result
     {
+        if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $method)) {
+            throw new \InvalidArgumentException(
+                sprintf("Invalid model method name '%s'.", $method),
+            );
+        }
+
         $sql = $this->loadSql($method);
         $bindings = $this->loadBindings($method, $sql);
         $params = $bindings !== [] ? Sql::resolveArgs($args, $bindings) : [];
