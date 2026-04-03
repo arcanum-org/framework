@@ -26,7 +26,11 @@ use Arcanum\Test\Flow\Conveyor\Fixture\MaybeCreateHandler;
 use Arcanum\Test\Flow\Conveyor\Fixture\PostDoSomethingHandler;
 use Arcanum\Test\Flow\Conveyor\Fixture\QueueJob;
 use Arcanum\Test\Flow\Conveyor\Fixture\QueueJobHandler;
+use Arcanum\Test\Flow\Conveyor\Fixture\ValidatedDto;
+use Arcanum\Test\Flow\Conveyor\Fixture\ValidatedDtoHandler;
 use Arcanum\Flow\Continuum\Continuum;
+use Arcanum\Validation\ValidationGuard;
+use Psr\Log\LoggerInterface;
 
 #[CoversClass(MiddlewareBus::class)]
 #[UsesClass(\Arcanum\Flow\Pipeline\Pipeline::class)]
@@ -42,6 +46,9 @@ use Arcanum\Flow\Continuum\Continuum;
 #[UsesClass(\Arcanum\Cabinet\PrototypeProvider::class)]
 #[UsesClass(\Arcanum\Codex\Event\ClassRequested::class)]
 #[UsesClass(\Arcanum\Codex\Resolver::class)]
+#[UsesClass(ValidationGuard::class)]
+#[UsesClass(\Arcanum\Validation\Validator::class)]
+#[UsesClass(\Arcanum\Validation\Rule\NotEmpty::class)]
 #[UsesClass(\Arcanum\Quill\Logger::class)]
 #[UsesClass(\Arcanum\Quill\Channel::class)]
 #[UsesClass(EmptyDTO::class)]
@@ -305,5 +312,59 @@ final class MiddlewareBusTest extends TestCase
 
         // Assert — no return type → treated as void → EmptyDTO
         $this->assertInstanceOf(EmptyDTO::class, $result);
+    }
+
+    // -----------------------------------------------------------
+    // Validation guard detection
+    // -----------------------------------------------------------
+
+    public function testThrowsInDebugWhenValidationAttributesPresentButNoGuard(): void
+    {
+        // Arrange
+        $bus = new MiddlewareBus(new Container(), debug: true);
+
+        // Act & Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('has validation rules but no ValidationGuard');
+
+        $bus->dispatch(new ValidatedDto(name: 'test'));
+    }
+
+    public function testLogsWarningInProductionWhenValidationAttributesPresentButNoGuard(): void
+    {
+        // Arrange
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('warning')->with(
+            $this->stringContains('has validation rules but no ValidationGuard'),
+        );
+        $bus = new MiddlewareBus(new Container(), debug: false, logger: $logger);
+
+        // Act
+        $bus->dispatch(new ValidatedDto(name: 'test'));
+    }
+
+    public function testNoWarningWhenValidationGuardIsRegistered(): void
+    {
+        // Arrange
+        $bus = new MiddlewareBus(new Container(), debug: true);
+        $bus->before(new ValidationGuard());
+
+        // Act — should not throw
+        $result = $bus->dispatch(new ValidatedDto(name: 'test'));
+
+        // Assert
+        $this->assertInstanceOf(DoSomethingResult::class, $result);
+    }
+
+    public function testNoWarningForDtoWithoutValidationAttributes(): void
+    {
+        // Arrange — DoSomething has no validation attributes
+        $bus = new MiddlewareBus(new Container(), debug: true);
+
+        // Act — should not throw even without ValidationGuard
+        $result = $bus->dispatch(new DoSomething('test'));
+
+        // Assert
+        $this->assertInstanceOf(DoSomethingResult::class, $result);
     }
 }

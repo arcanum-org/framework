@@ -11,9 +11,16 @@ use Arcanum\Flow\Continuum\Continuation;
 use Arcanum\Flow\Continuum\Progression;
 use Arcanum\Flow\Pipeline\Pipeline;
 use Arcanum\Toolkit\Strings;
+use Arcanum\Validation\Rule;
+use Arcanum\Validation\ValidationGuard;
 
 class MiddlewareBus implements Bus
 {
+    private bool $hasValidationGuard = false;
+
+    /** @var array<class-string, bool> */
+    private array $validationAttrCache = [];
+
     /**
      * @param bool $debug When true, log a warning when a prefixed handler
      *                    is not found and the bus falls back to the unprefixed handler.
@@ -34,6 +41,9 @@ class MiddlewareBus implements Bus
     {
         foreach ($middleware as $layer) {
             $this->dispatchFlow = $this->dispatchFlow->add($layer);
+            if ($layer instanceof ValidationGuard) {
+                $this->hasValidationGuard = true;
+            }
         }
     }
 
@@ -52,6 +62,8 @@ class MiddlewareBus implements Bus
      */
     public function dispatch(object $object, string $prefix = ''): object
     {
+        $this->warnIfValidationMissing($object);
+
         return (new Pipeline())
             ->pipe($this->dispatchFlow)
             ->pipe(function (object $object) use ($prefix) {
@@ -122,6 +134,68 @@ class MiddlewareBus implements Bus
         }
 
         return false;
+    }
+
+    /**
+     * Warn or throw if a DTO has validation attributes but no ValidationGuard.
+     */
+    private function warnIfValidationMissing(object $object): void
+    {
+        if ($this->hasValidationGuard) {
+            return;
+        }
+
+        if ($object instanceof HandlerProxy) {
+            return;
+        }
+
+        $class = get_class($object);
+
+        if (!$this->hasValidationAttributes($class)) {
+            return;
+        }
+
+        $message = sprintf(
+            'DTO "%s" has validation rules but no ValidationGuard is registered. '
+            . 'Validation will not run. Register ValidationGuard as before-middleware on the bus.',
+            $class,
+        );
+
+        if ($this->debug) {
+            throw new \RuntimeException($message);
+        }
+
+        $this->logger?->warning($message);
+    }
+
+    /**
+     * Check if a class has any Rule attributes on its constructor parameters.
+     *
+     * @param class-string $class
+     */
+    private function hasValidationAttributes(string $class): bool
+    {
+        if (isset($this->validationAttrCache[$class])) {
+            return $this->validationAttrCache[$class];
+        }
+
+        try {
+            $constructor = (new \ReflectionClass($class))->getConstructor();
+        } catch (\ReflectionException) {
+            return $this->validationAttrCache[$class] = false;
+        }
+
+        if ($constructor === null) {
+            return $this->validationAttrCache[$class] = false;
+        }
+
+        foreach ($constructor->getParameters() as $param) {
+            if ($param->getAttributes(Rule::class, \ReflectionAttribute::IS_INSTANCEOF) !== []) {
+                return $this->validationAttrCache[$class] = true;
+            }
+        }
+
+        return $this->validationAttrCache[$class] = false;
     }
 
     /**
