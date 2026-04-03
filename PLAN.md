@@ -133,6 +133,8 @@ Shodo decoupled from Hyper — formatters produce strings, response renderers bu
 
 Full pass across every package to make error messages helpful, friendly, and fun. Developers are our primary audience — when things go wrong, the framework should feel like a knowledgeable friend, not a stack trace. Every message should: (1) say what went wrong clearly, (2) suggest what to do about it, (3) have personality without sacrificing precision. Scan all `throw new`, `RuntimeException`, `InvalidArgumentException`, `HttpException`, `LogicException`, and custom exception classes across `src/`. Rewrite dry messages, add "did you mean?" hints where possible, and ensure every error points the developer toward a fix.
 
+"Did you mean?" hints and solution suggestions should be configurable — on by default in development, off in production, and toggleable for developers who prefer terse output. A config key like `app.verbose_errors` (defaulting to the value of `app.debug`) controls this. The error message core (what went wrong) is always present; the hint/suggestion suffix is conditional.
+
 ### 10. Template Helpers — Shodo extension
 
 Template helpers use static-method-call syntax in templates: `{{ Route::url('query:health') }}`, `{{ Format::number($price, 2) }}`. Each helper group is a plain class with public methods, registered under a short alias. The compiler recognizes `Name::method(...)` patterns and rewrites them to `$__helpers['Name']->method(...)`.
