@@ -37,6 +37,13 @@ class Container implements Application, Specifier
     protected array $providers = [];
 
     /**
+     * Tracks classes currently being resolved to detect circular dependencies.
+     *
+     * @var array<string, true>
+     */
+    private array $resolving = [];
+
+    /**
      * @var \Arcanum\Flow\Pipeline\System
      */
     protected System $decorators;
@@ -261,25 +268,42 @@ class Container implements Application, Specifier
             throw new InvalidKey("Invalid key type: " . gettype($offset));
         }
 
-        // Provide the instance.
-        $provider = $this->providers[$offset] ?? null;
-
-        if ($provider === null) {
-            if (!class_exists($offset)) {
-                throw new \InvalidArgumentException(
-                    "Cannot resolve service '$offset' with non-existent class '$offset'"
-                );
-            }
-            $provider = PrototypeProvider::fromFactory($this->simpleFactory($offset));
+        // Circular dependency detection.
+        if (isset($this->resolving[$offset])) {
+            $chain = array_keys($this->resolving);
+            $chain[] = $offset;
+            $this->resolving = [];
+            throw new \RuntimeException(sprintf(
+                'Circular dependency detected: %s',
+                implode(' → ', $chain),
+            ));
         }
 
-        $instance = $provider($this);
+        $this->resolving[$offset] = true;
 
-        // Apply decorators.
-        $instance = $this->applyDecorators($offset, $instance, $provider);
+        try {
+            // Provide the instance.
+            $provider = $this->providers[$offset] ?? null;
 
-        // Apply middleware.
-        return $this->middleware->send($offset, $instance);
+            if ($provider === null) {
+                if (!class_exists($offset)) {
+                    throw new \InvalidArgumentException(
+                        "Cannot resolve service '$offset' with non-existent class '$offset'"
+                    );
+                }
+                $provider = PrototypeProvider::fromFactory($this->simpleFactory($offset));
+            }
+
+            $instance = $provider($this);
+
+            // Apply decorators.
+            $instance = $this->applyDecorators($offset, $instance, $provider);
+
+            // Apply middleware.
+            return $this->middleware->send($offset, $instance);
+        } finally {
+            unset($this->resolving[$offset]);
+        }
     }
 
     /**

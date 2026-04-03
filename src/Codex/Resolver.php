@@ -25,6 +25,13 @@ class Resolver implements ClassResolver, Specifier
     private $specifications = [];
 
     /**
+     * Tracks classes currently being resolved to detect circular dependencies.
+     *
+     * @var array<string, true>
+     */
+    private array $resolving = [];
+
+    /**
      * Resolver uses a container to resolve dependencies.
      */
     private function __construct(
@@ -67,6 +74,32 @@ class Resolver implements ClassResolver, Specifier
             return $this->finalize($instance);
         }
 
+        // Circular dependency detection — only for reflection-based resolution.
+        if (isset($this->resolving[$className])) {
+            $chain = array_keys($this->resolving);
+            $chain[] = $className;
+            $this->resolving = [];
+            throw new \RuntimeException(sprintf(
+                'Circular dependency detected: %s',
+                implode(' → ', $chain),
+            ));
+        }
+
+        $this->resolving[$className] = true;
+
+        try {
+            /** @var T */
+            return $this->doResolve($className);
+        } finally {
+            unset($this->resolving[$className]);
+        }
+    }
+
+    /**
+     * @param class-string $className
+     */
+    private function doResolve(string $className): object
+    {
         $image = new \ReflectionClass($className);
 
         // If it is not instantiable, we cannot resolve it.
@@ -91,7 +124,7 @@ class Resolver implements ClassResolver, Specifier
         // Otherwise, we need to resolve the parameters as dependencies.
         $dependencies = $this->resolveParameters($parameters, $className);
 
-        /** @var T */
+        /** @var object $instance */
         $instance = $image->newInstanceArgs($dependencies);
         return $this->finalize($instance);
     }

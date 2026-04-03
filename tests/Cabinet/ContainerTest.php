@@ -1204,4 +1204,16 @@ final class ContainerTest extends TestCase
         $result = $container->get(Fixture\SimpleDependency::class);
         $this->assertInstanceOf(Fixture\SimpleDependency::class, $result);
     }
+
+    public function testCircularDependencyThrowsWithChain(): void
+    {
+        // Arrange
+        $container = new Container();
+
+        // Act & Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Circular dependency detected:');
+
+        $container->get(Fixture\CircularA::class);
+    }
 }
