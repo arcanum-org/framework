@@ -17,7 +17,7 @@ use Arcanum\Flow\Conveyor\HandlerProxy;
  * HandlerProxy payloads are skipped — dynamic DTOs don't have constructor
  * params to validate.
  */
-final class ValidationGuard implements Progression
+final class ValidationGuard implements Progression, ValidatesInput
 {
     /** @var array<class-string, bool> */
     private static array $ruleCache = [];
