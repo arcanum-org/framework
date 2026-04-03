@@ -11,7 +11,6 @@ use Arcanum\Flow\Continuum\Continuation;
 use Arcanum\Flow\Continuum\Progression;
 use Arcanum\Flow\Pipeline\Pipeline;
 use Arcanum\Toolkit\Strings;
-use Arcanum\Validation\ValidatesInput;
 use Arcanum\Validation\ValidationGuard;
 
 class MiddlewareBus implements Bus

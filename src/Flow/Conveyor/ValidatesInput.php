@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Arcanum\Validation;
+namespace Arcanum\Flow\Conveyor;
 
 /**
  * Marker interface for Conveyor middleware that validates DTO input.

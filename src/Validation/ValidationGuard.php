@@ -6,6 +6,7 @@ namespace Arcanum\Validation;
 
 use Arcanum\Flow\Continuum\Progression;
 use Arcanum\Flow\Conveyor\HandlerProxy;
+use Arcanum\Flow\Conveyor\ValidatesInput;
 
 /**
  * Conveyor before-middleware that validates DTOs before handler dispatch.
