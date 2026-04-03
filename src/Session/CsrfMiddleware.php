@@ -17,9 +17,6 @@ use Psr\Http\Server\RequestHandlerInterface;
  * Validates a CSRF token on state-changing requests (POST, PUT, PATCH, DELETE).
  * The token is read from the `_token` body parameter or the `X-CSRF-TOKEN` header.
  *
- * Requests with a Bearer token in the Authorization header are skipped —
- * API clients authenticate via tokens and don't need CSRF protection.
- *
  * Safe methods (GET, HEAD, OPTIONS) are always allowed through.
  */
 final class CsrfMiddleware implements MiddlewareInterface
@@ -37,13 +34,6 @@ final class CsrfMiddleware implements MiddlewareInterface
         $method = strtoupper($request->getMethod());
 
         if (!in_array($method, self::STATE_CHANGING_METHODS, true)) {
-            return $handler->handle($request);
-        }
-
-        // API clients using Bearer tokens don't need CSRF protection.
-        // Require a non-empty token — "Bearer " alone is not valid.
-        $authorization = $request->getHeaderLine('Authorization');
-        if (str_starts_with($authorization, 'Bearer ') && trim(substr($authorization, 7)) !== '') {
             return $handler->handle($request);
         }
 

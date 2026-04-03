@@ -195,47 +195,19 @@ final class CsrfMiddlewareTest extends TestCase
         );
     }
 
-    public function testBearerTokenBypassesCsrf(): void
+    public function testBearerHeaderDoesNotBypassCsrf(): void
     {
+        // Arrange — Bearer tokens no longer bypass CSRF. Coordination with
+        // Auth for token-authenticated requests is a separate concern.
         $registry = $this->registryWithSession();
         $middleware = new CsrfMiddleware($registry);
 
-        $response = $middleware->process(
+        // Act & Assert
+        $this->expectException(HttpException::class);
+        $this->expectExceptionCode(403);
+
+        $middleware->process(
             $this->stubRequest('POST', [], ['Authorization' => 'Bearer some-api-token']),
-            $this->stubHandler(),
-        );
-
-        $this->assertInstanceOf(ResponseInterface::class, $response);
-    }
-
-    public function testEmptyBearerTokenDoesNotBypassCsrf(): void
-    {
-        // Arrange — "Bearer " with no actual token should NOT skip CSRF
-        $registry = $this->registryWithSession();
-        $middleware = new CsrfMiddleware($registry);
-
-        // Act & Assert
-        $this->expectException(HttpException::class);
-        $this->expectExceptionCode(403);
-
-        $middleware->process(
-            $this->stubRequest('POST', [], ['Authorization' => 'Bearer ']),
-            $this->stubHandler(),
-        );
-    }
-
-    public function testWhitespaceBearerTokenDoesNotBypassCsrf(): void
-    {
-        // Arrange — "Bearer   " (whitespace only) should NOT skip CSRF
-        $registry = $this->registryWithSession();
-        $middleware = new CsrfMiddleware($registry);
-
-        // Act & Assert
-        $this->expectException(HttpException::class);
-        $this->expectExceptionCode(403);
-
-        $middleware->process(
-            $this->stubRequest('POST', [], ['Authorization' => 'Bearer   ']),
             $this->stubHandler(),
         );
     }

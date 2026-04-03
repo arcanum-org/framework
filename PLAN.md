@@ -98,7 +98,8 @@ Shodo decoupled from Hyper — formatters produce strings, response renderers bu
 
 ### Security fixes (priority)
 
-- [ ] **CSRF bypass via empty Bearer token** — `CsrfMiddleware` skips protection when `Authorization: Bearer ` is present, even with an empty/whitespace token. An attacker can add this header to any forged request to bypass CSRF on session-based endpoints. Fix: verify the token after `Bearer ` is non-empty before skipping CSRF.
+- [x] **Remove Bearer token CSRF bypass entirely** — `CsrfMiddleware` no longer skips protection for Bearer tokens. Any header value could be forged, so the presence of a Bearer header is not proof of API-client status. CSRF is now enforced on all state-changing requests regardless of Authorization header.
+- [ ] **CSRF/Auth coordination for token-authenticated requests** — API clients using Bearer tokens don't need CSRF (they're not vulnerable to cookie-based forgery). The CSRF middleware should coordinate with Auth: skip CSRF only when the request has been successfully authenticated via a token guard, not based on the raw header. Requires CSRF to run after Auth, or Auth to set a request attribute that CSRF checks.
 - [ ] **Bearer token not trimmed** — `TokenGuard` extracts the token via `substr($header, 7)` without trimming. Trailing whitespace causes silent auth failure (token doesn't match stored value). Fix: `trim(substr($header, 7))`.
 - [ ] **`#[Url]` validates `javascript:` URLs** — the `Url` validation rule accepts `javascript:`, `data:`, and other dangerous URI schemes. If a developer uses a validated URL in a redirect or `href`, it's an XSS vector. Fix: reject non-http(s) schemes, or add a `#[SafeUrl]` rule that does.
 - [ ] **Model::loadSql() path traversal** — `Model::__call()` builds a file path from the method name without validation. `$model->{'../../config'}()` traverses out of the Model directory. Fix: validate method names match `/^[a-zA-Z_][a-zA-Z0-9_]*$/` before building the path.
