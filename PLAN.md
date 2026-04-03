@@ -96,6 +96,14 @@ Shodo decoupled from Hyper — formatters produce strings, response renderers bu
 
 ## Upcoming Work
 
+### Security fixes (priority)
+
+- [ ] **CSRF bypass via empty Bearer token** — `CsrfMiddleware` skips protection when `Authorization: Bearer ` is present, even with an empty/whitespace token. An attacker can add this header to any forged request to bypass CSRF on session-based endpoints. Fix: verify the token after `Bearer ` is non-empty before skipping CSRF.
+- [ ] **Bearer token not trimmed** — `TokenGuard` extracts the token via `substr($header, 7)` without trimming. Trailing whitespace causes silent auth failure (token doesn't match stored value). Fix: `trim(substr($header, 7))`.
+- [ ] **`#[Url]` validates `javascript:` URLs** — the `Url` validation rule accepts `javascript:`, `data:`, and other dangerous URI schemes. If a developer uses a validated URL in a redirect or `href`, it's an XSS vector. Fix: reject non-http(s) schemes, or add a `#[SafeUrl]` rule that does.
+- [ ] **Document template eval() security** — Shodo README should note that `{{! !}}` raw output bypasses escaping and must only be used with trusted content. The default `{{ }}` syntax is safe.
+- [ ] **Document Pattern regex ReDoS risk** — Validation README should note that `#[Pattern]` regexes run against user input and developers must avoid catastrophic backtracking patterns (nested quantifiers).
+
 ### 10. Template Helpers — Shodo extension
 
 Template helpers use static-method-call syntax in templates: `{{ Route::url('query:health') }}`, `{{ Format::number($price, 2) }}`. Each helper group is a plain class with public methods, registered under a short alias. The compiler recognizes `Name::method(...)` patterns and rewrites them to `$__helpers['Name']->method(...)`.
