@@ -8,13 +8,13 @@ use Arcanum\Validation\Rule;
 use Arcanum\Validation\ValidationError;
 
 /**
- * Validates that a value is an HTTP or HTTPS URL.
+ * Validates URL format via `filter_var(FILTER_VALIDATE_URL)`.
  *
- * Rejects other schemes (ftp://, file://, etc.) since most use cases
- * expect web URLs. Use #[AnyUrl] for broader scheme support.
+ * Accepts any scheme (http, https, ftp, etc.). Use #[Url] instead
+ * if you only want http/https — which is the safer default.
  */
 #[\Attribute(\Attribute::TARGET_PARAMETER)]
-final class Url implements Rule
+final class AnyUrl implements Rule
 {
     public function validate(mixed $value, string $field): ValidationError|null
     {
@@ -26,15 +26,6 @@ final class Url implements Rule
             return new ValidationError(
                 $field,
                 "The {$field} field must be a valid URL.",
-            );
-        }
-
-        $scheme = parse_url($value, PHP_URL_SCHEME);
-        $scheme = is_string($scheme) ? strtolower($scheme) : '';
-        if ($scheme !== 'http' && $scheme !== 'https') {
-            return new ValidationError(
-                $field,
-                "The {$field} field must use http or https.",
             );
         }
 

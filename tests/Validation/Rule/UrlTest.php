@@ -52,4 +52,31 @@ final class UrlTest extends TestCase
 
         $this->assertNull($rule->validate(42, 'website'));
     }
+
+    public function testHttpUrlPasses(): void
+    {
+        $rule = new Url();
+
+        $this->assertNull($rule->validate('http://example.com', 'website'));
+    }
+
+    public function testFtpUrlRejected(): void
+    {
+        $rule = new Url();
+
+        $error = $rule->validate('ftp://example.com/file.txt', 'website');
+
+        $this->assertInstanceOf(ValidationError::class, $error);
+        $this->assertSame('The website field must use http or https.', $error->message);
+    }
+
+    public function testFileUrlRejected(): void
+    {
+        $rule = new Url();
+
+        $error = $rule->validate('file:///etc/passwd', 'website');
+
+        $this->assertInstanceOf(ValidationError::class, $error);
+        $this->assertSame('The website field must use http or https.', $error->message);
+    }
 }
