@@ -118,7 +118,7 @@ Shodo decoupled from Hyper — formatters produce strings, response renderers bu
 - [x] **Template undefined variables render as empty** — `{{ $missing }}` silently produces empty output. Fix: in dev mode, throw or warn on undefined template variables instead of silent empty.
 - [ ] **Document that `factory()` caches after first call** — `factory()` runs the closure once and caches the result (same as `service()`). For a new instance every call, use `prototype()` or `prototypeFactory()`. Document this prominently in the Cabinet README with a clear comparison table.
 - [x] **Bootstrapper ordering not enforced** — Auth depends on Sessions depends on Security. If a developer customizes their Kernel and reorders, they get `"Cannot resolve service 'ActiveSession'"` with no hint about ordering. Fix: have bootstrappers declare dependencies and validate the order at boot.
-- [ ] **Page discovery finds zero pages silently** — If `pages_directory` config points to a nonexistent path, no error, just no pages. Fix: warn at bootstrap if the configured pages directory doesn't exist.
+- [x] **Page discovery finds zero pages silently** — If `pages_directory` config points to a nonexistent path, no error, just no pages. Fix: warn at bootstrap if the configured pages directory doesn't exist.
 
 ### Starter app improvements
 
