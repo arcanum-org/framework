@@ -271,7 +271,7 @@ Convention: command handler returns a Query DTO instance → framework resolves 
 - [x] **LocationResolver tests** — resolves Query DTO with/without properties, returns null for unresolvable class, base URL handling, query string building.
 - [x] **Bootstrap wiring** — register LocationResolver in `Bootstrap\Routing` after UrlResolver, with `app.url` base URL.
 - [x] **Starter app Kernel** — add Location header to 201 responses via LocationResolver.
-- [ ] **Integration tests** — 201 + Location header for DTO return, 204 no Location for void, 202 no Location for null.
+- [x] **Integration tests** — 201 + Location header for DTO return, 204 no Location for void, 202 no Location for null.
 - [x] **Atlas README** — document LocationResolver and the return-Query-DTO convention.
 
 ---
