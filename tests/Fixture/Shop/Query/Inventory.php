@@ -9,4 +9,8 @@ use Arcanum\Atlas\Attribute\AllowedFormats;
 #[AllowedFormats('json')]
 final class Inventory
 {
+    public function __construct(
+        public readonly string $id = '',
+    ) {
+    }
 }

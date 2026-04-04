@@ -261,12 +261,18 @@ Planned:
 - [x] **Tests** — fallback, formatter, response renderer unit tests.
 - [x] **Shodo README** — add Markdown to formatter docs.
 
-### Deferred — Command Response Enhancements
+### Command Response Enhancements
 
-Blocked on reverse routing (Template Helpers item 10):
+Previously blocked on reverse routing (item 10), now unblocked.
 
-- **`Location` header for 201 responses** — requires URL generation from a class/identifier
-- **Integration tests for 202/201 in Kernel** — straightforward once Location header is settled
+Convention: command handler returns a Query DTO instance → framework resolves class → URL path, public properties → query params, adds Location header to 201 Created response. If the returned object can't be resolved, no Location header — still 201.
+
+- [ ] **LocationResolver** — `Atlas\LocationResolver` class. Composes `UrlResolver` + base URL. `resolve(object $dto): ?string` returns full URL with query params, or null on `UnresolvableRoute`.
+- [ ] **LocationResolver tests** — resolves Query DTO with/without properties, returns null for unresolvable class, base URL handling, query string building.
+- [ ] **Bootstrap wiring** — register LocationResolver in `Bootstrap\Routing` after UrlResolver, with `app.url` base URL.
+- [ ] **Starter app Kernel** — add Location header to 201 responses via LocationResolver.
+- [ ] **Integration tests** — 201 + Location header for DTO return, 204 no Location for void, 202 no Location for null.
+- [ ] **Atlas README** — document LocationResolver and the return-Query-DTO convention.
 
 ---
 

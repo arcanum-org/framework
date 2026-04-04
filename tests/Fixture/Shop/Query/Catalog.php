@@ -9,4 +9,9 @@ use Arcanum\Atlas\Attribute\AllowedFormats;
 #[AllowedFormats('json', 'html', 'csv')]
 final class Catalog
 {
+    public function __construct(
+        public readonly string $category = '',
+        public readonly int $page = 1,
+    ) {
+    }
 }
