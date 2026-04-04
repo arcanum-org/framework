@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Atlas;
 
+use Arcanum\Atlas\Attribute\AllowedFormats;
 use Arcanum\Glitch\HttpException;
 use Arcanum\Hyper\StatusCode;
 use Psr\Http\Message\ServerRequestInterface;
@@ -83,11 +84,14 @@ final class HttpRouter implements Router
 
         // Custom routes take priority over everything.
         if ($this->routeMap !== null && $this->routeMap->has($cleanPath)) {
-            return $this->routeMap->resolve(
+            $route = $this->routeMap->resolve(
                 $cleanPath,
                 $method,
                 $hasExtension ? $extensionFormat : null,
             );
+            $this->assertFormatAllowed($route);
+
+            return $route;
         }
 
         if ($this->pages !== null && $this->pages->has($cleanPath)) {
@@ -95,10 +99,13 @@ final class HttpRouter implements Router
                 throw new MethodNotAllowed(self::QUERY_METHODS);
             }
 
-            return $this->pages->resolve(
+            $route = $this->pages->resolve(
                 $cleanPath,
                 $hasExtension ? $extensionFormat : null,
             );
+            $this->assertFormatAllowed($route);
+
+            return $route;
         }
 
         $route = $this->resolver->resolve(
@@ -108,6 +115,8 @@ final class HttpRouter implements Router
         );
 
         if (class_exists($route->dtoClass)) {
+            $this->assertFormatAllowed($route);
+
             return $route;
         }
 
@@ -118,6 +127,39 @@ final class HttpRouter implements Router
         }
 
         $this->throwForMissingClass($route, $cleanPath, $method, $extensionFormat);
+    }
+
+    /**
+     * Throw 406 Not Acceptable if the DTO restricts formats and the
+     * requested format isn't in the allowed list.
+     */
+    private function assertFormatAllowed(Route $route): void
+    {
+        if (!class_exists($route->dtoClass)) {
+            return;
+        }
+
+        $ref = new \ReflectionClass($route->dtoClass);
+        $attrs = $ref->getAttributes(AllowedFormats::class);
+
+        if ($attrs === []) {
+            return;
+        }
+
+        /** @var AllowedFormats $allowed */
+        $allowed = $attrs[0]->newInstance();
+
+        if (!in_array($route->format, $allowed->formats, true)) {
+            throw new HttpException(
+                StatusCode::NotAcceptable,
+                sprintf(
+                    'Format "%s" is not allowed for "%s". Allowed formats: %s.',
+                    $route->format,
+                    $route->dtoClass,
+                    implode(', ', $allowed->formats),
+                ),
+            );
+        }
     }
 
     /**

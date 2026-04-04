@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Atlas;
 
+use Arcanum\Atlas\Attribute\AllowedFormats;
 use Arcanum\Atlas\ConventionResolver;
 use Arcanum\Atlas\HttpRouter;
 use Arcanum\Atlas\MethodNotAllowed;
@@ -21,6 +22,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\UriInterface;
 
 #[CoversClass(HttpRouter::class)]
+#[UsesClass(AllowedFormats::class)]
 #[UsesClass(ConventionResolver::class)]
 #[UsesClass(HttpException::class)]
 #[UsesClass(MethodNotAllowed::class)]
@@ -737,5 +739,159 @@ final class HttpRouterTest extends TestCase
         // Act & Assert
         $this->expectException(MethodNotAllowed::class);
         $this->router()->resolve($request);
+    }
+
+    // ---------------------------------------------------------------
+    // #[AllowedFormats] — format restriction via DTO attribute
+    // ---------------------------------------------------------------
+
+    public function testThrows406WhenFormatNotAllowed(): void
+    {
+        // Arrange — Shop\Query\Inventory has #[AllowedFormats('json')]
+        $request = $this->stubRequest('GET', '/shop/inventory.html');
+
+        // Act & Assert
+        $this->expectException(HttpException::class);
+        $this->router()->resolve($request);
+    }
+
+    public function testAllowsMatchingFormat(): void
+    {
+        // Arrange — Shop\Query\Inventory has #[AllowedFormats('json')]
+        $request = $this->stubRequest('GET', '/shop/inventory.json');
+
+        // Act
+        $route = $this->router()->resolve($request);
+
+        // Assert
+        $this->assertSame(self::ROOT_NS . '\\Shop\\Query\\Inventory', $route->dtoClass);
+        $this->assertSame('json', $route->format);
+    }
+
+    public function testNoAttributeMeansAllFormatsAllowed(): void
+    {
+        // Arrange — Shop\Query\Products has no #[AllowedFormats]
+        $request = $this->stubRequest('GET', '/shop/products.csv');
+
+        // Act
+        $route = $this->router()->resolve($request);
+
+        // Assert
+        $this->assertSame(self::ROOT_NS . '\\Shop\\Query\\Products', $route->dtoClass);
+        $this->assertSame('csv', $route->format);
+    }
+
+    public function testMultipleAllowedFormats(): void
+    {
+        // Arrange — Shop\Query\Catalog has #[AllowedFormats('json', 'html', 'csv')]
+        $router = $this->router();
+
+        // Act
+        $json = $router->resolve($this->stubRequest('GET', '/shop/catalog.json'));
+        $html = $router->resolve($this->stubRequest('GET', '/shop/catalog.html'));
+        $csv = $router->resolve($this->stubRequest('GET', '/shop/catalog.csv'));
+
+        // Assert
+        $this->assertSame('json', $json->format);
+        $this->assertSame('html', $html->format);
+        $this->assertSame('csv', $csv->format);
+    }
+
+    public function testMultipleAllowedFormatsRejectsUnlisted(): void
+    {
+        // Arrange — Shop\Query\Catalog has #[AllowedFormats('json', 'html', 'csv')]
+        $request = $this->stubRequest('GET', '/shop/catalog.xml');
+
+        // Act & Assert
+        $this->expectException(HttpException::class);
+        $this->router()->resolve($request);
+    }
+
+    public function test406StatusCodeForDisallowedFormat(): void
+    {
+        // Arrange
+        $request = $this->stubRequest('GET', '/shop/inventory.html');
+
+        // Act
+        try {
+            $this->router()->resolve($request);
+            $this->fail('Expected HttpException');
+        } catch (HttpException $e) {
+            // Assert
+            $this->assertSame(StatusCode::NotAcceptable, $e->getStatusCode());
+        }
+    }
+
+    public function test406MessageIncludesClassAndFormats(): void
+    {
+        // Arrange
+        $request = $this->stubRequest('GET', '/shop/inventory.html');
+
+        // Act
+        try {
+            $this->router()->resolve($request);
+            $this->fail('Expected HttpException');
+        } catch (HttpException $e) {
+            // Assert
+            $this->assertStringContainsString('html', $e->getMessage());
+            $this->assertStringContainsString('Inventory', $e->getMessage());
+            $this->assertStringContainsString('json', $e->getMessage());
+        }
+    }
+
+    public function testFormatCheckAppliesToPages(): void
+    {
+        // Arrange — Pages\RestrictedPage has #[AllowedFormats('html')]
+        $pages = new PageResolver(namespace: self::PAGES_NS);
+        $pages->register('/restricted-page');
+        $router = new HttpRouter(new ConventionResolver(self::ROOT_NS), pages: $pages);
+
+        $request = $this->stubRequest('GET', '/restricted-page.json');
+
+        // Act & Assert
+        $this->expectException(HttpException::class);
+        $router->resolve($request);
+    }
+
+    public function testPageWithAllowedFormatSucceeds(): void
+    {
+        // Arrange — Pages\RestrictedPage has #[AllowedFormats('html')]
+        $pages = new PageResolver(namespace: self::PAGES_NS);
+        $pages->register('/restricted-page');
+        $router = new HttpRouter(new ConventionResolver(self::ROOT_NS), pages: $pages);
+
+        $request = $this->stubRequest('GET', '/restricted-page.html');
+
+        // Act
+        $route = $router->resolve($request);
+
+        // Assert
+        $this->assertSame(self::PAGES_NS . '\\RestrictedPage', $route->dtoClass);
+        $this->assertSame('html', $route->format);
+    }
+
+    public function testDefaultFormatCheckedAgainstAllowedFormats(): void
+    {
+        // Arrange — Shop\Query\Inventory has #[AllowedFormats('json')],
+        // default format is 'json', no extension → should succeed
+        $request = $this->stubRequest('GET', '/shop/inventory');
+
+        // Act
+        $route = $this->router()->resolve($request);
+
+        // Assert
+        $this->assertSame('json', $route->format);
+    }
+
+    public function testDefaultFormatRejectedWhenNotAllowed(): void
+    {
+        // Arrange — Shop\Query\Inventory has #[AllowedFormats('json')],
+        // but default format is 'html' → should fail
+        $router = new HttpRouter(new ConventionResolver(self::ROOT_NS), defaultFormat: 'html');
+        $request = $this->stubRequest('GET', '/shop/inventory');
+
+        // Act & Assert
+        $this->expectException(HttpException::class);
+        $router->resolve($request);
     }
 }

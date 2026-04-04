@@ -236,6 +236,30 @@ final class PlaceOrder
 
 All three attributes are repeatable — stack as many as needed. They accept a single class-string argument.
 
+### Format restriction
+
+Use `#[AllowedFormats]` to restrict which response formats a DTO accepts. Requesting a disallowed format returns **406 Not Acceptable**. DTOs without the attribute accept all registered formats (backwards compatible).
+
+```php
+use Arcanum\Atlas\Attribute\AllowedFormats;
+
+#[AllowedFormats('json', 'html')]
+final class Products
+{
+    public function __construct(
+        public readonly string $category = '',
+    ) {}
+}
+```
+
+```
+GET /shop/products.json  → 200 OK
+GET /shop/products.html  → 200 OK
+GET /shop/products.csv   → 406 Not Acceptable
+```
+
+Works on Queries, Commands, and Pages. Format strings are case-insensitive (`'JSON'` and `'json'` are equivalent). The check runs in the router before hydration or handler dispatch.
+
 ### Co-located Middleware.php files
 
 Place a `Middleware.php` file in any domain directory to apply middleware to **all** handlers beneath it:
