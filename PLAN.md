@@ -123,11 +123,11 @@ Shodo decoupled from Hyper — formatters produce strings, response renderers bu
 ### Starter app improvements
 
 - [ ] **Add a getting-started README** — The starter app README is 3 lines. Needs: how to run the app, directory structure explanation, how to create a Query/Command/Page, how conventions work.
-- [ ] **Clean up config/auth.php placeholder credentials** — Hardcoded `"admin-token"` resolvers look like production code. Add clear `// TODO: Replace with real authentication` warnings.
-- [ ] **Simplify config/log.php** — Currently 200+ lines with 5 handler types. Replace with a minimal default (file logging) and comments pointing to Quill README for advanced config.
+- [x] **Clean up config/auth.php placeholder credentials** — Added `// TODO: Replace with real authentication` warning. Added comment showing array guard syntax.
+- [x] **Simplify config/log.php** — Replaced 203 lines with minimal default (one file handler, one channel, comment pointing to Quill README).
 - [ ] **Add database example to starter app** — Forge is a major feature but the starter app doesn't demonstrate it. Add a Model/ directory with example SQL files.
-- [ ] **Add comments to magic attributes** — `#[RequiresAuth]`, `#[HttpOnly]`, `#[NotEmpty]` etc. are used in DTO examples with no comments. Add brief explanations of what they do and that they're automatic.
-- [ ] **Add example test** — `tests/` is empty. Add at least one example test showing how to test a Query handler.
+- [x] **Add comments to magic attributes** — Inline comments on `#[RequiresAuth]`, `#[RequiresRole]`, `#[HttpOnly]`, `#[NotEmpty]`, `#[Email]`, `#[Description]` explaining what they do.
+- [x] **Add example test** — `HealthHandlerTest` demonstrates testing a Query handler: construct DTO, call handler, assert result.
 
 ### Maintenance — Split Bootstrap\Routing
 
