@@ -122,7 +122,7 @@ Shodo decoupled from Hyper — formatters produce strings, response renderers bu
 
 ### Starter app improvements
 
-- [ ] **Add a getting-started README** — The starter app README is 3 lines. Needs: how to run the app, directory structure explanation, how to create a Query/Command/Page, how conventions work.
+- [x] **Add a getting-started README** — Full README covering quick start, CQRS concepts (queries/commands/pages), directory structure, validation, auth, response formats, testing, and development workflow.
 - [x] **Clean up config/auth.php placeholder credentials** — Added `// TODO: Replace with real authentication` warning. Added comment showing array guard syntax.
 - [x] **Simplify config/log.php** — Replaced 203 lines with minimal default (one file handler, one channel, comment pointing to Quill README).
 - [ ] **Add database example to starter app** — Forge is a major feature but the starter app doesn't demonstrate it. Add a Model/ directory with example SQL files.
