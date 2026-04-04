@@ -88,45 +88,36 @@ class Resolver implements ClassResolver, Specifier
         $this->resolving[$className] = true;
 
         try {
+            $image = new \ReflectionClass($className);
+
+            // If it is not instantiable, we cannot resolve it.
+            if (!$image->isInstantiable()) {
+                throw new Error\UnresolvableClass(message: $className);
+            }
+
+            $constructor = $image->getConstructor();
+
+            // If it has no constructor, we can just instantiate it.
+            if ($constructor === null) {
+                return $this->finalize(new $className());
+            }
+
+            $parameters = $constructor->getParameters();
+
+            // If it has a constructor, but no parameters, we can just instantiate it.
+            if (count($parameters) === 0) {
+                return $this->finalize(new $className());
+            }
+
+            // Otherwise, we need to resolve the parameters as dependencies.
+            $dependencies = $this->resolveParameters($parameters, $className);
+
             /** @var T */
-            return $this->doResolve($className);
+            $instance = $image->newInstanceArgs($dependencies);
+            return $this->finalize($instance);
         } finally {
             unset($this->resolving[$className]);
         }
-    }
-
-    /**
-     * @param class-string $className
-     */
-    private function doResolve(string $className): object
-    {
-        $image = new \ReflectionClass($className);
-
-        // If it is not instantiable, we cannot resolve it.
-        if (!$image->isInstantiable()) {
-            throw new Error\UnresolvableClass(message: $className);
-        }
-
-        $constructor = $image->getConstructor();
-
-        // If it has no constructor, we can just instantiate it.
-        if ($constructor === null) {
-            return $this->finalize(new $className());
-        }
-
-        $parameters = $constructor->getParameters();
-
-        // If it has a constructor, but no parameters, we can just instantiate it.
-        if (count($parameters) === 0) {
-            return $this->finalize(new $className());
-        }
-
-        // Otherwise, we need to resolve the parameters as dependencies.
-        $dependencies = $this->resolveParameters($parameters, $className);
-
-        /** @var object $instance */
-        $instance = $image->newInstanceArgs($dependencies);
-        return $this->finalize($instance);
     }
 
     /**
