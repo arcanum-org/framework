@@ -133,20 +133,20 @@ Shodo decoupled from Hyper — formatters produce strings, response renderers bu
 
 `Bootstrap\Routing` is 430+ lines handling formatters, routers, helpers, URL resolvers, and bus middleware. Split into three focused bootstrappers:
 
-- [ ] **`Bootstrap\Formats`** — formatter registration (Json, CSV, Html, PlainText, Markdown), template infrastructure (compiler, cache, resolvers), HTTP response renderers.
-- [ ] **`Bootstrap\Routing`** (slimmed) — convention resolver, route map, page discovery, HTTP router, URL resolver, location resolver, bus middleware.
-- [ ] **`Bootstrap\Helpers`** — helper registry, discovery, resolver, domain-scoped helpers, framework helper registration (Format, Str, Arr, Html, Route).
-- [ ] **Update HyperKernel bootstrap sequence** — replace single Routing bootstrapper with Formats → Routing → Helpers ordering.
-- [ ] **Tests** — verify existing integration tests still pass, no new tests needed (behavior unchanged).
+- [x] **`Bootstrap\Formats`** — formatter registration (Json, CSV, Html, PlainText, Markdown), template infrastructure (compiler, cache, resolvers), HTTP response renderers.
+- [x] **`Bootstrap\Routing`** (slimmed) — convention resolver, route map, page discovery, HTTP router, URL resolver, location resolver, bus middleware.
+- [x] **`Bootstrap\Helpers`** — helper registry, discovery, resolver, domain-scoped helpers, framework helper registration (Format, Str, Arr, Html, Route).
+- [x] **Update HyperKernel bootstrap sequence** — Routing → Helpers → Formats ordering (Helpers needs UrlResolver from Routing; Formats resolves HelperResolver lazily).
+- [x] **Tests** — existing integration tests updated and passing, no behavior changes.
 
 ### Maintenance — Extract SqlScanner from Forge\Sql
 
 `Forge\Sql` has CC=68, driven by `extractBindings()` — a hand-rolled character-by-character SQL lexer that skips comments, block comments, and string literals while scanning for `:named` bindings. The same skip-comments-and-strings logic could be reused by `parseParams()`. Extract the lexer into a focused `SqlScanner` class.
 
-- [ ] **`Forge\SqlScanner`** — character-level SQL scanner that yields positions/tokens while skipping line comments (`--`), block comments (`/* */`), and single-quoted string literals. Reusable by both `extractBindings()` and `parseParams()`.
-- [ ] **Refactor `Sql::extractBindings()`** — delegate comment/string skipping to `SqlScanner`, keep only the binding-matching logic.
-- [ ] **Refactor `Sql::parseParams()`** — use `SqlScanner` if applicable (currently regex-based, may not need the lexer).
-- [ ] **Tests** — `SqlScannerTest` for the scanner, verify existing `SqlTest` still passes.
+- [x] **`Forge\SqlScanner`** — character-level SQL scanner with visitor callback. Skips line comments, block comments, and single-quoted string literals.
+- [x] **Refactor `Sql::extractBindings()`** — delegates scanning to `SqlScanner`, only handles binding-matching logic.
+- [x] ~~**Refactor `Sql::parseParams()`**~~ — not applicable, `parseParams()` is regex-based on `-- @param` comment lines, doesn't need the lexer.
+- [x] **Tests** — 10 new `SqlScannerTest` tests, all existing `SqlTest` tests pass unchanged.
 
 ### Error message personality pass
 
