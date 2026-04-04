@@ -139,6 +139,15 @@ Shodo decoupled from Hyper — formatters produce strings, response renderers bu
 - [ ] **Update HyperKernel bootstrap sequence** — replace single Routing bootstrapper with Formats → Routing → Helpers ordering.
 - [ ] **Tests** — verify existing integration tests still pass, no new tests needed (behavior unchanged).
 
+### Maintenance — Extract SqlScanner from Forge\Sql
+
+`Forge\Sql` has CC=68, driven by `extractBindings()` — a hand-rolled character-by-character SQL lexer that skips comments, block comments, and string literals while scanning for `:named` bindings. The same skip-comments-and-strings logic could be reused by `parseParams()`. Extract the lexer into a focused `SqlScanner` class.
+
+- [ ] **`Forge\SqlScanner`** — character-level SQL scanner that yields positions/tokens while skipping line comments (`--`), block comments (`/* */`), and single-quoted string literals. Reusable by both `extractBindings()` and `parseParams()`.
+- [ ] **Refactor `Sql::extractBindings()`** — delegate comment/string skipping to `SqlScanner`, keep only the binding-matching logic.
+- [ ] **Refactor `Sql::parseParams()`** — use `SqlScanner` if applicable (currently regex-based, may not need the lexer).
+- [ ] **Tests** — `SqlScannerTest` for the scanner, verify existing `SqlTest` still passes.
+
 ### Error message personality pass
 
 Full pass across every package to make error messages helpful, friendly, and fun. Developers are our primary audience — when things go wrong, the framework should feel like a knowledgeable friend, not a stack trace. Every message should: (1) say what went wrong clearly, (2) suggest what to do about it, (3) have personality without sacrificing precision. Scan all `throw new`, `RuntimeException`, `InvalidArgumentException`, `HttpException`, `LogicException`, and custom exception classes across `src/`. Rewrite dry messages, add "did you mean?" hints where possible, and ensure every error points the developer toward a fix.
