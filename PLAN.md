@@ -129,6 +129,16 @@ Shodo decoupled from Hyper — formatters produce strings, response renderers bu
 - [ ] **Add comments to magic attributes** — `#[RequiresAuth]`, `#[HttpOnly]`, `#[NotEmpty]` etc. are used in DTO examples with no comments. Add brief explanations of what they do and that they're automatic.
 - [ ] **Add example test** — `tests/` is empty. Add at least one example test showing how to test a Query handler.
 
+### Maintenance — Split Bootstrap\Routing
+
+`Bootstrap\Routing` is 430+ lines handling formatters, routers, helpers, URL resolvers, and bus middleware. Split into three focused bootstrappers:
+
+- [ ] **`Bootstrap\Formats`** — formatter registration (Json, CSV, Html, PlainText, Markdown), template infrastructure (compiler, cache, resolvers), HTTP response renderers.
+- [ ] **`Bootstrap\Routing`** (slimmed) — convention resolver, route map, page discovery, HTTP router, URL resolver, location resolver, bus middleware.
+- [ ] **`Bootstrap\Helpers`** — helper registry, discovery, resolver, domain-scoped helpers, framework helper registration (Format, Str, Arr, Html, Route).
+- [ ] **Update HyperKernel bootstrap sequence** — replace single Routing bootstrapper with Formats → Routing → Helpers ordering.
+- [ ] **Tests** — verify existing integration tests still pass, no new tests needed (behavior unchanged).
+
 ### Error message personality pass
 
 Full pass across every package to make error messages helpful, friendly, and fun. Developers are our primary audience — when things go wrong, the framework should feel like a knowledgeable friend, not a stack trace. Every message should: (1) say what went wrong clearly, (2) suggest what to do about it, (3) have personality without sacrificing precision. Scan all `throw new`, `RuntimeException`, `InvalidArgumentException`, `HttpException`, `LogicException`, and custom exception classes across `src/`. Rewrite dry messages, add "did you mean?" hints where possible, and ensure every error points the developer toward a fix.
