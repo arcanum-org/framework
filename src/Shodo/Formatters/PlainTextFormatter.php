@@ -7,6 +7,7 @@ namespace Arcanum\Shodo\Formatters;
 use Arcanum\Parchment\Reader;
 use Arcanum\Shodo\Formatter;
 use Arcanum\Shodo\HelperResolver;
+use Arcanum\Shodo\TemplateAnalyzer;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Shodo\TemplateResolver;
@@ -57,6 +58,11 @@ class PlainTextFormatter implements Formatter
         $variables = $this->extractVariables($data);
         $variables['__escape'] = static fn(string $value): string => $value;
         $variables['__helpers'] = $this->helpers !== null ? $this->helpers->for($dtoClass) : [];
+
+        if ($this->debug) {
+            $source = $this->reader->read($templatePath);
+            TemplateAnalyzer::warnUnused($source, $variables, $templatePath);
+        }
 
         return $this->execute($compiled, $variables);
     }

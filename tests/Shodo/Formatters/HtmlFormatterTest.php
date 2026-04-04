@@ -13,6 +13,7 @@ use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
+use Arcanum\Shodo\TemplateAnalyzer;
 use Arcanum\Shodo\TemplateResolver;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -25,6 +26,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(TemplateCompiler::class)]
 #[UsesClass(TemplateCache::class)]
 #[UsesClass(HtmlFallbackFormatter::class)]
+#[UsesClass(TemplateAnalyzer::class)]
 #[UsesClass(Reader::class)]
 #[UsesClass(Writer::class)]
 #[UsesClass(FileSystem::class)]
@@ -384,11 +386,18 @@ final class HtmlFormatterTest extends TestCase
         );
         $formatter = $this->createFormatter(debug: true);
 
-        // Act & Assert
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Undefined template variable "$usernme"');
+        // Suppress unused-variable notice (we're testing undefined detection)
+        set_error_handler(static fn() => true, \E_USER_NOTICE);
 
-        $formatter->format(['username' => 'Alice'], 'App\\Pages\\Index');
+        // Act & Assert
+        try {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('Undefined template variable "$usernme"');
+
+            $formatter->format(['username' => 'Alice'], 'App\\Pages\\Index');
+        } finally {
+            restore_error_handler();
+        }
     }
 
     public function testDebugModeListsAvailableVariables(): void
@@ -400,6 +409,9 @@ final class HtmlFormatterTest extends TestCase
         );
         $formatter = $this->createFormatter(debug: true);
 
+        // Suppress unused-variable notice (we're testing undefined detection)
+        set_error_handler(static fn() => true, \E_USER_NOTICE);
+
         // Act & Assert
         try {
             $formatter->format(['name' => 'Alice', 'email' => 'a@b.com'], 'App\\Pages\\Index');
@@ -407,6 +419,8 @@ final class HtmlFormatterTest extends TestCase
         } catch (\RuntimeException $e) {
             $this->assertStringContainsString('name', $e->getMessage());
             $this->assertStringContainsString('email', $e->getMessage());
+        } finally {
+            restore_error_handler();
         }
     }
 
@@ -424,5 +438,60 @@ final class HtmlFormatterTest extends TestCase
 
         // Assert — renders without crashing (empty value)
         $this->assertStringContainsString('<p>', $result);
+    }
+
+    // -----------------------------------------------------------
+    // Unused template variable warnings
+    // -----------------------------------------------------------
+
+    public function testDebugModeTriggersNoticeForUnusedVariables(): void
+    {
+        // Arrange — template uses $name but not $ssn
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<h1>{{ $name }}</h1>',
+        );
+        $formatter = $this->createFormatter(debug: true);
+
+        // Act — capture E_USER_NOTICE
+        $noticed = '';
+        set_error_handler(static function (int $severity, string $message) use (&$noticed): bool {
+            if ($severity === \E_USER_NOTICE) {
+                $noticed = $message;
+            }
+            return true;
+        });
+
+        $formatter->format(['name' => 'Alice', 'ssn' => '123-45-6789'], 'App\\Pages\\Index');
+        restore_error_handler();
+
+        // Assert
+        $this->assertStringContainsString('ssn', $noticed);
+        $this->assertStringContainsString('unused', strtolower($noticed));
+    }
+
+    public function testNonDebugModeDoesNotTriggerUnusedNotice(): void
+    {
+        // Arrange — debug: false (default)
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<h1>{{ $name }}</h1>',
+        );
+        $formatter = $this->createFormatter();
+
+        // Act — capture any notices
+        $noticed = '';
+        set_error_handler(static function (int $severity, string $message) use (&$noticed): bool {
+            if ($severity === \E_USER_NOTICE) {
+                $noticed = $message;
+            }
+            return true;
+        });
+
+        $formatter->format(['name' => 'Alice', 'ssn' => '123-45-6789'], 'App\\Pages\\Index');
+        restore_error_handler();
+
+        // Assert — no notice triggered
+        $this->assertSame('', $noticed);
     }
 }

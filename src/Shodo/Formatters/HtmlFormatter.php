@@ -7,6 +7,7 @@ namespace Arcanum\Shodo\Formatters;
 use Arcanum\Parchment\Reader;
 use Arcanum\Shodo\Formatter;
 use Arcanum\Shodo\HelperResolver;
+use Arcanum\Shodo\TemplateAnalyzer;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Shodo\TemplateResolver;
@@ -56,6 +57,11 @@ class HtmlFormatter implements Formatter
         $variables['__escape'] = static fn(string $value): string =>
             htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
         $variables['__helpers'] = $this->helpers !== null ? $this->helpers->for($dtoClass) : [];
+
+        if ($this->debug) {
+            $source = $this->reader->read($templatePath);
+            TemplateAnalyzer::warnUnused($source, $variables, $templatePath);
+        }
 
         return $this->execute($compiled, $variables);
     }
