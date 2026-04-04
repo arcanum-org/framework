@@ -6,6 +6,7 @@ namespace Arcanum\Ignition\Bootstrap;
 
 use Arcanum\Atlas\ConventionResolver;
 use Arcanum\Atlas\HttpRouter;
+use Arcanum\Atlas\LocationResolver;
 use Arcanum\Atlas\PageDiscovery;
 use Arcanum\Atlas\PageResolver;
 use Arcanum\Atlas\RouteMap;
@@ -355,6 +356,15 @@ class Routing implements Bootstrapper
             rootNamespace: $namespace,
             routeMap: $routeMap,
             pagesNamespace: $pagesNamespace,
+        ));
+
+        /** @var UrlResolver $urlResolver */
+        $urlResolver = $container->get(UrlResolver::class);
+        /** @var mixed $baseUrl */
+        $baseUrl = $config->get('app.url');
+        $container->instance(LocationResolver::class, new LocationResolver(
+            urlResolver: $urlResolver,
+            baseUrl: is_string($baseUrl) ? $baseUrl : '',
         ));
     }
 
