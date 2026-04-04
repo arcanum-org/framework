@@ -6,10 +6,13 @@ namespace Arcanum\Test\Integration;
 
 use Arcanum\Atlas\ConventionResolver;
 use Arcanum\Atlas\HttpRouter;
+use Arcanum\Atlas\LocationResolver;
 use Arcanum\Atlas\MiddlewareRegistry;
 use Arcanum\Atlas\RouteMiddleware;
+use Arcanum\Atlas\UrlResolver;
 use Arcanum\Cabinet\Container;
 use Arcanum\Codex\Hydrator;
+use Arcanum\Flow\Conveyor\AcceptedDTO;
 use Arcanum\Flow\Conveyor\EmptyDTO;
 use Arcanum\Flow\Conveyor\MiddlewareBus;
 use Arcanum\Flow\Conveyor\QueryResult;
@@ -500,5 +503,107 @@ final class CqrsLifecycleTest extends TestCase
         // Assert
         $this->assertInstanceOf(QueryResult::class, $result);
         $this->assertSame(['status' => 'ok', 'version' => '1.0.0', 'uptime' => 42], $result->data);
+    }
+
+    // -----------------------------------------------------------
+    // Command response: 201 Created + Location header
+    // -----------------------------------------------------------
+
+    public function testCommandReturningDtoProduces201WithLocationHeader(): void
+    {
+        // Arrange
+        $container = $this->container();
+        $bus = new MiddlewareBus($container);
+        $hydrator = new Hydrator();
+        $router = $this->router();
+
+        $emptyRenderer = new \Arcanum\Hyper\EmptyResponseRenderer();
+        $locationResolver = new LocationResolver(
+            new UrlResolver(self::ROOT_NS),
+            'https://api.example.com',
+        );
+
+        $request = $this->stubRequest(
+            'PUT',
+            '/integration/create-item',
+            jsonBody: '{"name":"Widget"}',
+        );
+
+        // Act — full command lifecycle with Location header
+        $route = $router->resolve($request);
+        $data = (array) ($request->getParsedBody() ?? []);
+        /** @var class-string $dtoClass */
+        $dtoClass = $route->dtoClass;
+        $dto = $hydrator->hydrate($dtoClass, $data);
+        $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
+
+        $status = match (true) {
+            $result instanceof EmptyDTO => \Arcanum\Hyper\StatusCode::NoContent,
+            $result instanceof AcceptedDTO => \Arcanum\Hyper\StatusCode::Accepted,
+            default => \Arcanum\Hyper\StatusCode::Created,
+        };
+        $response = $emptyRenderer->render($status);
+
+        if ($status === \Arcanum\Hyper\StatusCode::Created) {
+            $location = $locationResolver->resolve($result);
+            if ($location !== null) {
+                $response = $response->withHeader('Location', $location);
+            }
+        }
+
+        // Assert — 201 Created with Location header pointing to Query DTO
+        $this->assertSame(201, $response->getStatusCode());
+        $this->assertSame(
+            'https://api.example.com/integration/status?verbose=1',
+            $response->getHeaderLine('Location'),
+        );
+        $this->assertSame('', (string) $response->getBody());
+    }
+
+    public function testVoidCommandProduces204WithoutLocationHeader(): void
+    {
+        // Arrange
+        $container = $this->container();
+        $bus = new MiddlewareBus($container);
+        $hydrator = new Hydrator();
+        $router = $this->router();
+
+        $emptyRenderer = new \Arcanum\Hyper\EmptyResponseRenderer();
+        $locationResolver = new LocationResolver(
+            new UrlResolver(self::ROOT_NS),
+            'https://api.example.com',
+        );
+
+        $request = $this->stubRequest(
+            'PUT',
+            '/integration/submit',
+            jsonBody: '{"name":"Alice","email":"alice@example.com","message":"Hi"}',
+        );
+
+        // Act
+        $route = $router->resolve($request);
+        $data = (array) ($request->getParsedBody() ?? []);
+        /** @var class-string $dtoClass */
+        $dtoClass = $route->dtoClass;
+        $dto = $hydrator->hydrate($dtoClass, $data);
+        $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
+
+        $status = match (true) {
+            $result instanceof EmptyDTO => \Arcanum\Hyper\StatusCode::NoContent,
+            $result instanceof AcceptedDTO => \Arcanum\Hyper\StatusCode::Accepted,
+            default => \Arcanum\Hyper\StatusCode::Created,
+        };
+        $response = $emptyRenderer->render($status);
+
+        if ($status === \Arcanum\Hyper\StatusCode::Created) {
+            $location = $locationResolver->resolve($result);
+            if ($location !== null) {
+                $response = $response->withHeader('Location', $location);
+            }
+        }
+
+        // Assert — void handler → 204 No Content, no Location header
+        $this->assertSame(204, $response->getStatusCode());
+        $this->assertSame('', $response->getHeaderLine('Location'));
     }
 }
