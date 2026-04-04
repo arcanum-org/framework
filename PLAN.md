@@ -267,12 +267,12 @@ Previously blocked on reverse routing (item 10), now unblocked.
 
 Convention: command handler returns a Query DTO instance → framework resolves class → URL path, public properties → query params, adds Location header to 201 Created response. If the returned object can't be resolved, no Location header — still 201.
 
-- [ ] **LocationResolver** — `Atlas\LocationResolver` class. Composes `UrlResolver` + base URL. `resolve(object $dto): ?string` returns full URL with query params, or null on `UnresolvableRoute`.
-- [ ] **LocationResolver tests** — resolves Query DTO with/without properties, returns null for unresolvable class, base URL handling, query string building.
-- [ ] **Bootstrap wiring** — register LocationResolver in `Bootstrap\Routing` after UrlResolver, with `app.url` base URL.
-- [ ] **Starter app Kernel** — add Location header to 201 responses via LocationResolver.
+- [x] **LocationResolver** — `Atlas\LocationResolver` class. Composes `UrlResolver` + base URL. `resolve(object $dto): ?string` returns full URL with query params, or null on `UnresolvableRoute`.
+- [x] **LocationResolver tests** — resolves Query DTO with/without properties, returns null for unresolvable class, base URL handling, query string building.
+- [x] **Bootstrap wiring** — register LocationResolver in `Bootstrap\Routing` after UrlResolver, with `app.url` base URL.
+- [x] **Starter app Kernel** — add Location header to 201 responses via LocationResolver.
 - [ ] **Integration tests** — 201 + Location header for DTO return, 204 no Location for void, 202 no Location for null.
-- [ ] **Atlas README** — document LocationResolver and the return-Query-DTO convention.
+- [x] **Atlas README** — document LocationResolver and the return-Query-DTO convention.
 
 ---
 

@@ -128,6 +128,35 @@ $resolver = new UrlResolver(
 $resolver->resolve('App\\Domain\\Shop\\Query\\Products'); // → '/shop/products'
 ```
 
+## Location headers for created resources
+
+`LocationResolver` builds full URLs from DTO instances — designed for `Location` headers on 201 Created responses. When a command handler returns a Query DTO, the framework resolves the class to a path and the public properties to query params:
+
+```php
+// Command handler returns a Query DTO
+class PostCreateOrderHandler
+{
+    public function __invoke(CreateOrder $command): OrderDetail
+    {
+        $id = $this->service->create($command->item, $command->qty);
+        return new OrderDetail(id: $id);
+    }
+}
+
+// Framework resolves:
+//   Class: App\Domain\Shop\Query\OrderDetail → /shop/order-detail
+//   Properties: ['id' => 'abc123'] → ?id=abc123
+//   Location: https://api.example.com/shop/order-detail?id=abc123
+```
+
+If the returned object isn't a routable DTO (no `Query\` or `Command\` namespace), `resolve()` returns `null` and no Location header is added — the response is still 201 Created.
+
+```php
+$resolver = new LocationResolver($urlResolver, 'https://api.example.com');
+$resolver->resolve(new OrderDetail(id: 'abc123'));
+// → 'https://api.example.com/shop/order-detail?id=abc123'
+```
+
 ## Pages
 
 Pages are template-driven routes that live outside the Domain namespace. A page exists because a **template** exists — no handler needed, no config needed.
