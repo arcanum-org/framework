@@ -1,0 +1,226 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Arcanum\Ignition\Bootstrap;
+
+use Arcanum\Cabinet\Application;
+use Arcanum\Glitch\ExceptionRenderer;
+use Arcanum\Hyper\CsvResponseRenderer;
+use Arcanum\Hyper\FormatRegistry;
+use Arcanum\Hyper\HtmlResponseRenderer;
+use Arcanum\Hyper\JsonResponseRenderer;
+use Arcanum\Hyper\MarkdownResponseRenderer;
+use Arcanum\Hyper\PlainTextResponseRenderer;
+use Arcanum\Hyper\ValidationExceptionRenderer;
+use Arcanum\Ignition\Bootstrapper;
+use Arcanum\Ignition\Kernel;
+use Arcanum\Gather\Configuration;
+use Arcanum\Shodo\Format;
+use Arcanum\Shodo\Formatters\CsvFormatter;
+use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
+use Arcanum\Shodo\Formatters\HtmlFormatter;
+use Arcanum\Shodo\Formatters\JsonFormatter;
+use Arcanum\Shodo\Formatters\MarkdownFallbackFormatter;
+use Arcanum\Shodo\Formatters\MarkdownFormatter;
+use Arcanum\Shodo\Formatters\PlainTextFallbackFormatter;
+use Arcanum\Shodo\Formatters\PlainTextFormatter;
+use Arcanum\Shodo\HelperResolver;
+use Arcanum\Shodo\TemplateCache;
+use Arcanum\Shodo\TemplateCompiler;
+use Arcanum\Shodo\TemplateResolver;
+
+/**
+ * Registers Shodo formatters, template infrastructure, and HTTP response renderers.
+ *
+ * Reads from config/formats.php and config/cache.php.
+ */
+class Formats implements Bootstrapper
+{
+    public function bootstrap(Application $container): void
+    {
+        /** @var Configuration $config */
+        $config = $container->get(Configuration::class);
+
+        $this->registerFormatRegistry($container, $config);
+        $this->registerFormatters($container, $config);
+        $this->registerResponseRenderers($container);
+        $this->registerValidationRenderer($container);
+    }
+
+    private function registerFormatRegistry(Application $container, Configuration $config): void
+    {
+        $container->factory(FormatRegistry::class, function () use ($container, $config) {
+            $registry = new FormatRegistry($container);
+
+            /** @var array<string, array{content_type: string, renderer: string}>|null $formats */
+            $formats = $config->get('formats.formats');
+
+            foreach ($formats ?? [] as $extension => $definition) {
+                $registry->register(new Format(
+                    extension: $extension,
+                    contentType: $definition['content_type'],
+                    rendererClass: $definition['renderer'],
+                ));
+            }
+
+            return $registry;
+        });
+    }
+
+    private function registerFormatters(Application $container, Configuration $config): void
+    {
+        $container->service(JsonFormatter::class);
+        $container->service(CsvFormatter::class);
+
+        // Shared template infrastructure
+        $container->service(TemplateCompiler::class);
+
+        $container->factory(TemplateCache::class, function () use ($container, $config) {
+            /** @var mixed $cacheEnabled */
+            $cacheEnabled = $config->get('cache.templates.enabled');
+            $cacheEnabled = $cacheEnabled === null || $cacheEnabled === true;
+
+            if (!$cacheEnabled) {
+                return new TemplateCache('');
+            }
+
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+
+            return new TemplateCache(
+                $kernel->filesDirectory()
+                    . DIRECTORY_SEPARATOR . 'cache'
+                    . DIRECTORY_SEPARATOR . 'templates',
+            );
+        });
+
+        // Template-based formatters — each gets its own TemplateResolver
+        // configured for its file extension.
+        $container->factory(HtmlFormatter::class, function () use ($container, $config) {
+            [$compiler, $cache, $helpers, $debug] = $this->templateDeps($container, $config);
+
+            return new HtmlFormatter(
+                resolver: $this->createTemplateResolver($container, $config, 'html'),
+                compiler: $compiler,
+                cache: $cache,
+                fallback: new HtmlFallbackFormatter(),
+                helpers: $helpers,
+                debug: $debug,
+            );
+        });
+
+        $container->factory(PlainTextFormatter::class, function () use ($container, $config) {
+            [$compiler, $cache, $helpers, $debug] = $this->templateDeps($container, $config);
+
+            return new PlainTextFormatter(
+                resolver: $this->createTemplateResolver($container, $config, 'txt'),
+                compiler: $compiler,
+                cache: $cache,
+                fallback: new PlainTextFallbackFormatter(),
+                helpers: $helpers,
+                debug: $debug,
+            );
+        });
+
+        $container->factory(MarkdownFormatter::class, function () use ($container, $config) {
+            [$compiler, $cache, $helpers, $debug] = $this->templateDeps($container, $config);
+
+            return new MarkdownFormatter(
+                resolver: $this->createTemplateResolver($container, $config, 'md'),
+                compiler: $compiler,
+                cache: $cache,
+                fallback: new MarkdownFallbackFormatter(),
+                helpers: $helpers,
+                debug: $debug,
+            );
+        });
+    }
+
+    /**
+     * Resolve shared dependencies for template-based formatters.
+     *
+     * @return array{TemplateCompiler, TemplateCache, ?HelperResolver, bool}
+     */
+    private function templateDeps(Application $container, Configuration $config): array
+    {
+        /** @var TemplateCompiler $compiler */
+        $compiler = $container->get(TemplateCompiler::class);
+        /** @var TemplateCache $cache */
+        $cache = $container->get(TemplateCache::class);
+
+        $helpers = $container->has(HelperResolver::class)
+            ? $container->get(HelperResolver::class)
+            : null;
+
+        /** @var mixed $debug */
+        $debug = $config->get('app.debug');
+
+        return [
+            $compiler,
+            $cache,
+            $helpers instanceof HelperResolver ? $helpers : null,
+            $debug === true || $debug === 'true',
+        ];
+    }
+
+    private function createTemplateResolver(
+        Application $container,
+        Configuration $config,
+        string $extension,
+    ): TemplateResolver {
+        /** @var Kernel $kernel */
+        $kernel = $container->get(Kernel::class);
+
+        /** @var string $rootNamespace */
+        $rootNamespace = $config->get('app.namespace');
+
+        $topLevelNamespace = strstr($rootNamespace, '\\', true) ?: $rootNamespace;
+
+        return new TemplateResolver(
+            rootDirectory: $kernel->rootDirectory(),
+            rootNamespace: $topLevelNamespace,
+            extension: $extension,
+        );
+    }
+
+    private function registerResponseRenderers(Application $container): void
+    {
+        $container->service(JsonResponseRenderer::class);
+        $container->service(CsvResponseRenderer::class);
+
+        $container->factory(HtmlResponseRenderer::class, function () use ($container) {
+            /** @var HtmlFormatter $formatter */
+            $formatter = $container->get(HtmlFormatter::class);
+            return new HtmlResponseRenderer($formatter);
+        });
+
+        $container->factory(PlainTextResponseRenderer::class, function () use ($container) {
+            /** @var PlainTextFormatter $formatter */
+            $formatter = $container->get(PlainTextFormatter::class);
+            return new PlainTextResponseRenderer($formatter);
+        });
+
+        $container->factory(MarkdownResponseRenderer::class, function () use ($container) {
+            /** @var MarkdownFormatter $formatter */
+            $formatter = $container->get(MarkdownFormatter::class);
+            return new MarkdownResponseRenderer($formatter);
+        });
+    }
+
+    private function registerValidationRenderer(Application $container): void
+    {
+        if (!$container->has(ExceptionRenderer::class)) {
+            return;
+        }
+
+        $container->decorator(
+            ExceptionRenderer::class,
+            function (object $inner) use ($container): object {
+                /** @var JsonResponseRenderer $jsonRenderer */
+                $jsonRenderer = $container->get(JsonResponseRenderer::class);
+                return new ValidationExceptionRenderer($inner, $jsonRenderer);
+            },
+        );
+    }
+}

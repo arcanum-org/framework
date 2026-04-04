@@ -6,6 +6,7 @@ namespace Arcanum\Test\Integration;
 
 use Arcanum\Cabinet\Container;
 use Arcanum\Gather\Configuration;
+use Arcanum\Ignition\Bootstrap\Helpers;
 use Arcanum\Ignition\Bootstrap\Routing;
 use Arcanum\Ignition\HyperKernel;
 use Arcanum\Ignition\Kernel;
@@ -88,8 +89,8 @@ final class HelperResolutionTest extends TestCase
         $kernel = new HyperKernel($this->rootDir);
         $container->instance(Kernel::class, $kernel);
 
-        $bootstrapper = new Routing();
-        $bootstrapper->bootstrap($container);
+        (new Routing())->bootstrap($container);
+        (new Helpers())->bootstrap($container);
 
         return $container;
     }

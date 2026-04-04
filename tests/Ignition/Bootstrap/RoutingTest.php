@@ -14,6 +14,7 @@ use Arcanum\Atlas\Router;
 use Arcanum\Cabinet\Container;
 use Arcanum\Codex\Hydrator;
 use Arcanum\Gather\Configuration;
+use Arcanum\Ignition\Bootstrap\Formats;
 use Arcanum\Ignition\Bootstrap\Routing;
 use Arcanum\Ignition\HyperKernel;
 use Arcanum\Ignition\Kernel;
@@ -25,6 +26,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(Routing::class)]
+#[CoversClass(Formats::class)]
 #[UsesClass(Configuration::class)]
 #[UsesClass(\Arcanum\Gather\Registry::class)]
 #[UsesClass(Container::class)]
@@ -145,10 +147,9 @@ final class RoutingTest extends TestCase
     {
         // Arrange
         $container = $this->buildContainer($this->defaultApp(), ['pages' => []], $this->defaultFormats());
-        $bootstrapper = new Routing();
 
         // Act
-        $bootstrapper->bootstrap($container);
+        (new Formats())->bootstrap($container);
 
         // Assert
         $this->assertTrue($container->has(FormatRegistry::class));
@@ -171,10 +172,9 @@ final class RoutingTest extends TestCase
     {
         // Arrange
         $container = $this->buildContainer($this->defaultApp(), ['pages' => []], $this->defaultFormats());
-        $bootstrapper = new Routing();
 
         // Act
-        $bootstrapper->bootstrap($container);
+        (new Formats())->bootstrap($container);
 
         // Assert
         $this->assertTrue($container->has(JsonResponseRenderer::class));
@@ -294,10 +294,9 @@ final class RoutingTest extends TestCase
     {
         // Arrange
         $container = $this->buildContainer($this->defaultApp(), ['pages' => []], $this->defaultFormats());
-        $bootstrapper = new Routing();
 
         // Act
-        $bootstrapper->bootstrap($container);
+        (new Formats())->bootstrap($container);
 
         /** @var FormatRegistry $formats */
         $formats = $container->get(FormatRegistry::class);
@@ -318,10 +317,9 @@ final class RoutingTest extends TestCase
             ],
         ];
         $container = $this->buildContainer($this->defaultApp(), ['pages' => []], $formats);
-        $bootstrapper = new Routing();
 
         // Act
-        $bootstrapper->bootstrap($container);
+        (new Formats())->bootstrap($container);
 
         /** @var FormatRegistry $registry */
         $registry = $container->get(FormatRegistry::class);
