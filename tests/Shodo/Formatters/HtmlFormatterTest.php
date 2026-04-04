@@ -70,13 +70,14 @@ final class HtmlFormatterTest extends TestCase
     private function createFormatter(
         string $cacheDir = '',
         ?HelperResolver $helpers = null,
+        bool $debug = false,
     ): HtmlFormatter {
         $resolver = new TemplateResolver($this->rootDir, 'App');
         $compiler = new TemplateCompiler();
         $cache = new TemplateCache($cacheDir ?: $this->cacheDir);
         $fallback = new HtmlFallbackFormatter();
 
-        return new HtmlFormatter($resolver, $compiler, $cache, $fallback, helpers: $helpers);
+        return new HtmlFormatter($resolver, $compiler, $cache, $fallback, helpers: $helpers, debug: $debug);
     }
 
     public function testFormatReturnsNonEmptyOutput(): void
@@ -372,5 +373,56 @@ final class HtmlFormatterTest extends TestCase
             '<form><input type="hidden" name="_token" value="abc123"></form>',
             $result,
         );
+    }
+
+    public function testDebugModeThrowsOnUndefinedTemplateVariable(): void
+    {
+        // Arrange
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<p>{{ $usernme }}</p>',
+        );
+        $formatter = $this->createFormatter(debug: true);
+
+        // Act & Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Undefined template variable "$usernme"');
+
+        $formatter->format(['username' => 'Alice'], 'App\\Pages\\Index');
+    }
+
+    public function testDebugModeListsAvailableVariables(): void
+    {
+        // Arrange
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<p>{{ $typo }}</p>',
+        );
+        $formatter = $this->createFormatter(debug: true);
+
+        // Act & Assert
+        try {
+            $formatter->format(['name' => 'Alice', 'email' => 'a@b.com'], 'App\\Pages\\Index');
+            $this->fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('name', $e->getMessage());
+            $this->assertStringContainsString('email', $e->getMessage());
+        }
+    }
+
+    public function testProductionModeSilentlyRendersEmptyForUndefinedVariable(): void
+    {
+        // Arrange — debug: false (default)
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<p>{{ $missing }}</p>',
+        );
+        $formatter = $this->createFormatter();
+
+        // Act — should not throw
+        $result = @$formatter->format(['name' => 'Alice'], 'App\\Pages\\Index');
+
+        // Assert — renders without crashing (empty value)
+        $this->assertStringContainsString('<p>', $result);
     }
 }

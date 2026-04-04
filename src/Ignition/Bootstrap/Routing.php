@@ -144,12 +144,16 @@ class Routing implements Bootstrapper
                 ? $container->get(HelperResolver::class)
                 : null;
 
+            /** @var mixed $debug */
+            $debug = $config->get('app.debug');
+
             return new HtmlFormatter(
                 resolver: $this->createTemplateResolver($container, $config, 'html'),
                 compiler: $compiler,
                 cache: $cache,
                 fallback: new HtmlFallbackFormatter(),
                 helpers: $helpers instanceof HelperResolver ? $helpers : null,
+                debug: $debug === true || $debug === 'true',
             );
         });
 
@@ -163,12 +167,16 @@ class Routing implements Bootstrapper
                 ? $container->get(HelperResolver::class)
                 : null;
 
+            /** @var mixed $debug */
+            $debug = $config->get('app.debug');
+
             return new PlainTextFormatter(
                 resolver: $this->createTemplateResolver($container, $config, 'txt'),
                 compiler: $compiler,
                 cache: $cache,
                 fallback: new PlainTextFallbackFormatter(),
                 helpers: $helpers instanceof HelperResolver ? $helpers : null,
+                debug: $debug === true || $debug === 'true',
             );
         });
 

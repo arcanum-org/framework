@@ -29,6 +29,7 @@ class PlainTextFormatter implements Formatter
         private readonly PlainTextFallbackFormatter $fallback,
         private readonly Reader $reader = new Reader(),
         private readonly ?HelperResolver $helpers = null,
+        private readonly bool $debug = false,
     ) {
     }
 
@@ -82,11 +83,40 @@ class PlainTextFormatter implements Formatter
      */
     private function execute(string $compiledPhp, array $variables): string
     {
-        $executor = static function (string $__compiled, array $__vars): string {
+        $debug = $this->debug;
+        $availableKeys = $debug ? array_keys($variables) : [];
+
+        $executor = static function (string $__compiled, array $__vars) use ($debug, $availableKeys): string {
+            if ($debug) {
+                set_error_handler(static function (int $severity, string $message) use ($availableKeys): never {
+                    if (preg_match('/Undefined variable \\$?(\w+)/', $message, $matches)) {
+                        $hint = $availableKeys !== []
+                            ? ' Available variables: ' . implode(', ', $availableKeys) . '.'
+                            : '';
+                        throw new \RuntimeException(sprintf(
+                            'Undefined template variable "$%s".%s',
+                            $matches[1],
+                            $hint,
+                        ));
+                    }
+                    throw new \RuntimeException($message);
+                }, \E_WARNING | \E_NOTICE);
+            }
+
             extract($__vars);
             ob_start();
-            eval('?>' . $__compiled);
-            return (string) ob_get_clean();
+
+            try {
+                eval('?>' . $__compiled);
+                return (string) ob_get_clean();
+            } catch (\Throwable $__e) {
+                ob_end_clean();
+                throw $__e;
+            } finally {
+                if ($debug) {
+                    restore_error_handler();
+                }
+            }
         };
 
         return $executor($compiledPhp, $variables);
