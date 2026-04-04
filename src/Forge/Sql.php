@@ -167,60 +167,29 @@ final class Sql
     {
         $bindings = [];
         $seen = [];
-        $pos = 0;
-        $len = strlen($sql);
 
-        while ($pos < $len) {
-            $char = $sql[$pos];
+        SqlScanner::scan($sql, static function (string $sql, int $pos) use (&$bindings, &$seen): ?int {
+            $len = strlen($sql);
 
-            // Skip line comments.
-            if ($char === '-' && $pos + 1 < $len && $sql[$pos + 1] === '-') {
-                $newline = strpos($sql, "\n", $pos);
-                $pos = $newline === false ? $len : $newline + 1;
-                continue;
-            }
-
-            // Skip block comments.
-            if ($char === '/' && $pos + 1 < $len && $sql[$pos + 1] === '*') {
-                $end = strpos($sql, '*/', $pos + 2);
-                $pos = $end === false ? $len : $end + 2;
-                continue;
-            }
-
-            // Skip single-quoted string literals.
-            if ($char === '\'') {
-                $pos++;
-                while ($pos < $len) {
-                    if ($sql[$pos] === '\'') {
-                        if ($pos + 1 < $len && $sql[$pos + 1] === '\'') {
-                            $pos += 2; // escaped quote
-                            continue;
-                        }
-                        break;
-                    }
-                    $pos++;
-                }
-                $pos++;
-                continue;
+            if ($sql[$pos] !== ':' || $pos + 1 >= $len || !ctype_alpha($sql[$pos + 1])) {
+                return null;
             }
 
             // Match :named binding.
-            if ($char === ':' && $pos + 1 < $len && ctype_alpha($sql[$pos + 1])) {
-                $start = $pos + 1;
-                $pos = $start;
-                while ($pos < $len && (ctype_alnum($sql[$pos]) || $sql[$pos] === '_')) {
-                    $pos++;
-                }
-                $name = substr($sql, $start, $pos - $start);
-                if (!isset($seen[$name])) {
-                    $bindings[] = $name;
-                    $seen[$name] = true;
-                }
-                continue;
+            $start = $pos + 1;
+            $end = $start;
+            while ($end < $len && (ctype_alnum($sql[$end]) || $sql[$end] === '_')) {
+                $end++;
             }
 
-            $pos++;
-        }
+            $name = substr($sql, $start, $end - $start);
+            if (!isset($seen[$name])) {
+                $bindings[] = $name;
+                $seen[$name] = true;
+            }
+
+            return $end;
+        });
 
         return $bindings;
     }
