@@ -130,9 +130,17 @@ class HyperKernel implements Kernel, RequestHandlerInterface
         $container->instance(Transport::class, Transport::Http);
 
         foreach ($this->bootstrappers as $name) {
-            /** @var Bootstrapper $bootstrapper */
-            $bootstrapper = $container->get($name);
-            $bootstrapper->bootstrap($container);
+            try {
+                /** @var Bootstrapper $bootstrapper */
+                $bootstrapper = $container->get($name);
+                $bootstrapper->bootstrap($container);
+            } catch (\Throwable $e) {
+                throw new \RuntimeException(sprintf(
+                    'Failed during %s bootstrap: %s. Bootstrappers may be in the wrong order.',
+                    $name,
+                    $e->getMessage(),
+                ), 0, $e);
+            }
         }
 
         $this->isBootstrapped = true;

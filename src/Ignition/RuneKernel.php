@@ -116,9 +116,17 @@ class RuneKernel implements Kernel
         $container->instance(Transport::class, Transport::Cli);
 
         foreach ($this->bootstrappers as $name) {
-            /** @var Bootstrapper $bootstrapper */
-            $bootstrapper = $container->get($name);
-            $bootstrapper->bootstrap($container);
+            try {
+                /** @var Bootstrapper $bootstrapper */
+                $bootstrapper = $container->get($name);
+                $bootstrapper->bootstrap($container);
+            } catch (\Throwable $e) {
+                throw new \RuntimeException(sprintf(
+                    'Failed during %s bootstrap: %s. Bootstrappers may be in the wrong order.',
+                    $name,
+                    $e->getMessage(),
+                ), 0, $e);
+            }
         }
 
         $this->isBootstrapped = true;
