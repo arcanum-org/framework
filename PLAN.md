@@ -103,8 +103,8 @@ Shodo decoupled from Hyper — formatters produce strings, response renderers bu
 - [x] **`#[Url]` restricted to http/https, `#[AnyUrl]` added for broader schemes** — the `Url` validation rule accepts `javascript:`, `data:`, and other dangerous URI schemes. If a developer uses a validated URL in a redirect or `href`, it's an XSS vector. Fix: reject non-http(s) schemes, or add a `#[SafeUrl]` rule that does.
 - [x] **Model::loadSql() path traversal** — `Model::__call()` builds a file path from the method name without validation. `$model->{'../../config'}()` traverses out of the Model directory. Fix: validate method names match `/^[a-zA-Z_][a-zA-Z0-9_]*$/` before building the path.
 - [x] **JsonFormatter JSON_HEX_TAG added** — `</script>` passes through JSON unescaped. If JSON is embedded in HTML, this is an XSS vector. Fix: add `JSON_HEX_TAG` flag to `json_encode()`.
-- [ ] **Document template eval() security** — Shodo README should note that `{{! !}}` raw output bypasses escaping and must only be used with trusted content. The default `{{ }}` syntax is safe.
-- [ ] **Document Pattern regex ReDoS risk** — Validation README should note that `#[Pattern]` regexes run against user input and developers must avoid catastrophic backtracking patterns (nested quantifiers).
+- [x] **Document template eval() security** — Shodo README should note that `{{! !}}` raw output bypasses escaping and must only be used with trusted content. The default `{{ }}` syntax is safe.
+- [x] **Document Pattern regex ReDoS risk** — Validation README should note that `#[Pattern]` regexes run against user input and developers must avoid catastrophic backtracking patterns (nested quantifiers).
 
 ### DX guardrails (framework fixes)
 
@@ -116,7 +116,7 @@ Shodo decoupled from Hyper — formatters produce strings, response renderers bu
 - [x] **Promote `validate:handlers` in dev workflow** — The command exists but nobody knows about it. Fix: mention it in the starter app README, and consider running it automatically during bootstrap in dev mode (or as a pre-commit hook suggestion).
 - [x] **Container has no circular dependency detection** — `A → B → A` causes a stack overflow with no useful message. Fix: track the resolution stack in `Container::get()` and throw `CircularDependencyException` with the full chain.
 - [x] **Template undefined variables render as empty** — `{{ $missing }}` silently produces empty output. Fix: in dev mode, throw or warn on undefined template variables instead of silent empty.
-- [ ] **Document that `factory()` caches after first call** — `factory()` runs the closure once and caches the result (same as `service()`). For a new instance every call, use `prototype()` or `prototypeFactory()`. Document this prominently in the Cabinet README with a clear comparison table.
+- [x] **Document that `factory()` caches after first call** — `factory()` runs the closure once and caches the result (same as `service()`). For a new instance every call, use `prototype()` or `prototypeFactory()`. Document this prominently in the Cabinet README with a clear comparison table.
 - [x] **Bootstrapper ordering not enforced** — Auth depends on Sessions depends on Security. If a developer customizes their Kernel and reorders, they get `"Cannot resolve service 'ActiveSession'"` with no hint about ordering. Fix: have bootstrappers declare dependencies and validate the order at boot.
 - [x] **Page discovery finds zero pages silently** — If `pages_directory` config points to a nonexistent path, no error, just no pages. Fix: warn at bootstrap if the configured pages directory doesn't exist.
 
@@ -278,6 +278,7 @@ Convention: command handler returns a Query DTO instance → framework resolves 
 
 ## Long-Distance Future
 
+- **RFC 9457 Problem Details for HTTP APIs** — standardized JSON error response format (`application/problem+json`). Needs design discussion: how it integrates with HttpException, Glitch, and Shodo's exception renderers. See https://www.rfc-editor.org/rfc/rfc9457.html
 - **Queue/Job system** — async processing with drivers (Redis, database, SQS)
 - **Testing utilities** — DTO factories, service fakes, TestKernel
 - **Internationalization** — translation strings, locale detection, pluralization

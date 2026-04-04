@@ -53,6 +53,8 @@ On CLI, errors are printed to stderr with field names and messages.
 
 All rules skip non-applicable types silently — `MinLength` on an int is a no-op, `Email` on a non-string is a no-op. Type enforcement is PHP's job, not validation's.
 
+> **Security:** `#[Pattern]` regexes run against user input via `preg_match`. Avoid patterns with nested quantifiers (e.g., `(a+)+$`) that cause catastrophic backtracking (ReDoS). Test patterns against long adversarial inputs before deploying. When in doubt, use a more specific built-in rule instead.
+
 ## How it works
 
 1. The DTO is hydrated from HTTP/CLI input (typed values ready)

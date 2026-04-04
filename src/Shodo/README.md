@@ -148,8 +148,10 @@ Templates use `{{ }}` delimiters for everything. The compiler is format-agnostic
 
 ```
 {{ $name }}              Escaped output (htmlspecialchars for HTML, identity for plain text)
-{{! $rawHtml !}}         Raw output (no escaping, use for trusted content)
+{{! $rawHtml !}}         Raw output (no escaping — see security note below)
 ```
+
+> **Security:** `{{! !}}` raw output bypasses all escaping. Only use it with trusted content — never with user input. If user-supplied data reaches a `{{! !}}` block, it's an XSS vector. The default `{{ }}` syntax is always safe.
 
 ### Control flow
 
