@@ -18,6 +18,8 @@ final class CompositeGuard implements Guard
     /** @var list<Guard> */
     private readonly array $guards;
 
+    private Guard|null $lastResolved = null;
+
     public function __construct(Guard ...$guards)
     {
         $this->guards = array_values($guards);
@@ -25,14 +27,28 @@ final class CompositeGuard implements Guard
 
     public function resolve(ServerRequestInterface $request): Identity|null
     {
+        $this->lastResolved = null;
+
         foreach ($this->guards as $guard) {
             $identity = $guard->resolve($request);
 
             if ($identity !== null) {
+                $this->lastResolved = $guard;
                 return $identity;
             }
         }
 
         return null;
+    }
+
+    /**
+     * The inner guard that resolved the last identity, or null if none matched.
+     *
+     * Used by AuthMiddleware to determine the authentication method
+     * (e.g., whether a TokenGuard resolved, making CSRF unnecessary).
+     */
+    public function lastResolvedGuard(): Guard|null
+    {
+        return $this->lastResolved;
     }
 }

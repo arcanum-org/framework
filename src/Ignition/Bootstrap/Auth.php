@@ -57,20 +57,20 @@ class Auth implements Bootstrapper
 
     private function registerHttpGuard(Application $container, Configuration $config): void
     {
-        $guardName = $this->string($config, 'auth.guard', 'session');
+        /** @var string|list<string> $guardConfig */
+        $guardConfig = $config->get('auth.guard') ?? 'session';
 
-        $container->factory(Guard::class, function () use ($container, $config, $guardName): Guard {
-            return match ($guardName) {
-                'session' => $this->buildSessionGuard($container, $config),
-                'token' => $this->buildTokenGuard($config),
-                'composite' => new CompositeGuard(
-                    $this->buildSessionGuard($container, $config),
-                    $this->buildTokenGuard($config),
-                ),
-                default => throw new \RuntimeException(
-                    sprintf('Unknown auth guard "%s".', $guardName),
-                ),
-            };
+        $container->factory(Guard::class, function () use ($container, $config, $guardConfig): Guard {
+            // Array syntax: ['session', 'token'] → CompositeGuard in listed order.
+            if (is_array($guardConfig)) {
+                $guards = array_map(
+                    fn(string $name): Guard => $this->buildGuard($name, $container, $config),
+                    $guardConfig,
+                );
+                return new CompositeGuard(...$guards);
+            }
+
+            return $this->buildGuard($guardConfig, $container, $config);
         });
 
         $container->factory(
@@ -126,6 +126,17 @@ class Auth implements Bootstrapper
         );
     }
 
+    private function buildGuard(string $name, Application $container, Configuration $config): Guard
+    {
+        return match ($name) {
+            'session' => $this->buildSessionGuard($container, $config),
+            'token' => $this->buildTokenGuard($config),
+            default => throw new \RuntimeException(
+                sprintf('Unknown auth guard "%s". Available guards: session, token.', $name),
+            ),
+        };
+    }
+
     private function buildSessionGuard(Application $container, Configuration $config): SessionGuard
     {
         /** @var ActiveSession $session */
@@ -147,11 +158,5 @@ class Auth implements Bootstrapper
             : fn(string $token) => null;
 
         return new TokenGuard($resolverFn);
-    }
-
-    private function string(Configuration $config, string $key, string $default): string
-    {
-        $value = $config->get($key);
-        return is_string($value) ? $value : $default;
     }
 }

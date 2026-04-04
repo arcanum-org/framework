@@ -37,6 +37,14 @@ final class CsrfMiddleware implements MiddlewareInterface
             return $handler->handle($request);
         }
 
+        // Token-authenticated requests are not vulnerable to CSRF —
+        // the Bearer token is an explicit credential the browser won't
+        // auto-send in a cross-site request. This attribute is set by
+        // AuthMiddleware only when a TokenGuard successfully validates.
+        if ($request->getAttribute('auth.token_authenticated') === true) {
+            return $handler->handle($request);
+        }
+
         $session = $this->registry->get();
         $token = $this->extractToken($request);
 

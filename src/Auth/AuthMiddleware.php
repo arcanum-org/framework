@@ -33,8 +33,25 @@ final class AuthMiddleware implements MiddlewareInterface
 
         if ($identity !== null) {
             $this->activeIdentity->set($identity);
+
+            if ($this->isTokenAuthenticated()) {
+                $request = $request->withAttribute('auth.token_authenticated', true);
+            }
         }
 
         return $handler->handle($request);
+    }
+
+    private function isTokenAuthenticated(): bool
+    {
+        if ($this->guard instanceof TokenGuard) {
+            return true;
+        }
+
+        if ($this->guard instanceof CompositeGuard) {
+            return $this->guard->lastResolvedGuard() instanceof TokenGuard;
+        }
+
+        return false;
     }
 }

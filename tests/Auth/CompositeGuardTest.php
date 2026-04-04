@@ -70,4 +70,54 @@ final class CompositeGuardTest extends TestCase
 
         $this->assertNull($composite->resolve($this->stubRequest()));
     }
+
+    // -----------------------------------------------------------
+    // lastResolvedGuard() tracking
+    // -----------------------------------------------------------
+
+    public function testLastResolvedGuardReturnsMatchingGuard(): void
+    {
+        // Arrange
+        $tokenGuard = $this->identityGuard('user-1');
+        $composite = new CompositeGuard($this->nullGuard(), $tokenGuard);
+
+        // Act
+        $composite->resolve($this->stubRequest());
+
+        // Assert
+        $this->assertSame($tokenGuard, $composite->lastResolvedGuard());
+    }
+
+    public function testLastResolvedGuardReturnsNullWhenNoMatch(): void
+    {
+        // Arrange
+        $composite = new CompositeGuard($this->nullGuard(), $this->nullGuard());
+
+        // Act
+        $composite->resolve($this->stubRequest());
+
+        // Assert
+        $this->assertNull($composite->lastResolvedGuard());
+    }
+
+    public function testLastResolvedGuardResetsOnEachResolve(): void
+    {
+        // Arrange — first call matches, second call doesn't
+        $guard = $this->createStub(Guard::class);
+        $guard->method('resolve')->willReturn(
+            new SimpleIdentity('user-1'),
+            null,
+        );
+        $composite = new CompositeGuard($guard);
+
+        // Act — first resolve finds identity
+        $composite->resolve($this->stubRequest());
+        $this->assertNotNull($composite->lastResolvedGuard());
+
+        // Act — second resolve finds nothing
+        $composite->resolve($this->stubRequest());
+
+        // Assert — reset to null
+        $this->assertNull($composite->lastResolvedGuard());
+    }
 }

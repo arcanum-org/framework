@@ -41,14 +41,22 @@ final class CsrfMiddlewareTest extends TestCase
     /**
      * @param array<string, string> $body
      * @param array<string, string> $headers
+     * @param array<string, mixed> $attributes
      */
-    private function stubRequest(string $method, array $body = [], array $headers = []): ServerRequestInterface
-    {
+    private function stubRequest(
+        string $method,
+        array $body = [],
+        array $headers = [],
+        array $attributes = [],
+    ): ServerRequestInterface {
         $request = $this->createStub(ServerRequestInterface::class);
         $request->method('getMethod')->willReturn($method);
         $request->method('getParsedBody')->willReturn($body);
         $request->method('getHeaderLine')->willReturnCallback(
             fn(string $name) => $headers[$name] ?? '',
+        );
+        $request->method('getAttribute')->willReturnCallback(
+            fn(string $name, mixed $default = null) => $attributes[$name] ?? $default,
         );
         return $request;
     }
@@ -195,10 +203,11 @@ final class CsrfMiddlewareTest extends TestCase
         );
     }
 
-    public function testBearerHeaderDoesNotBypassCsrf(): void
+    public function testBearerHeaderAloneDoesNotBypassCsrf(): void
     {
-        // Arrange — Bearer tokens no longer bypass CSRF. Coordination with
-        // Auth for token-authenticated requests is a separate concern.
+        // Arrange — a raw Bearer header does NOT bypass CSRF. Only a
+        // successfully validated token (auth.token_authenticated attribute
+        // set by AuthMiddleware) skips CSRF validation.
         $registry = $this->registryWithSession();
         $middleware = new CsrfMiddleware($registry);
 
@@ -224,6 +233,92 @@ final class CsrfMiddlewareTest extends TestCase
             $this->stubHandler(),
         );
 
+        $this->assertInstanceOf(ResponseInterface::class, $response);
+    }
+
+    // -----------------------------------------------------------
+    // Token-authenticated requests skip CSRF
+    // -----------------------------------------------------------
+
+    public function testSkipsCsrfForTokenAuthenticatedRequest(): void
+    {
+        // Arrange — POST with no CSRF token, but auth.token_authenticated
+        // attribute set (meaning AuthMiddleware validated a Bearer token)
+        $registry = $this->registryWithSession();
+        $middleware = new CsrfMiddleware($registry);
+
+        // Act
+        $response = $middleware->process(
+            $this->stubRequest('POST', [], [], ['auth.token_authenticated' => true]),
+            $this->stubHandler(),
+        );
+
+        // Assert — passes through without CSRF token
+        $this->assertInstanceOf(ResponseInterface::class, $response);
+    }
+
+    public function testEnforcesCsrfForSessionAuthenticatedRequest(): void
+    {
+        // Arrange — POST without auth.token_authenticated attribute
+        // (session-based auth, needs CSRF protection)
+        $registry = $this->registryWithSession();
+        $middleware = new CsrfMiddleware($registry);
+
+        // Act & Assert
+        $this->expectException(HttpException::class);
+        $this->expectExceptionCode(403);
+
+        $middleware->process(
+            $this->stubRequest('POST'),
+            $this->stubHandler(),
+        );
+    }
+
+    public function testEnforcesCsrfForUnauthenticatedRequest(): void
+    {
+        // Arrange — POST with no auth at all (e.g., public contact form)
+        $registry = $this->registryWithSession();
+        $middleware = new CsrfMiddleware($registry);
+
+        // Act & Assert
+        $this->expectException(HttpException::class);
+        $this->expectExceptionCode(403);
+
+        $middleware->process(
+            $this->stubRequest('POST'),
+            $this->stubHandler(),
+        );
+    }
+
+    public function testPutSkipsCsrfWhenTokenAuthenticated(): void
+    {
+        // Arrange
+        $registry = $this->registryWithSession();
+        $middleware = new CsrfMiddleware($registry);
+
+        // Act
+        $response = $middleware->process(
+            $this->stubRequest('PUT', [], [], ['auth.token_authenticated' => true]),
+            $this->stubHandler(),
+        );
+
+        // Assert
+        $this->assertInstanceOf(ResponseInterface::class, $response);
+    }
+
+    public function testDeleteSkipsCsrfWhenTokenAuthenticated(): void
+    {
+        // Arrange
+        $registry = $this->registryWithSession();
+        $middleware = new CsrfMiddleware($registry);
+
+        // Act
+        $response = $middleware->process(
+            $this->stubRequest('DELETE', [], [], ['auth.token_authenticated' => true]),
+            $this->stubHandler(),
+        );
+
+        // Assert
         $this->assertInstanceOf(ResponseInterface::class, $response);
     }
 }
