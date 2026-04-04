@@ -274,6 +274,12 @@ class Routing implements Bootstrapper
             ? $pagesDirectory
             : $kernel->rootDirectory() . DIRECTORY_SEPARATOR . $pagesDirectory;
 
+        if (!is_dir($absolutePagesDir) && $container->has(\Psr\Log\LoggerInterface::class)) {
+            /** @var \Psr\Log\LoggerInterface $logger */
+            $logger = $container->get(\Psr\Log\LoggerInterface::class);
+            $logger->debug("Pages directory does not exist: {$absolutePagesDir}. No pages will be discovered.");
+        }
+
         // Page cache configuration.
         /** @var mixed $cacheEnabled */
         $cacheEnabled = $config->get('cache.pages.enabled');
