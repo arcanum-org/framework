@@ -70,6 +70,25 @@ PHP: {{ $php_version }}
 
 Falls back to a YAML-like structured dump when no template exists.
 
+### MarkdownFormatter
+
+Template-based, like HTML and plain text. Discovers a co-located `.md` template file. Uses an identity escape function — `{{ $var }}` passes through as-is since Markdown doesn't require HTML escaping.
+
+```
+// Template at app/Domain/Query/Health.md:
+# {{ $name }}
+
+**Status:** {{ $status }}
+
+{{ foreach($checks as $check) }}
+- {{ $check }}
+{{ endforeach }}
+
+// → Markdown string
+```
+
+Falls back to a structured Markdown representation when no template exists — bold keys for associative arrays (`**key:** value`), bulleted lists for sequential arrays, and `##` headings for nested structures.
+
 ### CsvFormatter
 
 Pure data serializer. Renders tabular data (list of associative arrays) as CSV with proper escaping:
@@ -251,7 +270,7 @@ HelperResolver
     → merges global HelperRegistry + domain Helpers.php matches
     → returns ['Format' => FormatHelper, 'Route' => RouteHelper, 'Cart' => CartHelper, ...]
 
-HtmlFormatter / PlainTextFormatter
+HtmlFormatter / PlainTextFormatter / MarkdownFormatter
   injects $__helpers into template scope via extract()
 ```
 
@@ -290,6 +309,10 @@ return [
             'content_type' => 'text/plain',
             'renderer' => \Arcanum\Hyper\PlainTextResponseRenderer::class,
         ],
+        'md' => [
+            'content_type' => 'text/markdown',
+            'renderer' => \Arcanum\Hyper\MarkdownResponseRenderer::class,
+        ],
     ],
 ];
 ```
@@ -306,9 +329,10 @@ Shodo (pure formatting — no transport dependency)
 │   ├── CsvFormatter (pure tabular serializer)
 │   ├── HtmlFormatter (template-based, htmlspecialchars escape)
 │   ├── PlainTextFormatter (template-based, identity escape)
+│   ├── MarkdownFormatter (template-based, identity escape)
 │   ├── KeyValueFormatter (auto-detect: key-value pairs or table)
 │   ├── TableFormatter (ASCII tables)
-│   ├── HtmlFallbackFormatter / PlainTextFallbackFormatter
+│   ├── HtmlFallbackFormatter / PlainTextFallbackFormatter / MarkdownFallbackFormatter
 ├── TemplateCompiler → TemplateCache → TemplateResolver
 ├── HelperRegistry → HelperResolver → HelperDiscovery
 ├── Helpers/
@@ -324,6 +348,7 @@ Hyper (HTTP response adapters — compose Shodo formatters)
 ├── CsvResponseRenderer → CsvFormatter
 ├── HtmlResponseRenderer → HtmlFormatter
 ├── PlainTextResponseRenderer → PlainTextFormatter
+├── MarkdownResponseRenderer → MarkdownFormatter
 ├── EmptyResponseRenderer (status-code-only for commands)
 ├── JsonExceptionResponseRenderer (exceptions as JSON)
 └── FormatRegistry (URL extension → ResponseRenderer)

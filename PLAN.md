@@ -252,6 +252,15 @@ Planned:
 - **Default CSS and styling** — minimal CSS and base HTML layout for presentable default pages and error screens
 - **Database example** — add a Model/ directory with SQL files, demonstrate Forge in a real domain
 
+### Markdown Formatter — Shodo
+
+- [x] **MarkdownFallbackFormatter** — renders data as Markdown when no `.md` template exists. Associative arrays as `**key:** value`, sequential arrays as `- item` lists, nested structures with `##` headings, objects via `get_object_vars()`.
+- [x] **MarkdownFormatter** — template-based formatter using `.md` co-located templates. Identity escape (no HTML escaping). Same architecture as PlainText/Html formatters.
+- [x] **MarkdownResponseRenderer** — HTTP response renderer, content type `text/markdown; charset=UTF-8`.
+- [x] **Bootstrap wiring** — register formatter factory and response renderer in `Bootstrap\Routing`.
+- [x] **Tests** — fallback, formatter, response renderer unit tests.
+- [x] **Shodo README** — add Markdown to formatter docs.
+
 ### Deferred — Command Response Enhancements
 
 Blocked on reverse routing (Template Helpers item 10):

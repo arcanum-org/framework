@@ -26,6 +26,7 @@ use Arcanum\Hyper\CsvResponseRenderer;
 use Arcanum\Hyper\FormatRegistry;
 use Arcanum\Hyper\HtmlResponseRenderer;
 use Arcanum\Hyper\JsonResponseRenderer;
+use Arcanum\Hyper\MarkdownResponseRenderer;
 use Arcanum\Hyper\PlainTextResponseRenderer;
 use Arcanum\Hyper\ValidationExceptionRenderer;
 use Arcanum\Ignition\Bootstrapper;
@@ -37,6 +38,8 @@ use Arcanum\Shodo\Formatters\CsvFormatter;
 use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\Formatters\JsonFormatter;
+use Arcanum\Shodo\Formatters\MarkdownFallbackFormatter;
+use Arcanum\Shodo\Formatters\MarkdownFormatter;
 use Arcanum\Shodo\Formatters\PlainTextFallbackFormatter;
 use Arcanum\Shodo\Formatters\PlainTextFormatter;
 use Arcanum\Shodo\HelperDiscovery;
@@ -180,6 +183,29 @@ class Routing implements Bootstrapper
             );
         });
 
+        $container->factory(MarkdownFormatter::class, function () use ($container, $config) {
+            /** @var TemplateCompiler $compiler */
+            $compiler = $container->get(TemplateCompiler::class);
+            /** @var TemplateCache $cache */
+            $cache = $container->get(TemplateCache::class);
+
+            $helpers = $container->has(HelperResolver::class)
+                ? $container->get(HelperResolver::class)
+                : null;
+
+            /** @var mixed $debug */
+            $debug = $config->get('app.debug');
+
+            return new MarkdownFormatter(
+                resolver: $this->createTemplateResolver($container, $config, 'md'),
+                compiler: $compiler,
+                cache: $cache,
+                fallback: new MarkdownFallbackFormatter(),
+                helpers: $helpers instanceof HelperResolver ? $helpers : null,
+                debug: $debug === true || $debug === 'true',
+            );
+        });
+
         // HTTP response renderers — compose formatters
         $container->service(JsonResponseRenderer::class);
         $container->service(CsvResponseRenderer::class);
@@ -194,6 +220,12 @@ class Routing implements Bootstrapper
             /** @var PlainTextFormatter $formatter */
             $formatter = $container->get(PlainTextFormatter::class);
             return new PlainTextResponseRenderer($formatter);
+        });
+
+        $container->factory(MarkdownResponseRenderer::class, function () use ($container) {
+            /** @var MarkdownFormatter $formatter */
+            $formatter = $container->get(MarkdownFormatter::class);
+            return new MarkdownResponseRenderer($formatter);
         });
     }
 
