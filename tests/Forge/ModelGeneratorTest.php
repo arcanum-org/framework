@@ -268,4 +268,167 @@ final class ModelGeneratorTest extends TestCase
             $source,
         );
     }
+
+    // ── Sub-model discovery ─────────────────────────────────────
+
+    public function testDiscoverSubModelDirsFindsDirectoriesWithSql(): void
+    {
+        // Arrange
+        mkdir($this->modelDir . '/Products', 0777, true);
+        mkdir($this->modelDir . '/Orders', 0777, true);
+        mkdir($this->modelDir . '/EmptyDir', 0777, true);
+        file_put_contents($this->modelDir . '/Products/FindAll.sql', 'SELECT * FROM products');
+        file_put_contents($this->modelDir . '/Orders/Create.sql', 'INSERT INTO orders (total) VALUES (:total)');
+        $generator = new ModelGenerator();
+
+        // Act
+        $dirs = $generator->discoverSubModelDirs($this->modelDir);
+
+        // Assert
+        $this->assertCount(2, $dirs);
+        $this->assertArrayHasKey('Orders', $dirs);
+        $this->assertArrayHasKey('Products', $dirs);
+        $this->assertArrayNotHasKey('EmptyDir', $dirs);
+    }
+
+    public function testDiscoverSubModelDirsReturnsEmptyForFlatDir(): void
+    {
+        // Arrange
+        $this->writeSql('AllProducts.sql', 'SELECT * FROM products');
+        $generator = new ModelGenerator();
+
+        // Act
+        $dirs = $generator->discoverSubModelDirs($this->modelDir);
+
+        // Assert
+        $this->assertSame([], $dirs);
+    }
+
+    public function testDiscoverSubModelDirsReturnsEmptyForMissingDir(): void
+    {
+        // Arrange
+        $generator = new ModelGenerator();
+
+        // Act
+        $dirs = $generator->discoverSubModelDirs('/nonexistent/path');
+
+        // Assert
+        $this->assertSame([], $dirs);
+    }
+
+    // ── Sub-model generation ────────────────────────────────────
+
+    public function testGenerateSubModelUsesSubModelStub(): void
+    {
+        // Arrange
+        $subDir = $this->modelDir . '/Products';
+        mkdir($subDir, 0777, true);
+        file_put_contents($subDir . '/FindAll.sql', 'SELECT * FROM products');
+        file_put_contents(
+            $subDir . '/FindById.sql',
+            "-- @param id int\nSELECT * FROM products WHERE id = :id",
+        );
+        $generator = new ModelGenerator();
+
+        // Act
+        $source = $generator->generateSubModel(
+            $subDir,
+            'App\\Domain\\Shop\\Model\\Products\\Products',
+        );
+
+        // Assert
+        $this->assertStringContainsString('namespace App\\Domain\\Shop\\Model\\Products;', $source);
+        $this->assertStringContainsString('class Products extends BaseModel', $source);
+        $this->assertStringContainsString('public function __construct(ConnectionManager $connections)', $source);
+        $this->assertStringContainsString("parent::__construct(__DIR__, \$connections)", $source);
+        $this->assertStringContainsString('function findAll(', $source);
+        $this->assertStringContainsString('function findById(int $id)', $source);
+    }
+
+    public function testGenerateAndWriteSubModelCreatesFile(): void
+    {
+        // Arrange
+        $subDir = $this->modelDir . '/Products';
+        mkdir($subDir, 0777, true);
+        file_put_contents($subDir . '/FindAll.sql', 'SELECT * FROM products');
+        $outputPath = $subDir . '/Products.php';
+        $generator = new ModelGenerator();
+
+        // Act
+        $result = $generator->generateAndWriteSubModel(
+            $subDir,
+            'App\\Domain\\Shop\\Model\\Products\\Products',
+            $outputPath,
+        );
+
+        // Assert
+        $this->assertTrue($result);
+        $this->assertFileExists($outputPath);
+        $this->assertStringContainsString(
+            'class Products extends BaseModel',
+            file_get_contents($outputPath) ?: '',
+        );
+    }
+
+    public function testGenerateAndWriteSubModelReturnsFalseForEmptyDir(): void
+    {
+        // Arrange
+        $subDir = $this->modelDir . '/Products';
+        mkdir($subDir, 0777, true);
+        $generator = new ModelGenerator();
+
+        // Act
+        $result = $generator->generateAndWriteSubModel(
+            $subDir,
+            'App\\Domain\\Shop\\Model\\Products\\Products',
+            $subDir . '/Products.php',
+        );
+
+        // Assert
+        $this->assertFalse($result);
+    }
+
+    // ── Mixed structure ─────────────────────────────────────────
+
+    public function testRootModelExcludesSubdirectorySqlFiles(): void
+    {
+        // Arrange — root SQL + subdirectory SQL
+        $this->writeSql('GetCart.sql', 'SELECT * FROM cart');
+        mkdir($this->modelDir . '/Products', 0777, true);
+        file_put_contents($this->modelDir . '/Products/FindAll.sql', 'SELECT * FROM products');
+        $generator = new ModelGenerator();
+
+        // Act
+        $source = $generator->generate(
+            $this->modelDir,
+            'App\\Domain\\Shop\\Model',
+        );
+
+        // Assert — root Model has getCart but NOT findAll
+        $this->assertStringContainsString('function getCart(', $source);
+        $this->assertStringNotContainsString('function findAll(', $source);
+    }
+
+    public function testIsStaleWorksForSubModelDirectory(): void
+    {
+        // Arrange
+        $subDir = $this->modelDir . '/Products';
+        mkdir($subDir, 0777, true);
+        file_put_contents($subDir . '/FindAll.sql', 'SELECT * FROM products');
+        $generator = new ModelGenerator();
+
+        // Act & Assert — no class file yet, should be stale
+        $this->assertTrue(
+            $generator->isStale($subDir, $subDir . '/Products.php'),
+        );
+
+        // Write class file after SQL
+        sleep(1);
+        file_put_contents($subDir . '/Products.php', '<?php // generated');
+
+        // Now it should not be stale
+        $this->assertFalse(
+            $generator->isStale($subDir, $subDir . '/Products.php'),
+        );
+    }
 }
