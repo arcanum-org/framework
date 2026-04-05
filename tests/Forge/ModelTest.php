@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Forge;
 
+use Arcanum\Forge\ConnectionFactory;
+use Arcanum\Forge\ConnectionManager;
 use Arcanum\Forge\Model;
 use Arcanum\Forge\PdoConnection;
 use Arcanum\Forge\Result;
@@ -14,6 +16,8 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(Model::class)]
+#[UsesClass(ConnectionFactory::class)]
+#[UsesClass(ConnectionManager::class)]
 #[UsesClass(PdoConnection::class)]
 #[UsesClass(Result::class)]
 #[UsesClass(Sql::class)]
@@ -22,6 +26,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 final class ModelTest extends TestCase
 {
     private string $modelDir;
+    private ConnectionManager $manager;
     private PdoConnection $connection;
 
     protected function setUp(): void
@@ -29,7 +34,15 @@ final class ModelTest extends TestCase
         $this->modelDir = sys_get_temp_dir() . '/arcanum_model_test_' . uniqid();
         mkdir($this->modelDir, 0777, true);
 
-        $this->connection = new PdoConnection(dsn: 'sqlite::memory:');
+        $this->manager = new ConnectionManager(
+            defaultConnection: 'main',
+            connections: ['main' => ['driver' => 'sqlite', 'database' => ':memory:']],
+            factory: new ConnectionFactory(),
+        );
+
+        /** @var PdoConnection $conn */
+        $conn = $this->manager->connection();
+        $this->connection = $conn;
         $this->createProductsTable($this->connection);
     }
 
@@ -57,14 +70,11 @@ final class ModelTest extends TestCase
         file_put_contents($this->modelDir . '/' . $filename, $sql);
     }
 
-    private function model(
-        ?PdoConnection $read = null,
-        ?PdoConnection $write = null,
-    ): Model {
+    private function model(?ConnectionManager $manager = null): Model
+    {
         return new Model(
             directory: $this->modelDir,
-            readConnection: $read ?? $this->connection,
-            writeConnection: $write ?? $this->connection,
+            connections: $manager ?? $this->manager,
         );
     }
 
@@ -256,17 +266,32 @@ final class ModelTest extends TestCase
     public function testSelectUsesReadConnection(): void
     {
         // Arrange
-        $readConn = new PdoConnection(dsn: 'sqlite::memory:');
-        $writeConn = new PdoConnection(dsn: 'sqlite::memory:');
+        $splitManager = new ConnectionManager(
+            defaultConnection: 'main',
+            connections: [
+                'main' => ['driver' => 'sqlite', 'database' => ':memory:'],
+                'read_replica' => ['driver' => 'sqlite', 'database' => ':memory:'],
+                'write_primary' => ['driver' => 'sqlite', 'database' => ':memory:'],
+            ],
+            factory: new ConnectionFactory(),
+            readConnection: 'read_replica',
+            writeConnection: 'write_primary',
+        );
+
+        /** @var PdoConnection $readConn */
+        $readConn = $splitManager->readConnection();
         $this->createProductsTable($readConn);
         $readConn->run(
             'INSERT INTO products (name) VALUES (:name)',
             ['name' => 'ReadOnly'],
         );
+
+        /** @var PdoConnection $writeConn */
+        $writeConn = $splitManager->writeConnection();
         $this->createProductsTable($writeConn);
 
         $this->writeSql('AllProducts.sql', 'SELECT name FROM products');
-        $model = $this->model(read: $readConn, write: $writeConn);
+        $model = $this->model(manager: $splitManager);
 
         // Act
         $result = $model->allProducts();
@@ -280,16 +305,31 @@ final class ModelTest extends TestCase
     public function testInsertUsesWriteConnection(): void
     {
         // Arrange
-        $readConn = new PdoConnection(dsn: 'sqlite::memory:');
-        $writeConn = new PdoConnection(dsn: 'sqlite::memory:');
+        $splitManager = new ConnectionManager(
+            defaultConnection: 'main',
+            connections: [
+                'main' => ['driver' => 'sqlite', 'database' => ':memory:'],
+                'read_replica' => ['driver' => 'sqlite', 'database' => ':memory:'],
+                'write_primary' => ['driver' => 'sqlite', 'database' => ':memory:'],
+            ],
+            factory: new ConnectionFactory(),
+            readConnection: 'read_replica',
+            writeConnection: 'write_primary',
+        );
+
+        /** @var PdoConnection $readConn */
+        $readConn = $splitManager->readConnection();
         $this->createProductsTable($readConn);
+
+        /** @var PdoConnection $writeConn */
+        $writeConn = $splitManager->writeConnection();
         $this->createProductsTable($writeConn);
 
         $this->writeSql(
             'InsertProduct.sql',
             'INSERT INTO products (name) VALUES (:name)',
         );
-        $model = $this->model(read: $readConn, write: $writeConn);
+        $model = $this->model(manager: $splitManager);
 
         // Act
         $model->insertProduct(name: 'WriteOnly');

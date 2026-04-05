@@ -34,11 +34,17 @@ class Model
     /** @var array<string, list<string>> Extracted binding names keyed by method name. */
     private array $bindingCache = [];
 
+    /**
+     * @param string $directory Filesystem path containing .sql files.
+     * @param ConnectionManager $connections Named connection registry.
+     * @param Reader $reader File reader.
+     * @param string|null $connectionName Override connection name (for domain mapping / explicit overrides).
+     */
     public function __construct(
         private readonly string $directory,
-        private readonly Connection $readConnection,
-        private readonly Connection $writeConnection,
+        private readonly ConnectionManager $connections,
         private readonly Reader $reader = new Reader(),
+        private readonly string|null $connectionName = null,
     ) {
     }
 
@@ -75,7 +81,7 @@ class Model
         $sql = $this->loadSql($method);
 
         $isRead = Sql::isRead($sql);
-        $connection = $isRead ? $this->readConnection : $this->writeConnection;
+        $connection = $isRead ? $this->readConnection() : $this->writeConnection();
 
         $result = $connection->run($sql, $params);
 
@@ -138,5 +144,23 @@ class Model
         $this->castCache[$method] = Sql::parseCasts($sql);
 
         return $this->castCache[$method];
+    }
+
+    protected function readConnection(): Connection
+    {
+        if ($this->connectionName !== null) {
+            return $this->connections->connection($this->connectionName);
+        }
+
+        return $this->connections->readConnection();
+    }
+
+    protected function writeConnection(): Connection
+    {
+        if ($this->connectionName !== null) {
+            return $this->connections->connection($this->connectionName);
+        }
+
+        return $this->connections->writeConnection();
     }
 }

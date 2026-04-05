@@ -81,7 +81,10 @@ final class Database
      */
     public function transaction(\Closure $callback): mixed
     {
-        $write = $this->resolveWriteConnection();
+        $connectionName = $this->resolveConnectionName();
+        $write = $connectionName !== null
+            ? $this->connections->connection($connectionName)
+            : $this->connections->writeConnection();
         $write->beginTransaction();
 
         try {
@@ -103,8 +106,7 @@ final class Database
         }
 
         $modelDir = $this->context->modelPath();
-        $readConn = $this->resolveReadConnection();
-        $writeConn = $this->resolveWriteConnection();
+        $connectionName = $this->resolveConnectionName();
 
         // Check for a generated model class at {DomainNamespace}\{Domain}\Model.
         if ($this->domainNamespace !== '') {
@@ -117,8 +119,8 @@ final class Database
             if (class_exists($generatedClass) && is_subclass_of($generatedClass, Model::class)) {
                 $this->modelInstance = new $generatedClass(
                     directory: $modelDir,
-                    readConnection: $readConn,
-                    writeConnection: $writeConn,
+                    connections: $this->connections,
+                    connectionName: $connectionName,
                 );
 
                 return $this->modelInstance;
@@ -127,8 +129,8 @@ final class Database
 
         $this->modelInstance = new Model(
             directory: $modelDir,
-            readConnection: $readConn,
-            writeConnection: $writeConn,
+            connections: $this->connections,
+            connectionName: $connectionName,
         );
 
         return $this->modelInstance;
@@ -163,43 +165,19 @@ final class Database
         ));
     }
 
-    private function resolveReadConnection(): Connection
+    private function resolveConnectionName(): string|null
     {
         if ($this->connectionOverride !== null) {
-            return $this->connections->connection($this->connectionOverride);
+            return $this->connectionOverride;
         }
 
         $domain = $this->context->get();
+        $mapping = $this->connections->domainMapping();
 
-        if (
-            $this->connections->domainMapping() !== []
-            && isset($this->connections->domainMapping()[$domain])
-        ) {
-            return $this->connections->connection(
-                $this->connections->domainMapping()[$domain],
-            );
+        if ($mapping !== [] && isset($mapping[$domain])) {
+            return $mapping[$domain];
         }
 
-        return $this->connections->readConnection();
-    }
-
-    private function resolveWriteConnection(): Connection
-    {
-        if ($this->connectionOverride !== null) {
-            return $this->connections->connection($this->connectionOverride);
-        }
-
-        $domain = $this->context->get();
-
-        if (
-            $this->connections->domainMapping() !== []
-            && isset($this->connections->domainMapping()[$domain])
-        ) {
-            return $this->connections->connection(
-                $this->connections->domainMapping()[$domain],
-            );
-        }
-
-        return $this->connections->writeConnection();
+        return null;
     }
 }
