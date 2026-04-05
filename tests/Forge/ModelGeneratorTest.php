@@ -71,6 +71,8 @@ final class ModelGeneratorTest extends TestCase
         // Assert
         $this->assertStringContainsString('namespace App\\Domain\\Shop;', $source);
         $this->assertStringContainsString('class Model extends BaseModel', $source);
+        $this->assertStringContainsString('function __construct(', $source);
+        $this->assertStringContainsString("__DIR__ . '/Model'", $source);
         $this->assertStringContainsString('function allProducts(', $source);
         $this->assertStringContainsString('function insertProduct(', $source);
     }
