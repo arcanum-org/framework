@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Rune\Command;
 
+use Arcanum\Forge\ModelGenerator;
 use Arcanum\Forge\Sql;
 use Arcanum\Parchment\Reader;
 use Arcanum\Rune\Attribute\Description;
@@ -32,6 +33,7 @@ final class ValidateModelsCommand implements BuiltInCommand
         private readonly string $domainRoot,
         private readonly string $domainNamespace,
         private readonly Reader $reader = new Reader(),
+        private readonly ModelGenerator $generator = new ModelGenerator(),
     ) {
     }
 
@@ -83,12 +85,50 @@ final class ValidateModelsCommand implements BuiltInCommand
     ): array {
         $issues = [];
 
+        // Validate root model (root-level SQL only).
         $sqlMethods = $this->discoverSqlMethods($modelDir);
+
+        if ($sqlMethods !== []) {
+            $issues = array_merge(
+                $issues,
+                $this->validateClass($domain, $className, $sqlMethods),
+            );
+        }
+
+        // Validate sub-models (subdirectories with SQL files).
+        $subDirs = $this->generator->discoverSubModelDirs($modelDir);
+
+        foreach ($subDirs as $dirName => $subDir) {
+            $subClassName = $className . '\\' . $dirName . '\\' . $dirName;
+            $subLabel = $domain . '\\' . $dirName;
+            $subSqlMethods = $this->discoverSqlMethods($subDir);
+
+            $issues = array_merge(
+                $issues,
+                $this->validateClass($subLabel, $subClassName, $subSqlMethods),
+            );
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Validate a single model class (root or sub-model) against its SQL methods.
+     *
+     * @param array<string, string> $sqlMethods Method name => SQL file path.
+     * @return list<string>
+     */
+    private function validateClass(
+        string $label,
+        string $className,
+        array $sqlMethods,
+    ): array {
+        $issues = [];
 
         if (!class_exists($className)) {
             $issues[] = sprintf(
                 '%s: no generated class — run forge:models',
-                $domain,
+                $label,
             );
             return $issues;
         }
@@ -101,7 +141,7 @@ final class ValidateModelsCommand implements BuiltInCommand
             if (!isset($classMethods[$method])) {
                 $issues[] = sprintf(
                     '%s: missing method %s() for %s',
-                    $domain,
+                    $label,
                     $method,
                     basename($sqlFile),
                 );
@@ -110,7 +150,7 @@ final class ValidateModelsCommand implements BuiltInCommand
 
             // Parameter validation.
             $paramIssues = $this->validateParams(
-                $domain,
+                $label,
                 $method,
                 $sqlFile,
                 $classMethods[$method],
@@ -123,7 +163,7 @@ final class ValidateModelsCommand implements BuiltInCommand
             if (!isset($sqlMethods[$method])) {
                 $issues[] = sprintf(
                     '%s: stale method %s() — SQL file deleted',
-                    $domain,
+                    $label,
                     $method,
                 );
             }
@@ -274,8 +314,7 @@ final class ValidateModelsCommand implements BuiltInCommand
             }
 
             if ($entry === 'Model') {
-                $sqlFiles = glob($path . DIRECTORY_SEPARATOR . '*.sql');
-                if ($sqlFiles !== false && $sqlFiles !== []) {
+                if ($this->hasSqlFiles($path)) {
                     $domain = ltrim($prefix, '\\');
                     if ($domain !== '') {
                         $domains[$domain] = $path;
@@ -294,5 +333,18 @@ final class ValidateModelsCommand implements BuiltInCommand
                 $domains,
             );
         }
+    }
+
+    /**
+     * Check if a Model/ directory has SQL files (root-level or in subdirectories).
+     */
+    private function hasSqlFiles(string $modelDir): bool
+    {
+        $rootSql = glob($modelDir . DIRECTORY_SEPARATOR . '*.sql');
+        if ($rootSql !== false && $rootSql !== []) {
+            return true;
+        }
+
+        return $this->generator->discoverSubModelDirs($modelDir) !== [];
     }
 }
