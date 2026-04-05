@@ -131,6 +131,83 @@ Full CQRS pipeline: Router → Hydrator → Conveyor → Renderer. Example Query
 
 - [x] **Add database example** — Contact domain persists to SQLite via Forge. Model/ directory with Save.sql, FindAll.sql, CreateTable.sql. New Messages query reads submissions back. config/database.php with SQLite connection.
 
+### Forge Sub-Model Redesign
+
+Current Forge generates one flat `Model.php` per domain with a method for every SQL file in `Model/`. For large domains this becomes a god object. Redesign: subdirectories become independent, autowireable model classes. Handlers inject specific sub-models by class name instead of `Database`.
+
+**Directory convention:**
+```
+app/Domain/Shop/Model/
+    Products/                   ← subdirectory = sub-model
+        FindAll.sql
+        FindById.sql
+        Products.php            ← generated, class named after directory
+    Orders/
+        Create.sql
+        FindByCustomer.sql
+        Orders.php              ← generated
+    GetCart.sql                 ← root-level SQL files
+    ListSpecials.sql
+    Model.php                   ← generated for root-level SQL only
+```
+
+**Generated class pattern:**
+```php
+// app/Domain/Shop/Model/Products/Products.php
+namespace App\Domain\Shop\Model\Products;
+
+final class Products extends BaseModel
+{
+    public function __construct(ConnectionManager $connections)
+    {
+        parent::__construct(__DIR__, $connections);
+    }
+
+    public function findAll(): Result { ... }
+    public function findById(int $id): Result { ... }
+}
+```
+
+- `__DIR__` for self-location — generated class lives next to its SQL files, no path config needed.
+- Only dependency is `ConnectionManager` — fully autowireable by Codex without container registration.
+- No root Model.php delegating to sub-models — each sub-model is independent.
+- Root-level SQL files still generate a `Model` class for small domains (backwards compatible).
+- Transactions: handler injects `Database` alongside specific models when needed.
+
+**Handler injection (new pattern):**
+```php
+use App\Domain\Shop\Model\Products\Products;
+
+final class ProductsHandler
+{
+    public function __construct(private readonly Products $products) {}
+
+    public function __invoke(ProductsQuery $query): array
+    {
+        return $this->products->findAll()->rows();
+    }
+}
+```
+
+**Changes required:**
+
+Framework:
+
+- [ ] **Refactor `Model` base class constructor** — accept `ConnectionManager` instead of separate read/write `Connection` objects. Model uses `ConnectionManager` to resolve read/write connections internally (respects domain mapping and read/write split). The `directory` parameter becomes optional — if omitted, defaults to `__DIR__` in generated subclasses.
+- [ ] **Update `ModelGenerator::generate()`** — scan for subdirectories in `Model/`. For each subdirectory with `.sql` files, generate a class named after the directory (e.g., `Products/Products.php`). Root-level `.sql` files generate `Model.php` as today. The `discoverSqlFiles()` method needs to distinguish root-level vs subdirectory files.
+- [ ] **Update model stub** — constructor takes `ConnectionManager` instead of `Connection $readConnection, Connection $writeConnection`. Uses `__DIR__` for directory. Import `ConnectionManager` instead of `Model as BaseModel`.
+- [ ] **Update `ModelGenerator::renderClass()`** — pass the class name (directory name for sub-models, `Model` for root-level) to the stub. Handle namespacing: sub-model at `Products/Products.php` has namespace `App\Domain\Shop\Model\Products`.
+- [ ] **Update `forge:models` CLI command** — iterate subdirectories and generate each sub-model. Report each generated file. Handle mixed structures (some root-level SQL + some subdirectories).
+- [ ] **Update `validate:models` CLI command** — validate sub-models alongside root models.
+- [ ] **Update `Database` class** — `$db->model` still works for backwards compatibility (resolves root-level Model). Consider deprecation path.
+- [ ] **Update `DomainContext`** — may need adjustment for sub-model path resolution.
+- [ ] **Tests** — `ModelGeneratorTest` for subdirectory generation, `ModelTest` for new constructor, existing tests must pass.
+- [ ] **Update Forge README** — document sub-model convention, handler injection pattern, directory structure.
+
+Starter app:
+
+- [ ] **Restructure Contact Model/** — reorganize into the new subdirectory pattern if appropriate, or keep flat (small domain). Update SubmitHandler and MessagesHandler to inject models directly.
+
 ### 11. Starter App Polish
 
 **Needs design and checklist.** Planned:
