@@ -6,7 +6,6 @@ namespace Arcanum\Forge;
 
 use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;
-use Arcanum\Parchment\Searcher;
 use Arcanum\Parchment\Writer;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Toolkit\Strings;
@@ -103,21 +102,101 @@ final class ModelGenerator
     }
 
     /**
+     * Generate a sub-model class for a subdirectory within Model/.
+     *
+     * Uses the sub_model stub which includes a __DIR__ constructor,
+     * making the generated class autowireable by Codex.
+     *
+     * @param string $subModelDir Absolute path to the sub-model directory.
+     * @param string $classNamespace Fully qualified class name for the generated class.
+     * @return string The generated PHP source code.
+     */
+    public function generateSubModel(string $subModelDir, string $classNamespace): string
+    {
+        $sqlFiles = $this->discoverSqlFiles($subModelDir);
+
+        $methods = [];
+        foreach ($sqlFiles as $file) {
+            $methods[] = $this->renderMethod($file);
+        }
+
+        return $this->renderClass($classNamespace, $methods, 'sub_model');
+    }
+
+    /**
+     * Generate and write a sub-model class file.
+     *
+     * @return bool True if written, false if no SQL files found.
+     */
+    public function generateAndWriteSubModel(
+        string $subModelDir,
+        string $classNamespace,
+        string $outputPath,
+    ): bool {
+        $sqlFiles = $this->discoverSqlFiles($subModelDir);
+
+        if ($sqlFiles === []) {
+            return false;
+        }
+
+        $source = $this->generateSubModel($subModelDir, $classNamespace);
+        $this->writer->write($outputPath, $source);
+
+        return true;
+    }
+
+    /**
+     * Discover root-level .sql files (not in subdirectories).
+     *
      * @return list<string> Sorted absolute paths to .sql files.
      */
-    private function discoverSqlFiles(string $modelDir): array
+    private function discoverSqlFiles(string $dir): array
+    {
+        if (!is_dir($dir)) {
+            return [];
+        }
+
+        $files = glob($dir . DIRECTORY_SEPARATOR . '*.sql') ?: [];
+        sort($files);
+
+        return $files;
+    }
+
+    /**
+     * Discover subdirectories that contain .sql files (sub-model candidates).
+     *
+     * @return array<string, string> Directory name => absolute path.
+     */
+    public function discoverSubModelDirs(string $modelDir): array
     {
         if (!is_dir($modelDir)) {
             return [];
         }
 
-        $files = [];
-        foreach (Searcher::findAll('*.sql', $modelDir) as $file) {
-            $files[] = $file->getRealPath();
-        }
-        sort($files);
+        $dirs = [];
+        $entries = scandir($modelDir) ?: [];
 
-        return $files;
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            $path = $modelDir . DIRECTORY_SEPARATOR . $entry;
+
+            if (!is_dir($path)) {
+                continue;
+            }
+
+            $sqlFiles = glob($path . DIRECTORY_SEPARATOR . '*.sql') ?: [];
+
+            if ($sqlFiles !== []) {
+                $dirs[$entry] = $path;
+            }
+        }
+
+        ksort($dirs);
+
+        return $dirs;
     }
 
     private function renderMethod(string $sqlFile): string
@@ -144,9 +223,12 @@ final class ModelGenerator
     /**
      * @param list<string> $methods Pre-rendered method strings.
      */
-    private function renderClass(string $classNamespace, array $methods): string
-    {
-        $stub = $this->loadStub('model');
+    private function renderClass(
+        string $classNamespace,
+        array $methods,
+        string $stubName = 'model',
+    ): string {
+        $stub = $this->loadStub($stubName);
 
         return $this->compiler->render($stub, [
             'namespace' => Strings::classNamespace($classNamespace),

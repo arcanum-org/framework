@@ -7,7 +7,6 @@ namespace Arcanum\Test\Forge;
 use Arcanum\Forge\ModelGenerator;
 use Arcanum\Forge\Sql;
 use Arcanum\Parchment\Reader;
-use Arcanum\Parchment\Searcher;
 use Arcanum\Parchment\Writer;
 use Arcanum\Toolkit\Strings;
 use PHPUnit\Framework\TestCase;
@@ -19,7 +18,6 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(Strings::class)]
 #[UsesClass(Reader::class)]
 #[UsesClass(Writer::class)]
-#[UsesClass(Searcher::class)]
 #[UsesClass(\Arcanum\Parchment\FileSystem::class)]
 #[UsesClass(\Arcanum\Shodo\TemplateCompiler::class)]
 final class ModelGeneratorTest extends TestCase
