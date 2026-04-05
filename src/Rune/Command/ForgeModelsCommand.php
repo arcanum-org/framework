@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace Arcanum\Rune\Command;
 
 use Arcanum\Forge\ModelGenerator;
-use Arcanum\Parchment\Searcher;
 use Arcanum\Rune\Attribute\Description;
 use Arcanum\Rune\BuiltInCommand;
 use Arcanum\Rune\ExitCode;
 use Arcanum\Rune\Input;
 use Arcanum\Rune\Output;
-use Arcanum\Toolkit\Strings;
 
 /**
  * Scans all domain Model/ directories and generates typed Model classes.
@@ -41,12 +39,27 @@ final class ForgeModelsCommand implements BuiltInCommand
 
         foreach ($domains as $domain => $modelDir) {
             $namespace = $this->domainNamespace . '\\' . $domain . '\\Model';
+
+            // Root-level Model (only root-level SQL files).
             $outputPath = $modelDir . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'Model.php';
             $outputPath = realpath(dirname($outputPath)) . DIRECTORY_SEPARATOR . 'Model.php';
 
             if ($this->generator->generateAndWrite($modelDir, $namespace, $outputPath)) {
                 $output->writeLine(sprintf('Generated: %s', $outputPath));
                 $generated++;
+            }
+
+            // Sub-models (subdirectories with SQL files).
+            $subDirs = $this->generator->discoverSubModelDirs($modelDir);
+
+            foreach ($subDirs as $dirName => $subDir) {
+                $subNamespace = $namespace . '\\' . $dirName . '\\' . $dirName;
+                $subOutput = $subDir . DIRECTORY_SEPARATOR . $dirName . '.php';
+
+                if ($this->generator->generateAndWriteSubModel($subDir, $subNamespace, $subOutput)) {
+                    $output->writeLine(sprintf('Generated: %s', $subOutput));
+                    $generated++;
+                }
             }
         }
 
@@ -97,8 +110,7 @@ final class ForgeModelsCommand implements BuiltInCommand
             }
 
             if ($entry === 'Model') {
-                $sqlFiles = glob($path . DIRECTORY_SEPARATOR . '*.sql');
-                if ($sqlFiles !== false && $sqlFiles !== []) {
+                if ($this->hasSqlFiles($path)) {
                     $domain = ltrim($prefix, '\\');
                     if ($domain !== '') {
                         $domains[$domain] = $path;
@@ -118,5 +130,18 @@ final class ForgeModelsCommand implements BuiltInCommand
                 $domains,
             );
         }
+    }
+
+    /**
+     * Check if a Model/ directory has SQL files (root-level or in subdirectories).
+     */
+    private function hasSqlFiles(string $modelDir): bool
+    {
+        $rootSql = glob($modelDir . DIRECTORY_SEPARATOR . '*.sql');
+        if ($rootSql !== false && $rootSql !== []) {
+            return true;
+        }
+
+        return $this->generator->discoverSubModelDirs($modelDir) !== [];
     }
 }
