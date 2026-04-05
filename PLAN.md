@@ -193,20 +193,20 @@ final class ProductsHandler
 
 Framework:
 
-- [ ] **Refactor `Model` base class constructor** — accept `ConnectionManager` instead of separate read/write `Connection` objects. Model uses `ConnectionManager` to resolve read/write connections internally (respects domain mapping and read/write split). The `directory` parameter becomes optional — if omitted, defaults to `__DIR__` in generated subclasses.
-- [ ] **Update `ModelGenerator::generate()`** — scan for subdirectories in `Model/`. For each subdirectory with `.sql` files, generate a class named after the directory (e.g., `Products/Products.php`). Root-level `.sql` files generate `Model.php` as today. The `discoverSqlFiles()` method needs to distinguish root-level vs subdirectory files.
-- [ ] **Update model stub** — constructor takes `ConnectionManager` instead of `Connection $readConnection, Connection $writeConnection`. Uses `__DIR__` for directory. Import `ConnectionManager` instead of `Model as BaseModel`.
-- [ ] **Update `ModelGenerator::renderClass()`** — pass the class name (directory name for sub-models, `Model` for root-level) to the stub. Handle namespacing: sub-model at `Products/Products.php` has namespace `App\Domain\Shop\Model\Products`.
-- [ ] **Update `forge:models` CLI command** — iterate subdirectories and generate each sub-model. Report each generated file. Handle mixed structures (some root-level SQL + some subdirectories).
-- [ ] **Update `validate:models` CLI command** — validate sub-models alongside root models.
-- [ ] **Update `Database` class** — `$db->model` still works for backwards compatibility (resolves root-level Model). Consider deprecation path.
-- [ ] **Update `DomainContext`** — may need adjustment for sub-model path resolution.
-- [ ] **Tests** — `ModelGeneratorTest` for subdirectory generation, `ModelTest` for new constructor, existing tests must pass.
-- [ ] **Update Forge README** — document sub-model convention, handler injection pattern, directory structure.
+- [x] **Refactor `Model` base class constructor** — accept `ConnectionManager` instead of separate read/write `Connection` objects. Model uses `ConnectionManager` to resolve read/write connections internally (respects domain mapping and read/write split via optional `connectionName` parameter).
+- [x] **Update `ModelGenerator::generate()`** — scan for subdirectories in `Model/`. For each subdirectory with `.sql` files, generate a class named after the directory (e.g., `Products/Products.php`). Root-level `.sql` files generate `Model.php` as today. `discoverSqlFiles()` changed from recursive to root-only; `discoverSubModelDirs()` added.
+- [x] **Update model stub** — imports `ConnectionManager`. New `sub_model.stub` with `__DIR__` constructor taking only `ConnectionManager` (fully autowireable by Codex).
+- [x] **Update `ModelGenerator::renderClass()`** — accepts stub name parameter. Sub-models use `sub_model` stub with directory-named class and nested namespace.
+- [x] **Update `forge:models` CLI command** — iterates subdirectories and generates each sub-model. Reports each generated file. Handles mixed structures.
+- [x] **Update `validate:models` CLI command** — validates sub-models alongside root models. Shared validation logic extracted to `validateClass()`.
+- [x] **Update `Database` class** — `$db->model` still works for backwards compatibility. Connection override and domain mapping preserved via `connectionName` parameter.
+- [x] **`DomainContext` unchanged** — sub-models bypass Database entirely via Codex autowiring; no changes needed.
+- [x] **Tests** — `ModelGeneratorTest` for subdirectory generation (8 new tests), `ModelTest` for new constructor, all 2217 tests pass.
+- [x] **Update Forge README** — documented sub-model convention, handler injection pattern, directory structure, transaction pattern.
 
 Starter app:
 
-- [ ] **Restructure Contact Model/** — reorganize into the new subdirectory pattern if appropriate, or keep flat (small domain). Update SubmitHandler and MessagesHandler to inject models directly.
+- [x] **Contact domain kept flat** — small domain (3 SQL files), stays as-is. Demonstrates backwards compatibility with `$db->model`.
 
 ### 11. Starter App Polish
 
