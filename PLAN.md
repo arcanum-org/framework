@@ -129,7 +129,7 @@ Full CQRS pipeline: Router → Hydrator → Conveyor → Renderer. Example Query
 
 ### Starter app
 
-- [ ] **Add database example** — Forge is a major feature but the starter app doesn't demonstrate it. Add a Model/ directory with example SQL files.
+- [x] **Add database example** — Contact domain persists to SQLite via Forge. Model/ directory with Save.sql, FindAll.sql, CreateTable.sql. New Messages query reads submissions back. config/database.php with SQLite connection.
 
 ### 11. Starter App Polish
 
