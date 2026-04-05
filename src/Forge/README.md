@@ -285,6 +285,100 @@ php arcanum validate:models
 
 Reports missing methods, stale methods (deleted SQL files), parameter count mismatches, and type mismatches.
 
+## Sub-models
+
+When a domain grows, a single Model class becomes a god object. Organize your SQL files into subdirectories and Forge generates independent, autowireable model classes for each:
+
+```
+app/Domain/Shop/Model/
+    Products/                   ← subdirectory = sub-model
+        FindAll.sql
+        FindById.sql
+        Products.php            ← generated
+    Orders/
+        Create.sql
+        FindByCustomer.sql
+        Orders.php              ← generated
+    GetCart.sql                 ← root-level SQL files
+    ListSpecials.sql
+    Model.php                   ← generated for root-level SQL only
+```
+
+Each subdirectory becomes its own class, named after the directory:
+
+```php
+// Auto-generated — app/Domain/Shop/Model/Products/Products.php
+namespace App\Domain\Shop\Model\Products;
+
+final class Products extends BaseModel
+{
+    public function __construct(ConnectionManager $connections)
+    {
+        parent::__construct(__DIR__, $connections);
+    }
+
+    public function findAll(): Result { ... }
+    public function findById(int $id): Result { ... }
+}
+```
+
+The only dependency is `ConnectionManager`, so Codex autowires sub-models without any container registration. Handlers inject them directly:
+
+```php
+use App\Domain\Shop\Model\Products\Products;
+
+final class ProductsHandler
+{
+    public function __construct(private readonly Products $products) {}
+
+    public function __invoke(ProductsQuery $query): array
+    {
+        return $this->products->findAll()->rows();
+    }
+}
+```
+
+### When to use sub-models vs `$db->model`
+
+| Pattern | When to use |
+|---|---|
+| `$db->model->methodName()` | Small domains with a handful of SQL files |
+| Inject sub-model directly | Large domains, clearer handler dependencies |
+
+Root-level SQL files (not in subdirectories) still generate a `Model` class, so small domains work exactly as before. You can mix root-level SQL and subdirectories in the same domain.
+
+### Transactions with sub-models
+
+Sub-models don't have their own transaction support. If a handler needs a transaction, inject `Database` alongside the sub-model:
+
+```php
+use App\Domain\Shop\Model\Products\Products;
+use App\Domain\Shop\Model\Orders\Orders;
+
+final class PlaceOrderHandler
+{
+    public function __construct(
+        private readonly Products $products,
+        private readonly Orders $orders,
+        private readonly Database $db,
+    ) {}
+
+    public function __invoke(PlaceOrder $command): void
+    {
+        $this->db->transaction(function () use ($command) {
+            $this->orders->create(
+                productId: $command->productId,
+                quantity: $command->quantity,
+            );
+            $this->products->deductStock(
+                id: $command->productId,
+                quantity: $command->quantity,
+            );
+        });
+    }
+}
+```
+
 ## CLI commands
 
 ```
@@ -320,7 +414,7 @@ Forge/
     DomainContext         — request-scoped domain holder
     DomainContextMiddleware — Conveyor middleware, sets domain from DTO namespace
     Model                 — maps method calls to SQL files (magic + generated)
-    ModelGenerator        — generates typed model classes from SQL files
+    ModelGenerator        — generates typed model classes (root + sub-models) from SQL files
     Result                — query result with typed accessors
     Sql                   — SQL string introspection (read detection, @cast, @param, bindings)
 ```
