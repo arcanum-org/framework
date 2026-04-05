@@ -12,5 +12,10 @@ use Arcanum\Forge\Result;
 
 final class {{! $className !}} extends BaseModel
 {
+    public function __construct(ConnectionManager $connections)
+    {
+        parent::__construct(__DIR__, $connections);
+    }
+
 {{! $methods !}}
 }
