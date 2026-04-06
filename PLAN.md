@@ -158,9 +158,9 @@ New `Throttle` package under `src/Throttle/`. Depends on `Psr\SimpleCache\CacheI
 
 **Starter app:**
 
-- [ ] **`RateLimit` middleware** — `App\Http\Middleware\RateLimit`. Extracts key from request (IP address). Calls `RateLimiter::attempt()`. On reject: throws `HttpException(StatusCode::TooManyRequests)`. On allow: adds `X-RateLimit-*` headers to response.
-- [ ] **Register in `config/middleware.php`** — add to global middleware stack.
-- [ ] **Add `throttle` config** — `config/throttle.php` or section in existing config. Limit, window, strategy.
+- [x] **`RateLimit` middleware** — `App\Http\Middleware\RateLimit`. Extracts key from request (IP address). Calls `RateLimiter::attempt()`. On reject: throws `HttpException(StatusCode::TooManyRequests)`. On allow: adds `X-RateLimit-*` headers to response.
+- [x] **Register in `config/middleware.php`** — add to global middleware stack.
+- [x] **Add `throttle` config** — `config/throttle.php` or section in existing config. Limit, window, strategy.
 
 **HTTP headers (added to successful responses and 429s):**
 
