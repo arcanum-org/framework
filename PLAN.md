@@ -321,6 +321,8 @@ Each package replaces generic `throw new \RuntimeException(...)` with named exce
 
 ## Long-Distance Future
 
+- **Hyper README** — document PSR-7 message classes, response renderers, exception renderers, format registry, file uploads, URI handling. Currently the only core package without a README.
+- **Starter app production build** — `public/css/app.css` with `@tailwind` directives, `composer css:build` script using Tailwind standalone binary, production guardrail warning when CDN play script detected with `app.debug=false`.
 - **RFC 9457 Problem Details for HTTP APIs** — standardized JSON error response format (`application/problem+json`). Forward-compatible with the `ArcanumException` interface (#14). When ready, it's a renderer change — exception infrastructure is already in place. See https://www.rfc-editor.org/rfc/rfc9457.html
 - **Queue/Job system** — async processing with drivers (Redis, database, SQS)
 - **Testing utilities** — DTO factories, service fakes, TestKernel
