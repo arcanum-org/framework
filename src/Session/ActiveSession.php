@@ -24,9 +24,7 @@ final class ActiveSession
     public function get(): Session
     {
         if ($this->session === null) {
-            throw new \RuntimeException(
-                'No active session. Is SessionMiddleware registered in the HTTP middleware stack?'
-            );
+            throw new SessionNotStarted();
         }
 
         return $this->session;

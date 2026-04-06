@@ -297,14 +297,14 @@ Each package replaces generic `throw new \RuntimeException(...)` with named exce
 - [x] **Codex** — `UnresolvableParameter`, `ClassNotFound`. Suggestions: "Parameter $x has no type hint and no default — add a type or register a specification."
 - [x] **Forge** — `SqlFileNotFound`, `InvalidModelMethod`, `ConnectionNotConfigured`, `UnsupportedDriver`. Suggestions: list nearby SQL files, list configured connections, list supported drivers.
 - [x] **Atlas** — `UnresolvableRoute` updated with ArcanumException, `MethodNotAllowed` inherits from HttpException. Suggestions: "Run `validate:handlers` to check registration."
-- [ ] **Shodo** — `TemplateNotFound`, `CompilationError`. Suggestions: "Expected template at: {path}", "Check syntax near line {n}."
-- [ ] **Hyper** — `UnsupportedFormat`. Suggestions: "Available formats: .json, .html, .csv."
-- [ ] **Vault** — `StoreNotFound`. Suggestions: "Configured stores: file, redis, array."
-- [ ] **Flow** — `HandlerNotFound` (Conveyor). Suggestions: "Expected {Handler}Handler class."
-- [ ] **Gather** — `KeyNotFound`. Suggestions: "Available keys: ..." (when the registry is small enough).
-- [ ] **Session** — `SessionNotStarted`. Suggestions: "Ensure SessionMiddleware is registered."
-- [ ] **Auth** — `GuardNotFound`. Suggestions: "Configured guards: session, token."
-- [ ] **Remaining packages** (Ignition, Quill, Parchment, Toolkit, Rune, Throttle) — audit throw sites, add named exceptions where useful.
+- [x] **Shodo** — `UnknownHelper` and `UnsupportedFormat` updated with ArcanumException. UnknownHelper lists available helpers.
+- [x] **Hyper** — `HttpException` already implements ArcanumException; FormatRegistry throws 406 with reason phrase as title.
+- [x] **Vault** — `StoreNotFound` created, `InvalidArgument` updated with ArcanumException. StoreNotFound lists configured stores.
+- [x] **Flow** — `HandlerNotFound` (Conveyor) created with suggestion to create handler class or run validate:handlers.
+- [x] **Gather** — Gather exceptions are LogicException for singleton protection (clone/unserialize) — not developer-facing errors. Skipped.
+- [x] **Session** — `SessionNotStarted` created. Suggests registering SessionMiddleware.
+- [x] **Auth** — Auth rejects via HttpException (already ArcanumException). No GuardNotFound throw site exists. Skipped.
+- [ ] **Remaining packages** (Ignition, Quill, Parchment, Toolkit, Rune) — audit throw sites, add named exceptions where useful.
 
 **Framework — message rewrite pass:**
 

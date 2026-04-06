@@ -47,7 +47,15 @@ final class CacheManager
         }
 
         if (!isset($this->stores[$name])) {
-            throw new \RuntimeException(sprintf('Cache store "%s" is not configured.', $name));
+            $available = array_keys($this->stores);
+            throw (new StoreNotFound($name))
+                ->withSuggestion(
+                    $available !== []
+                        ? 'Configured stores: '
+                            . implode(', ', $available)
+                        : 'No stores configured'
+                            . ' — add one to config/cache.php',
+                );
         }
 
         $this->resolved[$name] = $this->buildDriver($this->stores[$name]);
