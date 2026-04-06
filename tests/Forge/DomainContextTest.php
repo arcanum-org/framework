@@ -108,23 +108,39 @@ final class DomainContextTest extends TestCase
         );
     }
 
-    public function testExtractDomainThrowsOnWrongNamespace(): void
+    public function testExtractDomainReturnsEmptyForWrongNamespace(): void
     {
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('is not under namespace prefix');
-        DomainContext::extractDomain(
+        // Arrange & Act
+        $result = DomainContext::extractDomain(
             'Other\\Namespace\\Foo',
             'App\\Domain',
         );
+
+        // Assert
+        $this->assertSame('', $result);
     }
 
-    public function testExtractDomainThrowsOnNoDomainSegment(): void
+    public function testExtractDomainReturnsEmptyForNoDomainSegment(): void
     {
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('no domain segment found');
-        DomainContext::extractDomain(
+        // Arrange & Act
+        $result = DomainContext::extractDomain(
             'App\\Domain\\Command\\PlaceOrder',
             'App\\Domain',
         );
+
+        // Assert
+        $this->assertSame('', $result);
+    }
+
+    public function testExtractDomainReturnsEmptyForDomainlessQuery(): void
+    {
+        // Arrange & Act
+        $result = DomainContext::extractDomain(
+            'App\\Domain\\Query\\Health',
+            'App\\Domain',
+        );
+
+        // Assert
+        $this->assertSame('', $result);
     }
 }

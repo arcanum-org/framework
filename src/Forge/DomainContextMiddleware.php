@@ -27,7 +27,10 @@ final class DomainContextMiddleware implements Progression
     public function __invoke(object $payload, callable $next): void
     {
         $domain = DomainContext::extractDomain($payload::class, $this->namespace);
-        $this->context->set($domain);
+
+        if ($domain !== '') {
+            $this->context->set($domain);
+        }
 
         $next();
     }

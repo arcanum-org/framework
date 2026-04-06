@@ -84,7 +84,12 @@ final class DomainContext
      */
     public static function extractDomain(string $class, string $namespace): string
     {
-        $relative = Strings::stripNamespacePrefix($class, $namespace);
+        $prefix = rtrim($namespace, '\\') . '\\';
+        if (!str_starts_with($class, $prefix)) {
+            return '';
+        }
+
+        $relative = substr($class, strlen($prefix));
         $segments = explode('\\', $relative);
 
         // Collect segments until we hit a CQRS boundary (Command/Query).
@@ -103,15 +108,6 @@ final class DomainContext
             array_pop($domain);
         }
 
-        $result = implode('\\', $domain);
-
-        if ($result === '') {
-            throw new \RuntimeException(sprintf(
-                "Cannot extract domain from class '%s' — no domain segment found.",
-                $class,
-            ));
-        }
-
-        return $result;
+        return implode('\\', $domain);
     }
 }
