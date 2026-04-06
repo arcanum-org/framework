@@ -22,7 +22,7 @@ namespace Arcanum\Shodo;
  *
  * Pre-compilation passes (run before PHP compilation):
  * - @include 'path' — inlines referenced file contents
- * - @extends 'layout' / @section 'name' / @yield 'name' — layout inheritance
+ * - extends / section / yield directives — layout inheritance
  */
 final class TemplateCompiler
 {
@@ -59,13 +59,22 @@ final class TemplateCompiler
      * Compile template source into PHP.
      *
      * When $templateDirectory is provided, pre-compilation passes run first:
-     * @include inlining and @extends/@section/@yield layout inheritance.
+     * include inlining and extends/section/yield layout inheritance.
+     *
+     * When $fragment is true, layout inheritance is skipped — only the
+     * 'content' section is rendered. This is used for HTMX partial swaps
+     * where the layout wrapper (head, nav, footer) is not needed.
      */
-    public function compile(string $source, string $templateDirectory = ''): string
-    {
+    public function compile(
+        string $source,
+        string $templateDirectory = '',
+        bool $fragment = false,
+    ): string {
         if ($templateDirectory !== '') {
             $source = $this->resolveIncludes($source, $templateDirectory);
-            $source = $this->resolveLayout($source, $templateDirectory);
+            $source = $fragment
+                ? $this->resolveFragment($source, $templateDirectory)
+                : $this->resolveLayout($source, $templateDirectory);
         }
 
         // Order matters: raw output before escaped output to avoid double-matching.
@@ -234,7 +243,7 @@ final class TemplateCompiler
     /**
      * Resolve layout inheritance.
      *
-     * If the source starts with {{ @extends 'layout' }}, extract all
+     * If the source starts with the extends directive, extract all
      * {{ @section 'name' }}...{{ @endsection }} blocks from the child,
      * load the layout file, and replace {{ @yield 'name' }} placeholders
      * with the section contents.
@@ -275,6 +284,27 @@ final class TemplateCompiler
             },
             $layoutSource,
         );
+    }
+
+    /**
+     * Resolve fragment mode: extract only the 'content' section, skip layout.
+     *
+     * When a template declares a layout via the extends directive, fragment
+     * mode returns the content section directly without wrapping in the
+     * layout. If there's no extends directive, the source passes through.
+     */
+    private function resolveFragment(
+        string $source,
+        string $templateDirectory,
+    ): string {
+        if (!preg_match('/^\s*\{\{\s*@extends\s+\'([^\']+)\'\s*\}\}/s', $source, $extendsMatch)) {
+            return $source;
+        }
+
+        $childSource = substr($source, strlen($extendsMatch[0]));
+        $sections = $this->extractSections($childSource);
+
+        return $sections['content'] ?? '';
     }
 
     /**

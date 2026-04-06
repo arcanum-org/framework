@@ -681,4 +681,54 @@ final class TemplateCompilerTest extends TestCase
         // Assert — @include was NOT resolved (no directory to resolve against)
         $this->assertStringNotContainsString('<nav>', $result);
     }
+
+    // -----------------------------------------------------------
+    // Fragment rendering (HTMX partial swaps)
+    // -----------------------------------------------------------
+
+    public function testFragmentModeRendersOnlyContentSection(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+        $source = file_get_contents(self::$fixtureDir . '/page-with-layout.html');
+        assert(is_string($source));
+
+        // Act
+        $result = $compiler->compile($source, self::$fixtureDir, fragment: true);
+
+        // Assert — only the content section, no layout wrapper
+        $this->assertStringNotContainsString('<!DOCTYPE html>', $result);
+        $this->assertStringNotContainsString('<nav>', $result);
+        $this->assertStringNotContainsString('<footer>', $result);
+        $this->assertStringContainsString('$__escape((string)($message))', $result);
+    }
+
+    public function testFragmentModeWithNoExtendsPassesThrough(): void
+    {
+        // Arrange — template without @extends
+        $compiler = new TemplateCompiler();
+        $source = '<p>{{ $name }}</p>';
+
+        // Act
+        $result = $compiler->compile($source, self::$fixtureDir, fragment: true);
+
+        // Assert — compiled normally since there's no layout to strip
+        $this->assertSame(
+            '<p><?= $__escape((string)($name)) ?></p>',
+            $result,
+        );
+    }
+
+    public function testFragmentModeReturnsEmptyWhenNoContentSection(): void
+    {
+        // Arrange — extends layout but only fills 'title', not 'content'
+        $compiler = new TemplateCompiler();
+        $source = "{{ @extends 'layout' }}\n{{ @section 'title' }}Title{{ @endsection }}";
+
+        // Act
+        $result = $compiler->compile($source, self::$fixtureDir, fragment: true);
+
+        // Assert — no content section defined, so empty
+        $this->assertSame('', $result);
+    }
 }

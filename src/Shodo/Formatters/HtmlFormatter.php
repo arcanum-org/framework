@@ -21,6 +21,8 @@ use Arcanum\Shodo\TemplateResolver;
  */
 class HtmlFormatter implements Formatter
 {
+    private bool $fragment = false;
+
     public function __construct(
         private readonly TemplateResolver $resolver,
         private readonly TemplateCompiler $compiler,
@@ -30,6 +32,18 @@ class HtmlFormatter implements Formatter
         private readonly ?HelperResolver $helpers = null,
         private readonly bool $debug = false,
     ) {
+    }
+
+    /**
+     * Enable fragment mode for the current request.
+     *
+     * When enabled, templates that use @extends will render only the
+     * 'content' section without the layout wrapper. Call this from
+     * middleware when the HX-Request header is present.
+     */
+    public function setFragment(bool $fragment): void
+    {
+        $this->fragment = $fragment;
     }
 
     public function format(mixed $data, string $dtoClass = ''): string
@@ -45,7 +59,15 @@ class HtmlFormatter implements Formatter
 
     private function renderTemplate(string $templatePath, mixed $data, string $dtoClass): string
     {
-        if ($this->cache->isFresh($templatePath)) {
+        if ($this->fragment) {
+            // Fragment mode bypasses cache — different output than full render.
+            $source = $this->reader->read($templatePath);
+            $compiled = $this->compiler->compile(
+                $source,
+                dirname($templatePath),
+                fragment: true,
+            );
+        } elseif ($this->cache->isFresh($templatePath)) {
             $compiled = $this->cache->load($templatePath);
         } else {
             $source = $this->reader->read($templatePath);
