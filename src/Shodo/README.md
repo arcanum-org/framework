@@ -187,6 +187,66 @@ The handler's return value becomes the template's variables:
 - **Object** — public properties become variables
 - **Scalar** — available as `{{ $data }}`
 
+## Layouts
+
+Templates can extend a layout using `{{ @extends 'layout' }}`. The layout defines `{{ @yield 'name' }}` slots, and child templates fill them with `{{ @section 'name' }}...{{ @endsection }}`:
+
+**Layout** (`app/Pages/layout.html`):
+```html
+<!DOCTYPE html>
+<html>
+<head><title>{{ @yield 'title' }}</title></head>
+<body>
+{{ @include 'partials/nav' }}
+<main>{{ @yield 'content' }}</main>
+{{ @include 'partials/footer' }}
+</body>
+</html>
+```
+
+**Child template** (`app/Pages/Index.html`):
+```html
+{{ @extends 'layout' }}
+
+{{ @section 'title' }}Home{{ @endsection }}
+
+{{ @section 'content' }}
+<h1>{{ $name }}</h1>
+<p>{{ $message }}</p>
+{{ @endsection }}
+```
+
+Layout resolution walks up directories from the child template's location. A `Pages/layout.html` is found before a top-level `layout.html`, so subdirectories can have their own layouts.
+
+Unfilled `{{ @yield }}` slots produce an empty string.
+
+## Includes
+
+The `{{ @include 'path' }}` directive inlines another template file's contents before compilation:
+
+```html
+{{ @include 'partials/nav' }}
+{{ @include 'partials/footer.html' }}
+```
+
+Paths resolve relative to the current template's directory. The `.html` extension is optional — it's tried automatically when no extension is given.
+
+Includes nest up to 10 levels deep. Included files can themselves use `{{ @include }}`.
+
+## Fragment rendering (HTMX)
+
+When a template uses `@extends`, the same file can serve both full-page loads and HTMX partial swaps. In **fragment mode**, only the `content` section is rendered — the layout wrapper (head, nav, footer) is skipped.
+
+The `HtmlFormatter` exposes `setFragment(bool)`. Call it from middleware when the `HX-Request` header is present:
+
+```php
+if ($request->hasHeader('HX-Request')) {
+    $formatter->setFragment(true);
+}
+```
+
+Full page load returns the complete layout. HTMX request returns just the content — ready for `hx-swap`.
+
 ## Template discovery
 
 Templates are co-located with their handler DTOs. The `TemplateResolver` maps a DTO class name to a template file using PSR-4 convention:

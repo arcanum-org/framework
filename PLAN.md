@@ -241,7 +241,7 @@ Prerequisites (framework — Shodo changes, must complete first):
 - [x] **Shodo `@include` directive** — add `{{ @include 'partials/nav' }}` to `TemplateCompiler`. Resolves relative to the current template's directory. For reusable fragments (nav, footer) shared across pages.
 - [x] **Shodo fragment rendering** — when the `HX-Request` header is present, Shodo renders only the content section (skipping the layout wrapper). This means the same template serves both full-page loads and HTMX partial swaps. Lives in the framework: `HtmlFormatter::setFragment()` called by middleware, compiler resolves fragment mode.
 - [x] **Shodo tests** — test layout inheritance, section filling, include resolution, fragment-only rendering.
-- [ ] **Update Shodo README** — document layouts, sections, includes, and HTMX fragment behavior.
+- [x] **Update Shodo README** — document layouts, sections, includes, and HTMX fragment behavior.
 
 Starter app (depends on Shodo changes above):
 
