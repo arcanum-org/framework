@@ -13,6 +13,8 @@ use Arcanum\Glitch\ArcanumException;
 use Arcanum\Glitch\HttpException;
 use Arcanum\Hyper\Headers;
 use Arcanum\Hyper\HtmlExceptionResponseRenderer;
+use Arcanum\Parchment\Reader;
+use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Hyper\Message;
 use Arcanum\Hyper\Phrase;
 use Arcanum\Hyper\Response;
@@ -26,6 +28,8 @@ use Psr\Http\Message\ResponseInterface;
 #[CoversClass(HtmlExceptionResponseRenderer::class)]
 #[UsesClass(ArcanumException::class)]
 #[UsesClass(HttpException::class)]
+#[UsesClass(TemplateCompiler::class)]
+#[UsesClass(Reader::class)]
 #[UsesClass(Response::class)]
 #[UsesClass(Message::class)]
 #[UsesClass(Headers::class)]
@@ -396,5 +400,59 @@ final class HtmlExceptionResponseRendererTest extends TestCase
                 "Status {$code->value} should have a friendly description",
             );
         }
+    }
+
+    // -----------------------------------------------------------
+    // App override templates
+    // -----------------------------------------------------------
+
+    public function testRenderUsesAppTemplateWhenAvailable(): void
+    {
+        // Arrange
+        $fixtureDir = dirname(__DIR__) . '/Fixture/ErrorTemplates';
+        $renderer = new HtmlExceptionResponseRenderer(
+            errorTemplatesDirectory: $fixtureDir,
+            compiler: new TemplateCompiler(),
+        );
+
+        // Act — 404 has an app template
+        $body = $this->getBody($renderer->render(new HttpException(StatusCode::NotFound)));
+
+        // Assert — uses the custom template, not the built-in
+        $this->assertStringContainsString('class="custom-error"', $body);
+        $this->assertStringContainsString('404', $body);
+        $this->assertStringContainsString('Not Found', $body);
+    }
+
+    public function testRenderFallsBackToBuiltInWhenNoAppTemplate(): void
+    {
+        // Arrange
+        $fixtureDir = dirname(__DIR__) . '/Fixture/ErrorTemplates';
+        $renderer = new HtmlExceptionResponseRenderer(
+            errorTemplatesDirectory: $fixtureDir,
+            compiler: new TemplateCompiler(),
+        );
+
+        // Act — 500 has no app template
+        $body = $this->getBody($renderer->render(
+            new HttpException(StatusCode::InternalServerError),
+        ));
+
+        // Assert — uses the built-in renderer
+        $this->assertStringContainsString('<!DOCTYPE html>', $body);
+        $this->assertStringNotContainsString('custom-error', $body);
+    }
+
+    public function testRenderFallsBackWhenNoDirectoryConfigured(): void
+    {
+        // Arrange — no error templates directory
+        $renderer = new HtmlExceptionResponseRenderer();
+
+        // Act
+        $body = $this->getBody($renderer->render(new HttpException(StatusCode::NotFound)));
+
+        // Assert — uses the built-in renderer
+        $this->assertStringContainsString('<!DOCTYPE html>', $body);
+        $this->assertStringNotContainsString('custom-error', $body);
     }
 }

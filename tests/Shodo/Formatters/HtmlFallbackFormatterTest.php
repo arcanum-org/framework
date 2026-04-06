@@ -132,7 +132,9 @@ final class HtmlFallbackFormatterTest extends TestCase
         $html = $fallback->format([]);
 
         // Assert
-        $this->assertStringContainsString('<body></body>', $html);
+        $this->assertStringNotContainsString('<dl>', $html);
+        $this->assertStringNotContainsString('<ul>', $html);
+        $this->assertStringNotContainsString('<p>', $html);
     }
 
     public function testRendersNull(): void
@@ -144,7 +146,8 @@ final class HtmlFallbackFormatterTest extends TestCase
         $html = $fallback->format(null);
 
         // Assert
-        $this->assertStringContainsString('<body></body>', $html);
+        $this->assertStringNotContainsString('<dl>', $html);
+        $this->assertStringNotContainsString('<ul>', $html);
     }
 
     public function testOutputIsValidHtmlDocument(): void

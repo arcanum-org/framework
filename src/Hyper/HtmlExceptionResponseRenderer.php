@@ -9,6 +9,8 @@ use Arcanum\Flow\River\Stream;
 use Arcanum\Glitch\ArcanumException;
 use Arcanum\Glitch\ExceptionRenderer;
 use Arcanum\Glitch\HttpException;
+use Arcanum\Parchment\Reader;
+use Arcanum\Shodo\TemplateCompiler;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -20,12 +22,19 @@ use Psr\Http\Message\ResponseInterface;
  * Production mode: status code, title, message, navigation links.
  * Debug mode adds: exception class, file:line, stack trace.
  * Verbose errors adds: suggestion hint from ArcanumException.
+ *
+ * App override: when errorTemplatesDirectory is configured, checks for
+ * a {code}.html template (e.g., errors/404.html) before rendering the
+ * built-in page. Templates receive $code, $title, $message, $suggestion.
  */
 class HtmlExceptionResponseRenderer implements ExceptionRenderer
 {
     public function __construct(
         private readonly bool $debug = false,
         private readonly bool $verboseErrors = false,
+        private readonly string $errorTemplatesDirectory = '',
+        private readonly ?TemplateCompiler $compiler = null,
+        private readonly Reader $reader = new Reader(),
     ) {
     }
 
@@ -43,7 +52,8 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
             ? $e->getSuggestion()
             : null;
 
-        $html = $this->buildHtml($status, $title, $e, $suggestion);
+        $html = $this->renderAppTemplate($status, $title, $e, $suggestion)
+            ?? $this->buildHtml($status, $title, $e, $suggestion);
 
         $body = new Stream(LazyResource::for('php://memory', 'w+'));
         $body->write($html);
@@ -59,6 +69,67 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
             ),
             $status,
         );
+    }
+
+    /**
+     * Try to render an app-provided error template.
+     *
+     * Looks for {errorTemplatesDirectory}/{code}.html. Returns null if
+     * no template exists or the directory isn't configured.
+     */
+    private function renderAppTemplate(
+        StatusCode $status,
+        string $title,
+        \Throwable $e,
+        ?string $suggestion,
+    ): ?string {
+        if ($this->errorTemplatesDirectory === '' || $this->compiler === null) {
+            return null;
+        }
+
+        $templatePath = $this->errorTemplatesDirectory
+            . DIRECTORY_SEPARATOR . $status->value . '.html';
+
+        if (!is_file($templatePath)) {
+            return null;
+        }
+
+        $source = $this->reader->read($templatePath);
+        $compiled = $this->compiler->compile(
+            $source,
+            $this->errorTemplatesDirectory,
+        );
+
+        $rawMessage = $e->getMessage();
+        if ($rawMessage === $status->reason()->value) {
+            $rawMessage = $this->defaultDescription($status);
+        }
+
+        $variables = [
+            'code' => $status->value,
+            'title' => $title,
+            'message' => $rawMessage,
+            'suggestion' => $this->verboseErrors ? $suggestion : null,
+            '__escape' => static fn(string $v): string =>
+                htmlspecialchars($v, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8'),
+            '__helpers' => [],
+        ];
+
+        if ($this->debug) {
+            $variables['exception'] = get_class($e);
+            $variables['file'] = $e->getFile();
+            $variables['line'] = $e->getLine();
+            $variables['trace'] = $e->getTraceAsString();
+        }
+
+        $executor = static function (string $php, array $vars): string {
+            extract($vars);
+            ob_start();
+            eval('?>' . $php);
+            return (string) ob_get_clean();
+        };
+
+        return $executor($compiled, $variables);
     }
 
     private function buildHtml(
