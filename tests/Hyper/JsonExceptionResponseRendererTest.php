@@ -9,6 +9,7 @@ use Arcanum\Flow\River\Stream;
 use Arcanum\Flow\River\StreamResource;
 use Arcanum\Gather\IgnoreCaseRegistry;
 use Arcanum\Gather\Registry;
+use Arcanum\Glitch\ArcanumException;
 use Arcanum\Glitch\HttpException;
 use Arcanum\Hyper\Headers;
 use Arcanum\Hyper\JsonExceptionResponseRenderer;
@@ -27,6 +28,7 @@ use Psr\Http\Message\ResponseInterface;
 #[CoversClass(JsonExceptionResponseRenderer::class)]
 #[UsesClass(JsonResponseRenderer::class)]
 #[UsesClass(JsonFormatter::class)]
+#[UsesClass(ArcanumException::class)]
 #[UsesClass(HttpException::class)]
 #[UsesClass(Response::class)]
 #[UsesClass(Message::class)]
@@ -217,5 +219,106 @@ final class JsonExceptionResponseRendererTest extends TestCase
 
         // Assert
         $this->assertArrayNotHasKey('trace', $error);
+    }
+
+    // -----------------------------------------------------------
+    // ArcanumException — title
+    // -----------------------------------------------------------
+
+    public function testRenderIncludesTitleForArcanumExceptions(): void
+    {
+        // Arrange
+        $renderer = new JsonExceptionResponseRenderer(new JsonResponseRenderer());
+
+        // Act
+        $response = $renderer->render(new HttpException(StatusCode::NotFound, 'Order #42 not found'));
+        $error = $this->decodeErrorPayload($response);
+
+        // Assert
+        $this->assertSame('Not Found', $error['title']);
+    }
+
+    public function testRenderExcludesTitleForGenericExceptions(): void
+    {
+        // Arrange
+        $renderer = new JsonExceptionResponseRenderer(new JsonResponseRenderer());
+
+        // Act
+        $response = $renderer->render(new \RuntimeException('fail'));
+        $error = $this->decodeErrorPayload($response);
+
+        // Assert
+        $this->assertArrayNotHasKey('title', $error);
+    }
+
+    // -----------------------------------------------------------
+    // ArcanumException — suggestion
+    // -----------------------------------------------------------
+
+    public function testRenderIncludesSuggestionWhenVerboseErrorsEnabled(): void
+    {
+        // Arrange
+        $renderer = new JsonExceptionResponseRenderer(
+            new JsonResponseRenderer(),
+            verboseErrors: true,
+        );
+        $exception = (new HttpException(StatusCode::NotFound, 'Order not found'))
+            ->withSuggestion('Check the order ID and try again');
+
+        // Act
+        $response = $renderer->render($exception);
+        $error = $this->decodeErrorPayload($response);
+
+        // Assert
+        $this->assertSame('Check the order ID and try again', $error['suggestion']);
+    }
+
+    public function testRenderExcludesSuggestionWhenVerboseErrorsDisabled(): void
+    {
+        // Arrange
+        $renderer = new JsonExceptionResponseRenderer(
+            new JsonResponseRenderer(),
+            verboseErrors: false,
+        );
+        $exception = (new HttpException(StatusCode::NotFound, 'Order not found'))
+            ->withSuggestion('Check the order ID and try again');
+
+        // Act
+        $response = $renderer->render($exception);
+        $error = $this->decodeErrorPayload($response);
+
+        // Assert
+        $this->assertArrayNotHasKey('suggestion', $error);
+    }
+
+    public function testRenderExcludesSuggestionWhenNullEvenIfVerbose(): void
+    {
+        // Arrange
+        $renderer = new JsonExceptionResponseRenderer(
+            new JsonResponseRenderer(),
+            verboseErrors: true,
+        );
+
+        // Act — HttpException with no suggestion set
+        $response = $renderer->render(new HttpException(StatusCode::NotFound));
+        $error = $this->decodeErrorPayload($response);
+
+        // Assert
+        $this->assertArrayNotHasKey('suggestion', $error);
+    }
+
+    public function testVerboseErrorsDefaultsToFalse(): void
+    {
+        // Arrange
+        $renderer = new JsonExceptionResponseRenderer(new JsonResponseRenderer());
+        $exception = (new HttpException(StatusCode::NotFound))
+            ->withSuggestion('Try something else');
+
+        // Act
+        $response = $renderer->render($exception);
+        $error = $this->decodeErrorPayload($response);
+
+        // Assert
+        $this->assertArrayNotHasKey('suggestion', $error);
     }
 }
