@@ -235,18 +235,26 @@ Visual design system defined in `DESIGN.md` (committed). Framework ships self-co
 
 **Starter app — HTMX:**
 
-- [ ] **HTMX CDN script in `<head>`** — single `<script>` tag. No build step needed. Pin to a specific version.
+Prerequisites (framework — Shodo changes, must complete first):
+
+- [ ] **Shodo layout support** — add `{{ @extends 'layout' }}` and `{{ @section 'name' }}...{{ @endsection }}` directives to `TemplateCompiler`. A layout template defines `{{ @yield 'name' }}` slots. The child template declares which layout it extends and fills the sections. Layout resolution: co-located `layout.html` in the same directory, then parent directories, then a configurable default path.
+- [ ] **Shodo `@include` directive** — add `{{ @include 'partials/nav' }}` to `TemplateCompiler`. Resolves relative to the current template's directory. For reusable fragments (nav, footer) shared across pages.
+- [ ] **Shodo fragment rendering** — when the `HX-Request` header is present, Shodo renders only the content section (skipping the layout wrapper). This means the same template serves both full-page loads and HTMX partial swaps. Lives in the framework: `HtmlFormatter` checks for the header on the request and passes a flag to the compiler/renderer.
+- [ ] **Shodo tests** — test layout inheritance, section filling, include resolution, fragment-only rendering.
+- [ ] **Update Shodo README** — document layouts, sections, includes, and HTMX fragment behavior.
+
+Starter app (depends on Shodo changes above):
+
+- [ ] **HTMX CDN script in `<head>`** — single `<script>` tag in the base layout. No build step needed. Pin to a specific version.
 - [ ] **`HtmxMiddleware`** — detects `HX-Request` header. On responses with `Location` header, copies it to `HX-Location` so HTMX follows the redirect automatically. On 204 responses from commands, can set `HX-Trigger` to fire client-side events (e.g., "contactSubmitted" for UI updates).
-- [ ] **Partial vs full page responses** — when `HX-Request` header is present, Shodo could return just the content fragment instead of the full HTML document. Needs design: does this live in the framework (Shodo detects the header) or the app (templates use conditionals)?
 - [ ] **Update Contact form** — demonstrate HTMX: `hx-post="/contact/submit"` on the form, command returns 204, HTMX middleware triggers a follow-up GET to `/contact/messages.html` to show the updated list without full page reload.
 - [ ] **Update Index page** — demonstrate HTMX navigation: `hx-get` links that swap page content without full reload, `hx-push-url` for browser history.
 
-**Starter app — base layout:**
+**Starter app — base layout (depends on Shodo changes above):**
 
-- [ ] **Base layout template** — shared HTML structure: `<!DOCTYPE html>`, `<head>` with meta, Tailwind CDN/CSS link, HTMX script, dark mode toggle. `<body>` with navigation, `{{ @content }}` slot, footer. All pages extend this.
-- [ ] **Template inheritance in Shodo** — if Shodo doesn't support `extends`/`block` yet, implement a minimal version: `{{ @extends 'layout' }}` and `{{ @section 'content' }}...{{ @endsection }}`. Or use a simpler approach: `{{ @include 'partials/head' }}` and `{{ @include 'partials/footer' }}`.
-- [ ] **Navigation component** — styled nav bar with links to starter app pages. Active state uses copper accent. Responsive: hamburger on mobile.
-- [ ] **Footer** — minimal footer with "Built with Arcanum" and dark mode toggle.
+- [ ] **Base layout template** — `app/Pages/layout.html`: shared `<!DOCTYPE html>`, `<head>` with meta, Tailwind CDN/CSS link, HTMX script, dark mode toggle. `<body>` with `{{ @include 'partials/nav' }}`, `{{ @yield 'content' }}`, `{{ @include 'partials/footer' }}`.
+- [ ] **Navigation partial** — `app/Pages/partials/nav.html`: styled nav bar with links to starter app pages. Active state uses copper accent. Responsive: hamburger on mobile.
+- [ ] **Footer partial** — `app/Pages/partials/footer.html`: minimal footer with "Built with Arcanum" and dark mode toggle.
 
 **Starter app — styled pages:**
 
