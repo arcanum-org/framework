@@ -74,7 +74,18 @@ class Formats implements Bootstrapper
         $container->service(CsvFormatter::class);
 
         // Shared template infrastructure
-        $container->service(TemplateCompiler::class);
+        $container->factory(TemplateCompiler::class, function () use ($container, $config) {
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+
+            /** @var mixed $templatesDir */
+            $templatesDir = $config->get('app.templates_directory');
+            $templatesPath = is_string($templatesDir) && $templatesDir !== ''
+                ? $kernel->rootDirectory() . DIRECTORY_SEPARATOR . $templatesDir
+                : '';
+
+            return new TemplateCompiler(templatesDirectory: $templatesPath);
+        });
 
         $container->factory(TemplateCache::class, function () use ($container, $config) {
             /** @var mixed $cacheEnabled */

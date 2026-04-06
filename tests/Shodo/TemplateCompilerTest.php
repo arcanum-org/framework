@@ -596,12 +596,14 @@ final class TemplateCompilerTest extends TestCase
     public function testLayoutResolvesFromSameDirectory(): void
     {
         // Arrange — Pages/nested-page.html extends 'layout', finds Pages/layout.html
-        $compiler = new TemplateCompiler();
+        $compiler = new TemplateCompiler(
+            templatesDirectory: self::$fixtureDir,
+        );
         $pagesDir = self::$fixtureDir . '/Pages';
         $source = file_get_contents($pagesDir . '/nested-page.html');
         assert(is_string($source));
 
-        // Act
+        // Act — co-located Pages/layout.html takes precedence over Templates/layout.html
         $result = $compiler->compile($source, $pagesDir);
 
         // Assert — uses the Pages/layout.html (has " - Pages" suffix)
@@ -609,11 +611,13 @@ final class TemplateCompilerTest extends TestCase
         $this->assertStringContainsString('Nested content', $result);
     }
 
-    public function testLayoutResolvesFromParentDirectory(): void
+    public function testLayoutResolvesFromTemplatesDirectory(): void
     {
-        // Arrange — page-with-layout.html extends 'layout', finds layout.html
-        // in the same directory (Templates/)
-        $compiler = new TemplateCompiler();
+        // Arrange — page-with-layout.html extends 'layout', finds it in
+        // the configured templates directory
+        $compiler = new TemplateCompiler(
+            templatesDirectory: self::$fixtureDir,
+        );
         $source = file_get_contents(self::$fixtureDir . '/page-with-layout.html');
         assert(is_string($source));
 
@@ -642,7 +646,7 @@ final class TemplateCompilerTest extends TestCase
     {
         // Arrange
         $compiler = new TemplateCompiler();
-        $source = "{{ @extends 'nonexistent' }}\n{{ @section 'x' }}y{{ @endsection }}";
+        $source = "{{ @extends 'nonexistent' }}\n{{ @section 'content' }}y{{ @endsection }}";
 
         // Assert
         $this->expectException(\RuntimeException::class);
@@ -666,6 +670,25 @@ final class TemplateCompilerTest extends TestCase
             '<p><?= $__escape((string)($name)) ?></p>',
             $result,
         );
+    }
+
+    public function testSectionMismatchThrowsWithAvailableYields(): void
+    {
+        // Arrange — child defines 'contnent' (typo) but layout has 'content'
+        $compiler = new TemplateCompiler(
+            templatesDirectory: self::$fixtureDir,
+        );
+        $source = "{{ @extends 'layout' }}\n"
+            . "{{ @section 'title' }}OK{{ @endsection }}\n"
+            . "{{ @section 'contnent' }}Typo{{ @endsection }}";
+
+        // Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('contnent');
+        $this->expectExceptionMessage('Available yields');
+
+        // Act
+        $compiler->compile($source, self::$fixtureDir);
     }
 
     public function testCompileWithoutDirectorySkipsPreCompilation(): void

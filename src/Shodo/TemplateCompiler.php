@@ -28,8 +28,15 @@ final class TemplateCompiler
 {
     private const HELPER_PATTERN = '([A-Z][a-zA-Z0-9]*)::(\w+)((?:\((?:[^()]*+|\((?:[^()]*+|\([^()]*+\))*\))*\)))';
 
+    /**
+     * @param string $templatesDirectory Shared templates directory
+     *     (e.g. app/Templates/). Used as a fallback when resolving
+     *     layout and include paths that aren't found relative to
+     *     the child template's directory.
+     */
     public function __construct(
         private readonly \Arcanum\Parchment\Reader $reader = new \Arcanum\Parchment\Reader(),
+        private readonly string $templatesDirectory = '',
     ) {
     }
 
@@ -207,21 +214,54 @@ final class TemplateCompiler
     }
 
     /**
-     * Resolve an include path relative to the base directory.
+     * Resolve an include path.
      *
-     * Tries the path as-is first, then appends common extensions.
+     * Resolution order:
+     * 1. Relative to the current template's directory
+     * 2. Relative to the configured templates directory (if set)
+     *
+     * Tries each location with the exact path first, then with .html
+     * appended if no extension was given.
      */
     private function resolveIncludePath(
         string $path,
         string $baseDirectory,
     ): string {
-        $absolute = $baseDirectory . DIRECTORY_SEPARATOR . $path;
+        $resolved = $this->findFile($path, $baseDirectory);
+        if ($resolved !== null) {
+            return $resolved;
+        }
+
+        if ($this->templatesDirectory !== '') {
+            $resolved = $this->findFile($path, $this->templatesDirectory);
+            if ($resolved !== null) {
+                return $resolved;
+            }
+        }
+
+        $searched = $baseDirectory;
+        if ($this->templatesDirectory !== '') {
+            $searched .= ', ' . $this->templatesDirectory;
+        }
+
+        throw new \RuntimeException(sprintf(
+            'Include file not found: %s (searched: %s)',
+            $path,
+            $searched,
+        ));
+    }
+
+    /**
+     * Try to find a file in a directory, with optional .html extension.
+     */
+    private function findFile(string $path, string $directory): ?string
+    {
+        $absolute = $directory . DIRECTORY_SEPARATOR . $path;
 
         if (is_file($absolute)) {
             return $absolute;
         }
 
-        // Try with .html extension if no extension was given.
         if (pathinfo($path, PATHINFO_EXTENSION) === '') {
             $withExt = $absolute . '.html';
             if (is_file($withExt)) {
@@ -229,11 +269,7 @@ final class TemplateCompiler
             }
         }
 
-        throw new \RuntimeException(sprintf(
-            'Include file not found: %s (resolved from %s)',
-            $path,
-            $baseDirectory,
-        ));
+        return null;
     }
 
     // ------------------------------------------------------------------
@@ -275,6 +311,32 @@ final class TemplateCompiler
             $layoutSource,
             dirname($layoutPath),
         );
+
+        // Collect yield names from the layout.
+        preg_match_all(
+            '/\{\{\s*@yield\s+\'([^\']+)\'\s*\}\}/s',
+            $layoutSource,
+            $yieldMatches,
+        );
+        $yieldNames = $yieldMatches[1];
+
+        // Warn about sections defined in the child that don't match
+        // any yield in the layout — almost always a typo.
+        $unusedSections = array_diff(
+            array_keys($sections),
+            $yieldNames,
+        );
+        if ($unusedSections !== []) {
+            $available = $yieldNames !== []
+                ? 'Available yields: ' . implode(', ', $yieldNames)
+                : 'The layout has no yield directives';
+
+            throw new \RuntimeException(sprintf(
+                'Template defines section(s) not found in layout: %s. %s',
+                implode(', ', $unusedSections),
+                $available,
+            ));
+        }
 
         // Replace @yield directives in the layout with section content.
         return $this->replaceCallback(
@@ -333,37 +395,38 @@ final class TemplateCompiler
     /**
      * Resolve a layout file path.
      *
-     * Walks up from the template directory looking for the layout file,
-     * trying each directory until the application root.
+     * Resolution order:
+     * 1. Relative to the child template's directory
+     * 2. Relative to the configured templates directory (if set)
+     *
+     * This means co-located layouts (next to the child) take precedence,
+     * with the shared templates directory as the standard fallback.
      */
     private function resolveLayoutPath(
         string $name,
         string $startDirectory,
     ): string {
-        $directory = $startDirectory;
+        $resolved = $this->findFile($name, $startDirectory);
+        if ($resolved !== null) {
+            return $resolved;
+        }
 
-        // Try with and without .html extension.
-        $candidates = pathinfo($name, PATHINFO_EXTENSION) === ''
-            ? [$name . '.html', $name]
-            : [$name];
-
-        // Walk up directories looking for the layout.
-        $previousDirectory = '';
-        while ($directory !== $previousDirectory) {
-            foreach ($candidates as $candidate) {
-                $path = $directory . DIRECTORY_SEPARATOR . $candidate;
-                if (is_file($path)) {
-                    return $path;
-                }
+        if ($this->templatesDirectory !== '') {
+            $resolved = $this->findFile($name, $this->templatesDirectory);
+            if ($resolved !== null) {
+                return $resolved;
             }
-            $previousDirectory = $directory;
-            $directory = dirname($directory);
+        }
+
+        $searched = $startDirectory;
+        if ($this->templatesDirectory !== '') {
+            $searched .= ', ' . $this->templatesDirectory;
         }
 
         throw new \RuntimeException(sprintf(
-            'Layout file not found: %s (searched from %s)',
+            'Layout file not found: %s (searched: %s)',
             $name,
-            $startDirectory,
+            $searched,
         ));
     }
 }
