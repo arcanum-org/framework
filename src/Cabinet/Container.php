@@ -78,8 +78,10 @@ class Container implements Application, Specifier
             $implementation = $serviceName;
         }
         if (!class_exists($implementation)) {
-            throw new \InvalidArgumentException(
-                "Cannot register service '$serviceName' with non-existent class '$implementation'"
+            throw new ServiceNotFound(
+                $serviceName,
+                "Cannot register service '{$serviceName}'"
+                    . " — class '{$implementation}' does not exist",
             );
         }
         $this->factory($serviceName, $this->simpleFactory($implementation));
@@ -273,10 +275,7 @@ class Container implements Application, Specifier
             $chain = array_keys($this->resolving);
             $chain[] = $offset;
             $this->resolving = [];
-            throw new \RuntimeException(sprintf(
-                'Circular dependency detected: %s',
-                implode(' → ', $chain),
-            ));
+            throw new CircularDependency($chain);
         }
 
         $this->resolving[$offset] = true;
@@ -287,8 +286,13 @@ class Container implements Application, Specifier
 
             if ($provider === null) {
                 if (!class_exists($offset)) {
-                    throw new \InvalidArgumentException(
-                        "Cannot resolve service '$offset' with non-existent class '$offset'"
+                    throw (new ServiceNotFound(
+                        $offset,
+                        "Service '{$offset}' is not registered and"
+                            . " does not match an existing class",
+                    ))->withSuggestion(
+                        "Register it with \$container->service('{$offset}')"
+                            . ' or check the class name for typos',
                     );
                 }
                 $provider = PrototypeProvider::fromFactory($this->simpleFactory($offset));

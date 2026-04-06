@@ -292,8 +292,8 @@ Every framework error should: (1) say what went wrong clearly, (2) suggest what 
 
 Each package replaces generic `throw new \RuntimeException(...)` with named exception classes. Not every throw site needs a unique class — group by error category. Every named exception implements `ArcanumException`, extends the appropriate PHP built-in, and provides a clear `getTitle()`.
 
-- [ ] **Glitch** — `HttpException` already exists. Add `ArcanumException` interface to it. Add title derived from status code.
-- [ ] **Cabinet** — `ServiceNotFound`, `CircularDependency`. Suggestions: "Did you register it?", "Check your dependency chain: A → B → C → A."
+- [x] **Glitch** — `HttpException` already exists. Add `ArcanumException` interface to it. Add title derived from status code.
+- [x] **Cabinet** — `ServiceNotFound`, `CircularDependency`. Suggestions: "Did you register it?", "Check your dependency chain: A → B → C → A."
 - [ ] **Codex** — `UnresolvableParameter`, `ClassNotFound`. Suggestions: "Parameter $x has no type hint and no default — add a type or register a specification."
 - [ ] **Forge** — `SqlFileNotFound`, `InvalidModelMethod`. Suggestions: list nearby SQL files, suggest correct method name.
 - [ ] **Atlas** — `HandlerNotFound`, `RouteNotFound`. Suggestions: "Did you mean FooHandler?", "Run `validate:handlers` to check registration."
