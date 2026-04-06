@@ -183,7 +183,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
             try {
                 return $this->handleRequest($r);
             } catch (\Throwable $e) {
-                return $this->handleException($e);
+                return $this->handleException($e, $r);
             }
         });
 
@@ -252,13 +252,36 @@ class HyperKernel implements Kernel, RequestHandlerInterface
      *
      * Reports the exception via the ExceptionHandler, then renders
      * it into a ResponseInterface via the ExceptionRenderer.
+     *
+     * When a request is available, the format is extracted from the
+     * URL extension. HTML requests get the HtmlExceptionResponseRenderer
+     * if registered; all others use the default ExceptionRenderer.
      */
-    protected function handleException(\Throwable $e): ResponseInterface
-    {
+    protected function handleException(
+        \Throwable $e,
+        ?ServerRequestInterface $request = null,
+    ): ResponseInterface {
         if ($this->container->has(ExceptionHandler::class)) {
             /** @var ExceptionHandler $handler */
             $handler = $this->container->get(ExceptionHandler::class);
             $handler->handleException($e);
+        }
+
+        // Use format-specific renderer when the request indicates HTML.
+        if ($request !== null) {
+            $path = $request->getUri()->getPath();
+            $extension = pathinfo($path, PATHINFO_EXTENSION);
+
+            if (
+                $extension === 'html'
+                && $this->container->has(\Arcanum\Hyper\HtmlExceptionResponseRenderer::class)
+            ) {
+                /** @var ExceptionRenderer $htmlRenderer */
+                $htmlRenderer = $this->container->get(
+                    \Arcanum\Hyper\HtmlExceptionResponseRenderer::class,
+                );
+                return $htmlRenderer->render($e);
+            }
         }
 
         if ($this->container->has(ExceptionRenderer::class)) {
