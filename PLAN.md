@@ -265,8 +265,8 @@ Starter app (depends on Shodo changes above):
 
 **Starter app — documentation:**
 
-- [ ] **README section on front-end** — document the Tailwind + HTMX setup, CDN vs build, dark mode toggle, HTMX patterns with CQRS (commands return 204/Location, middleware translates to HX-Location).
-- [ ] **Production deployment checklist** — in README: run `composer css:build`, verify no CDN script in production, test with `app.debug=false`.
+- [x] **README section on front-end** — documents Tailwind + HTMX setup, CDN vs build, dark mode, templates/layouts, HTMX patterns with CQRS, production build instructions.
+- [x] **Production deployment checklist** — documented in README front-end section.
 
 ### 14. Error Message Personality Pass
 
