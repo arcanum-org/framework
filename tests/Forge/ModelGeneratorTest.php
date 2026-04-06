@@ -65,14 +65,14 @@ final class ModelGeneratorTest extends TestCase
         // Act
         $source = $generator->generate(
             $this->modelDir,
-            'App\\Domain\\Shop\\Model',
+            'App\\Domain\\Shop\\Model\\Model',
         );
 
         // Assert
-        $this->assertStringContainsString('namespace App\\Domain\\Shop;', $source);
+        $this->assertStringContainsString('namespace App\\Domain\\Shop\\Model;', $source);
         $this->assertStringContainsString('class Model extends BaseModel', $source);
         $this->assertStringContainsString('function __construct(', $source);
-        $this->assertStringContainsString("__DIR__ . '/Model'", $source);
+        $this->assertStringContainsString('$directory = __DIR__,', $source);
         $this->assertStringContainsString('function allProducts(', $source);
         $this->assertStringContainsString('function insertProduct(', $source);
     }
@@ -91,7 +91,7 @@ final class ModelGeneratorTest extends TestCase
         // Act
         $source = $generator->generate(
             $this->modelDir,
-            'App\\Domain\\Shop\\Model',
+            'App\\Domain\\Shop\\Model\\Model',
         );
 
         // Assert
@@ -113,7 +113,7 @@ final class ModelGeneratorTest extends TestCase
         // Act
         $source = $generator->generate(
             $this->modelDir,
-            'App\\Domain\\Shop\\Model',
+            'App\\Domain\\Shop\\Model\\Model',
         );
 
         // Assert
@@ -135,7 +135,7 @@ final class ModelGeneratorTest extends TestCase
         // Act
         $source = $generator->generate(
             $this->modelDir,
-            'App\\Domain\\Shop\\Model',
+            'App\\Domain\\Shop\\Model\\Model',
         );
 
         // Assert
@@ -155,7 +155,7 @@ final class ModelGeneratorTest extends TestCase
         // Act
         $source = $generator->generate(
             $this->modelDir,
-            'App\\Domain\\Shop\\Model',
+            'App\\Domain\\Shop\\Model\\Model',
         );
 
         // Assert
@@ -173,7 +173,7 @@ final class ModelGeneratorTest extends TestCase
         // Act
         $result = $generator->generateAndWrite(
             $this->modelDir,
-            'App\\Domain\\Shop\\Model',
+            'App\\Domain\\Shop\\Model\\Model',
             $outputPath,
         );
 
@@ -194,7 +194,7 @@ final class ModelGeneratorTest extends TestCase
         // Act
         $result = $generator->generateAndWrite(
             $this->modelDir,
-            'App\\Domain\\Shop\\Model',
+            'App\\Domain\\Shop\\Model\\Model',
             $this->modelDir . '/Model.php',
         );
 
@@ -242,7 +242,7 @@ final class ModelGeneratorTest extends TestCase
         // Act
         $source = $generator->generate(
             $this->modelDir,
-            'App\\Domain\\Shop\\Model',
+            'App\\Domain\\Shop\\Model\\Model',
         );
 
         // Assert
@@ -261,7 +261,7 @@ final class ModelGeneratorTest extends TestCase
         // Act
         $source = $generator->generate(
             $this->modelDir,
-            'App\\Domain\\Shop\\Model',
+            'App\\Domain\\Shop\\Model\\Model',
         );
 
         // Assert
@@ -403,7 +403,7 @@ final class ModelGeneratorTest extends TestCase
         // Act
         $source = $generator->generate(
             $this->modelDir,
-            'App\\Domain\\Shop\\Model',
+            'App\\Domain\\Shop\\Model\\Model',
         );
 
         // Assert — root Model has getCart but NOT findAll

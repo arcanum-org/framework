@@ -38,11 +38,10 @@ final class ForgeModelsCommand implements BuiltInCommand
         $generated = 0;
 
         foreach ($domains as $domain => $modelDir) {
-            $namespace = $this->domainNamespace . '\\' . $domain . '\\Model';
+            $namespace = $this->domainNamespace . '\\' . $domain . '\\Model\\Model';
 
             // Root-level Model (only root-level SQL files).
-            $outputPath = $modelDir . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'Model.php';
-            $outputPath = realpath(dirname($outputPath)) . DIRECTORY_SEPARATOR . 'Model.php';
+            $outputPath = $modelDir . DIRECTORY_SEPARATOR . 'Model.php';
 
             if ($this->generator->generateAndWrite($modelDir, $namespace, $outputPath)) {
                 $output->writeLine(sprintf('Generated: %s', $outputPath));

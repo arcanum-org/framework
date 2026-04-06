@@ -110,9 +110,8 @@ final class Database
 
         // Check for a generated model class at {DomainNamespace}\{Domain}\Model.
         if ($this->domainNamespace !== '') {
-            $generatedClass = $this->domainNamespace . '\\' . $this->context->get() . '\\Model';
-            $classFile = $modelDir . DIRECTORY_SEPARATOR . '..'
-                . DIRECTORY_SEPARATOR . 'Model.php';
+            $generatedClass = $this->domainNamespace . '\\' . $this->context->get() . '\\Model\\Model';
+            $classFile = $modelDir . DIRECTORY_SEPARATOR . 'Model.php';
 
             $this->handleStaleness($modelDir, $classFile, $generatedClass);
 

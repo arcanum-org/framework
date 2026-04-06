@@ -54,7 +54,7 @@ final class ValidateModelsCommand implements BuiltInCommand
         $issues = [];
 
         foreach ($domains as $domain => $modelDir) {
-            $className = $this->domainNamespace . '\\' . $domain . '\\Model';
+            $className = $this->domainNamespace . '\\' . $domain . '\\Model\\Model';
             $domainIssues = $this->validateDomain($domain, $modelDir, $className);
             $issues = array_merge($issues, $domainIssues);
         }
