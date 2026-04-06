@@ -295,7 +295,7 @@ Each package replaces generic `throw new \RuntimeException(...)` with named exce
 - [x] **Glitch** — `HttpException` already exists. Add `ArcanumException` interface to it. Add title derived from status code.
 - [x] **Cabinet** — `ServiceNotFound`, `CircularDependency`. Suggestions: "Did you register it?", "Check your dependency chain: A → B → C → A."
 - [x] **Codex** — `UnresolvableParameter`, `ClassNotFound`. Suggestions: "Parameter $x has no type hint and no default — add a type or register a specification."
-- [ ] **Forge** — `SqlFileNotFound`, `InvalidModelMethod`. Suggestions: list nearby SQL files, suggest correct method name.
+- [x] **Forge** — `SqlFileNotFound`, `InvalidModelMethod`, `ConnectionNotConfigured`, `UnsupportedDriver`. Suggestions: list nearby SQL files, list configured connections, list supported drivers.
 - [ ] **Atlas** — `HandlerNotFound`, `RouteNotFound`. Suggestions: "Did you mean FooHandler?", "Run `validate:handlers` to check registration."
 - [ ] **Shodo** — `TemplateNotFound`, `CompilationError`. Suggestions: "Expected template at: {path}", "Check syntax near line {n}."
 - [ ] **Hyper** — `UnsupportedFormat`. Suggestions: "Available formats: .json, .html, .csv."

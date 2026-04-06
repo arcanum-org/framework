@@ -47,9 +47,16 @@ final class ConnectionManager
         }
 
         if (!isset($this->connections[$name])) {
-            throw new \RuntimeException(
-                sprintf('Database connection "%s" is not configured.', $name),
-            );
+            $available = array_keys($this->connections);
+            throw (new ConnectionNotConfigured($name))
+                ->withSuggestion(
+                    $available !== []
+                        ? 'Configured connections: '
+                            . implode(', ', $available)
+                            . " — check config/database.php"
+                        : 'No connections configured'
+                            . ' — add one to config/database.php',
+                );
         }
 
         $this->resolved[$name] = $this->factory->make($this->connections[$name]);

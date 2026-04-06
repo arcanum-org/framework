@@ -64,9 +64,11 @@ class Model
     public function __call(string $method, array $args): Result
     {
         if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $method)) {
-            throw new \InvalidArgumentException(
-                sprintf("Invalid model method name '%s'.", $method),
-            );
+            throw (new InvalidModelMethod($method))
+                ->withSuggestion(
+                    'Model method names must be valid PHP identifiers'
+                        . ' (letters, numbers, underscores)',
+                );
         }
 
         $dir = $this->resolveDirectory();
@@ -149,10 +151,7 @@ class Model
         try {
             $this->sqlCache[$path] = $this->reader->read($path);
         } catch (\RuntimeException) {
-            throw new \RuntimeException(sprintf(
-                "SQL file not found: %s",
-                $path,
-            ));
+            throw (new SqlFileNotFound($path))->withNearbySuggestion();
         }
 
         return $this->sqlCache[$path];

@@ -26,9 +26,7 @@ final class ConnectionFactory
             'mysql' => $this->buildMysql($cfg),
             'pgsql' => $this->buildPgsql($cfg),
             'sqlite' => $this->buildSqlite($cfg),
-            default => throw new \RuntimeException(
-                sprintf('Unsupported database driver "%s".', $driver),
-            ),
+            default => throw new UnsupportedDriver($driver),
         };
     }
 
