@@ -137,10 +137,40 @@ Subdirectories in `Model/` become independent, autowireable model classes. Gener
 
 Single stub for all models. `forge:models` and `validate:models` handle both root and sub-model generation/validation. Handlers inject generated model classes directly for full type safety. `$db->model` still works for backwards compatibility.
 
-### 11. Starter App Polish
+### 11. Rate Limiting — Throttle (new package)
 
-**Needs design and checklist.** Planned:
-- **Rate limiting middleware** — example in starter app, uses Vault cache, demonstrates 429 Too Many Requests
+New `Throttle` package under `src/Throttle/`. Depends on `Psr\SimpleCache\CacheInterface` (Vault). Two strategies: token bucket and sliding window. Starter app gets an example middleware.
+
+**Algorithms:**
+
+- **Token bucket** — store `{tokens, lastRefill}`. Tokens refill at a steady rate up to a max. Each request costs one token. Allows controlled bursts.
+- **Sliding window** — store `{count, windowStart}` for current and previous windows. Weight the previous window's count by overlap fraction. No burst allowance, strict.
+
+**Framework (Throttle package):**
+
+- [ ] **`RateLimiter` class** — main entry point. Takes `CacheInterface` in constructor. `attempt(string $key, int $limit, int $windowSeconds): Outcome` checks and decrements. Configurable strategy (token bucket default, sliding window option).
+- [ ] **`Outcome` value object** — immutable result of an attempt: `$allowed` (bool), `$remaining` (int), `$limit` (int), `$resetAt` (int, epoch). Methods: `isAllowed()`, `headers()` (returns array of `X-RateLimit-*` and `Retry-After` headers).
+- [ ] **`TokenBucketStrategy`** — implements token bucket algorithm against cache get/set with TTL.
+- [ ] **`SlidingWindowStrategy`** — implements sliding window algorithm against cache get/set with TTL.
+- [ ] **`Strategy` interface** — `attempt(CacheInterface $cache, string $key, int $limit, int $windowSeconds): Outcome`.
+- [ ] **Tests** — both strategies, edge cases (first request, limit reached, window rollover, TTL expiry). Use `ArrayDriver` from Vault.
+- [ ] **Throttle README** — document algorithms, usage, configuration, header conventions.
+
+**Starter app:**
+
+- [ ] **`RateLimit` middleware** — `App\Http\Middleware\RateLimit`. Extracts key from request (IP address). Calls `RateLimiter::attempt()`. On reject: throws `HttpException(StatusCode::TooManyRequests)`. On allow: adds `X-RateLimit-*` headers to response.
+- [ ] **Register in `config/middleware.php`** — add to global middleware stack.
+- [ ] **Add `throttle` config** — `config/throttle.php` or section in existing config. Limit, window, strategy.
+
+**HTTP headers (added to successful responses and 429s):**
+
+- `X-RateLimit-Limit` — max requests allowed
+- `X-RateLimit-Remaining` — requests left in current window
+- `X-RateLimit-Reset` — epoch time when window resets
+- `Retry-After` — seconds until client should retry (429 only)
+
+### Starter App Polish
+
 - **Request logging middleware** — example demonstrating the middleware onion model
 - **Default CSS and styling** — minimal CSS and base HTML layout for presentable default pages and error screens
 
