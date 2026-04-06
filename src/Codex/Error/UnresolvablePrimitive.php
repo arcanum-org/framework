@@ -10,4 +10,9 @@ final class UnresolvablePrimitive extends Unresolvable
     {
         parent::__construct("Unresolvable Primitive: $message", $code, $previous);
     }
+
+    public function getTitle(): string
+    {
+        return 'Unresolvable Parameter';
+    }
 }

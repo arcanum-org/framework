@@ -10,4 +10,9 @@ final class UnresolvableUnionType extends Unresolvable
     {
         parent::__construct("Unresolvable Union Type: $message", $code, $previous);
     }
+
+    public function getTitle(): string
+    {
+        return 'Unresolvable Union Type';
+    }
 }

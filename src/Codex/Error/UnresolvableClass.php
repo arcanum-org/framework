@@ -10,4 +10,9 @@ final class UnresolvableClass extends Unresolvable
     {
         parent::__construct("Unresolvable Class: $message", $code, $previous);
     }
+
+    public function getTitle(): string
+    {
+        return 'Unresolvable Class';
+    }
 }

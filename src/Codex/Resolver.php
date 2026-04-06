@@ -92,7 +92,16 @@ class Resolver implements ClassResolver, Specifier
 
             // If it is not instantiable, we cannot resolve it.
             if (!$image->isInstantiable()) {
-                throw new Error\UnresolvableClass(message: $className);
+                throw (new Error\UnresolvableClass(message: $className))
+                    ->withSuggestion(
+                        $image->isInterface()
+                            ? "Register a concrete implementation with"
+                                . " \$container->service('{$className}',"
+                                . " ConcreteClass::class)"
+                            : "Abstract classes and traits can't be"
+                                . " instantiated — register a concrete"
+                                . " subclass instead",
+                    );
             }
 
             $constructor = $image->getConstructor();
@@ -238,7 +247,16 @@ class Resolver implements ClassResolver, Specifier
 
         // If it is not instantiable, we cannot resolve it.
         if (!$image->isInstantiable()) {
-            throw new Error\UnresolvableClass(message: $className);
+            throw (new Error\UnresolvableClass(message: $className))
+                ->withSuggestion(
+                    $image->isInterface()
+                        ? "Register a concrete implementation with"
+                            . " \$container->service('{$className}',"
+                            . " ConcreteClass::class)"
+                        : "Abstract classes and traits can't be"
+                            . " instantiated — register a concrete"
+                            . " subclass instead",
+                );
         }
 
         $constructor = $image->getConstructor();
