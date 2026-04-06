@@ -85,6 +85,16 @@ class Container implements Application, Specifier
                     . " — class '{$implementation}' does not exist",
             );
         }
+
+        // When mapping an interface to an implementation that already has a
+        // registered provider (e.g., a factory), forward to the container
+        // instead of re-resolving via Codex. This ensures custom factories
+        // are respected for interface aliases.
+        if ($implementation !== $serviceName && isset($this->providers[$implementation])) {
+            $this->factory($serviceName, fn(Container $c) => $c->get($implementation));
+            return;
+        }
+
         $this->factory($serviceName, $this->simpleFactory($implementation));
     }
 
