@@ -13,6 +13,7 @@ use Arcanum\Hyper\HttpMiddleware;
 use Arcanum\Hyper\MiddlewareStage;
 use Arcanum\Hyper\StatusCode;
 use Arcanum\Ignition\Bootstrapper;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Arcanum\Ignition\HyperKernel;
 use Arcanum\Test\Fixture\CapturingKernel;
 use PHPUnit\Framework\TestCase;
@@ -155,6 +156,7 @@ final class HyperKernelTest extends TestCase
         $container->method('has')->willReturnMap([
             [ExceptionHandler::class, false],
             [ExceptionRenderer::class, true],
+            [EventDispatcherInterface::class, false],
         ]);
         $container->method('get')->willReturnCallback(
             fn(string $id) => $id === ExceptionRenderer::class ? $renderer : $bootstrapper
@@ -188,6 +190,7 @@ final class HyperKernelTest extends TestCase
         $container->method('has')->willReturnMap([
             [ExceptionHandler::class, true],
             [ExceptionRenderer::class, true],
+            [EventDispatcherInterface::class, false],
         ]);
         $container->method('get')->willReturnCallback(
             fn(string $id) => match ($id) {
@@ -543,6 +546,7 @@ final class HyperKernelTest extends TestCase
         $container->method('has')->willReturnMap([
             [ExceptionHandler::class, false],
             [ExceptionRenderer::class, true],
+            [EventDispatcherInterface::class, false],
         ]);
 
         $class = get_class($middleware);
@@ -597,6 +601,7 @@ final class HyperKernelTest extends TestCase
         $container->method('has')->willReturnMap([
             [ExceptionHandler::class, false],
             [ExceptionRenderer::class, true],
+            [EventDispatcherInterface::class, false],
         ]);
 
         $class = get_class($middleware);

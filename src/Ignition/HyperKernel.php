@@ -9,8 +9,13 @@ use Arcanum\Glitch\ExceptionHandler;
 use Arcanum\Glitch\ExceptionRenderer;
 use Arcanum\Glitch\HttpException;
 use Arcanum\Hyper\CallableHandler;
+use Arcanum\Hyper\Event\RequestFailed;
+use Arcanum\Hyper\Event\RequestHandled;
+use Arcanum\Hyper\Event\RequestReceived;
+use Arcanum\Hyper\Event\ResponseSent;
 use Arcanum\Hyper\HttpMiddleware;
 use Arcanum\Hyper\StatusCode;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -32,6 +37,12 @@ class HyperKernel implements Kernel, RequestHandlerInterface
      * @var list<class-string<MiddlewareInterface>>
      */
     private array $middleware = [];
+
+    /**
+     * Stored for terminate() to dispatch ResponseSent.
+     */
+    private ?ServerRequestInterface $lastRequest = null;
+    private ?ResponseInterface $lastResponse = null;
 
     /**
      * The application container, set during bootstrap.
@@ -173,21 +184,35 @@ class HyperKernel implements Kernel, RequestHandlerInterface
         try {
             $request = $this->prepareRequest($request);
         } catch (\Throwable $e) {
-            return $this->sendThroughMiddleware(
+            $this->lastRequest = $request;
+            $response = $this->sendThroughMiddleware(
                 $request,
                 new CallableHandler(fn() => $this->handleException($e)),
             );
+            $this->lastResponse = $response;
+            return $response;
         }
+
+        // Dispatch RequestReceived — listeners can mutate the request.
+        $request = $this->dispatchRequestReceived($request);
+        $this->lastRequest = $request;
 
         $core = new CallableHandler(function (ServerRequestInterface $r): ResponseInterface {
             try {
                 return $this->handleRequest($r);
             } catch (\Throwable $e) {
+                $this->dispatchRequestFailed($r, $e);
                 return $this->handleException($e, $r);
             }
         });
 
-        return $this->sendThroughMiddleware($request, $core);
+        $response = $this->sendThroughMiddleware($request, $core);
+
+        // Dispatch RequestHandled — read-only observation.
+        $this->dispatchRequestHandled($request, $response);
+        $this->lastResponse = $response;
+
+        return $response;
     }
 
     /**
@@ -293,10 +318,77 @@ class HyperKernel implements Kernel, RequestHandlerInterface
         throw $e;
     }
 
+    // ------------------------------------------------------------------
+    // Lifecycle event dispatching
+    // ------------------------------------------------------------------
+
     /**
-     * Terminate the application.
+     * Dispatch RequestReceived and return the (possibly mutated) request.
+     */
+    private function dispatchRequestReceived(
+        ServerRequestInterface $request,
+    ): ServerRequestInterface {
+        $event = new RequestReceived($request);
+        $this->dispatchEvent($event);
+
+        return $event->getRequest();
+    }
+
+    /**
+     * Dispatch RequestHandled for read-only observation.
+     */
+    private function dispatchRequestHandled(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): void {
+        $this->dispatchEvent(new RequestHandled($request, $response));
+    }
+
+    /**
+     * Dispatch RequestFailed for observational reporting.
+     */
+    private function dispatchRequestFailed(
+        ServerRequestInterface $request,
+        \Throwable $exception,
+    ): void {
+        $this->dispatchEvent(new RequestFailed($request, $exception));
+    }
+
+    /**
+     * Dispatch an event if an EventDispatcher is available.
+     */
+    private function dispatchEvent(object $event): void
+    {
+        if (!isset($this->container)) {
+            return;
+        }
+
+        if ($this->container->has(EventDispatcherInterface::class)) {
+            /** @var EventDispatcherInterface $dispatcher */
+            $dispatcher = $this->container->get(EventDispatcherInterface::class);
+            $dispatcher->dispatch($event);
+        }
+    }
+
+    /**
+     * Terminate the application after the response has been sent.
+     *
+     * Calls fastcgi_finish_request() if available to release the client
+     * connection, then dispatches ResponseSent for post-response work
+     * (deferred logging, metrics, cleanup).
+     *
+     * Call this from public/index.php after sending the response.
      */
     public function terminate(): void
     {
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        }
+
+        if ($this->lastRequest !== null && $this->lastResponse !== null) {
+            $this->dispatchEvent(
+                new ResponseSent($this->lastRequest, $this->lastResponse),
+            );
+        }
     }
 }

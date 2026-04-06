@@ -192,13 +192,13 @@ Design decisions:
 
 **Framework:**
 
-- [ ] **`Hyper\Event\RequestReceived`** — carries `ServerRequestInterface`. Mutable: listener can replace the request via `setRequest()`.
-- [ ] **`Hyper\Event\RequestHandled`** — carries request + response. Read-only.
-- [ ] **`Hyper\Event\RequestFailed`** — carries request + throwable. Read-only.
-- [ ] **`Hyper\Event\ResponseSent`** — carries request + response. Read-only.
-- [ ] **Update `HyperKernel::handle()`** — dispatch `RequestReceived` before middleware, `RequestHandled` after, `RequestFailed` on exception.
-- [ ] **Add `HyperKernel::terminate()`** — dispatches `ResponseSent`. Called from `public/index.php` after the response is sent. Calls `fastcgi_finish_request()` if available before dispatching.
-- [ ] **Update starter app `public/index.php`** — call `$kernel->terminate()` after sending the response.
+- [x] **`Hyper\Event\RequestReceived`** — carries `ServerRequestInterface`. Mutable: listener can replace the request via `setRequest()`.
+- [x] **`Hyper\Event\RequestHandled`** — carries request + response. Read-only.
+- [x] **`Hyper\Event\RequestFailed`** — carries request + throwable. Read-only.
+- [x] **`Hyper\Event\ResponseSent`** — carries request + response. Read-only.
+- [x] **Update `HyperKernel::handle()`** — dispatch `RequestReceived` before middleware, `RequestHandled` after, `RequestFailed` on exception.
+- [x] **Add `HyperKernel::terminate()`** — dispatches `ResponseSent`. Calls `fastcgi_finish_request()` if available.
+- [x] **Update starter app `public/index.php`** — already calls `$kernel->terminate()`.
 - [ ] **Tests** — verify events fire at the right points, verify request mutation propagates, verify exception events fire on failure.
 - [ ] **Update Hyper README** — document lifecycle events, when to use events vs middleware.
 
