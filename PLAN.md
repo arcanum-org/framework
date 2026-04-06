@@ -321,12 +321,14 @@ Each package replaces generic `throw new \RuntimeException(...)` with named exce
 
 ## Long-Distance Future
 
-- **RFC 9457 Problem Details for HTTP APIs** — standardized JSON error response format (`application/problem+json`). Needs design discussion: how it integrates with HttpException, Glitch, and Shodo's exception renderers. See https://www.rfc-editor.org/rfc/rfc9457.html
+- **RFC 9457 Problem Details for HTTP APIs** — standardized JSON error response format (`application/problem+json`). Forward-compatible with the `ArcanumException` interface (#14). When ready, it's a renderer change — exception infrastructure is already in place. See https://www.rfc-editor.org/rfc/rfc9457.html
 - **Queue/Job system** — async processing with drivers (Redis, database, SQS)
 - **Testing utilities** — DTO factories, service fakes, TestKernel
 - **Internationalization** — translation strings, locale detection, pluralization
 - **Task scheduling** — `schedule:run` cron dispatcher
 - **Mail/Notifications** — thin wrappers or Symfony Mailer integration
+- **Todo App dogfood** — build a fully-featured Todo app twice: once from scratch (no starter app), once using the starter app as a base. Both versions: SQLite via Forge, Vault caching, auth with sessions, Tailwind + HTMX front-end. Full CRUD, task lists, completion toggling, filtering. Step-by-step, experiencing the framework as an app developer would. Then write a retrospective: pain points, what worked, what didn't, friction in the DX, missing features, surprising gaps. The retrospective feeds back into new plan items. This is how we find what we can't see from the framework side.
+- **Arcanum Wizard** — interactive project scaffolding tool (`composer create-project` or standalone script). Guides a developer through setting up a new Arcanum app: project name, database driver, cache driver, auth (yes/no), Tailwind + HTMX (or bring your own), session config, etc. Generates `config/` files, `composer.json`, directory structure, and a working entry point based on answers. **Must wait until after the Todo App dogfood and retrospective** — we need to know what the real setup experience is before we try to automate it.
 
 ---
 
