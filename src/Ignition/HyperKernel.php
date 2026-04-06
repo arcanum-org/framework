@@ -183,6 +183,8 @@ class HyperKernel implements Kernel, RequestHandlerInterface
     {
         try {
             $request = $this->prepareRequest($request);
+            // Dispatch RequestReceived — listeners can mutate the request.
+            $request = $this->dispatchRequestReceived($request);
         } catch (\Throwable $e) {
             $this->lastRequest = $request;
             $response = $this->sendThroughMiddleware(
@@ -193,8 +195,6 @@ class HyperKernel implements Kernel, RequestHandlerInterface
             return $response;
         }
 
-        // Dispatch RequestReceived — listeners can mutate the request.
-        $request = $this->dispatchRequestReceived($request);
         $this->lastRequest = $request;
 
         $core = new CallableHandler(function (ServerRequestInterface $r): ResponseInterface {
@@ -209,7 +209,13 @@ class HyperKernel implements Kernel, RequestHandlerInterface
         $response = $this->sendThroughMiddleware($request, $core);
 
         // Dispatch RequestHandled — read-only observation.
-        $this->dispatchRequestHandled($request, $response);
+        // Listener failures must not destroy a successful response.
+        try {
+            $this->dispatchRequestHandled($request, $response);
+        } catch (\Throwable $e) {
+            $this->reportException($e);
+        }
+
         $this->lastResponse = $response;
 
         return $response;
@@ -316,6 +322,21 @@ class HyperKernel implements Kernel, RequestHandlerInterface
         }
 
         throw $e;
+    }
+
+    /**
+     * Report an exception without rendering a response.
+     *
+     * Used for non-fatal errors (e.g., listener failures) where the
+     * request should still complete successfully.
+     */
+    private function reportException(\Throwable $e): void
+    {
+        if ($this->container->has(ExceptionHandler::class)) {
+            /** @var ExceptionHandler $handler */
+            $handler = $this->container->get(ExceptionHandler::class);
+            $handler->handleException($e);
+        }
     }
 
     // ------------------------------------------------------------------
