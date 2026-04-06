@@ -268,11 +268,54 @@ Starter app (depends on Shodo changes above):
 - [ ] **README section on front-end** — document the Tailwind + HTMX setup, CDN vs build, dark mode toggle, HTMX patterns with CQRS (commands return 204/Location, middleware translates to HX-Location).
 - [ ] **Production deployment checklist** — in README: run `composer css:build`, verify no CDN script in production, test with `app.debug=false`.
 
-### Error message personality pass
+### 14. Error Message Personality Pass
 
-Full pass across every package to make error messages helpful, friendly, and fun. Every message should: (1) say what went wrong clearly, (2) suggest what to do about it, (3) have personality without sacrificing precision. Scan all `throw new`, `RuntimeException`, `InvalidArgumentException`, `HttpException`, `LogicException`, and custom exception classes across `src/`. Rewrite dry messages, add "did you mean?" hints where possible, and ensure every error points the developer toward a fix.
+Every framework error should: (1) say what went wrong clearly, (2) suggest what to do about it, (3) have personality without sacrificing precision. Voice: direct, uses contractions, addresses the developer as a peer, always ends with actionable information. Warm but not cute — a colleague, not a mascot.
 
-"Did you mean?" hints and solution suggestions should be configurable — on by default in development, off in production, and toggleable for developers who prefer terse output. A config key like `app.verbose_errors` (defaulting to the value of `app.debug`) controls this. The error message core (what went wrong) is always present; the hint/suggestion suffix is conditional.
+**Design decisions:**
+
+- **Named exceptions over generic PHP built-ins.** Each distinct error case gets its own class (`SqlFileNotFound`, `HandlerNotFound`, `ServiceNotFound`). Each extends the semantically correct PHP built-in (`RuntimeException`, `InvalidArgumentException`, `LogicException`). All implement `ArcanumException` interface.
+- **`ArcanumException` interface in Glitch.** Two methods: `getTitle(): string` (stable human-readable category, e.g., "SQL File Not Found") and `getSuggestion(): ?string` (optional fix hint, shown when `verbose_errors` is enabled). Forward-compatible with RFC 9457 Problem Details — `title` maps to RFC `title`, `getMessage()` maps to `detail`, class name can derive `type` URI later.
+- **`app.verbose_errors` config.** Independent from `app.debug` (defaults to `app.debug` value if unset). Controls whether suggestions are shown. The core message (what went wrong) is always present. Stack traces are still controlled by `app.debug` separately.
+- **Suggestions computed at throw site.** The throw site has the context — nearby files for "did you mean?", available methods, registered services, allowed formats. The exception carries the suggestion; the renderer decides whether to display it.
+
+**Framework — exception infrastructure:**
+
+- [ ] **`ArcanumException` interface** — in Glitch. `getTitle(): string` and `getSuggestion(): ?string`. Any exception class can implement it.
+- [ ] **`HasSuggestion` trait** — optional convenience trait providing `$suggestion` property, `getSuggestion()` method, and fluent `withSuggestion(string): static`. For exception classes that want suggestion support with minimal boilerplate.
+- [ ] **`app.verbose_errors` config** — add to Bootstrap. Defaults to `app.debug` if not set. Available via `Configuration` for renderers and error handlers.
+- [ ] **Update `JsonExceptionResponseRenderer`** — if exception implements `ArcanumException`: include `title` in JSON output always, include `suggestion` when `verbose_errors` is enabled. Forward-compatible with RFC 9457 shape.
+- [ ] **Update `HtmlExceptionResponseRenderer`** — (from section 13) render suggestion below the error message when `verbose_errors` is enabled. Styled as a helpful aside, not an error.
+- [ ] **Tests** — verify suggestion is shown/hidden based on config, verify `ArcanumException` interface, verify JSON and HTML renderers respect the toggle.
+
+**Framework — named exceptions per package:**
+
+Each package replaces generic `throw new \RuntimeException(...)` with named exception classes. Not every throw site needs a unique class — group by error category. Every named exception implements `ArcanumException`, extends the appropriate PHP built-in, and provides a clear `getTitle()`.
+
+- [ ] **Glitch** — `HttpException` already exists. Add `ArcanumException` interface to it. Add title derived from status code.
+- [ ] **Cabinet** — `ServiceNotFound`, `CircularDependency`. Suggestions: "Did you register it?", "Check your dependency chain: A → B → C → A."
+- [ ] **Codex** — `UnresolvableParameter`, `ClassNotFound`. Suggestions: "Parameter $x has no type hint and no default — add a type or register a specification."
+- [ ] **Forge** — `SqlFileNotFound`, `InvalidModelMethod`. Suggestions: list nearby SQL files, suggest correct method name.
+- [ ] **Atlas** — `HandlerNotFound`, `RouteNotFound`. Suggestions: "Did you mean FooHandler?", "Run `validate:handlers` to check registration."
+- [ ] **Shodo** — `TemplateNotFound`, `CompilationError`. Suggestions: "Expected template at: {path}", "Check syntax near line {n}."
+- [ ] **Hyper** — `UnsupportedFormat`. Suggestions: "Available formats: .json, .html, .csv."
+- [ ] **Vault** — `StoreNotFound`. Suggestions: "Configured stores: file, redis, array."
+- [ ] **Flow** — `HandlerNotFound` (Conveyor). Suggestions: "Expected {Handler}Handler class."
+- [ ] **Gather** — `KeyNotFound`. Suggestions: "Available keys: ..." (when the registry is small enough).
+- [ ] **Session** — `SessionNotStarted`. Suggestions: "Ensure SessionMiddleware is registered."
+- [ ] **Auth** — `GuardNotFound`. Suggestions: "Configured guards: session, token."
+- [ ] **Remaining packages** (Ignition, Quill, Parchment, Toolkit, Rune, Throttle) — audit throw sites, add named exceptions where useful.
+
+**Framework — message rewrite pass:**
+
+- [ ] **Audit all throw sites** — scan `throw new` across `src/`. For each: is the message clear? Does it say what went wrong and point toward a fix? Rewrite dry messages.
+- [ ] **Add "did you mean?" logic** — for exceptions where context exists (file directories, registered services, configured keys), compute nearby matches using `similar_text()` or Levenshtein distance. Attach as suggestion.
+- [ ] **Consistent message format** — every message follows: "[What went wrong] — [actionable context]." No periods at the end of single-sentence messages. Contractions allowed. No "Error:" or "Exception:" prefixes.
+
+**Starter app:**
+
+- [ ] **`app.verbose_errors` in config/app.php** — add key, default to `app.debug`.
+- [ ] **Update README** — document error message conventions for app developers writing their own exceptions.
 
 ---
 
