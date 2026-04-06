@@ -181,6 +181,45 @@ $kernel->middleware(\App\Http\Middleware\Cors::class);
 $kernel->middleware(\App\Http\Middleware\Auth::class);
 ```
 
+### Lifecycle events
+
+The kernel dispatches events via Echo (PSR-14) at key points in the request lifecycle. Events are for observation — use middleware when you need to wrap or transform.
+
+| Event | When | Mutable? |
+|---|---|---|
+| `RequestReceived` | Before middleware | Yes — `setRequest()` adds attributes (start time, request ID) |
+| `RequestHandled` | After response produced | No — observe only |
+| `RequestFailed` | Exception thrown | No — for reporting, not rendering |
+| `ResponseSent` | After `terminate()` | No — post-response cleanup |
+
+Events only dispatch when a `PSR-14 EventDispatcherInterface` is registered in the container. No overhead when no listeners exist.
+
+**Guideline:** If you need before *and* after, or need to short-circuit — use middleware. If you need to react at one point — use an event listener.
+
+```php
+// Register a listener via Echo\Provider
+$provider->listen(RequestReceived::class, function (RequestReceived $event) {
+    $event->setRequest(
+        $event->getRequest()->withAttribute('start_time', microtime(true))
+    );
+    return $event;
+});
+
+$provider->listen(RequestHandled::class, function (RequestHandled $event) {
+    $start = $event->getRequest()->getAttribute('start_time');
+    $duration = microtime(true) - $start;
+    $logger->info('Request handled', [
+        'method' => $event->getRequest()->getMethod(),
+        'path' => $event->getRequest()->getUri()->getPath(),
+        'status' => $event->getResponse()->getStatusCode(),
+        'duration_ms' => round($duration * 1000, 2),
+    ]);
+    return $event;
+});
+```
+
+`terminate()` should be called from `public/index.php` after sending the response. It calls `fastcgi_finish_request()` if available (releasing the client connection), then dispatches `ResponseSent`.
+
 ## CLI command handling
 
 `RuneKernel::handle()` follows a similar pattern but without PSR-7 or middleware:

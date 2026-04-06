@@ -200,13 +200,13 @@ Design decisions:
 - [x] **Add `HyperKernel::terminate()`** — dispatches `ResponseSent`. Calls `fastcgi_finish_request()` if available.
 - [x] **Update starter app `public/index.php`** — already calls `$kernel->terminate()`.
 - [x] **Tests** — verify events fire at the right points, verify request mutation propagates, verify exception events fire on failure.
-- [ ] **Update Hyper README** — document lifecycle events, when to use events vs middleware.
+- [x] **Update Ignition README** — documented lifecycle events, event table, when to use events vs middleware, listener examples.
 
 **Starter app — request logging listener:**
 
 - [ ] **`App\Http\Listener\RequestLogger`** — listens to `RequestReceived` (records start time on request attribute) and `RequestHandled` (logs method, path, status, duration). Uses `LoggerInterface`. Log level by status: 2xx→info, 4xx→warning, 5xx→error.
-- [ ] **Register listener** — via Echo subscriber registration in bootstrap or config.
-- [ ] **Add `requests` channel to `config/log.php`** — separate log file for HTTP access logs.
+- [x] **Register listener** — via Echo subscriber registration in bootstrap or config.
+- [x] **Add `requests` channel to `config/log.php`** — separate log file for HTTP access logs.
 
 ### 13. Default Styling & Front-End Integration
 
