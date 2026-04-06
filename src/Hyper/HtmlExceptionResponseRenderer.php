@@ -103,6 +103,7 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>{$code} {$escapedTitle}</title>
+            {$this->fonts()}
             {$this->css()}
         </head>
         <body>
@@ -119,6 +120,19 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
             </div>
         </body>
         </html>
+        HTML;
+    }
+
+    private function fonts(): string
+    {
+        // phpcs:disable Generic.Files.LineLength.TooLong
+        $families = 'family=Inter:wght@400;500&family=JetBrains+Mono:wght@400&family=Lora:wght@600';
+        // phpcs:enable Generic.Files.LineLength.TooLong
+
+        return <<<HTML
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?{$families}&display=swap" rel="stylesheet">
         HTML;
     }
 
