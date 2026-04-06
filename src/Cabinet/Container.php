@@ -7,6 +7,7 @@ namespace Arcanum\Cabinet;
 use Arcanum\Codex\ClassResolver;
 use Arcanum\Codex\Resolver;
 use Arcanum\Codex\Specifier;
+use Arcanum\Toolkit\Strings;
 use Arcanum\Flow\Pipeline\System;
 use Arcanum\Flow\Pipeline\PipelayerSystem;
 use Arcanum\Flow\Continuum\Collection;
@@ -286,13 +287,20 @@ class Container implements Application, Specifier
 
             if ($provider === null) {
                 if (!class_exists($offset)) {
-                    throw (new ServiceNotFound(
+                    $exception = new ServiceNotFound(
                         $offset,
                         "Service '{$offset}' is not registered and"
                             . " does not match an existing class",
-                    ))->withSuggestion(
-                        "Register it with \$container->service('{$offset}')"
-                            . ' or check the class name for typos',
+                    );
+
+                    $registered = array_keys($this->providers);
+                    $closest = Strings::closestMatch($offset, $registered);
+
+                    throw $exception->withSuggestion(
+                        $closest !== null
+                            ? "Did you mean '{$closest}'?"
+                            : "Register it with \$container->service('{$offset}')"
+                                . ' or check the class name for typos',
                     );
                 }
                 $provider = PrototypeProvider::fromFactory($this->simpleFactory($offset));

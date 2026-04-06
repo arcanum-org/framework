@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Forge;
 
+use Arcanum\Toolkit\Strings;
+
 /**
  * Factory/registry for named database connections.
  *
@@ -48,14 +50,18 @@ final class ConnectionManager
 
         if (!isset($this->connections[$name])) {
             $available = array_keys($this->connections);
+            $closest = Strings::closestMatch($name, $available);
+
             throw (new ConnectionNotConfigured($name))
                 ->withSuggestion(
-                    $available !== []
-                        ? 'Configured connections: '
-                            . implode(', ', $available)
-                            . " — check config/database.php"
-                        : 'No connections configured'
-                            . ' — add one to config/database.php',
+                    $closest !== null
+                        ? "Did you mean \"{$closest}\"?"
+                        : ($available !== []
+                            ? 'Configured connections: '
+                                . implode(', ', $available)
+                                . ' — check config/database.php'
+                            : 'No connections configured'
+                                . ' — add one to config/database.php'),
                 );
         }
 

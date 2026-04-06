@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Arcanum\Forge;
 
 use Arcanum\Glitch\ArcanumException;
+use Arcanum\Toolkit\Strings;
 
 class SqlFileNotFound extends \RuntimeException implements ArcanumException
 {
@@ -67,6 +68,13 @@ class SqlFileNotFound extends \RuntimeException implements ArcanumException
         }
 
         $names = array_map('basename', $sqlFiles);
+        $closest = Strings::closestMatch($expected, $names);
+
+        if ($closest !== null) {
+            return $this->withSuggestion(
+                "Did you mean {$closest}?",
+            );
+        }
 
         return $this->withSuggestion(
             "Expected {$expected} — available SQL files: "

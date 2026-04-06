@@ -177,4 +177,52 @@ final class StringsTest extends TestCase
     {
         $this->assertSame('vendor', Strings::namespacePath('Vendor'));
     }
+
+    // -----------------------------------------------------------
+    // closestMatch()
+    // -----------------------------------------------------------
+
+    public function testClosestMatchFindsExactMatch(): void
+    {
+        $this->assertSame(
+            'FindAll',
+            Strings::closestMatch('FindAll', ['FindAll', 'Save', 'Delete']),
+        );
+    }
+
+    public function testClosestMatchFindsSimilar(): void
+    {
+        $this->assertSame(
+            'FindAll',
+            Strings::closestMatch('FindAl', ['FindAll', 'Save', 'Delete']),
+        );
+    }
+
+    public function testClosestMatchIsCaseInsensitive(): void
+    {
+        $this->assertSame(
+            'FindAll',
+            Strings::closestMatch('findall', ['FindAll', 'Save', 'Delete']),
+        );
+    }
+
+    public function testClosestMatchReturnsNullWhenNoCandidates(): void
+    {
+        $this->assertNull(Strings::closestMatch('foo', []));
+    }
+
+    public function testClosestMatchReturnsNullWhenTooDistant(): void
+    {
+        $this->assertNull(
+            Strings::closestMatch('xyz', ['FindAll', 'Save', 'Delete']),
+        );
+    }
+
+    public function testClosestMatchPicksNearest(): void
+    {
+        $this->assertSame(
+            'Save',
+            Strings::closestMatch('Sve', ['FindAll', 'Save', 'Delete']),
+        );
+    }
 }

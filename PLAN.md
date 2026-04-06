@@ -304,17 +304,17 @@ Each package replaces generic `throw new \RuntimeException(...)` with named exce
 - [x] **Gather** — Gather exceptions are LogicException for singleton protection (clone/unserialize) — not developer-facing errors. Skipped.
 - [x] **Session** — `SessionNotStarted` created. Suggests registering SessionMiddleware.
 - [x] **Auth** — Auth rejects via HttpException (already ArcanumException). No GuardNotFound throw site exists. Skipped.
-- [ ] **Remaining packages** (Ignition, Quill, Parchment, Toolkit, Rune) — audit throw sites, add named exceptions where useful.
+- [x] **Remaining packages** (Ignition, Quill, Parchment, Toolkit, Rune) — audited. Ignition bootstrap errors already have actionable messages but fire before renderers exist. Parchment/Toolkit are low-level I/O — not developer-facing. No changes needed.
 
 **Framework — message rewrite pass:**
 
-- [ ] **Audit all throw sites** — scan `throw new` across `src/`. For each: is the message clear? Does it say what went wrong and point toward a fix? Rewrite dry messages.
-- [ ] **Add "did you mean?" logic** — for exceptions where context exists (file directories, registered services, configured keys), compute nearby matches using `similar_text()` or Levenshtein distance. Attach as suggestion.
-- [ ] **Consistent message format** — every message follows: "[What went wrong] — [actionable context]." No periods at the end of single-sentence messages. Contractions allowed. No "Error:" or "Exception:" prefixes.
+- [x] **Audit all throw sites** — scan `throw new` across `src/`. For each: is the message clear? Does it say what went wrong and point toward a fix? Rewrite dry messages.
+- [x] **Add "did you mean?" logic** — `Strings::closestMatch()` utility using Levenshtein distance. Wired into SqlFileNotFound, ServiceNotFound, ConnectionNotConfigured, StoreNotFound.
+- [x] **Consistent message format** — every message follows: "[What went wrong] — [actionable context]." No periods at the end of single-sentence messages. Contractions allowed. No "Error:" or "Exception:" prefixes.
 
 **Starter app:**
 
-- [ ] **`app.verbose_errors` in config/app.php** — add key, default to `app.debug`.
+- [x] **`app.verbose_errors` in config/app.php** — add key, default to `app.debug`.
 - [ ] **Update README** — document error message conventions for app developers writing their own exceptions.
 
 ---

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Arcanum\Vault;
 
 use Arcanum\Gather\Configuration;
+use Arcanum\Toolkit\Strings;
 use Psr\SimpleCache\CacheInterface;
 
 /**
@@ -48,13 +49,17 @@ final class CacheManager
 
         if (!isset($this->stores[$name])) {
             $available = array_keys($this->stores);
+            $closest = Strings::closestMatch($name, $available);
+
             throw (new StoreNotFound($name))
                 ->withSuggestion(
-                    $available !== []
-                        ? 'Configured stores: '
-                            . implode(', ', $available)
-                        : 'No stores configured'
-                            . ' — add one to config/cache.php',
+                    $closest !== null
+                        ? "Did you mean \"{$closest}\"?"
+                        : ($available !== []
+                            ? 'Configured stores: '
+                                . implode(', ', $available)
+                            : 'No stores configured'
+                                . ' — add one to config/cache.php'),
                 );
         }
 

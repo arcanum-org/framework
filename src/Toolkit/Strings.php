@@ -185,4 +185,44 @@ final class Strings
 
         return lcfirst($path);
     }
+
+    /**
+     * Find the closest match to a needle in a list of candidates.
+     *
+     * Uses Levenshtein distance with a threshold of 50% of the needle
+     * length. Returns null if no candidate is close enough.
+     *
+     * Useful for "did you mean?" suggestions in error messages.
+     *
+     *   Strings::closestMatch('FindAl', ['FindAll', 'Save', 'Delete'])
+     *   → 'FindAll'
+     *
+     * @param list<string> $candidates
+     */
+    public static function closestMatch(
+        string $needle,
+        array $candidates,
+    ): ?string {
+        if ($candidates === []) {
+            return null;
+        }
+
+        $best = null;
+        $bestDistance = PHP_INT_MAX;
+        $threshold = max(3, (int) ceil(strlen($needle) * 0.5));
+
+        foreach ($candidates as $candidate) {
+            $distance = levenshtein(
+                strtolower($needle),
+                strtolower($candidate),
+            );
+
+            if ($distance < $bestDistance && $distance <= $threshold) {
+                $best = $candidate;
+                $bestDistance = $distance;
+            }
+        }
+
+        return $best;
+    }
 }
