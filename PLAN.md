@@ -219,7 +219,7 @@ Visual design system defined in `DESIGN.md` (committed). Framework ships self-co
 **Framework — HTML error pages:**
 
 - [x] **`HtmlExceptionResponseRenderer`** — renders exceptions as styled HTML instead of JSON. Self-contained inline styles following DESIGN.md. Displays: status code (display heading in copper), error title, helpful description, "Go back" / "Go home" links. Debug mode adds: exception class, file:line, stack trace in a collapsible code block.
-- [ ] **Default error templates** — framework ships HTML for common status codes (400, 401, 403, 404, 405, 406, 419, 422, 429, 500, 503). Each has a human-friendly title and description. Inline-styled — no external CSS dependency. Works even when the app's assets are broken.
+- [x] **Default error templates** — HtmlExceptionResponseRenderer ships friendly default descriptions for common status codes (400, 401, 403, 404, 405, 406, 422, 429, 500, 503). Used when no custom exception message is provided. Inline-styled, no external CSS dependency.
 - [ ] **App override mechanism** — if the app provides its own error template (e.g., co-located with a Page DTO or in a configurable directory), the framework uses it instead of the built-in. Same pattern as Laravel's `vendor:publish`.
 - [ ] **`HtmlFallbackFormatter` styling** — update the bare HTML fallback with inline styles matching DESIGN.md. Currently generates unstyled `<dl>`/`<ul>`/`<p>`.
 - [ ] **Tests** — verify HTML rendering, verify debug vs production output, verify app override loading.

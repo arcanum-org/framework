@@ -337,4 +337,64 @@ final class HtmlExceptionResponseRendererTest extends TestCase
         // Assert
         $this->assertStringContainsString('<title>404 Not Found</title>', $body);
     }
+
+    // -----------------------------------------------------------
+    // Default descriptions
+    // -----------------------------------------------------------
+
+    public function testRenderUsesFriendlyDescriptionWhenNoCustomMessage(): void
+    {
+        // Arrange
+        $renderer = new HtmlExceptionResponseRenderer();
+
+        // Act — no custom message, so it defaults to reason phrase
+        $body = $this->getBody($renderer->render(new HttpException(StatusCode::NotFound)));
+
+        // Assert — friendly description instead of just "Not Found"
+        $this->assertStringContainsString("doesn&apos;t exist", $body);
+        $this->assertStringNotContainsString('>Not Found</p>', $body);
+    }
+
+    public function testRenderUsesCustomMessageWhenProvided(): void
+    {
+        // Arrange
+        $renderer = new HtmlExceptionResponseRenderer();
+
+        // Act — custom message provided
+        $body = $this->getBody($renderer->render(
+            new HttpException(StatusCode::NotFound, 'Order #42 not found'),
+        ));
+
+        // Assert — uses the custom message, not the friendly default
+        $this->assertStringContainsString('Order #42 not found', $body);
+    }
+
+    public function testRenderHasFriendlyDescriptionForCommonCodes(): void
+    {
+        // Arrange
+        $renderer = new HtmlExceptionResponseRenderer();
+        $codes = [
+            StatusCode::BadRequest,
+            StatusCode::Unauthorized,
+            StatusCode::Forbidden,
+            StatusCode::NotFound,
+            StatusCode::MethodNotAllowed,
+            StatusCode::UnprocessableEntity,
+            StatusCode::TooManyRequests,
+            StatusCode::InternalServerError,
+            StatusCode::ServiceUnavailable,
+        ];
+
+        foreach ($codes as $code) {
+            // Act
+            $body = $this->getBody($renderer->render(new HttpException($code)));
+
+            // Assert — description differs from the reason phrase
+            $this->assertStringNotContainsString(
+                '>' . $code->reason()->value . '</p>',
+                $body,
+                "Status {$code->value} should have a friendly description",
+            );
+        }
+    }
 }

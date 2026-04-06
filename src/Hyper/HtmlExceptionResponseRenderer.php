@@ -68,7 +68,15 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
         ?string $suggestion,
     ): string {
         $code = $status->value;
-        $message = $this->escape($e->getMessage());
+        $rawMessage = $e->getMessage();
+
+        // When the exception message is just the reason phrase (no custom
+        // message was provided), use a friendlier default description.
+        if ($rawMessage === $status->reason()->value) {
+            $rawMessage = $this->defaultDescription($status);
+        }
+
+        $message = $this->escape($rawMessage);
         $escapedTitle = $this->escape($title);
 
         $suggestionBlock = '';
@@ -219,6 +227,54 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
         </style>
         CSS;
         // phpcs:enable Generic.Files.LineLength.TooLong
+    }
+
+    /**
+     * Human-friendly default descriptions for common HTTP error codes.
+     *
+     * Used when no custom exception message was provided. Each description
+     * explains what happened in plain language and hints at what to do.
+     */
+    private function defaultDescription(StatusCode $status): string
+    {
+        return match ($status) {
+            StatusCode::BadRequest
+                => "The request couldn't be understood — check the"
+                    . " data you sent and try again",
+            StatusCode::Unauthorized
+                => 'You need to sign in to access this page',
+            StatusCode::Forbidden
+                => "You don't have permission to access this page",
+            StatusCode::NotFound
+                => "The page you're looking for doesn't exist —"
+                    . " it may have been moved or removed",
+            StatusCode::MethodNotAllowed
+                => 'This URL exists, but not for that HTTP method',
+            StatusCode::NotAcceptable
+                => "The requested format isn't available for this"
+                    . ' resource',
+            StatusCode::RequestTimeout
+                => 'The server waited too long for the request'
+                    . ' — try again',
+            StatusCode::Conflict
+                => 'The request conflicts with the current state'
+                    . ' of the resource',
+            StatusCode::Gone
+                => 'This resource has been permanently removed',
+            StatusCode::UnprocessableEntity
+                => "The data you submitted couldn't be processed"
+                    . ' — check for errors and try again',
+            StatusCode::TooManyRequests
+                => "You've made too many requests — slow down and"
+                    . ' try again shortly',
+            StatusCode::InternalServerError
+                => 'Something went wrong on our end — this has'
+                    . ' been noted and will be looked into',
+            StatusCode::ServiceUnavailable
+                => "The service is temporarily unavailable —"
+                    . ' try again in a moment',
+            default => $status->reason()->value,
+        };
     }
 
     private function escape(string $value): string
