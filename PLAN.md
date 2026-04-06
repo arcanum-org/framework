@@ -281,7 +281,7 @@ Every framework error should: (1) say what went wrong clearly, (2) suggest what 
 
 **Framework — exception infrastructure:**
 
-- [ ] **`ArcanumException` interface** — in Glitch. `getTitle(): string` and `getSuggestion(): ?string`. Any exception class can implement it.
+- [x] **`ArcanumException` interface** — in Glitch. `getTitle(): string` and `getSuggestion(): ?string`. Any exception class can implement it.
 - [ ] **`HasSuggestion` trait** — optional convenience trait providing `$suggestion` property, `getSuggestion()` method, and fluent `withSuggestion(string): static`. For exception classes that want suggestion support with minimal boilerplate.
 - [ ] **`app.verbose_errors` config** — add to Bootstrap. Defaults to `app.debug` if not set. Available via `Configuration` for renderers and error handlers.
 - [ ] **Update `JsonExceptionResponseRenderer`** — if exception implements `ArcanumException`: include `title` in JSON output always, include `suggestion` when `verbose_errors` is enabled. Forward-compatible with RFC 9457 shape.
