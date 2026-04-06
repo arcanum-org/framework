@@ -1,4 +1,4 @@
     public function {{! $methodName !}}({{! $params !}}): Result
     {
-        return $this->execute('{{! $methodName !}}', {{! $paramsArray !}});
+        return $this->execute(__DIR__ . '/{{! $sqlFile !}}', {{! $paramsArray !}});
     }

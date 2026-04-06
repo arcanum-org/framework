@@ -71,8 +71,7 @@ final class ModelGeneratorTest extends TestCase
         // Assert
         $this->assertStringContainsString('namespace App\\Domain\\Shop\\Model;', $source);
         $this->assertStringContainsString('class Model extends BaseModel', $source);
-        $this->assertStringContainsString('function __construct(', $source);
-        $this->assertStringContainsString('$directory = __DIR__,', $source);
+        $this->assertStringNotContainsString('function __construct(', $source);
         $this->assertStringContainsString('function allProducts(', $source);
         $this->assertStringContainsString('function insertProduct(', $source);
     }
@@ -123,7 +122,7 @@ final class ModelGeneratorTest extends TestCase
         );
     }
 
-    public function testMethodDelegatesToCall(): void
+    public function testMethodPassesSqlPathToExecute(): void
     {
         // Arrange
         $this->writeSql(
@@ -140,7 +139,7 @@ final class ModelGeneratorTest extends TestCase
 
         // Assert
         $this->assertStringContainsString(
-            "\$this->execute('getById'",
+            "__DIR__ . '/GetById.sql'",
             $source,
         );
         $this->assertStringContainsString("'id' => \$id", $source);
@@ -160,7 +159,7 @@ final class ModelGeneratorTest extends TestCase
 
         // Assert
         $this->assertStringContainsString('function countAll(): Result', $source);
-        $this->assertStringContainsString("execute('countAll', [])", $source);
+        $this->assertStringContainsString("__DIR__ . '/CountAll.sql', []", $source);
     }
 
     public function testGenerateAndWriteCreatesFile(): void
@@ -320,7 +319,7 @@ final class ModelGeneratorTest extends TestCase
 
     // ── Sub-model generation ────────────────────────────────────
 
-    public function testGenerateSubModelUsesSubModelStub(): void
+    public function testGenerateSubModelHasNoConstructor(): void
     {
         // Arrange
         $subDir = $this->modelDir . '/Products';
@@ -333,7 +332,7 @@ final class ModelGeneratorTest extends TestCase
         $generator = new ModelGenerator();
 
         // Act
-        $source = $generator->generateSubModel(
+        $source = $generator->generate(
             $subDir,
             'App\\Domain\\Shop\\Model\\Products\\Products',
         );
@@ -341,10 +340,11 @@ final class ModelGeneratorTest extends TestCase
         // Assert
         $this->assertStringContainsString('namespace App\\Domain\\Shop\\Model\\Products;', $source);
         $this->assertStringContainsString('class Products extends BaseModel', $source);
-        $this->assertStringContainsString('public function __construct(ConnectionManager $connections)', $source);
-        $this->assertStringContainsString("parent::__construct(__DIR__, \$connections)", $source);
+        $this->assertStringNotContainsString('function __construct(', $source);
         $this->assertStringContainsString('function findAll(', $source);
         $this->assertStringContainsString('function findById(int $id)', $source);
+        $this->assertStringContainsString("__DIR__ . '/FindAll.sql'", $source);
+        $this->assertStringContainsString("__DIR__ . '/FindById.sql'", $source);
     }
 
     public function testGenerateAndWriteSubModelCreatesFile(): void
@@ -357,7 +357,7 @@ final class ModelGeneratorTest extends TestCase
         $generator = new ModelGenerator();
 
         // Act
-        $result = $generator->generateAndWriteSubModel(
+        $result = $generator->generateAndWrite(
             $subDir,
             'App\\Domain\\Shop\\Model\\Products\\Products',
             $outputPath,
@@ -380,7 +380,7 @@ final class ModelGeneratorTest extends TestCase
         $generator = new ModelGenerator();
 
         // Act
-        $result = $generator->generateAndWriteSubModel(
+        $result = $generator->generateAndWrite(
             $subDir,
             'App\\Domain\\Shop\\Model\\Products\\Products',
             $subDir . '/Products.php',

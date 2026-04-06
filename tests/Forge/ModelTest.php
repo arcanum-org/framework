@@ -73,8 +73,8 @@ final class ModelTest extends TestCase
     private function model(?ConnectionManager $manager = null): Model
     {
         return new Model(
-            directory: $this->modelDir,
             connections: $manager ?? $this->manager,
+            directory: $this->modelDir,
         );
     }
 

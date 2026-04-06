@@ -102,50 +102,6 @@ final class ModelGenerator
     }
 
     /**
-     * Generate a sub-model class for a subdirectory within Model/.
-     *
-     * Uses the sub_model stub which includes a __DIR__ constructor,
-     * making the generated class autowireable by Codex.
-     *
-     * @param string $subModelDir Absolute path to the sub-model directory.
-     * @param string $classNamespace Fully qualified class name for the generated class.
-     * @return string The generated PHP source code.
-     */
-    public function generateSubModel(string $subModelDir, string $classNamespace): string
-    {
-        $sqlFiles = $this->discoverSqlFiles($subModelDir);
-
-        $methods = [];
-        foreach ($sqlFiles as $file) {
-            $methods[] = $this->renderMethod($file);
-        }
-
-        return $this->renderClass($classNamespace, $methods, 'sub_model');
-    }
-
-    /**
-     * Generate and write a sub-model class file.
-     *
-     * @return bool True if written, false if no SQL files found.
-     */
-    public function generateAndWriteSubModel(
-        string $subModelDir,
-        string $classNamespace,
-        string $outputPath,
-    ): bool {
-        $sqlFiles = $this->discoverSqlFiles($subModelDir);
-
-        if ($sqlFiles === []) {
-            return false;
-        }
-
-        $source = $this->generateSubModel($subModelDir, $classNamespace);
-        $this->writer->write($outputPath, $source);
-
-        return true;
-    }
-
-    /**
      * Discover root-level .sql files (not in subdirectories).
      *
      * @return list<string> Sorted absolute paths to .sql files.
@@ -215,6 +171,7 @@ final class ModelGenerator
 
         return $this->compiler->render($stub, [
             'methodName' => $methodName,
+            'sqlFile' => basename($sqlFile),
             'params' => $params,
             'paramsArray' => $paramsArray,
         ]);
@@ -223,12 +180,9 @@ final class ModelGenerator
     /**
      * @param list<string> $methods Pre-rendered method strings.
      */
-    private function renderClass(
-        string $classNamespace,
-        array $methods,
-        string $stubName = 'model',
-    ): string {
-        $stub = $this->loadStub($stubName);
+    private function renderClass(string $classNamespace, array $methods): string
+    {
+        $stub = $this->loadStub('model');
 
         return $this->compiler->render($stub, [
             'namespace' => Strings::classNamespace($classNamespace),

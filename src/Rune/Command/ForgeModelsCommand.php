@@ -55,7 +55,7 @@ final class ForgeModelsCommand implements BuiltInCommand
                 $subNamespace = $namespace . '\\' . $dirName . '\\' . $dirName;
                 $subOutput = $subDir . DIRECTORY_SEPARATOR . $dirName . '.php';
 
-                if ($this->generator->generateAndWriteSubModel($subDir, $subNamespace, $subOutput)) {
+                if ($this->generator->generateAndWrite($subDir, $subNamespace, $subOutput)) {
                     $output->writeLine(sprintf('Generated: %s', $subOutput));
                     $generated++;
                 }

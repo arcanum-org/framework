@@ -117,7 +117,6 @@ final class Database
 
             if (class_exists($generatedClass) && is_subclass_of($generatedClass, Model::class)) {
                 $this->modelInstance = new $generatedClass(
-                    directory: $modelDir,
                     connections: $this->connections,
                     connectionName: $connectionName,
                 );
@@ -127,9 +126,9 @@ final class Database
         }
 
         $this->modelInstance = new Model(
-            directory: $modelDir,
             connections: $this->connections,
             connectionName: $connectionName,
+            directory: $modelDir,
         );
 
         return $this->modelInstance;
