@@ -315,7 +315,7 @@ Each package replaces generic `throw new \RuntimeException(...)` with named exce
 **Starter app:**
 
 - [x] **`app.verbose_errors` in config/app.php** — add key, default to `app.debug`.
-- [ ] **Update README** — document error message conventions for app developers writing their own exceptions.
+- [x] **Update README** — document error message conventions for app developers writing their own exceptions.
 
 ---
 
