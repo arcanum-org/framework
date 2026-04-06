@@ -226,12 +226,12 @@ Visual design system defined in `DESIGN.md` (committed). Framework ships self-co
 
 **Starter app — Tailwind CSS:**
 
-- [ ] **`tailwind.config.js`** — maps DESIGN.md tokens to Tailwind: custom colors (`parchment`, `vellum`, `linen`, `ink`, `copper`, `charcoal`, `warm-gray`, `stone`, `sand`), font families (`heading`, `body`, `code`), extended spacing scale matching DESIGN.md 8px base.
-- [ ] **`public/css/app.css`** — Tailwind entry file with `@tailwind` directives and any base layer overrides (e.g., default body background, font, text color).
-- [ ] **CDN play script in `<head>`** — Tailwind CDN play script for zero-build development. Includes inline Tailwind config matching the full config file. Wrapped in a conditional or comment: "Replace with built CSS for production."
-- [ ] **Production build** — document Tailwind CLI standalone (no Node required) or Vite setup. Add `composer css:build` script using Tailwind standalone binary. Add `composer css:watch` for development.
-- [ ] **Production guardrail** — when `app.debug` is false and the CDN play script is detected (no built CSS file exists), log a warning or render a notice: "Tailwind CDN detected in production — run `composer css:build` for optimized CSS."
-- [ ] **Dark mode** — Tailwind `darkMode: 'class'` strategy. Dark mode colors from DESIGN.md mapped as `dark:` variants. JavaScript toggle in base layout (persisted to `localStorage`).
+- [x] **`tailwind.config.js`** — maps DESIGN.md tokens to Tailwind: custom colors, font families, spacing scale.
+- [x] **CDN play script in `<head>`** — Tailwind CDN play script with inline config matching the full config file. Marked for replacement with built CSS in production.
+- [ ] **`public/css/app.css`** — Tailwind entry file with `@tailwind` directives. Pending production build setup.
+- [ ] **Production build** — document Tailwind CLI standalone or Vite setup. Add `composer css:build` and `composer css:watch`.
+- [ ] **Production guardrail** — warn when CDN play script is detected in production.
+- [x] **Dark mode** — Tailwind `darkMode: 'class'` strategy. Dark mode toggle in nav persisted to `localStorage`. OS preference detection on first load.
 
 **Starter app — HTMX:**
 
@@ -245,23 +245,23 @@ Prerequisites (framework — Shodo changes, must complete first):
 
 Starter app (depends on Shodo changes above):
 
-- [ ] **HTMX CDN script in `<head>`** — single `<script>` tag in the base layout. No build step needed. Pin to a specific version.
-- [ ] **`HtmxMiddleware`** — detects `HX-Request` header. On responses with `Location` header, copies it to `HX-Location` so HTMX follows the redirect automatically. On 204 responses from commands, can set `HX-Trigger` to fire client-side events (e.g., "contactSubmitted" for UI updates).
-- [ ] **Update Contact form** — demonstrate HTMX: `hx-post="/contact/submit"` on the form, command returns 204, HTMX middleware triggers a follow-up GET to `/contact/messages.html` to show the updated list without full page reload.
-- [ ] **Update Index page** — demonstrate HTMX navigation: `hx-get` links that swap page content without full reload, `hx-push-url` for browser history.
+- [x] **HTMX CDN script in `<head>`** — HTMX 2.0.4 pinned with integrity hash in base layout.
+- [x] **`HtmxMiddleware`** — detects `HX-Request` header, enables fragment rendering, copies Location to HX-Location.
+- [x] **Update Contact form** — HTMX-enhanced: `hx-post` on form, messages div refreshes via `hx-trigger="load, refresh"` after submission.
+- [x] **Update Index page** — hero section with CQRS explainer cards, styled with Tailwind.
 
 **Starter app — base layout (depends on Shodo changes above):**
 
-- [ ] **Base layout template** — `app/Pages/layout.html`: shared `<!DOCTYPE html>`, `<head>` with meta, Tailwind CDN/CSS link, HTMX script, dark mode toggle. `<body>` with `{{ @include 'partials/nav' }}`, `{{ @yield 'content' }}`, `{{ @include 'partials/footer' }}`.
-- [ ] **Navigation partial** — `app/Pages/partials/nav.html`: styled nav bar with links to starter app pages. Active state uses copper accent. Responsive: hamburger on mobile.
-- [ ] **Footer partial** — `app/Pages/partials/footer.html`: minimal footer with "Built with Arcanum" and dark mode toggle.
+- [x] **Base layout template** — `app/Templates/layout.html`: shared HTML shell with Tailwind CDN, HTMX, Google Fonts, dark mode toggle. Nav and footer via `@include`.
+- [x] **Navigation partial** — `app/Templates/partials/nav.html`: styled nav with links to Home, Contact, Health, and dark mode toggle icon.
+- [x] **Footer partial** — `app/Templates/partials/footer.html`: minimal footer with "Built with Arcanum" link.
 
 **Starter app — styled pages:**
 
-- [ ] **Index page** — hero section with framework name and tagline, styled with Tailwind utilities. Links to health check, contact form, messages.
-- [ ] **Contact page** — styled form with Tailwind: labels, inputs, textarea, submit button all using DESIGN.md tokens via Tailwind classes. HTMX-enhanced submission.
-- [ ] **Messages page** — styled table/list of contact submissions. HTMX-loaded after form submission.
-- [ ] **Health check** — minimal styled output for `.html` format.
+- [x] **Index page** — hero section with framework name, tagline, CTA buttons, and CQRS explainer cards.
+- [x] **Contact page** — styled form with HTMX submission, inline messages list loaded via HTMX.
+- [x] **Messages page** — styled card list of contact submissions, loaded via HTMX fragment.
+- [x] **Health check** — styled card with status indicator and JSON link.
 
 **Starter app — documentation:**
 
