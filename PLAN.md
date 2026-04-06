@@ -218,7 +218,7 @@ Visual design system defined in `DESIGN.md` (committed). Framework ships self-co
 
 **Framework — HTML error pages:**
 
-- [ ] **`HtmlExceptionResponseRenderer`** — renders exceptions as styled HTML instead of JSON. Self-contained inline styles following DESIGN.md. Displays: status code (display heading in copper), error title, helpful description, "Go back" / "Go home" links. Debug mode adds: exception class, file:line, stack trace in a collapsible code block.
+- [x] **`HtmlExceptionResponseRenderer`** — renders exceptions as styled HTML instead of JSON. Self-contained inline styles following DESIGN.md. Displays: status code (display heading in copper), error title, helpful description, "Go back" / "Go home" links. Debug mode adds: exception class, file:line, stack trace in a collapsible code block.
 - [ ] **Default error templates** — framework ships HTML for common status codes (400, 401, 403, 404, 405, 406, 419, 422, 429, 500, 503). Each has a human-friendly title and description. Inline-styled — no external CSS dependency. Works even when the app's assets are broken.
 - [ ] **App override mechanism** — if the app provides its own error template (e.g., co-located with a Page DTO or in a configurable directory), the framework uses it instead of the built-in. Same pattern as Laravel's `vendor:publish`.
 - [ ] **`HtmlFallbackFormatter` styling** — update the bare HTML fallback with inline styles matching DESIGN.md. Currently generates unstyled `<dl>`/`<ul>`/`<p>`.
@@ -285,8 +285,8 @@ Every framework error should: (1) say what went wrong clearly, (2) suggest what 
 - [x] **`HasSuggestion` trait** — skipped; each exception implements ArcanumException directly. Boilerplate is minimal. Can revisit with an abstract base class if it becomes verbose.
 - [x] **`app.verbose_errors` config** — add to Bootstrap. Defaults to `app.debug` if not set. Available via `Configuration` for renderers and error handlers.
 - [x] **Update `JsonExceptionResponseRenderer`** — if exception implements `ArcanumException`: include `title` in JSON output always, include `suggestion` when `verbose_errors` is enabled. Forward-compatible with RFC 9457 shape.
-- [ ] **Update `HtmlExceptionResponseRenderer`** — (from section 13) render suggestion below the error message when `verbose_errors` is enabled. Styled as a helpful aside, not an error.
-- [ ] **Tests** — verify suggestion is shown/hidden based on config, verify `ArcanumException` interface, verify JSON and HTML renderers respect the toggle.
+- [x] **Update `HtmlExceptionResponseRenderer`** — (from section 13) render suggestion below the error message when `verbose_errors` is enabled. Styled as a helpful aside, not an error.
+- [x] **Tests** — verify suggestion is shown/hidden based on config, verify `ArcanumException` interface, verify JSON and HTML renderers respect the toggle.
 
 **Framework — named exceptions per package:**
 
