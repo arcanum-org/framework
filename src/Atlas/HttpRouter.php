@@ -188,9 +188,12 @@ final class HttpRouter implements Router
             throw new MethodNotAllowed($alternateMethods);
         }
 
-        throw new HttpException(
+        throw (new HttpException(
             StatusCode::NotFound,
             sprintf('No route found for path "%s".', $path),
+        ))->withSuggestion(
+            "Check your URL, or run 'php arcanum validate:handlers'"
+                . " to verify route registration",
         );
     }
 
