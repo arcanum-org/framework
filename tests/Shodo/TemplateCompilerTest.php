@@ -5,12 +5,23 @@ declare(strict_types=1);
 namespace Arcanum\Test\Shodo;
 
 use Arcanum\Shodo\TemplateCompiler;
+use Arcanum\Parchment\Reader;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(TemplateCompiler::class)]
+#[UsesClass(Reader::class)]
 final class TemplateCompilerTest extends TestCase
 {
+    private static string $fixtureDir;
+
+    public static function setUpBeforeClass(): void
+    {
+        self::$fixtureDir = dirname(__DIR__)
+            . '/Fixture/Templates';
+    }
+
     public function testEscapedOutput(): void
     {
         // Arrange
@@ -479,5 +490,195 @@ final class TemplateCompilerTest extends TestCase
             '<form><?= $__helpers[\'Html\']->csrf() ?><button>Submit</button></form>',
             $result,
         );
+    }
+
+    // -----------------------------------------------------------
+    // @include directive
+    // -----------------------------------------------------------
+
+    public function testIncludeInlinesFileContents(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+        $source = "<div>{{ @include 'partials/nav' }}</div>";
+
+        // Act
+        $result = $compiler->compile($source, self::$fixtureDir);
+
+        // Assert — nav.html content is inlined, then compiled
+        $this->assertStringContainsString('<nav>Navigation</nav>', $result);
+    }
+
+    public function testIncludeResolvesWithoutExtension(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+        $source = "{{ @include 'partials/nav' }}";
+
+        // Act
+        $result = $compiler->compile($source, self::$fixtureDir);
+
+        // Assert
+        $this->assertStringContainsString('<nav>Navigation</nav>', $result);
+    }
+
+    public function testIncludeResolvesWithExtension(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+        $source = "{{ @include 'partials/nav.html' }}";
+
+        // Act
+        $result = $compiler->compile($source, self::$fixtureDir);
+
+        // Assert
+        $this->assertStringContainsString('<nav>Navigation</nav>', $result);
+    }
+
+    public function testIncludeWithSurroundingContent(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+        $source = file_get_contents(self::$fixtureDir . '/page-with-include.html');
+        assert(is_string($source));
+
+        // Act
+        $result = $compiler->compile($source, self::$fixtureDir);
+
+        // Assert
+        $this->assertStringContainsString('<nav>Navigation</nav>', $result);
+        $this->assertStringContainsString('$__escape((string)($message))', $result);
+    }
+
+    public function testIncludeThrowsForMissingFile(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+        $source = "{{ @include 'partials/nonexistent' }}";
+
+        // Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Include file not found');
+
+        // Act
+        $compiler->compile($source, self::$fixtureDir);
+    }
+
+    // -----------------------------------------------------------
+    // @extends / @section / @yield — layout inheritance
+    // -----------------------------------------------------------
+
+    public function testLayoutInheritance(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+        $source = file_get_contents(self::$fixtureDir . '/page-with-layout.html');
+        assert(is_string($source));
+
+        // Act
+        $result = $compiler->compile($source, self::$fixtureDir);
+
+        // Assert — layout structure is present
+        $this->assertStringContainsString('<!DOCTYPE html>', $result);
+        $this->assertStringContainsString('<html>', $result);
+
+        // Assert — title section was filled
+        $this->assertStringContainsString('<title>My Page</title>', $result);
+
+        // Assert — content section was filled and compiled
+        $this->assertStringContainsString('$__escape((string)($message))', $result);
+
+        // Assert — includes in the layout were resolved
+        $this->assertStringContainsString('<nav>Navigation</nav>', $result);
+        $this->assertStringContainsString('<footer>Footer</footer>', $result);
+    }
+
+    public function testLayoutResolvesFromSameDirectory(): void
+    {
+        // Arrange — Pages/nested-page.html extends 'layout', finds Pages/layout.html
+        $compiler = new TemplateCompiler();
+        $pagesDir = self::$fixtureDir . '/Pages';
+        $source = file_get_contents($pagesDir . '/nested-page.html');
+        assert(is_string($source));
+
+        // Act
+        $result = $compiler->compile($source, $pagesDir);
+
+        // Assert — uses the Pages/layout.html (has " - Pages" suffix)
+        $this->assertStringContainsString('<title>Nested - Pages</title>', $result);
+        $this->assertStringContainsString('Nested content', $result);
+    }
+
+    public function testLayoutResolvesFromParentDirectory(): void
+    {
+        // Arrange — page-with-layout.html extends 'layout', finds layout.html
+        // in the same directory (Templates/)
+        $compiler = new TemplateCompiler();
+        $source = file_get_contents(self::$fixtureDir . '/page-with-layout.html');
+        assert(is_string($source));
+
+        // Act
+        $result = $compiler->compile($source, self::$fixtureDir);
+
+        // Assert — uses Templates/layout.html (no " - Pages" suffix)
+        $this->assertStringContainsString('<title>My Page</title>', $result);
+    }
+
+    public function testEmptyYieldProducesEmptyString(): void
+    {
+        // Arrange — page that only fills 'content', not 'title'
+        $compiler = new TemplateCompiler();
+        $source = "{{ @extends 'layout' }}\n{{ @section 'content' }}Hello{{ @endsection }}";
+
+        // Act
+        $result = $compiler->compile($source, self::$fixtureDir);
+
+        // Assert — title yield is empty
+        $this->assertStringContainsString('<title></title>', $result);
+        $this->assertStringContainsString('Hello', $result);
+    }
+
+    public function testLayoutThrowsForMissingFile(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+        $source = "{{ @extends 'nonexistent' }}\n{{ @section 'x' }}y{{ @endsection }}";
+
+        // Assert
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Layout file not found');
+
+        // Act
+        $compiler->compile($source, self::$fixtureDir);
+    }
+
+    public function testNoExtendsPassesThroughUnchanged(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+        $source = '<p>{{ $name }}</p>';
+
+        // Act — with a templateDirectory but no @extends
+        $result = $compiler->compile($source, self::$fixtureDir);
+
+        // Assert — compiled normally, no layout wrapping
+        $this->assertSame(
+            '<p><?= $__escape((string)($name)) ?></p>',
+            $result,
+        );
+    }
+
+    public function testCompileWithoutDirectorySkipsPreCompilation(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+        $source = "{{ @include 'partials/nav' }}";
+
+        // Act — no directory, so @include is treated as unknown and compiled
+        // as a regular expression (which will be an escaped output)
+        $result = $compiler->compile($source);
+
+        // Assert — @include was NOT resolved (no directory to resolve against)
+        $this->assertStringNotContainsString('<nav>', $result);
     }
 }

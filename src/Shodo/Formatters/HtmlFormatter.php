@@ -49,7 +49,10 @@ class HtmlFormatter implements Formatter
             $compiled = $this->cache->load($templatePath);
         } else {
             $source = $this->reader->read($templatePath);
-            $compiled = $this->compiler->compile($source);
+            $compiled = $this->compiler->compile(
+                $source,
+                dirname($templatePath),
+            );
             $this->cache->store($templatePath, $compiled);
         }
 

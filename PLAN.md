@@ -237,8 +237,8 @@ Visual design system defined in `DESIGN.md` (committed). Framework ships self-co
 
 Prerequisites (framework — Shodo changes, must complete first):
 
-- [ ] **Shodo layout support** — add `{{ @extends 'layout' }}` and `{{ @section 'name' }}...{{ @endsection }}` directives to `TemplateCompiler`. A layout template defines `{{ @yield 'name' }}` slots. The child template declares which layout it extends and fills the sections. Layout resolution: co-located `layout.html` in the same directory, then parent directories, then a configurable default path.
-- [ ] **Shodo `@include` directive** — add `{{ @include 'partials/nav' }}` to `TemplateCompiler`. Resolves relative to the current template's directory. For reusable fragments (nav, footer) shared across pages.
+- [x] **Shodo layout support** — add `{{ @extends 'layout' }}` and `{{ @section 'name' }}...{{ @endsection }}` directives to `TemplateCompiler`. A layout template defines `{{ @yield 'name' }}` slots. The child template declares which layout it extends and fills the sections. Layout resolution: co-located `layout.html` in the same directory, then parent directories, then a configurable default path.
+- [x] **Shodo `@include` directive** — add `{{ @include 'partials/nav' }}` to `TemplateCompiler`. Resolves relative to the current template's directory. For reusable fragments (nav, footer) shared across pages.
 - [ ] **Shodo fragment rendering** — when the `HX-Request` header is present, Shodo renders only the content section (skipping the layout wrapper). This means the same template serves both full-page loads and HTMX partial swaps. Lives in the framework: `HtmlFormatter` checks for the header on the request and passes a flag to the compiler/renderer.
 - [ ] **Shodo tests** — test layout inheritance, section filling, include resolution, fragment-only rendering.
 - [ ] **Update Shodo README** — document layouts, sections, includes, and HTMX fragment behavior.
