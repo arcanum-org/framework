@@ -199,7 +199,7 @@ Design decisions:
 - [x] **Update `HyperKernel::handle()`** — dispatch `RequestReceived` before middleware, `RequestHandled` after, `RequestFailed` on exception.
 - [x] **Add `HyperKernel::terminate()`** — dispatches `ResponseSent`. Calls `fastcgi_finish_request()` if available.
 - [x] **Update starter app `public/index.php`** — already calls `$kernel->terminate()`.
-- [ ] **Tests** — verify events fire at the right points, verify request mutation propagates, verify exception events fire on failure.
+- [x] **Tests** — verify events fire at the right points, verify request mutation propagates, verify exception events fire on failure.
 - [ ] **Update Hyper README** — document lifecycle events, when to use events vs middleware.
 
 **Starter app — request logging listener:**

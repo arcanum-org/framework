@@ -359,10 +359,6 @@ class HyperKernel implements Kernel, RequestHandlerInterface
      */
     private function dispatchEvent(object $event): void
     {
-        if (!isset($this->container)) {
-            return;
-        }
-
         if ($this->container->has(EventDispatcherInterface::class)) {
             /** @var EventDispatcherInterface $dispatcher */
             $dispatcher = $this->container->get(EventDispatcherInterface::class);

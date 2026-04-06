@@ -13,9 +13,9 @@ use Arcanum\Hyper\HttpMiddleware;
 use Arcanum\Hyper\MiddlewareStage;
 use Arcanum\Hyper\StatusCode;
 use Arcanum\Ignition\Bootstrapper;
-use Psr\EventDispatcher\EventDispatcherInterface;
 use Arcanum\Ignition\HyperKernel;
 use Arcanum\Test\Fixture\CapturingKernel;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -258,14 +258,23 @@ final class HyperKernelTest extends TestCase
     // prepareRequest() — JSON body parsing
     // -----------------------------------------------------------
 
-    private function stubJsonRequest(string $body, string $contentType = 'application/json'): ServerRequestInterface
+    public function testPrepareRequestParsesJsonBody(): void
     {
+        // Arrange
+        $kernel = new CapturingKernel('/app');
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturn(false);
+        $container->method('get')->willReturn($bootstrapper);
+        $kernel->bootstrap($container);
+
         $stream = $this->createStub(StreamInterface::class);
-        $stream->method('__toString')->willReturn($body);
+        $stream->method('__toString')->willReturn('{"name":"test","count":42}');
 
         $request = $this->createStub(ServerRequestInterface::class);
         $request->method('getHeaderLine')->willReturnCallback(
-            fn(string $name) => $name === 'Content-Type' ? $contentType : ''
+            fn(string $name) => $name === 'Content-Type' ? 'application/json' : ''
         );
         $request->method('getBody')->willReturn($stream);
         $request->method('withParsedBody')->willReturnCallback(
@@ -279,33 +288,19 @@ final class HyperKernelTest extends TestCase
             }
         );
 
-        return $request;
-    }
-
-    /**
-     * Create a kernel that captures the prepared request instead of throwing.
-     */
-    private function capturingKernel(): CapturingKernel
-    {
-        return new CapturingKernel('/app');
-    }
-
-    public function testPrepareRequestParsesJsonBody(): void
-    {
-        // Arrange
-        $kernel = $this->capturingKernel();
-        $request = $this->stubJsonRequest('{"name":"test","count":42}');
-
         // Act
         $kernel->handle($request);
 
         // Assert
-        $this->assertSame(['name' => 'test', 'count' => 42], $kernel->capturedRequest?->getParsedBody());
+        $this->assertSame(
+            ['name' => 'test', 'count' => 42],
+            $kernel->capturedRequest?->getParsedBody(),
+        );
     }
 
     public function testPrepareRequestThrows400ForMalformedJson(): void
     {
-        // Arrange — bootstrap with a container that has no renderer, so exception rethrows
+        // Arrange
         $kernel = new HyperKernel('/app');
         $bootstrapper = $this->createStub(Bootstrapper::class);
         $container = $this->createStub(Application::class);
@@ -313,7 +308,14 @@ final class HyperKernelTest extends TestCase
         $container->method('get')->willReturn($bootstrapper);
         $kernel->bootstrap($container);
 
-        $request = $this->stubJsonRequest('{invalid json}');
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('__toString')->willReturn('{invalid json}');
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getHeaderLine')->willReturnCallback(
+            fn(string $name) => $name === 'Content-Type' ? 'application/json' : ''
+        );
+        $request->method('getBody')->willReturn($stream);
 
         // Act & Assert
         try {
@@ -328,8 +330,22 @@ final class HyperKernelTest extends TestCase
     public function testPrepareRequestLeavesEmptyJsonBodyAlone(): void
     {
         // Arrange
-        $kernel = $this->capturingKernel();
-        $request = $this->stubJsonRequest('');
+        $kernel = new CapturingKernel('/app');
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturn(false);
+        $container->method('get')->willReturn($bootstrapper);
+        $kernel->bootstrap($container);
+
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('__toString')->willReturn('');
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getHeaderLine')->willReturnCallback(
+            fn(string $name) => $name === 'Content-Type' ? 'application/json' : ''
+        );
+        $request->method('getBody')->willReturn($stream);
 
         // Act
         $kernel->handle($request);
@@ -341,8 +357,22 @@ final class HyperKernelTest extends TestCase
     public function testPrepareRequestIgnoresNonJsonContentType(): void
     {
         // Arrange
-        $kernel = $this->capturingKernel();
-        $request = $this->stubJsonRequest('not json', 'text/plain');
+        $kernel = new CapturingKernel('/app');
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturn(false);
+        $container->method('get')->willReturn($bootstrapper);
+        $kernel->bootstrap($container);
+
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('__toString')->willReturn('not json');
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getHeaderLine')->willReturnCallback(
+            fn(string $name) => $name === 'Content-Type' ? 'text/plain' : ''
+        );
+        $request->method('getBody')->willReturn($stream);
 
         // Act
         $kernel->handle($request);
@@ -353,15 +383,41 @@ final class HyperKernelTest extends TestCase
 
     public function testPrepareRequestHandlesJsonWithCharset(): void
     {
-        // Arrange — Content-Type: application/json; charset=utf-8
-        $kernel = $this->capturingKernel();
-        $request = $this->stubJsonRequest('{"key":"value"}', 'application/json; charset=utf-8');
+        // Arrange
+        $kernel = new CapturingKernel('/app');
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturn(false);
+        $container->method('get')->willReturn($bootstrapper);
+        $kernel->bootstrap($container);
+
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('__toString')->willReturn('{"key":"value"}');
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getHeaderLine')->willReturnCallback(
+            fn(string $name) => $name === 'Content-Type'
+                ? 'application/json; charset=utf-8'
+                : ''
+        );
+        $request->method('getBody')->willReturn($stream);
+        $request->method('withParsedBody')->willReturnCallback(
+            function (mixed $data) {
+                $clone = $this->createStub(ServerRequestInterface::class);
+                $clone->method('getParsedBody')->willReturn($data);
+                return $clone;
+            }
+        );
 
         // Act
         $kernel->handle($request);
 
         // Assert
-        $this->assertSame(['key' => 'value'], $kernel->capturedRequest?->getParsedBody());
+        $this->assertSame(
+            ['key' => 'value'],
+            $kernel->capturedRequest?->getParsedBody(),
+        );
     }
 
     public function testPrepareRequestThrows400ForJsonScalar(): void
@@ -374,7 +430,14 @@ final class HyperKernelTest extends TestCase
         $container->method('get')->willReturn($bootstrapper);
         $kernel->bootstrap($container);
 
-        $request = $this->stubJsonRequest('"just a string"');
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('__toString')->willReturn('"just a string"');
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getHeaderLine')->willReturnCallback(
+            fn(string $name) => $name === 'Content-Type' ? 'application/json' : ''
+        );
+        $request->method('getBody')->willReturn($stream);
 
         // Act & Assert
         try {
@@ -388,28 +451,6 @@ final class HyperKernelTest extends TestCase
     // -----------------------------------------------------------
     // Middleware pipeline integration
     // -----------------------------------------------------------
-
-    /**
-     * Bootstrap a CapturingKernel with a container that supports middleware resolution.
-     *
-     * @param array<string, MiddlewareInterface> $middlewareServices
-     */
-    private function kernelWithMiddleware(array $middlewareServices = []): CapturingKernel
-    {
-        $kernel = $this->capturingKernel();
-
-        $bootstrapper = $this->createStub(Bootstrapper::class);
-
-        $container = $this->createStub(Application::class);
-        $container->method('has')->willReturn(false);
-        $container->method('get')->willReturnCallback(
-            fn(string $id) => $middlewareServices[$id] ?? $bootstrapper
-        );
-
-        $kernel->bootstrap($container);
-
-        return $kernel;
-    }
 
     public function testMiddlewareExecutesAroundHandleRequest(): void
     {
@@ -434,9 +475,15 @@ final class HyperKernelTest extends TestCase
         };
 
         $class = get_class($middleware);
-        $kernel = $this->kernelWithMiddleware([
-            $class => $middleware,
-        ]);
+        $kernel = new CapturingKernel('/app');
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturn(false);
+        $container->method('get')->willReturnCallback(
+            fn(string $id) => $id === $class ? $middleware : $bootstrapper,
+        );
+        $kernel->bootstrap($container);
         $kernel->middleware($class);
 
         // Act
@@ -467,12 +514,35 @@ final class HyperKernelTest extends TestCase
         };
 
         $class = get_class($middleware);
-        $kernel = $this->kernelWithMiddleware([
-            $class => $middleware,
-        ]);
+        $kernel = new CapturingKernel('/app');
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturn(false);
+        $container->method('get')->willReturnCallback(
+            fn(string $id) => $id === $class ? $middleware : $bootstrapper,
+        );
+        $kernel->bootstrap($container);
         $kernel->middleware($class);
 
-        $request = $this->stubJsonRequest('{"from":"json"}');
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('__toString')->willReturn('{"from":"json"}');
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getHeaderLine')->willReturnCallback(
+            fn(string $name) => $name === 'Content-Type' ? 'application/json' : ''
+        );
+        $request->method('getBody')->willReturn($stream);
+        $request->method('withParsedBody')->willReturnCallback(
+            function (mixed $data) {
+                $clone = $this->createStub(ServerRequestInterface::class);
+                $clone->method('getParsedBody')->willReturn($data);
+                $clone->method('getHeaderLine')->willReturnCallback(
+                    fn(string $name) => $name === 'Content-Type' ? 'application/json' : ''
+                );
+                return $clone;
+            }
+        );
 
         // Act
         $kernel->handle($request);
@@ -500,9 +570,15 @@ final class HyperKernelTest extends TestCase
         };
 
         $class = get_class($middleware);
-        $kernel = $this->kernelWithMiddleware([
-            $class => $middleware,
-        ]);
+        $kernel = new CapturingKernel('/app');
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturn(false);
+        $container->method('get')->willReturnCallback(
+            fn(string $id) => $id === $class ? $middleware : $bootstrapper,
+        );
+        $kernel->bootstrap($container);
         $kernel->middleware($class);
 
         // Act
@@ -617,7 +693,14 @@ final class HyperKernelTest extends TestCase
         $kernel->bootstrap($container);
         $kernel->middleware($class);
 
-        $request = $this->stubJsonRequest('{invalid json}');
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('__toString')->willReturn('{invalid json}');
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getHeaderLine')->willReturnCallback(
+            fn(string $name) => $name === 'Content-Type' ? 'application/json' : ''
+        );
+        $request->method('getBody')->willReturn($stream);
 
         // Act
         $kernel->handle($request);
