@@ -36,14 +36,17 @@ final class ExceptionsTest extends TestCase
     /**
      * Build a stub Application that returns specific handlers.
      * Returns null from get() for unregistered handler interfaces.
+     *
+     * @param array<string, mixed> $appConfig
      */
     private function buildApplication(
         string $environment = 'production',
         ErrorHandler|null $errorHandler = null,
         ExceptionHandler|null $exceptionHandler = null,
         ShutdownHandler|null $shutdownHandler = null,
+        array $appConfig = [],
     ): Application {
-        $config = new Configuration(['app' => ['environment' => $environment]]);
+        $config = new Configuration(['app' => array_merge(['environment' => $environment], $appConfig)]);
 
         $app = $this->createStub(Application::class);
         $app->method('get')->willReturnCallback(
@@ -115,6 +118,91 @@ final class ExceptionsTest extends TestCase
 
         // Assert
         $this->assertNotSame('Off', ini_get('display_errors'));
+    }
+
+    // -----------------------------------------------------------
+    // verbose_errors config
+    // -----------------------------------------------------------
+
+    public function testVerboseErrorsDefaultsToDebugWhenNotSet(): void
+    {
+        // Arrange
+        $app = $this->buildApplication(appConfig: ['debug' => true]);
+        $bootstrapper = new Exceptions();
+
+        // Act
+        $bootstrapper->bootstrap($app);
+
+        // Assert
+        /** @var Configuration $config */
+        $config = $app->get(Configuration::class);
+        $this->assertTrue($config->get('app.verbose_errors'));
+    }
+
+    public function testVerboseErrorsDefaultsToFalseWhenDebugIsFalse(): void
+    {
+        // Arrange
+        $app = $this->buildApplication(appConfig: ['debug' => false]);
+        $bootstrapper = new Exceptions();
+
+        // Act
+        $bootstrapper->bootstrap($app);
+
+        // Assert
+        /** @var Configuration $config */
+        $config = $app->get(Configuration::class);
+        $this->assertFalse($config->get('app.verbose_errors'));
+    }
+
+    public function testVerboseErrorsDefaultsToTrueWhenDebugIsStringTrue(): void
+    {
+        // Arrange
+        $app = $this->buildApplication(appConfig: ['debug' => 'true']);
+        $bootstrapper = new Exceptions();
+
+        // Act
+        $bootstrapper->bootstrap($app);
+
+        // Assert
+        /** @var Configuration $config */
+        $config = $app->get(Configuration::class);
+        $this->assertTrue($config->get('app.verbose_errors'));
+    }
+
+    public function testVerboseErrorsPreservesExplicitValue(): void
+    {
+        // Arrange — debug is false but verbose_errors is explicitly true
+        $app = $this->buildApplication(appConfig: [
+            'debug' => false,
+            'verbose_errors' => true,
+        ]);
+        $bootstrapper = new Exceptions();
+
+        // Act
+        $bootstrapper->bootstrap($app);
+
+        // Assert
+        /** @var Configuration $config */
+        $config = $app->get(Configuration::class);
+        $this->assertTrue($config->get('app.verbose_errors'));
+    }
+
+    public function testVerboseErrorsCanBeDisabledWhileDebugIsOn(): void
+    {
+        // Arrange — debug is on but verbose_errors explicitly off
+        $app = $this->buildApplication(appConfig: [
+            'debug' => true,
+            'verbose_errors' => false,
+        ]);
+        $bootstrapper = new Exceptions();
+
+        // Act
+        $bootstrapper->bootstrap($app);
+
+        // Assert
+        /** @var Configuration $config */
+        $config = $app->get(Configuration::class);
+        $this->assertFalse($config->get('app.verbose_errors'));
     }
 
     // -----------------------------------------------------------
