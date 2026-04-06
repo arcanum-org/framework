@@ -208,9 +208,57 @@ Design decisions:
 - [ ] **Register listener** — via Echo subscriber registration in bootstrap or config.
 - [ ] **Add `requests` channel to `config/log.php`** — separate log file for HTTP access logs.
 
-### Starter App Polish
+### 13. Default Styling & Front-End Integration
 
-- **Default CSS and styling** — minimal CSS and base HTML layout for presentable default pages and error screens
+Visual design system defined in `DESIGN.md` (committed). Framework ships self-contained error pages. Starter app uses Tailwind CSS + HTMX — CDN for dev, build for prod. HTMX integrates naturally with CQRS: commands return 204/201+Location, a small middleware translates Location to HX-Location for HTMX-driven navigation.
+
+**Design system:**
+
+- [x] **`DESIGN.md`** — warm editorial design: parchment canvas, Lora headings, Inter body, burnt copper accent, dark mode. Google Stitch format.
+
+**Framework — HTML error pages:**
+
+- [ ] **`HtmlExceptionResponseRenderer`** — renders exceptions as styled HTML instead of JSON. Self-contained inline styles following DESIGN.md. Displays: status code (display heading in copper), error title, helpful description, "Go back" / "Go home" links. Debug mode adds: exception class, file:line, stack trace in a collapsible code block.
+- [ ] **Default error templates** — framework ships HTML for common status codes (400, 401, 403, 404, 405, 406, 419, 422, 429, 500, 503). Each has a human-friendly title and description. Inline-styled — no external CSS dependency. Works even when the app's assets are broken.
+- [ ] **App override mechanism** — if the app provides its own error template (e.g., co-located with a Page DTO or in a configurable directory), the framework uses it instead of the built-in. Same pattern as Laravel's `vendor:publish`.
+- [ ] **`HtmlFallbackFormatter` styling** — update the bare HTML fallback with inline styles matching DESIGN.md. Currently generates unstyled `<dl>`/`<ul>`/`<p>`.
+- [ ] **Tests** — verify HTML rendering, verify debug vs production output, verify app override loading.
+
+**Starter app — Tailwind CSS:**
+
+- [ ] **`tailwind.config.js`** — maps DESIGN.md tokens to Tailwind: custom colors (`parchment`, `vellum`, `linen`, `ink`, `copper`, `charcoal`, `warm-gray`, `stone`, `sand`), font families (`heading`, `body`, `code`), extended spacing scale matching DESIGN.md 8px base.
+- [ ] **`public/css/app.css`** — Tailwind entry file with `@tailwind` directives and any base layer overrides (e.g., default body background, font, text color).
+- [ ] **CDN play script in `<head>`** — Tailwind CDN play script for zero-build development. Includes inline Tailwind config matching the full config file. Wrapped in a conditional or comment: "Replace with built CSS for production."
+- [ ] **Production build** — document Tailwind CLI standalone (no Node required) or Vite setup. Add `composer css:build` script using Tailwind standalone binary. Add `composer css:watch` for development.
+- [ ] **Production guardrail** — when `app.debug` is false and the CDN play script is detected (no built CSS file exists), log a warning or render a notice: "Tailwind CDN detected in production — run `composer css:build` for optimized CSS."
+- [ ] **Dark mode** — Tailwind `darkMode: 'class'` strategy. Dark mode colors from DESIGN.md mapped as `dark:` variants. JavaScript toggle in base layout (persisted to `localStorage`).
+
+**Starter app — HTMX:**
+
+- [ ] **HTMX CDN script in `<head>`** — single `<script>` tag. No build step needed. Pin to a specific version.
+- [ ] **`HtmxMiddleware`** — detects `HX-Request` header. On responses with `Location` header, copies it to `HX-Location` so HTMX follows the redirect automatically. On 204 responses from commands, can set `HX-Trigger` to fire client-side events (e.g., "contactSubmitted" for UI updates).
+- [ ] **Partial vs full page responses** — when `HX-Request` header is present, Shodo could return just the content fragment instead of the full HTML document. Needs design: does this live in the framework (Shodo detects the header) or the app (templates use conditionals)?
+- [ ] **Update Contact form** — demonstrate HTMX: `hx-post="/contact/submit"` on the form, command returns 204, HTMX middleware triggers a follow-up GET to `/contact/messages.html` to show the updated list without full page reload.
+- [ ] **Update Index page** — demonstrate HTMX navigation: `hx-get` links that swap page content without full reload, `hx-push-url` for browser history.
+
+**Starter app — base layout:**
+
+- [ ] **Base layout template** — shared HTML structure: `<!DOCTYPE html>`, `<head>` with meta, Tailwind CDN/CSS link, HTMX script, dark mode toggle. `<body>` with navigation, `{{ @content }}` slot, footer. All pages extend this.
+- [ ] **Template inheritance in Shodo** — if Shodo doesn't support `extends`/`block` yet, implement a minimal version: `{{ @extends 'layout' }}` and `{{ @section 'content' }}...{{ @endsection }}`. Or use a simpler approach: `{{ @include 'partials/head' }}` and `{{ @include 'partials/footer' }}`.
+- [ ] **Navigation component** — styled nav bar with links to starter app pages. Active state uses copper accent. Responsive: hamburger on mobile.
+- [ ] **Footer** — minimal footer with "Built with Arcanum" and dark mode toggle.
+
+**Starter app — styled pages:**
+
+- [ ] **Index page** — hero section with framework name and tagline, styled with Tailwind utilities. Links to health check, contact form, messages.
+- [ ] **Contact page** — styled form with Tailwind: labels, inputs, textarea, submit button all using DESIGN.md tokens via Tailwind classes. HTMX-enhanced submission.
+- [ ] **Messages page** — styled table/list of contact submissions. HTMX-loaded after form submission.
+- [ ] **Health check** — minimal styled output for `.html` format.
+
+**Starter app — documentation:**
+
+- [ ] **README section on front-end** — document the Tailwind + HTMX setup, CDN vs build, dark mode toggle, HTMX patterns with CQRS (commands return 204/Location, middleware translates to HX-Location).
+- [ ] **Production deployment checklist** — in README: run `composer css:build`, verify no CDN script in production, test with `app.debug=false`.
 
 ### Error message personality pass
 
