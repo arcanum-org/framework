@@ -148,13 +148,13 @@ New `Throttle` package under `src/Throttle/`. Depends on `Psr\SimpleCache\CacheI
 
 **Framework (Throttle package):**
 
-- [ ] **`RateLimiter` class** — main entry point. Takes `CacheInterface` in constructor. `attempt(string $key, int $limit, int $windowSeconds): Outcome` checks and decrements. Configurable strategy (token bucket default, sliding window option).
-- [ ] **`Outcome` value object** — immutable result of an attempt: `$allowed` (bool), `$remaining` (int), `$limit` (int), `$resetAt` (int, epoch). Methods: `isAllowed()`, `headers()` (returns array of `X-RateLimit-*` and `Retry-After` headers).
-- [ ] **`TokenBucketStrategy`** — implements token bucket algorithm against cache get/set with TTL.
-- [ ] **`SlidingWindowStrategy`** — implements sliding window algorithm against cache get/set with TTL.
-- [ ] **`Strategy` interface** — `attempt(CacheInterface $cache, string $key, int $limit, int $windowSeconds): Outcome`.
-- [ ] **Tests** — both strategies, edge cases (first request, limit reached, window rollover, TTL expiry). Use `ArrayDriver` from Vault.
-- [ ] **Throttle README** — document algorithms, usage, configuration, header conventions.
+- [x] **`RateLimiter` class** — main entry point. Takes `CacheInterface` in constructor. `attempt(string $key, int $limit, int $windowSeconds): Quota` checks and decrements. Configurable strategy (token bucket default, sliding window option).
+- [x] **`Quota` value object** — immutable result of an attempt: `$allowed` (bool), `$remaining` (int), `$limit` (int), `$resetAt` (int, epoch). Methods: `isAllowed()`, `headers()` (returns array of `X-RateLimit-*` and `Retry-After` headers).
+- [x] **`TokenBucket`** — implements token bucket algorithm against cache get/set with TTL.
+- [x] **`SlidingWindow`** — implements sliding window algorithm against cache get/set with TTL.
+- [x] **`Throttler` interface** — `attempt(CacheInterface $cache, string $key, int $limit, int $windowSeconds): Quota`.
+- [x] **Tests** — both strategies, edge cases (first request, limit reached, window rollover, TTL expiry). Use `ArrayDriver` from Vault.
+- [x] **Throttle README** — document algorithms, usage, configuration, header conventions.
 
 **Starter app:**
 
