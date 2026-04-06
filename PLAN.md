@@ -169,9 +169,47 @@ New `Throttle` package under `src/Throttle/`. Depends on `Psr\SimpleCache\CacheI
 - `X-RateLimit-Reset` — epoch time when window resets
 - `Retry-After` — seconds until client should retry (429 only)
 
+### 12. Kernel Lifecycle Events
+
+HTTP lifecycle events dispatched via Echo. Listeners observe the request/response flow without being in the middleware stack. Middleware stays for things that wrap or transform (auth, CSRF, rate limiting). Events are for things that react at a specific point (logging, metrics, audit trails, post-response work).
+
+**Guideline for developers:** If you need before *and* after, or need to short-circuit — use middleware. If you need to react at one point — use an event listener.
+
+**Events (Hyper\Event):**
+
+| Event | Carries | When |
+|---|---|---|
+| `RequestReceived` | `ServerRequestInterface` (mutable) | Request enters kernel, before middleware |
+| `RequestHandled` | `ServerRequestInterface`, `ResponseInterface` (read-only) | After middleware + handler, response exists |
+| `RequestFailed` | `ServerRequestInterface`, `Throwable` | Exception thrown during handling |
+| `ResponseSent` | `ServerRequestInterface`, `ResponseInterface` (read-only) | After response bytes sent to client |
+
+Design decisions:
+- `RequestReceived` allows mutation (listeners can add request attributes, e.g., start time, request ID). Returns the (possibly modified) request to the kernel.
+- `RequestHandled` and `ResponseSent` are read-only — middleware is the last word on the response. No mutation after the stack.
+- `RequestFailed` is observational — Glitch still handles exception rendering. Listeners are for reporting, metrics, notifications.
+- `ResponseSent` fires after `fastcgi_finish_request()` if available, otherwise at script end. Documented as best-effort post-response.
+
+**Framework:**
+
+- [ ] **`Hyper\Event\RequestReceived`** — carries `ServerRequestInterface`. Mutable: listener can replace the request via `setRequest()`.
+- [ ] **`Hyper\Event\RequestHandled`** — carries request + response. Read-only.
+- [ ] **`Hyper\Event\RequestFailed`** — carries request + throwable. Read-only.
+- [ ] **`Hyper\Event\ResponseSent`** — carries request + response. Read-only.
+- [ ] **Update `HyperKernel::handle()`** — dispatch `RequestReceived` before middleware, `RequestHandled` after, `RequestFailed` on exception.
+- [ ] **Add `HyperKernel::terminate()`** — dispatches `ResponseSent`. Called from `public/index.php` after the response is sent. Calls `fastcgi_finish_request()` if available before dispatching.
+- [ ] **Update starter app `public/index.php`** — call `$kernel->terminate()` after sending the response.
+- [ ] **Tests** — verify events fire at the right points, verify request mutation propagates, verify exception events fire on failure.
+- [ ] **Update Hyper README** — document lifecycle events, when to use events vs middleware.
+
+**Starter app — request logging listener:**
+
+- [ ] **`App\Http\Listener\RequestLogger`** — listens to `RequestReceived` (records start time on request attribute) and `RequestHandled` (logs method, path, status, duration). Uses `LoggerInterface`. Log level by status: 2xx→info, 4xx→warning, 5xx→error.
+- [ ] **Register listener** — via Echo subscriber registration in bootstrap or config.
+- [ ] **Add `requests` channel to `config/log.php`** — separate log file for HTTP access logs.
+
 ### Starter App Polish
 
-- **Request logging middleware** — example demonstrating the middleware onion model
 - **Default CSS and styling** — minimal CSS and base HTML layout for presentable default pages and error screens
 
 ### Error message personality pass
