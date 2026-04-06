@@ -195,6 +195,27 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
                 text-decoration:none;
             }
             .actions a:hover { background:#ece9e0; }
+            @media (prefers-color-scheme: dark) {
+                body { background:#1a1915; color:#e8e4db; }
+                .status-code { color:#c8795a; }
+                h1 { color:#e8e4db; }
+                .message { color:#9c9789; }
+                .suggestion {
+                    border-color:#6a8fc0; color:#6a8fc0;
+                    background:rgba(106,143,192,0.1);
+                }
+                .debug { border-color:#3d3a34; }
+                .debug-class { color:#c4bfb3; }
+                .debug-file { color:#9c9789; }
+                details summary { color:#9c9789; }
+                details pre {
+                    background:#2d2b24; border-color:#3d3a34; color:#c4bfb3;
+                }
+                .actions a {
+                    border-color:#3d3a34; color:#c8795a;
+                }
+                .actions a:hover { background:#2d2b24; }
+            }
         </style>
         CSS;
         // phpcs:enable Generic.Files.LineLength.TooLong
