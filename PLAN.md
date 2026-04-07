@@ -262,6 +262,93 @@ The Contact form/page/command was useful early on as a smoke test for the full C
 
 GitHub source and issues URLs will use the real `arcanum-org/framework` repo links — those exist already.
 
+### Stopwatch — framework-wide lifecycle timing
+
+Surfaced while writing the starter app's `RenderMetrics` holder for the welcome page footer crumb. That class wanted to be one specific thing (request-scoped start time) but already aspirationally named itself for a broader concept (render metrics). The honest design is a generic, framework-level **stopwatch** that records named checkpoints across the request lifecycle and exposes them to anyone who asks. The welcome page's "rendered in X ms" is then just one of many consumers — a debug toolbar, log lines with phase breakdowns, slow-test detection in CI, and per-middleware profiling all sit on top of the same primitive.
+
+**Decisions, settled:**
+
+- **Lives in `Arcanum\Toolkit\Stopwatch`** — single class, fits Toolkit's "small reusable utilities" character. (Echo gets its own subpackage because it's many related classes; Stopwatch is one class.)
+- **Always on, no debug gate.** `microtime(true)` + array push is single-digit nanoseconds; five core marks per request is below noise floor. The welcome page's footer crumb is a fact, not a debug feature, and should work in dev *and* prod. Heavier instrumentation (per-middleware, per-bootstrapper marks) opts in via the debug flag later if it lands.
+- **Construction marks `request.start`.** Constructor captures `microtime(true)` AND adds a `request.start` entry to the marks list. Keeps the chronological timeline complete and self-explanatory — no special-casing "the start time isn't in marks but is implied".
+- **Single source of truth.** Replaces the dual-write currently in `RequestLogger` (which writes start time to both a PSR-7 request attribute and the starter-app `RenderMetrics` holder). Stopwatch is the only place that knows.
+
+**Shape:**
+
+```php
+namespace Arcanum\Toolkit\Stopwatch;
+
+final class Stopwatch
+{
+    /** @var array<string, Mark> */
+    private array $marks = [];
+
+    public function __construct()
+    {
+        $this->mark('request.start');
+    }
+
+    public function mark(string $label): void;        // record current monotonic time
+    public function has(string $label): bool;
+    public function elapsedMs(): float;               // since request.start
+    public function elapsedSinceMs(string $label): ?float;
+    public function elapsedBetweenMs(string $from, string $to): ?float;
+    public function startTime(): float;               // microtime(true) of request.start
+
+    /** @return list<Mark> in insertion order */
+    public function marks(): array;
+}
+
+final class Mark
+{
+    public function __construct(
+        public readonly string $label,
+        public readonly float $time, // microtime(true)
+    ) {}
+}
+```
+
+**Built-in lifecycle marks (always on):**
+
+| Mark | When |
+|---|---|
+| `request.start` | Stopwatch constructor (called as the first thing in `public/index.php` / `bin/arcanum`) |
+| `boot.complete` | After `HyperKernel::boot()` finishes running bootstrappers |
+| `request.received` | `RequestReceived` listener |
+| `handler.start` | Conveyor before-middleware boundary |
+| `handler.complete` | Conveyor after-middleware boundary |
+| `render.start` | Formatter `format()` entry |
+| `render.complete` | Formatter `format()` exit |
+| `request.handled` | `RequestHandled` listener |
+| `response.sent` | `ResponseSent` listener |
+
+**Plan items — framework:**
+
+- [ ] **`Arcanum\Toolkit\Stopwatch\Stopwatch`** — single class as sketched above. `mark()`, `has()`, `elapsedMs()`, `elapsedSinceMs()`, `elapsedBetweenMs()`, `startTime()`, `marks()`. Constructor records `request.start`.
+- [ ] **`Arcanum\Toolkit\Stopwatch\Mark`** — immutable value object, label + time.
+- [ ] **`tests/Toolkit/Stopwatch/StopwatchTest.php`** — construction marks request.start, mark records insertion-ordered marks, has() returns true/false correctly, elapsedMs returns positive duration, elapsedSinceMs returns null for missing labels, elapsedBetweenMs returns null when either label is missing, marks() returns insertion order (use a frozen-time helper or accept small tolerances).
+- [ ] **`tests/Toolkit/Stopwatch/MarkTest.php`** — value object basics.
+- [ ] **`Bootstrap\HyperKernel`** — accept an optional pre-built Stopwatch in the constructor (so `public/index.php` can mark `request.start` at the absolute earliest moment); fall back to constructing one if none provided. Bind it to the container as a singleton. Mark `boot.complete` after bootstrappers run.
+- [ ] **`Bootstrap\Hyper`** — register Echo listeners that mark `request.received`, `request.handled`, and `response.sent` from the corresponding lifecycle events.
+- [ ] **`Flow\Conveyor\MiddlewareBus`** — mark `handler.start` before before-middleware fires, `handler.complete` after after-middleware fires. Inject Stopwatch as an optional dependency (so the bus stays usable in CLI / non-HTTP contexts where no Stopwatch is bound).
+- [ ] **`Shodo\Formatter` boundary** — mark `render.start` / `render.complete` around `format()` execution. Inject Stopwatch optionally.
+- [ ] **`src/Toolkit/Stopwatch/README.md`** — small dedicated doc covering the class, the built-in marks, and example consumers (welcome page footer, profiling middleware, slow-test assertions).
+
+**Plan items — starter app migration:**
+
+- [ ] **`public/index.php`** — `$stopwatch = new Stopwatch()` as the first thing after `vendor/autoload.php`. Pass into kernel construction.
+- [ ] **`bin/arcanum`** — same first-line construction for CLI requests (so CLI scripts can also benefit from elapsed-time reporting).
+- [ ] **`RequestLogger`** — read elapsed from `Stopwatch::elapsedMs()` instead of the PSR-7 request attribute. Drop the `arcanum.start_time` attribute write entirely.
+- [ ] **Delete `App\Http\RenderMetrics`** + its test + its bootstrap registration. The starter app no longer carries this concept; Stopwatch covers it.
+- [ ] **`EnvCheckHelper`** — when written, takes `Stopwatch` instead of `RenderMetrics` for `renderDurationMs()`.
+
+**Open follow-ups (defer):**
+
+- **Per-middleware marks** — `App\Http\Middleware\StopwatchMiddleware` that marks `middleware.{name}.start` / `.complete` around each PSR-15 middleware. Opt-in via the debug flag because the mark count grows with the middleware stack.
+- **Per-bootstrapper marks** — same idea for `Ignition\HyperKernel::boot()`. Useful for tracking down a slow bootstrapper. Debug-mode only.
+- **Debug toolbar** — render `Stopwatch::marks()` as an inline timeline strip at the bottom of HTML responses in debug mode.
+- **Phase context in log lines** — `RequestLogger` includes a `phases` dict with all marks in its log context.
+
 ### Shodo conditionals (and directive syntax cleanup)
 
 Initial plan was based on a wrong premise. Shodo *does* already have `if`/`elseif`/`else`/`endif`/`foreach`/`for`/`while` — they live under bare-keyword syntax with required parens (`{{ if ($foo > 0) }}`). I missed them when researching because I grepped for `@if`. So the actual gap isn't "no conditionals," it's an **inconsistency**: layout/structure directives are `@`-prefixed (`@extends`, `@section`, `@yield`, `@include`, `@csrf`), control structures are bare keywords. Two conventions in the same templates.
