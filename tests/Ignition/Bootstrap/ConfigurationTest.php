@@ -175,6 +175,56 @@ final class ConfigurationTest extends TestCase
         $this->assertSame('Cached', $config->get('app.name'));
     }
 
+    public function testBypassesConfigCacheWhenFrameworkCacheDisabled(): void
+    {
+        // Arrange — both a cache file AND the live config files exist, but
+        // cache.framework.enabled is false. The bootstrapper should skip
+        // the cache and re-read from disk.
+        $cachePath = $this->filesDir . '/cache/config.php';
+        file_put_contents($cachePath, "<?php return ['app' => ['name' => 'Cached']];\n");
+        file_put_contents($this->configDir . '/app.php', "<?php return ['name' => 'Fresh'];\n");
+        file_put_contents(
+            $this->configDir . '/cache.php',
+            "<?php return ['framework' => ['enabled' => false]];\n",
+        );
+
+        $container = $this->buildContainer();
+        $bootstrapper = new Configuration();
+
+        // Act
+        $bootstrapper->bootstrap($container);
+
+        /** @var GatherConfiguration $config */
+        $config = $container->get(GatherConfiguration::class);
+
+        // Assert — fresh value, not cached
+        $this->assertSame('Fresh', $config->get('app.name'));
+    }
+
+    public function testHonoursConfigCacheWhenFrameworkCacheEnabled(): void
+    {
+        // Arrange — explicit cache.framework.enabled => true, cache present
+        $cachePath = $this->filesDir . '/cache/config.php';
+        file_put_contents($cachePath, "<?php return ['app' => ['name' => 'Cached']];\n");
+        file_put_contents($this->configDir . '/app.php', "<?php return ['name' => 'Fresh'];\n");
+        file_put_contents(
+            $this->configDir . '/cache.php',
+            "<?php return ['framework' => ['enabled' => true]];\n",
+        );
+
+        $container = $this->buildContainer();
+        $bootstrapper = new Configuration();
+
+        // Act
+        $bootstrapper->bootstrap($container);
+
+        /** @var GatherConfiguration $config */
+        $config = $container->get(GatherConfiguration::class);
+
+        // Assert — cache wins when bypass is off
+        $this->assertSame('Cached', $config->get('app.name'));
+    }
+
     public function testSkipsFileScanningWhenCacheExists(): void
     {
         // Arrange — cache exists, config dir has a file that would cause error if required
