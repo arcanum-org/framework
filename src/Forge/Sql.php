@@ -130,32 +130,6 @@ final class Sql
     }
 
     /**
-     * Apply cast annotations to a set of result rows.
-     *
-     * @param list<array<string, mixed>> $rows
-     * @param array<string, string> $casts Column → type map from parseCasts().
-     * @return list<array<string, mixed>>
-     */
-    public static function applyCasts(array $rows, array $casts): array
-    {
-        if ($casts === []) {
-            return $rows;
-        }
-
-        foreach ($rows as $i => $row) {
-            foreach ($casts as $column => $type) {
-                if (!array_key_exists($column, $row)) {
-                    continue;
-                }
-
-                $rows[$i][$column] = self::castValue($row[$column], $type);
-            }
-        }
-
-        return $rows;
-    }
-
-    /**
      * Extract `:named` binding names from SQL in order of first appearance.
      *
      * Scans for `:word` patterns, skipping occurrences inside line comments,
@@ -295,36 +269,5 @@ final class Sql
         }
 
         return $ordered;
-    }
-
-    public static function castValue(mixed $value, string $type): mixed
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        if (!is_scalar($value)) {
-            return $value;
-        }
-
-        return match ($type) {
-            'int' => (int) $value,
-            'float' => (float) $value,
-            'bool' => self::castBool($value),
-            'json' => json_decode((string) $value, true),
-            default => $value,
-        };
-    }
-
-    private static function castBool(bool|int|float|string $value): bool
-    {
-        if (is_bool($value)) {
-            return $value;
-        }
-
-        return match ((string) $value) {
-            't', '1', 'true', 'yes' => true,
-            default => false,
-        };
     }
 }
