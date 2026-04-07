@@ -151,6 +151,7 @@ New `src/Hourglass/` package owns all time primitives. Originally planned as a s
 | `render.start` / `render.complete` | ResponseRenderer boundaries |
 | `request.handled` | HyperKernel after response built |
 | `response.sent` | HyperKernel::terminate after fastcgi_finish_request |
+| `arcanum.complete` | End of terminate() — last thing the framework does before process exit. Pairs symmetrically with `arcanum.start` for total process lifetime; captures any post-`response.sent` listener time. RuneKernel marks it from its own `terminate()`. |
 
 **Open follow-ups (deferred):**
 
@@ -300,6 +301,7 @@ The dedicated "Helper calls in escaped output" and "Helper calls in raw output" 
 
 ## Long-Distance Future
 
+- **FastCGI / post-response work patterns** — Surfaced while adding `arcanum.complete`. Arcanum currently calls `fastcgi_finish_request()` in `HyperKernel::terminate()` and dispatches `ResponseSent` afterwards, but there is no formal "deferred work" abstraction beyond the listener — no queueing semantics, no per-listener time budget, no documentation of what is and isn't safe to do post-response, no story for non-FCGI SAPIs (CLI workers, RoadRunner, FrankenPHP, Swoole) that lack `fastcgi_finish_request()` entirely. Worth a focused pass: document the contract, decide whether to formalize a `DeferredWork` hook above raw `ResponseSent` listeners, and consider how `arcanum.complete` should behave under long-running runtimes where there is no "process exit" per request. Until then, `arcanum.complete` measures what it measures (end of `terminate()`), and consumers should treat it as "framework work done" rather than "process exit".
 - **Hyper README** — document PSR-7 message classes, response renderers, exception renderers, format registry, file uploads, URI handling. Currently the only core package without a README.
 - **RFC 9457 Problem Details for HTTP APIs** — standardized JSON error response format (`application/problem+json`). Forward-compatible with the `ArcanumException` interface (#14). When ready, it's a renderer change — exception infrastructure is already in place. See https://www.rfc-editor.org/rfc/rfc9457.html
 - **Queue/Job system** — async processing with drivers (Redis, database, SQS)

@@ -282,6 +282,7 @@ class RuneKernel implements Kernel
 
     public function terminate(): void
     {
+        Stopwatch::tap('arcanum.complete');
     }
 
     private function splash(Output $output): void

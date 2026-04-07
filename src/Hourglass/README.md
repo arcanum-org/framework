@@ -135,7 +135,8 @@ The framework records these instants automatically once Stopwatch is wired throu
 | `render.start` | Formatter `format()` entry |
 | `render.complete` | Formatter `format()` exit |
 | `request.handled` | `RequestHandled` listener |
-| `response.sent` | `ResponseSent` listener |
+| `response.sent` | After `fastcgi_finish_request()` — client connection released |
+| `arcanum.complete` | End of `terminate()` — last thing the framework does before process exit |
 
 The cost is single-digit nanoseconds per mark. Stopwatch is always on.
 

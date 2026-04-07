@@ -466,5 +466,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
                 new ResponseSent($this->lastRequest, $this->lastResponse),
             );
         }
+
+        Stopwatch::tap('arcanum.complete');
     }
 }
