@@ -71,9 +71,16 @@ final class TemplateCache
 
     /**
      * Store compiled PHP to the cache.
+     *
+     * No-op when caching is disabled (cacheDirectory is empty), so the
+     * "disabled" sentinel can't accidentally write to the filesystem root.
      */
     public function store(string $templatePath, string $compiledPhp): void
     {
+        if ($this->cacheDirectory === '') {
+            return;
+        }
+
         $this->writer->write($this->cachePath($templatePath), $compiledPhp);
     }
 

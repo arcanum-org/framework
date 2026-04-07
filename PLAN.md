@@ -240,6 +240,19 @@ PHP's native `match` expression can't be used directly because match arms must b
 
 Surfaced while wiring up the Tailwind production build. The template helper `App::cssTags()` reads `file_exists()` at render time, but compiled templates inline the layout content at build time, so the helper call only takes effect after the cache is invalidated. `cache:clear` doesn't currently clean the templates cache, which made the helper appear broken until manually nuked.
 
+**Design — framework cache bypass switch:**
+
+Some developers want a completely fresh pull on every refresh while iterating, regardless of debug mode. Tying this to `app.debug` is wrong: debug is a runtime concern (verbose errors, stack traces), and a developer might legitimately want caching enabled in dev to test cache behavior, or disabled in production for diagnosis. Cache bypass is its own orthogonal switch.
+
+A new `cache.framework.enabled` config key (defaults to `true`). When set to `false`, every framework-internal cache surface — templates, helpers, page discovery, middleware discovery, configuration cache — becomes a no-op. Application caches that the dev wired up themselves through `Vault` are unaffected; this is purely a framework escape hatch.
+
+Implementation: `CacheManager::frameworkStore()` checks the flag and returns a `NullDriver` instead of resolving the configured store. One choke point, every framework subsystem already routes through it.
+
+**Plan items:**
+
+- [x] **`cache.framework.enabled` config flag** — new key in `config/cache.php`, defaults to `true`. Read by `CacheManager::frameworkStore()`. When `false`, returns `NullDriver` for every named store regardless of configured driver. Application stores via `CacheManager::store()` remain unaffected. `Bootstrap\Formats` also consults the flag so the `TemplateCache` (which writes directly to disk, not through Vault) honors the master switch. `cache.framework` was restructured from a flat `[purpose => store]` map to `['enabled' => bool, 'stores' => [purpose => store]]`.
+- [x] **Document the bypass switch** in the Vault README — explain when and why to use it, and what it does and does not affect.
+- [x] **`TemplateCache::store()` no-op when disabled** — fixed a latent bug where calling `store()` with `cacheDirectory=''` (the disabled sentinel) wrote a file to the filesystem root (`/<md5>.php`) and crashed on read-only filesystems. Surfaced when wiring the framework cache bypass through `Bootstrap\Formats`.
 - [ ] **`cache:clear` should clear the templates cache** — currently iterates `Vault` stores and the configuration cache, but skips `files/cache/templates/`. Either route template compilation through Vault, or have `cache:clear` walk all framework cache directories under `files/cache/`.
 - [ ] **`cache:clear` should clear the helper discovery cache** — the framework store named `helpers` (used by `HelperDiscovery`) is cached separately and survives `cache:clear`. Same fix scope as the templates cache.
 - [ ] **Audit framework cache surfaces** — list every place the framework writes a cache (templates, helpers, page discovery, middleware discovery, configuration, etc.), confirm `cache:clear` reaches all of them, and document the inventory in the Vault README.

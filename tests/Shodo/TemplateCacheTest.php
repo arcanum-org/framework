@@ -72,6 +72,22 @@ final class TemplateCacheTest extends TestCase
         $this->assertFalse($cache->isFresh($templatePath));
     }
 
+    public function testStoreIsNoOpWhenCachingDisabled(): void
+    {
+        // Arrange — when cacheDirectory is empty, store() must NOT try to
+        // write to disk. Without this guard, the cache path becomes
+        // /<md5>.php at the filesystem root, which fails on read-only
+        // filesystems and pollutes / on writeable ones.
+        $cache = new TemplateCache('');
+        $templatePath = $this->createTemplate('page.html', '<p>hello</p>');
+
+        // Act — must not throw
+        $cache->store($templatePath, '<?php echo "compiled"; ?>');
+
+        // Assert — nothing was written; isFresh still false
+        $this->assertFalse($cache->isFresh($templatePath));
+    }
+
     public function testIsFreshReturnsFalseWhenNoCacheFileExists(): void
     {
         // Arrange

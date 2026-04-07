@@ -88,6 +88,17 @@ class Formats implements Bootstrapper
         });
 
         $container->factory(TemplateCache::class, function () use ($container, $config) {
+            // Master switch: cache.framework.enabled disables every framework
+            // cache, including templates. Checked first so the per-cache
+            // toggle below can't override the master.
+            if ($container->has(\Arcanum\Vault\CacheManager::class)) {
+                /** @var \Arcanum\Vault\CacheManager $cacheManager */
+                $cacheManager = $container->get(\Arcanum\Vault\CacheManager::class);
+                if (!$cacheManager->frameworkCacheEnabled()) {
+                    return new TemplateCache('');
+                }
+            }
+
             /** @var mixed $cacheEnabled */
             $cacheEnabled = $config->get('cache.templates.enabled');
             $cacheEnabled = $cacheEnabled === null || $cacheEnabled === true;

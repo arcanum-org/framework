@@ -135,10 +135,6 @@ This is an orthogonal switch from `app.debug` — a developer can run with cache
 
 **What it does NOT affect:** application caches that the developer wires up via `CacheManager::store()` or by injecting `CacheInterface` directly. Those continue to use whatever driver is configured.
 
-### Backwards-compatible legacy shape
-
-If `cache.framework` is itself a flat `[purpose => store]` map (the older shape, no `enabled`/`stores` wrapper), it is still honoured and treated as the store mapping with the bypass disabled.
-
 ## PrefixedCache
 
 Decorator that prepends a namespace prefix to all keys:

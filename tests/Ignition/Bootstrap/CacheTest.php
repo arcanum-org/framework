@@ -104,31 +104,7 @@ final class CacheTest extends TestCase
         $this->assertTrue($container->has(CacheInterface::class));
     }
 
-    public function testReadsLegacyFlatFrameworkMapping(): void
-    {
-        // Backwards-compat: a flat [purpose => store] under cache.framework
-        // should still be honoured (no enabled/stores wrapper).
-        $container = $this->buildContainer([
-            'default' => 'array',
-            'stores' => [
-                'array' => ['driver' => 'array'],
-                'other' => ['driver' => 'array'],
-            ],
-            'framework' => [
-                'pages' => 'other',
-            ],
-        ]);
-
-        (new Cache())->bootstrap($container);
-
-        /** @var CacheManager $manager */
-        $manager = $container->get(CacheManager::class);
-
-        $this->assertSame(['pages' => 'other'], $manager->frameworkStoreMapping());
-        $this->assertTrue($manager->frameworkCacheEnabled());
-    }
-
-    public function testReadsNewFrameworkConfigShape(): void
+    public function testReadsFrameworkConfigShape(): void
     {
         // New shape: cache.framework has 'enabled' and 'stores' siblings.
         $container = $this->buildContainer([

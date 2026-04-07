@@ -46,10 +46,8 @@ class Cache implements Bootstrapper
         }
 
         // The framework cache section has two keys:
-        //   'enabled' (bool)        — master bypass switch for framework-internal caches
-        //   'stores'  (array)       — purpose => store-name mapping
-        // Backwards compatible: if 'cache.framework' is itself a flat
-        // [purpose => store] map (the older shape), treat it as stores.
+        //   'enabled' (bool)  — master bypass switch for framework-internal caches
+        //   'stores'  (array) — purpose => store-name mapping
         $rawFramework = $config->get('cache.framework');
 
         $frameworkCacheEnabled = true;
@@ -57,15 +55,10 @@ class Cache implements Bootstrapper
         $frameworkStores = [];
 
         if (is_array($rawFramework)) {
-            if (array_key_exists('enabled', $rawFramework) || array_key_exists('stores', $rawFramework)) {
-                $frameworkCacheEnabled = ($rawFramework['enabled'] ?? true) === true;
-                /** @var array<string, string> $stores2 */
-                $stores2 = is_array($rawFramework['stores'] ?? null) ? $rawFramework['stores'] : [];
-                $frameworkStores = $stores2;
-            } else {
-                /** @var array<string, string> $rawFramework */
-                $frameworkStores = $rawFramework;
-            }
+            $frameworkCacheEnabled = ($rawFramework['enabled'] ?? true) === true;
+            /** @var array<string, string> $storesMap */
+            $storesMap = is_array($rawFramework['stores'] ?? null) ? $rawFramework['stores'] : [];
+            $frameworkStores = $storesMap;
         }
 
         $manager = new CacheManager(
