@@ -708,4 +708,67 @@ final class HyperKernelTest extends TestCase
         // Assert — middleware ran even for a prepareRequest error
         $this->assertTrue($middlewareRan);
     }
+
+    public function testExceptionThrownInMiddlewareIsCaughtAndRendered(): void
+    {
+        // Arrange — middleware throws before reaching the core handler.
+        // The kernel must catch the exception and render a response,
+        // not let it escape and leave the client with no body.
+        $thrown = new \RuntimeException('Boom from middleware');
+
+        $middleware = new class ($thrown) implements MiddlewareInterface {
+            public function __construct(private \Throwable $error)
+            {
+            }
+
+            public function process(
+                ServerRequestInterface $request,
+                RequestHandlerInterface $handler,
+            ): ResponseInterface {
+                throw $this->error;
+            }
+        };
+
+        $errorResponse = $this->createStub(ResponseInterface::class);
+
+        $renderer = $this->createMock(ExceptionRenderer::class);
+        $renderer->expects($this->once())
+            ->method('render')
+            ->with($thrown)
+            ->willReturn($errorResponse);
+
+        $exceptionHandler = $this->createMock(ExceptionHandler::class);
+        $exceptionHandler->expects($this->once())
+            ->method('handleException')
+            ->with($thrown);
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturnMap([
+            [ExceptionHandler::class, true],
+            [ExceptionRenderer::class, true],
+            [EventDispatcherInterface::class, false],
+        ]);
+
+        $class = get_class($middleware);
+        $container->method('get')->willReturnCallback(
+            fn(string $id) => match ($id) {
+                ExceptionHandler::class => $exceptionHandler,
+                ExceptionRenderer::class => $renderer,
+                $class => $middleware,
+                default => $bootstrapper,
+            }
+        );
+
+        $kernel = new HyperKernel('/app');
+        $kernel->bootstrap($container);
+        $kernel->middleware($class);
+
+        // Act
+        $response = $kernel->handle($this->createStub(ServerRequestInterface::class));
+
+        // Assert — the rendered error response was returned, not bubbled
+        $this->assertSame($errorResponse, $response);
+    }
 }

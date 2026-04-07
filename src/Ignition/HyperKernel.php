@@ -175,9 +175,18 @@ class HyperKernel implements Kernel, RequestHandlerInterface
     /**
      * Handle an incoming HTTP request.
      *
-     * Exception handling is inside the core handler so that error responses
-     * flow back through the middleware stack — every response (success or
-     * error) passes through all middleware layers.
+     * Exception handling has two layers:
+     *
+     * 1. Inside the core handler — handler exceptions are caught here so
+     *    that the rendered error response flows back through the middleware
+     *    stack (so middleware like CORS still runs on error responses).
+     *
+     * 2. Around sendThroughMiddleware — middleware-thrown exceptions are
+     *    caught here. The middleware that threw has already half-executed,
+     *    so the error response cannot be fed back through it; instead we
+     *    render the exception directly. Without this catch, an exception
+     *    from middleware would escape the kernel entirely, leaving the
+     *    client with whatever default response PHP emits (usually nothing).
      */
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
@@ -206,7 +215,15 @@ class HyperKernel implements Kernel, RequestHandlerInterface
             }
         });
 
-        $response = $this->sendThroughMiddleware($request, $core);
+        try {
+            $response = $this->sendThroughMiddleware($request, $core);
+        } catch (\Throwable $e) {
+            // A middleware threw before reaching the core handler. The
+            // partially-executed stack can't be replayed, so render the
+            // exception directly into a response.
+            $this->dispatchRequestFailed($request, $e);
+            $response = $this->handleException($e, $request);
+        }
 
         // Dispatch RequestHandled — read-only observation.
         // Listener failures must not destroy a successful response.
