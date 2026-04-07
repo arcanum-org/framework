@@ -127,6 +127,15 @@ Full CQRS pipeline: Router → Hydrator → Conveyor → Renderer. Example Query
 
 ## Upcoming Work
 
+### Cache management gaps
+
+Surfaced while wiring up the Tailwind production build. The template helper `App::cssTags()` reads `file_exists()` at render time, but compiled templates inline the layout content at build time, so the helper call only takes effect after the cache is invalidated. `cache:clear` doesn't currently clean the templates cache, which made the helper appear broken until manually nuked.
+
+- [ ] **`cache:clear` should clear the templates cache** — currently iterates `Vault` stores and the configuration cache, but skips `files/cache/templates/`. Either route template compilation through Vault, or have `cache:clear` walk all framework cache directories under `files/cache/`.
+- [ ] **`cache:clear` should clear the helper discovery cache** — the framework store named `helpers` (used by `HelperDiscovery`) is cached separately and survives `cache:clear`. Same fix scope as the templates cache.
+- [ ] **Audit framework cache surfaces** — list every place the framework writes a cache (templates, helpers, page discovery, middleware discovery, configuration, etc.), confirm `cache:clear` reaches all of them, and document the inventory in the Vault README.
+- [ ] **Template cache invalidation on layout change** — when a child template `@extends` a layout, the layout's content is inlined into the compiled child. Editing the layout doesn't invalidate the children. Either checksum the layout into the child's cache key, or invalidate dependents on layout change. This is what made the Tailwind helper iteration painful — every layout edit required a manual `rm -rf files/cache/templates/`.
+
 ### Starter app
 
 - [x] **Add database example** — Contact domain persists to SQLite via Forge. Model/ directory with Save.sql, FindAll.sql, CreateTable.sql. New Messages query reads submissions back. config/database.php with SQLite connection.
@@ -228,9 +237,9 @@ Visual design system defined in `DESIGN.md` (committed). Framework ships self-co
 
 - [x] **`tailwind.config.js`** — maps DESIGN.md tokens to Tailwind: custom colors, font families, spacing scale.
 - [x] **CDN play script in `<head>`** — Tailwind CDN play script with inline config matching the full config file. Marked for replacement with built CSS in production.
-- [ ] **`public/css/app.css`** — Tailwind entry file with `@tailwind` directives. Pending production build setup.
-- [ ] **Production build** — document Tailwind CLI standalone or Vite setup. Add `composer css:build` and `composer css:watch`.
-- [ ] **Production guardrail** — warn when CDN play script is detected in production.
+- [x] **`public/css/app.css`** — Tailwind entry file with `@tailwind` directives. Pending production build setup.
+- [x] **Production build** — document Tailwind CLI standalone or Vite setup. Add `composer css:build` and `composer css:watch`.
+- [x] **Production guardrail** — warn when CDN play script is detected in production. Logs a WARNING from `public/index.php` when `APP_DEBUG=false` and `public/css/app.min.css` is missing.
 - [x] **Dark mode** — Tailwind `darkMode: 'class'` strategy. Dark mode toggle in nav persisted to `localStorage`. OS preference detection on first load.
 
 **Starter app — HTMX:**
@@ -322,7 +331,6 @@ Each package replaces generic `throw new \RuntimeException(...)` with named exce
 ## Long-Distance Future
 
 - **Hyper README** — document PSR-7 message classes, response renderers, exception renderers, format registry, file uploads, URI handling. Currently the only core package without a README.
-- **Starter app production build** — `public/css/app.css` with `@tailwind` directives, `composer css:build` script using Tailwind standalone binary, production guardrail warning when CDN play script detected with `app.debug=false`.
 - **RFC 9457 Problem Details for HTTP APIs** — standardized JSON error response format (`application/problem+json`). Forward-compatible with the `ArcanumException` interface (#14). When ready, it's a renderer change — exception infrastructure is already in place. See https://www.rfc-editor.org/rfc/rfc9457.html
 - **Queue/Job system** — async processing with drivers (Redis, database, SQS)
 - **Testing utilities** — DTO factories, service fakes, TestKernel
