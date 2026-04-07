@@ -127,6 +127,48 @@ Full CQRS pipeline: Router → Hydrator → Conveyor → Renderer. Example Query
 
 ## Upcoming Work
 
+### Shodo conditionals
+
+The template compiler currently has no conditional directives. Templates that need to branch on runtime state have to push the entire branch into a helper that returns a raw HTML string (which is what we did for `App::cssTags()`). That works but pulls layout-shaped logic into PHP classes for no good reason.
+
+**`@if` / `@elseif` / `@else`** (foundation):
+
+```
+{{ @if App::debug() }}
+    <script src="https://cdn.tailwindcss.com"></script>
+{{ @elseif App::cssBuilt() }}
+    <link rel="stylesheet" href="/css/app.min.css">
+{{ @else }}
+    <!-- no styles -->
+{{ @endif }}
+```
+
+Compiles to vanilla PHP `if`/`elseif`/`else`. Conditions are full PHP expressions — same model as `{{ $expr }}` interpolation. Templates are already compiled to PHP, so this opens no door that isn't already open.
+
+**`@match` / `@case` / `@default`** (sugar on top):
+
+```
+{{ @match $status }}
+    {{ @case 'pending', 'active' }}
+        <span class="text-success">Active</span>
+    {{ @case 'closed' }}
+        <span class="text-error">Closed</span>
+    {{ @default }}
+        <span class="text-stone">Unknown</span>
+{{ @endmatch }}
+```
+
+Compiles to a PHP `switch` statement (with implicit `break` after each case). Strictly an equality-match-against-subject construct — not a free-form pattern matcher (free-form is just `@if` in different clothing). Comma-separated values in `@case` map to fall-through case lists. The subject is evaluated once.
+
+PHP's native `match` expression can't be used directly because match arms must be expressions, not statement bodies. The compiler emits `switch` under the hood, but the directive is named `@match` because it's the closer mental model and avoids conflating with C-style switch fall-through.
+
+**Plan items:**
+
+- [ ] **`@if` / `@elseif` / `@else`** — directive parsing in `TemplateCompiler`, compiles to PHP if/elseif/else with raw PHP expression conditions. Supports nested ifs.
+- [ ] **`@match` / `@case` / `@default` / `@endmatch`** — compiles to PHP switch with implicit breaks. Comma-separated values in @case map to fall-through cases.
+- [ ] **Tests** — both directives, nesting, inside layouts/sections, inside includes, mixed with `{{ }}` interpolation.
+- [ ] **Update Shodo README** — document directives, condition expression rules, when to use `@if` vs `@match`.
+
 ### Cache management gaps
 
 Surfaced while wiring up the Tailwind production build. The template helper `App::cssTags()` reads `file_exists()` at render time, but compiled templates inline the layout content at build time, so the helper call only takes effect after the cache is invalidated. `cache:clear` doesn't currently clean the templates cache, which made the helper appear broken until manually nuked.
