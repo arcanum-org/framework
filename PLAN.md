@@ -6,134 +6,79 @@
 
 2455 tests, PHPStan level 9 clean.
 
-<details>
-<summary>Core packages (click to expand)</summary>
+### Core packages
 
 Cabinet, Codex, Echo, Flow (Pipeline, Continuum, Conveyor, River, Sequence), Gather, Glitch, Hyper, Ignition, Atlas, Shodo, Rune, Parchment, Quill, Toolkit. Full test coverage, all READMEs written.
 
-</details>
-
-<details>
-<summary>1. Security Primitives — Toolkit (click to expand)</summary>
+### 1. Security Primitives — Toolkit
 
 Encryption (SodiumEncryptor, XSalsa20-Poly1305), hashing (BcryptHasher, Argon2Hasher), random (Random utility), HMAC signing (SodiumSigner). Bootstrap\Security wires from APP_KEY. `make:key` CLI command.
 
-</details>
-
-<details>
-<summary>2. Validation — new package (click to expand)</summary>
+### 2. Validation — new package
 
 Attribute-based validation on DTO constructor params. 10 built-in rules (NotEmpty, MinLength, MaxLength, Min, Max, Email, Pattern, In, Url, Uuid, Callback). ValidationGuard Conveyor middleware fires before handlers. 422 on HTTP, field-level errors on CLI. Custom rules via Rule interface.
 
-</details>
-
-<details>
-<summary>3. Caching — Vault (click to expand)</summary>
+### 3. Caching — Vault
 
 PSR-16 caching with 5 drivers (File, Array, Null, APCu, Redis). CacheManager for named stores. PrefixedCache decorator. Framework caches (config, templates, pages, middleware) migrated onto Vault. `cache:clear` and `cache:status` CLI commands.
 
-</details>
-
-<details>
-<summary>4. Scaffolding Generators (click to expand)</summary>
+### 4. Scaffolding Generators
 
 Generator base class with stub templates (app-level overrides supported). `make:command`, `make:query`, `make:page`, `make:middleware`. Stubs use Shodo TemplateCompiler.
 
-</details>
-
-<details>
-<summary>5. Sessions (click to expand)</summary>
+### 5. Sessions
 
 HTTP session management with configurable drivers (file, cookie, cache). ActiveSession request-scoped holder. SessionMiddleware handles start/save/cookie. CSRF protection via CsrfMiddleware + `csrf` template directive. Bootstrap\Sessions wires from config/session.php.
 
-</details>
-
-<details>
-<summary>6. Auth & Authorization (click to expand)</summary>
+### 6. Auth & Authorization
 
 Identity interface, Guards (Session, Token, Composite), AuthMiddleware (HTTP), CliAuthResolver (CLI). Authorization via DTO attributes (#[RequiresAuth], #[RequiresRole], #[RequiresPolicy]). AuthorizationGuard Conveyor middleware. CLI sessions: Prompter, CliSession (encrypted file store), LoginCommand, LogoutCommand. Priority chain: --token → session → ARCANUM_TOKEN env. CSRF/Auth coordination: AuthMiddleware sets PSR-7 request attribute for token-authenticated requests; CsrfMiddleware skips CSRF for those. Guard config supports array syntax: `'guard' => ['session', 'token']`.
 
-</details>
-
-<details>
-<summary>7. HTTP Client (click to expand)</summary>
+### 7. HTTP Client
 
 PSR-18 HTTP client wrapper. Complete.
 
-</details>
-
-<details>
-<summary>8. Custom App Scripts (click to expand)</summary>
+### 8. Custom App Scripts
 
 Rune extension for app-defined CLI scripts. Complete.
 
-</details>
-
-<details>
-<summary>9. Persistence — Forge (click to expand)</summary>
+### 9. Persistence — Forge
 
 SQL files as first-class methods. Connection interface with PdoConnection (MySQL, PostgreSQL, SQLite). ConnectionManager with read/write split and domain mapping. Model maps `__call` to .sql files with PHP named/positional/mixed arg support. `@cast` (int, float, bool, json) and `@param` annotations. Sql utility with SqlScanner for comment/string-aware parsing. Database service with domain-scoped model access and transactions. DomainContext + DomainContextMiddleware for automatic domain scoping. ModelGenerator with stub templates and app-level overrides. forge:models, validate:models, db:status CLI commands. Dev-mode auto-regeneration with configurable auto_forge. Bootstrap\Database wires from config/database.php.
 
-</details>
-
-<details>
-<summary>10. Template Helpers — Shodo extension (click to expand)</summary>
+### 10. Template Helpers — Shodo extension
 
 Static-method-call syntax in templates: `{{ Route::url('...') }}`, `{{ Format::number($price, 2) }}`. HelperRegistry, HelperResolver (domain-scoped via co-located `Helpers.php` files), HelperDiscovery. Five built-in helper groups: Route, Format, Str, Html, Arr. `{{ csrf }}` directive. Compiler rewrites `Name::method(...)` to `$__helpers['Name']->method(...)`.
 
-</details>
-
-<details>
-<summary>11. Rate Limiting — Throttle (click to expand)</summary>
+### 11. Rate Limiting — Throttle
 
 New `Throttle` package under `src/Throttle/`. Token bucket and sliding window strategies behind a `Throttler` interface. `RateLimiter` entry point takes `CacheInterface`, returns a `Quota` value object with `isAllowed()`, `headers()` (X-RateLimit-* + Retry-After). Starter app gets `RateLimit` middleware extracting key from IP, throws `HttpException(StatusCode::TooManyRequests)` on reject, adds headers on allow. `config/throttle.php` for limit/window/strategy. Throttle README documents algorithms.
 
-</details>
-
-<details>
-<summary>12. Kernel Lifecycle Events (click to expand)</summary>
+### 12. Kernel Lifecycle Events
 
 Hyper\Event classes: `RequestReceived` (mutable, listeners can rewrite the request), `RequestHandled` / `RequestFailed` / `ResponseSent` (read-only — middleware is the last word on the response). HyperKernel dispatches them around the middleware stack; `terminate()` calls `fastcgi_finish_request()` then dispatches `ResponseSent`. Starter ships `App\Http\Listener\RequestLogger` listening to RequestReceived (records start time on a request attribute) and RequestHandled (logs method/path/status/duration via the `requests` channel). Ignition README documents the events table and the "use middleware to wrap, listeners to react" rule.
 
-</details>
-
-<details>
-<summary>13. Default Styling & Front-End Integration (click to expand)</summary>
+### 13. Default Styling & Front-End Integration
 
 `DESIGN.md` warm editorial system: parchment canvas, Lora headings, Inter body, copper accent, dark mode. Framework ships `HtmlExceptionResponseRenderer` with self-contained inline styles, friendly default descriptions for common status codes (400/401/403/404/405/406/422/429/500/503), and an app-override mechanism via `{errorTemplatesDirectory}/{code}.html`. `HtmlFallbackFormatter` styled to match. Starter app uses Tailwind CSS (CDN play script in dev, built `app.min.css` in prod via `composer css:build` / `css:watch`, production guardrail logs a WARNING when CDN is detected without the bundle), `darkMode: 'class'` toggle persisted to localStorage with OS preference detection. Shodo gained layout support (`extends`, `section`, `yield`), `include` directive, and HTMX fragment rendering (HX-Request header skips the layout wrapper). Starter ships HTMX 2.0.4 pinned, `HtmxMiddleware` (Location → HX-Location), styled base layout with shared nav/footer partials, styled Index/Contact/Messages/Health pages, and a README front-end section.
 
-</details>
-
-<details>
-<summary>14. Error Message Personality Pass (click to expand)</summary>
+### 14. Error Message Personality Pass
 
 `ArcanumException` interface in Glitch with `getTitle()` + `getSuggestion()` (RFC 9457 forward-compatible). `app.verbose_errors` config gates suggestion display, independent from `app.debug`. Renderers updated: JsonExceptionResponseRenderer always includes title, includes suggestion when verbose; HtmlExceptionResponseRenderer renders suggestion as a styled aside. Named exceptions per package, each implementing ArcanumException over the right PHP built-in: Cabinet (ServiceNotFound, CircularDependency), Codex (UnresolvableParameter, ClassNotFound), Forge (SqlFileNotFound, InvalidModelMethod, ConnectionNotConfigured, UnsupportedDriver), Atlas (UnresolvableRoute, MethodNotAllowed), Shodo (UnknownHelper, UnsupportedFormat), Vault (StoreNotFound, InvalidArgument), Flow\Conveyor (HandlerNotFound), Session (SessionNotStarted), Glitch HttpException. Suggestions computed at the throw site (nearby files, registered services, allowed formats). `Strings::closestMatch()` Levenshtein helper wired into the four "did you mean?" exceptions. Consistent message format pass across `src/`. Starter app picks up `app.verbose_errors` config + README conventions.
 
-</details>
-
-<details>
-<summary>Shodo conditionals + directive cleanup (click to expand)</summary>
+### Shodo conditionals + directive cleanup
 
 Settled the directive inconsistency: layout/structure directives used to be `@`-prefixed, control structures were bare keywords. Dropped `@` from everything and adopted a single rule for the inside of `{{ }}`: starts-with-`$` → variable, starts-with-uppercase → helper call, starts-with-lowercase → directive. Mirrors PHP itself. Tolerant `if`/`elseif`/`for`/`while`/`foreach` regex accepts paren-free, paren-wrapped, and PHP-alt-syntax forms — compiler normalises to canonical `<?php KEYWORD (EXPR): ?>`. New `match`/`case`/`default`/`endmatch` pre-pass compiles to PHP `switch` alt-syntax with implicit breaks; comma-separated case values fall through. Migrated test fixtures, starter templates, README, and added 12 new tests for the new behaviours.
 
-</details>
-
-<details>
-<summary>Cache management gaps (click to expand)</summary>
+### Cache management gaps
 
 `cache.framework.enabled` master switch (independent of `app.debug`) makes every framework cache a no-op when off — `CacheManager::frameworkStore()` returns NullDriver, `Bootstrap\Formats` consults the flag for the disk-only TemplateCache. `cache:clear` now reaches every framework cache surface: Vault stores, structured framework caches, and a stray-subdirectory walk in `files/cache/` as a safety net for any future cache. CLI bootstrap got a TemplateCache factory so `Cleared template cache` actually fires. Latent `TemplateCache::store()` filesystem-root crash fixed. Template cache invalidation on layout/include change: TemplateCompiler tracks dependencies, TemplateCache stores them as a JSON header, `isFresh()` checks every dep's mtime. Vault README documents the bypass switch and a framework cache inventory table.
 
-</details>
-
-<details>
-<summary>Forge Sub-Model Redesign (click to expand)</summary>
+### Forge Sub-Model Redesign
 
 Subdirectories in `Model/` become independent, autowireable model classes. Generated classes have zero constructors — they inherit `(ConnectionManager)` from the base class. Methods pass `__DIR__ . '/File.sql'` directly. Base class `__call` derives its directory via reflection. Single stub for all models. `forge:models` and `validate:models` handle root + sub-model generation/validation. Handlers inject generated model classes directly for full type safety. `$db->model` still works for backwards compatibility.
 
-</details>
-
-<details>
-<summary>Flow\Sequence + Forge Read/Write Split (click to expand)</summary>
+### Flow\Sequence + Forge Read/Write Split
 
 Forge\Result is gone. Replaced with two separate types and a generic ordered-iterable subpackage:
 
@@ -149,17 +94,11 @@ Forge\Result is gone. Replaced with two separate types and a generic ordered-ite
 
 Phases 1, 2, 3 complete. Forge README rewritten around `Sequencer` + `WriteResult` with a Cursor-based "Bring your own DBAL" example. New `src/Flow/Sequence/README.md` covers the interface, both implementations, the `toSeries()` escape hatch, the benchmark table, and a when-to-use-which decision table. `src/Flow/README.md` updated to mention the new subpackage.
 
-</details>
-
-<details>
-<summary>Shodo #[WithHelper] attribute (click to expand)</summary>
+### Shodo #[WithHelper] attribute
 
 Per-DTO template helpers via a class-level attribute. `Arcanum\Shodo\Attribute\WithHelper` is repeatable; takes class name + explicit alias as two required positional args. `HelperResolver::for($dtoClass)` reads the attributes via reflection and merges them onto the helper set with the highest precedence — global registry ← domain-discovered Helpers.php ← #[WithHelper] attributes. Use this for narrow, page-specific helpers (welcome page diagnostics, admin one-offs); keep `Helpers.php` files for genuinely shared functionality. Auto-stripping of `Helper` suffix was tried and dropped — the "obvious" auto-derived alias was almost never the one anyone wanted, and inconsistent with the explicit-alias convention everywhere else in the system. Now all three registration paths (HelperRegistry::register, Helpers.php map, #[WithHelper]) require explicit aliases.
 
-</details>
-
-<details>
-<summary>Welcome page helpers — Group 1 (click to expand)</summary>
+### Welcome page helpers — Group 1
 
 The data layer behind the upcoming Index page redesign:
 
@@ -173,45 +112,28 @@ The data layer behind the upcoming Index page redesign:
 
 Bonus framework fixes from the same arc: bound `HelperRegistry` to the container at bootstrap (was being auto-wired empty); bumped the starter app's dev toolchain to PHPStan 2.x and PHPUnit 13.x (matches the framework); narrowed the `$rootDirectory` resolution in `bootstrap/{cli,http}.php` to satisfy phpstan 2.x's stricter mixed checks; renamed `app/HTTP` → `app/Http` to fix a latent PSR-4 case bug.
 
-</details>
-
-<details>
-<summary>Shodo/Hyper rendering refactor (click to expand)</summary>
+### Shodo/Hyper rendering refactor
 
 Shodo decoupled from Hyper — formatters produce strings, response renderers build HTTP responses. Five phases: interface extraction, ResponseRenderer classes, old code deletion, Bootstrap rewiring, pipeline verification.
 
-</details>
-
-<details>
-<summary>Security fixes (click to expand)</summary>
+### Security fixes
 
 All complete: Bearer token CSRF bypass removed, CSRF/Auth coordination via request attributes, `#[Url]` restricted to http/https, Model path traversal fixed, JsonFormatter JSON_HEX_TAG added, template eval() security documented, Pattern regex ReDoS documented.
 
-</details>
-
-<details>
-<summary>DX guardrails (click to expand)</summary>
+### DX guardrails
 
 All complete: ValidationGuard missing detection, `#[AllowedFormats]` attribute (406 Not Acceptable), unused template variable warning (TemplateAnalyzer), handler error messages, `validate:handlers` promotion, circular dependency detection, template undefined variable errors, `factory()` caching documented, bootstrapper ordering enforcement, page discovery warning.
 
-</details>
-
-<details>
-<summary>Additional features (click to expand)</summary>
+### Additional features
 
 - **Markdown formatter** — template-based with `.md` files, identity escape, fallback renderer, MarkdownResponseRenderer.
 - **Command response Location headers** — LocationResolver builds URLs from returned Query DTO instances (class → path, properties → query params). 201 Created + Location header.
 - **Bootstrap\Routing split** — split into Bootstrap\Formats, Bootstrap\Routing (slimmed), Bootstrap\Helpers.
 - **SqlScanner** — extracted character-level SQL lexer from Forge\Sql::extractBindings() into reusable SqlScanner class.
 
-</details>
-
-<details>
-<summary>Starter project (click to expand)</summary>
+### Starter project
 
 Full CQRS pipeline: Router → Hydrator → Conveyor → Renderer. Example Query (Health), Page (Index). HTTP + CLI entry points. Config files with comments. Getting-started README covering quick start, CQRS concepts, directory structure, validation, auth, response formats, testing, and development workflow. Contact domain was added as a database example, then yanked once it served its purpose — `config/database.php` and the SQLite connection stay around for the upcoming todo app. Example test (HealthHandlerTest).
-
-</details>
 
 ---
 
@@ -221,8 +143,7 @@ Full CQRS pipeline: Router → Hydrator → Conveyor → Renderer. Example Query
 
 **Group 1 (data layer)** is complete and lives in the collapsed "Welcome page helpers — Group 1" entry above. What remains is the actual page redesign that consumes those helpers, plus content writing and verification.
 
-<details>
-<summary>Design narrative + section spec (click to expand)</summary>
+#### Design narrative + section spec
 
 Researched the Symfony 8 and CakePHP 5 welcome pages. Symfony is polished and resource-focused (banner, "Next Step" CTA, three columns of links). CakePHP is diagnostic and reassuring (version banner, filesystem/database health checks with green/red bullets). Our current index is sparse — hero + two CTAs + a CQRS card grid, no version, no environment info. The new index combines all three: Symfony's polish, CakePHP's diagnostic checklist, and our CQRS explainer (uniquely valuable — neither competitor explains its own mental model on the first page).
 
@@ -242,8 +163,6 @@ The page should tell a new dev: (1) the framework is alive and healthy, (2) what
 10. **Nice-to-have: `?debug=1` easter egg** — toggling the query param replaces the welcome banner with a visualization of the resolved bootstrap order. Optional, ship only if the rest lands cleanly.
 
 **Design decisions, settled:** static checks per request (no caching — page renders rarely, accuracy matters); page is not auto-disabled in production (the user replaces `app/Pages/Index.html` themselves — replacing the file is the explicit signal that they're making the app their own); framework version via `Composer\InstalledVersions::getVersion('arcanum-org/framework')`.
-
-</details>
 
 **Plan items — page and templates:**
 
@@ -434,17 +353,13 @@ final class Mark
 
 ## Performance Notes
 
-<details>
-<summary>Reflection caching — explored and rejected (click to expand)</summary>
+### Reflection caching — explored and rejected
 
 Benchmarked three reflection caching approaches (in-memory, flyweight facade, APCu persistence) under production conditions (nginx + PHP-FPM + opcache + JIT). PHP 8.4 reflection is already fast enough — caching produced no measurable throughput improvement (~300 req/s ceiling dominated by FPM/FastCGI overhead, not reflection).
 
 Open question: 3→10 DTO fields drops throughput 77% — worth profiling.
 
-</details>
-
-<details>
-<summary>Benchmark harness (click to expand)</summary>
+### Benchmark harness
 
 ```bash
 BD=$(mktemp -d /tmp/arcanum_bench.XXXXXX)
@@ -492,14 +407,11 @@ ab -n 10000 -c 20 -q http://127.0.0.1:8299/health.json
 nginx -s stop; kill $(cat "$BD/php-fpm.pid"); rm -rf "$BD"
 ```
 
-</details>
-
 ---
 
 ## Closed Questions
 
-<details>
-<summary>Decided — preserved for context (click to expand)</summary>
+### Decided — preserved for context
 
 - ~~Bootstrap lifecycle hooks~~ — Won't do. App controls the Kernel subclass.
 - ~~Handler auto-discovery~~ — Won't do for runtime. `validate:handlers` CLI command covers build-time.
@@ -511,5 +423,3 @@ nginx -s stop; kill $(cat "$BD/php-fpm.pid"); rm -rf "$BD"
 - ~~Full template engine~~ — Won't do. Shodo covers lightweight pages.
 - ~~Reflection caching~~ — Won't do. Benchmarked, no measurable improvement.
 - ~~`#[WithHelper]` auto-strip alias~~ — Tried `EnvCheckHelper` → `EnvCheck`. Confused even its own author. Now requires explicit alias, matching every other registration path.
-
-</details>
