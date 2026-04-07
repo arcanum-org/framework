@@ -10,6 +10,7 @@ use Arcanum\Flow\Continuum\Continuum;
 use Arcanum\Flow\Continuum\Continuation;
 use Arcanum\Flow\Continuum\Progression;
 use Arcanum\Flow\Pipeline\Pipeline;
+use Arcanum\Hourglass\Stopwatch;
 use Arcanum\Toolkit\Strings;
 use Arcanum\Validation\ValidationGuard;
 
@@ -60,23 +61,29 @@ class MiddlewareBus implements Bus
     {
         $this->warnIfValidationMissing($object);
 
-        return (new Pipeline())
-            ->pipe($this->dispatchFlow)
-            ->pipe(function (object $object) use ($prefix) {
-                $handler = $this->handlerFor($object, $prefix);
-                $result = $handler($object);
-                if ($result === null) {
-                    return $this->isVoidHandler($handler)
-                        ? new EmptyDTO()
-                        : new AcceptedDTO();
-                }
-                if (!is_object($result)) {
-                    return new QueryResult($result);
-                }
-                return $result;
-            })
-            ->pipe($this->responseFlow)
-            ->send($object);
+        Stopwatch::tap('handler.start');
+
+        try {
+            return (new Pipeline())
+                ->pipe($this->dispatchFlow)
+                ->pipe(function (object $object) use ($prefix) {
+                    $handler = $this->handlerFor($object, $prefix);
+                    $result = $handler($object);
+                    if ($result === null) {
+                        return $this->isVoidHandler($handler)
+                            ? new EmptyDTO()
+                            : new AcceptedDTO();
+                    }
+                    if (!is_object($result)) {
+                        return new QueryResult($result);
+                    }
+                    return $result;
+                })
+                ->pipe($this->responseFlow)
+                ->send($object);
+        } finally {
+            Stopwatch::tap('handler.complete');
+        }
     }
 
     /**

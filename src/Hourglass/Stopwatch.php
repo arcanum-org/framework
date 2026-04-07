@@ -114,6 +114,27 @@ final class Stopwatch
         self::$current = $stopwatch;
     }
 
+    /**
+     * Record an instant on the installed Stopwatch.
+     *
+     * No-op when no Stopwatch is installed. This is the right call for
+     * write-only sites (middleware, formatter boundaries, listeners) — code
+     * that wants to read the timeline (renderDurationMs, log lines, debug
+     * toolbars) should use current() so missing-Stopwatch surfaces loudly.
+     *
+     * Named tap() rather than mark() to keep the static and instance APIs
+     * unambiguous: instances mark, the global timeline gets tapped.
+     */
+    public static function tap(string $label, ?float $time = null): void
+    {
+        self::$current?->mark($label, $time);
+    }
+
+    public static function isInstalled(): bool
+    {
+        return self::$current !== null;
+    }
+
     public static function current(): self
     {
         if (self::$current === null) {

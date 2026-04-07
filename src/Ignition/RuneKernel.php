@@ -16,6 +16,7 @@ use Arcanum\Flow\Conveyor\AcceptedDTO;
 use Arcanum\Flow\Conveyor\Query;
 use Arcanum\Flow\Conveyor\QueryResult;
 use Arcanum\Glitch\ExceptionHandler;
+use Arcanum\Hourglass\Stopwatch;
 use Arcanum\Rune\CliExceptionWriter;
 use Arcanum\Rune\BuiltInRegistry;
 use Arcanum\Rune\ExitCode;
@@ -57,6 +58,7 @@ class RuneKernel implements Kernel
      * @var class-string<Bootstrapper>[]
      */
     protected array $bootstrappers = [
+        Bootstrap\Stopwatch::class,
         Bootstrap\Environment::class,
         Bootstrap\Configuration::class,
         Bootstrap\Security::class,
@@ -128,6 +130,8 @@ class RuneKernel implements Kernel
                 ), 0, $e);
             }
         }
+
+        Stopwatch::tap('boot.complete');
 
         $this->isBootstrapped = true;
     }

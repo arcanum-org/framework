@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Hyper;
 
+use Arcanum\Hourglass\Stopwatch;
 use Arcanum\Shodo\Formatters\JsonFormatter;
 use Psr\Http\Message\ResponseInterface;
 
@@ -22,7 +23,12 @@ class JsonResponseRenderer extends ResponseRenderer
 
     public function render(mixed $data, string $dtoClass = '', StatusCode $status = StatusCode::OK): ResponseInterface
     {
-        $json = $this->formatter->format($data, $dtoClass);
-        return $this->buildResponse($json, 'application/json', $status);
+        Stopwatch::tap('render.start');
+        try {
+            $json = $this->formatter->format($data, $dtoClass);
+            return $this->buildResponse($json, 'application/json', $status);
+        } finally {
+            Stopwatch::tap('render.complete');
+        }
     }
 }

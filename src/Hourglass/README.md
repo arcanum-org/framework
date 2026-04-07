@@ -105,8 +105,17 @@ Stopwatch is mandatory framework-wide. For DI-friendly call sites (kernels, boot
 ```php
 use Arcanum\Hourglass\Stopwatch;
 
+// Fire-and-forget tap on the installed Stopwatch — no-op if uninstalled.
+Stopwatch::tap('middleware.cors.start');
+
+// Or explicitly read the installed instance — throws if uninstalled.
 Stopwatch::current()->mark('middleware.cors.start');
 ```
+
+`Stopwatch::tap()` is the right call for write-only sites (middleware,
+formatter boundaries, listeners). `Stopwatch::current()` is the right call
+for read sites (welcome page footer, log-line phase context, debug toolbars)
+where missing-Stopwatch should fail loudly.
 
 Bootstrap installs the container-resolved instance via `Stopwatch::install($stopwatch)`. From that point on, `Stopwatch::current()` returns it. Calling `current()` before `install()` throws — tests fail loudly instead of silently no-oping.
 

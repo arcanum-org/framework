@@ -13,6 +13,7 @@ use Arcanum\Hyper\Event\RequestFailed;
 use Arcanum\Hyper\Event\RequestHandled;
 use Arcanum\Hyper\Event\RequestReceived;
 use Arcanum\Hyper\Event\ResponseSent;
+use Arcanum\Hourglass\Stopwatch;
 use Arcanum\Hyper\HttpMiddleware;
 use Arcanum\Hyper\StatusCode;
 use Psr\EventDispatcher\EventDispatcherInterface;
@@ -63,6 +64,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
      * @var class-string<Bootstrapper>[]
      */
     protected array $bootstrappers = [
+        Bootstrap\Stopwatch::class,
         Bootstrap\Environment::class,
         Bootstrap\Configuration::class,
         Bootstrap\Security::class,
@@ -155,6 +157,8 @@ class HyperKernel implements Kernel, RequestHandlerInterface
                 ), 0, $e);
             }
         }
+
+        Stopwatch::tap('boot.complete');
 
         $this->isBootstrapped = true;
     }
@@ -401,6 +405,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
     private function dispatchRequestReceived(
         ServerRequestInterface $request,
     ): ServerRequestInterface {
+        Stopwatch::tap('request.received');
         $event = new RequestReceived($request);
         $this->dispatchEvent($event);
 
@@ -414,6 +419,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
         ServerRequestInterface $request,
         ResponseInterface $response,
     ): void {
+        Stopwatch::tap('request.handled');
         $this->dispatchEvent(new RequestHandled($request, $response));
     }
 
@@ -455,6 +461,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
         }
 
         if ($this->lastRequest !== null && $this->lastResponse !== null) {
+            Stopwatch::tap('response.sent');
             $this->dispatchEvent(
                 new ResponseSent($this->lastRequest, $this->lastResponse),
             );

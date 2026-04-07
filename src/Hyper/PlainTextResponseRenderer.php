@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Hyper;
 
+use Arcanum\Hourglass\Stopwatch;
 use Arcanum\Shodo\Formatters\PlainTextFormatter;
 use Psr\Http\Message\ResponseInterface;
 
@@ -22,7 +23,12 @@ class PlainTextResponseRenderer extends ResponseRenderer
 
     public function render(mixed $data, string $dtoClass = ''): ResponseInterface
     {
-        $text = $this->formatter->format($data, $dtoClass);
-        return $this->buildResponse($text, 'text/plain; charset=UTF-8');
+        Stopwatch::tap('render.start');
+        try {
+            $text = $this->formatter->format($data, $dtoClass);
+            return $this->buildResponse($text, 'text/plain; charset=UTF-8');
+        } finally {
+            Stopwatch::tap('render.complete');
+        }
     }
 }

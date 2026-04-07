@@ -153,6 +153,35 @@ final class StopwatchTest extends TestCase
         $this->assertSame($stopwatch, Stopwatch::current());
     }
 
+    public function testIsInstalledReflectsInstallState(): void
+    {
+        $this->assertFalse(Stopwatch::isInstalled());
+
+        Stopwatch::install(new Stopwatch());
+        $this->assertTrue(Stopwatch::isInstalled());
+
+        Stopwatch::uninstall();
+        $this->assertFalse(Stopwatch::isInstalled());
+    }
+
+    public function testTapRecordsOnInstalledStopwatch(): void
+    {
+        $stopwatch = new Stopwatch(1000.0);
+        Stopwatch::install($stopwatch);
+
+        Stopwatch::tap('handler.start', 1001.0);
+
+        $this->assertTrue($stopwatch->has('handler.start'));
+        $this->assertSame(1001.0, $stopwatch->marks()[1]->time);
+    }
+
+    public function testTapIsNoopWhenNoStopwatchInstalled(): void
+    {
+        // Should not throw.
+        Stopwatch::tap('handler.start');
+        $this->assertFalse(Stopwatch::isInstalled());
+    }
+
     public function testUninstallClearsTheCurrentInstance(): void
     {
         Stopwatch::install(new Stopwatch());
