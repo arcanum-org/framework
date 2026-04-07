@@ -601,10 +601,10 @@ Generator is equal or faster at every row count tested from 10 up (the 1-row −
 
 ### Open questions to resolve before coding
 
-- [ ] **Internal `Model::execute()` shape.** Today it's a single protected method returning `Result` regardless of read/write. New design needs the dispatch split so generated methods can declare tight return types. Options: (a) keep one internal dispatcher returning `Sequence|WriteResult` and let generated methods declare narrower types statically via ModelGenerator's read/write detection; (b) split into two internal methods (`read`/`write` or similar). Decide during Phase 2 implementation — preference is (b) for type cleanliness, but worth confirming that PHPStan is happy with either.
-- [ ] **`Forge\Cast::apply()` placement.** New helper returning a row-mapping closure from a cast map. Lives in `src/Forge/Cast.php`. Reuses `Sql::castValue`. Confirm during Phase 2 that this is the right namespace (vs. `Forge\Sql::caster()` or similar).
-- [ ] **`scalar()` shape in Forge.** Today `Result::scalar()` returns the first column of the first row. In the new design there's no such method on `Sequence`. Options: (a) drop it — let callers write `(int) $seq->first()['count']`; (b) small Forge helper `Forge\Scalar::from($sequence, $column = null)`; (c) a `scalar()` method on Forge's query path that returns `mixed` directly (separate from `query()`, returns the first column of the first row without going through Sequence). Recommend (a) for simplicity unless there are many existing callers that would churn. Check before committing.
-- [ ] **`DbStatusCommand`** — uses `Result` directly (per grep). Identify the exact call sites and confirm the migration path during Phase 2.
+- [x] **Internal `Model::execute()` shape.** Resolved as **(b)** + a runtime bridge: `Model` now has `protected read()` (returns `Sequencer<array<string,mixed>>`) and `protected write()` (returns `WriteResult`), with `protected dispatch()` sniffing isRead at runtime so the single generated stub keeps working until Phase 3 narrows it. Today it's a single protected method returning `Result` regardless of read/write. New design needs the dispatch split so generated methods can declare tight return types. Options: (a) keep one internal dispatcher returning `Sequence|WriteResult` and let generated methods declare narrower types statically via ModelGenerator's read/write detection; (b) split into two internal methods (`read`/`write` or similar). Decide during Phase 2 implementation — preference is (b) for type cleanliness, but worth confirming that PHPStan is happy with either.
+- [x] **`Forge\Cast::apply()` placement.** Landed in `src/Forge/Cast.php` as planned. Empty cast maps short-circuit to an identity closure so callers can compose unconditionally. New helper returning a row-mapping closure from a cast map. Lives in `src/Forge/Cast.php`. Reuses `Sql::castValue`. Confirm during Phase 2 that this is the right namespace (vs. `Forge\Sql::caster()` or similar).
+- [x] **`scalar()` shape in Forge.** Resolved as **(a)** — dropped. No production callers existed; the only references were in the deleted `ResultTest` and one `ModelTest` case that now uses `$row['cnt']`. Today `Result::scalar()` returns the first column of the first row. In the new design there's no such method on `Sequence`. Options: (a) drop it — let callers write `(int) $seq->first()['count']`; (b) small Forge helper `Forge\Scalar::from($sequence, $column = null)`; (c) a `scalar()` method on Forge's query path that returns `mixed` directly (separate from `query()`, returns the first column of the first row without going through Sequence). Recommend (a) for simplicity unless there are many existing callers that would churn. Check before committing.
+- [x] **`DbStatusCommand`** — uses `Result` directly (per grep). Identify the exact call sites and confirm the migration path during Phase 2.
 
 ### Phase 1 — `Flow\Sequence` subpackage (no Forge changes)
 
@@ -624,34 +624,34 @@ The generic primitives land first with zero Forge coupling. This phase can be re
 
 With `Flow\Sequence` available, refactor Forge to use it. This phase deletes `Forge\Result` and introduces `Forge\WriteResult` and the `Connection::query`/`Connection::execute` split.
 
-- [ ] **`Forge\WriteResult`** — new `final class`. Immutable. Holds `affectedRows: int`, `lastInsertId: string`. Constructor + accessors. No rows field.
-- [ ] **`Forge\Connection` interface rewrite:**
+- [x] **`Forge\WriteResult`** — new `final class`. Immutable. Holds `affectedRows: int`, `lastInsertId: string`. Constructor + accessors. No rows field.
+- [x] **`Forge\Connection` interface rewrite:**
   - Remove `run(string $sql, array $params = []): Result`.
   - Add `query(string $sql, array $params = []): Sequence` with `@return Sequence<array<string, mixed>>` annotation.
   - Add `execute(string $sql, array $params = []): WriteResult`.
   - Keep `beginTransaction()`, `commit()`, `rollBack()` unchanged.
-- [ ] **`Forge\PdoConnection::query()`** — prepare + execute; wrap `$statement->fetch()` loop in a generator; construct a `Cursor` with `onClose` calling `$statement->closeCursor()`. No `Sql::isRead()` branch — caller named their intent by choosing `query()`.
-- [ ] **`Forge\PdoConnection::execute()`** — prepare + execute; read `$statement->rowCount()` and `$pdo->lastInsertId() ?: ''`; return `new WriteResult(...)`. No row fetching.
-- [ ] **`Forge\Cast`** — new `final class` with `public static function apply(array<string, string> $casts): \Closure`. The returned closure takes `array<string, mixed> $row` and returns the casted row. Reuses `Sql::castValue`. Pure function, no state.
-- [ ] **Delete `Forge\Result`** — `src/Forge/Result.php` removed. All references to `Arcanum\Forge\Result` deleted across `src/` and `tests/`.
-- [ ] **`Forge\Model` rewrite:**
+- [x] **`Forge\PdoConnection::query()`** — prepare + execute; wrap `$statement->fetch()` loop in a generator; construct a `Cursor` with `onClose` calling `$statement->closeCursor()`. No `Sql::isRead()` branch — caller named their intent by choosing `query()`.
+- [x] **`Forge\PdoConnection::execute()`** — prepare + execute; read `$statement->rowCount()` and `$pdo->lastInsertId() ?: ''`; return `new WriteResult(...)`. No row fetching.
+- [x] **`Forge\Cast`** — new `final class` with `public static function apply(array<string, string> $casts): \Closure`. The returned closure takes `array<string, mixed> $row` and returns the casted row. Reuses `Sql::castValue`. Pure function, no state.
+- [x] **Delete `Forge\Result`** — `src/Forge/Result.php` removed. All references to `Arcanum\Forge\Result` deleted across `src/` and `tests/`.
+- [x] **`Forge\Model` rewrite:**
   - `__call` return type becomes `Sequence|WriteResult` (union; the dynamic path has to be honest about dispatch).
   - `__call` dispatches via `Sql::isRead()` to either an internal read path (`query`) or write path (`write`) — exact shape decided per open question above.
   - Internal read path: loads SQL, loads casts, calls `$connection->query($sql, $params)`, composes `->map(Cast::apply($casts))` if casts declared, returns the `Sequence`.
   - Internal write path: calls `$connection->execute($sql, $params)`, returns the `WriteResult`.
   - Delete `loadCasts` cache? No — still useful; casts are still parsed from SQL comments via `Sql::parseCasts()`.
   - Delete the old `execute()` method (protected dispatcher returning `Result`).
-- [ ] **`Forge\Database`** — scan for Result references, update accordingly.
-- [ ] **`Rune\Command\DbStatusCommand`** — migrate from `Result` to `Sequence`/`Series`/`WriteResult` as appropriate. Determine which during implementation.
-- [ ] **Update all Forge test fakes** — `tests/Forge/ConnectionTest.php` fake connection, any stubs in `ConnectionFactoryTest`, `ConnectionManagerTest`, `DatabaseTest`. All must satisfy the new interface (implement `query` and `execute`).
-- [ ] **Delete `tests/Forge/ResultTest.php`** — the class is gone.
-- [ ] **`tests/Forge/WriteResultTest.php`** — new, covers `WriteResult` getters and immutability.
-- [ ] **`tests/Forge/PdoConnectionQueryTest.php`** — sqlite in-memory, seed ~10k rows, iterate via `query()`, assert peak memory delta is bounded relative to what fetching everything would cost; assert `closeCursor` is called on early `break`; assert `closeCursor` is called when iteration throws.
-- [ ] **`tests/Forge/PdoConnectionExecuteTest.php`** — sqlite in-memory, cover INSERT/UPDATE/DELETE returning correct `WriteResult.affectedRows` and (for INSERT) `lastInsertId`.
-- [ ] **`tests/Forge/CastTest.php`** — new, covers `Cast::apply()` behavior: returned closure casts each column per the map, leaves unmapped columns alone, handles empty cast maps.
-- [ ] **Update `ModelTest`** — adjust existing tests for the new return types. Read methods now return `Sequence` (asserting via `iterator_to_array` or `->toSeries()->all()` where tests previously called `->rows()`). Write methods return `WriteResult`.
-- [ ] **Update `ConnectionTest`, `ConnectionFactoryTest`, `ConnectionManagerTest`, `DatabaseTest`** — any test touching `Result` or `->run()` migrates to `Sequence`/`WriteResult` and `query`/`execute`.
-- [ ] **Run `composer check`.** Expect PHPStan generic warnings during the refactor; resolve each.
+- [x] **`Forge\Database`** — scan for Result references, update accordingly.
+- [x] **`Rune\Command\DbStatusCommand`** — migrated; uses `$conn->query('SELECT 1')->first()` for the ping.
+- [x] **Update all Forge test fakes** — `tests/Forge/ConnectionTest.php` fake connection, any stubs in `ConnectionFactoryTest`, `ConnectionManagerTest`, `DatabaseTest`. All must satisfy the new interface (implement `query` and `execute`).
+- [x] **Delete `tests/Forge/ResultTest.php`** — the class is gone.
+- [x] **`tests/Forge/WriteResultTest.php`** — new, covers `WriteResult` getters and immutability.
+- [x] **`tests/Forge/PdoConnectionQueryTest.php`** — sqlite in-memory, seed ~10k rows, iterate via `query()`, assert peak memory delta is bounded relative to what fetching everything would cost; assert `closeCursor` is called on early `break`; assert `closeCursor` is called when iteration throws.
+- [x] **`tests/Forge/PdoConnectionExecuteTest.php`** — sqlite in-memory, cover INSERT/UPDATE/DELETE returning correct `WriteResult.affectedRows` and (for INSERT) `lastInsertId`.
+- [x] **`tests/Forge/CastTest.php`** — new, covers `Cast::apply()` behavior: returned closure casts each column per the map, leaves unmapped columns alone, handles empty cast maps.
+- [x] **Update `ModelTest`** — adjust existing tests for the new return types. Read methods now return `Sequence` (asserting via `iterator_to_array` or `->toSeries()->all()` where tests previously called `->rows()`). Write methods return `WriteResult`.
+- [x] **Update `ConnectionTest`, `ConnectionFactoryTest`, `ConnectionManagerTest`, `DatabaseTest`** — any test touching `Result` or `->run()` migrates to `Sequence`/`WriteResult` and `query`/`execute`.
+- [x] **Run `composer check`.** 2442 tests / 4924 assertions / PHPStan level 9 clean.
 
 ### Phase 3 — ModelGenerator + starter app
 
