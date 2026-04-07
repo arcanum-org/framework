@@ -754,4 +754,88 @@ final class TemplateCompilerTest extends TestCase
         // Assert — no content section defined, so empty
         $this->assertSame('', $result);
     }
+
+    // ------------------------------------------------------------------
+    // Dependency tracking
+    // ------------------------------------------------------------------
+
+    public function testLastDependenciesIsEmptyWhenNoIncludesOrLayout(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $compiler->compile('<p>{{ $name }}</p>', self::$fixtureDir);
+
+        // Assert
+        $this->assertSame([], $compiler->lastDependencies());
+    }
+
+    public function testLastDependenciesTracksIncludeFile(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+        $source = file_get_contents(self::$fixtureDir . '/page-with-include.html');
+        assert(is_string($source));
+
+        // Act
+        $compiler->compile($source, self::$fixtureDir);
+
+        // Assert — the included partial is tracked
+        $deps = $compiler->lastDependencies();
+        $this->assertCount(1, $deps);
+        $this->assertStringEndsWith('partials/nav.html', $deps[0]);
+    }
+
+    public function testLastDependenciesTracksLayoutAndItsIncludes(): void
+    {
+        // Arrange — page-with-layout extends layout, which includes nav + footer
+        $compiler = new TemplateCompiler();
+        $source = file_get_contents(self::$fixtureDir . '/page-with-layout.html');
+        assert(is_string($source));
+
+        // Act
+        $compiler->compile($source, self::$fixtureDir);
+
+        // Assert — layout, nav, and footer are all tracked
+        $deps = $compiler->lastDependencies();
+        $this->assertCount(3, $deps);
+
+        $depNames = array_map(fn(string $p) => basename($p), $deps);
+        $this->assertContains('layout.html', $depNames);
+        $this->assertContains('nav.html', $depNames);
+        $this->assertContains('footer.html', $depNames);
+    }
+
+    public function testLastDependenciesResetsBetweenCompileCalls(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+        $withDeps = file_get_contents(self::$fixtureDir . '/page-with-include.html');
+        assert(is_string($withDeps));
+
+        // Act — first compile produces deps, second should reset
+        $compiler->compile($withDeps, self::$fixtureDir);
+        $this->assertNotEmpty($compiler->lastDependencies());
+
+        $compiler->compile('<p>plain</p>', self::$fixtureDir);
+
+        // Assert
+        $this->assertSame([], $compiler->lastDependencies());
+    }
+
+    public function testLastDependenciesAreDeduplicated(): void
+    {
+        // Arrange — a template that includes the same partial twice should
+        // only have one entry for it.
+        $compiler = new TemplateCompiler();
+        $source = "{{ @include 'partials/nav' }}\n{{ @include 'partials/nav' }}";
+
+        // Act
+        $compiler->compile($source, self::$fixtureDir);
+
+        // Assert
+        $deps = $compiler->lastDependencies();
+        $this->assertCount(1, $deps);
+    }
 }

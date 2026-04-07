@@ -29,6 +29,19 @@ final class TemplateCompiler
     private const HELPER_PATTERN = '([A-Z][a-zA-Z0-9]*)::(\w+)((?:\((?:[^()]*+|\((?:[^()]*+|\([^()]*+\))*\))*\)))';
 
     /**
+     * Files touched by the most recent compile() call, in the order they
+     * were resolved. Includes layouts and any nested @include partials —
+     * but NOT the main template path itself, which the cache already
+     * tracks via its own filename → mtime check.
+     *
+     * Reset at the start of every compile() call. Read by callers via
+     * lastDependencies() to know what to invalidate the cache against.
+     *
+     * @var list<string>
+     */
+    private array $lastDependencies = [];
+
+    /**
      * @param string $templatesDirectory Shared templates directory
      *     (e.g. app/Templates/). Used as a fallback when resolving
      *     layout and include paths that aren't found relative to
@@ -38,6 +51,19 @@ final class TemplateCompiler
         private readonly \Arcanum\Parchment\Reader $reader = new \Arcanum\Parchment\Reader(),
         private readonly string $templatesDirectory = '',
     ) {
+    }
+
+    /**
+     * Files the most recent compile() call read in addition to the main
+     * template — layouts, includes, and any nested partials. Used by
+     * callers like TemplateCache to record dependencies for later
+     * freshness checks.
+     *
+     * @return list<string>
+     */
+    public function lastDependencies(): array
+    {
+        return $this->lastDependencies;
     }
 
     /**
@@ -77,6 +103,8 @@ final class TemplateCompiler
         string $templateDirectory = '',
         bool $fragment = false,
     ): string {
+        $this->lastDependencies = [];
+
         if ($templateDirectory !== '') {
             $source = $this->resolveIncludes($source, $templateDirectory);
             $source = $fragment
@@ -201,6 +229,7 @@ final class TemplateCompiler
                     $matches[1],
                     $baseDirectory,
                 );
+                $this->trackDependency($path);
                 $contents = $this->reader->read($path);
 
                 return $this->resolveIncludes(
@@ -211,6 +240,16 @@ final class TemplateCompiler
             },
             $source,
         );
+    }
+
+    /**
+     * Append a dependency to the deps list, deduplicated.
+     */
+    private function trackDependency(string $path): void
+    {
+        if (!in_array($path, $this->lastDependencies, true)) {
+            $this->lastDependencies[] = $path;
+        }
     }
 
     /**
@@ -306,6 +345,7 @@ final class TemplateCompiler
             $layoutName,
             $templateDirectory,
         );
+        $this->trackDependency($layoutPath);
         $layoutSource = $this->reader->read($layoutPath);
         $layoutSource = $this->resolveIncludes(
             $layoutSource,

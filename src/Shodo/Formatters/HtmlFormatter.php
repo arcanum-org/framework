@@ -75,7 +75,11 @@ class HtmlFormatter implements Formatter
                 $source,
                 dirname($templatePath),
             );
-            $this->cache->store($templatePath, $compiled);
+            $this->cache->store(
+                $templatePath,
+                $compiled,
+                $this->compiler->lastDependencies(),
+            );
         }
 
         $variables = $this->extractVariables($data);

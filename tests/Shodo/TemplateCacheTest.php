@@ -177,6 +177,120 @@ final class TemplateCacheTest extends TestCase
         $this->assertNotSame($path1, $path2);
     }
 
+    public function testStoreWritesDependencyHeaderWhenDepsProvided(): void
+    {
+        // Arrange
+        $cache = new TemplateCache($this->cacheDir);
+        $templatePath = $this->createTemplate('page.html', '<p>hello</p>');
+        $layoutPath = $this->createTemplate('layout.html', '<html></html>');
+
+        // Act
+        $cache->store(
+            $templatePath,
+            '<?php echo "compiled"; ?>',
+            [$layoutPath],
+        );
+
+        // Assert — file starts with the deps header line
+        $contents = file_get_contents($cache->cachePath($templatePath));
+        $this->assertNotFalse($contents);
+        $this->assertStringStartsWith('<?php /* arcanum-deps: ', $contents);
+        $this->assertStringContainsString($layoutPath, $contents);
+    }
+
+    public function testStoreOmitsHeaderWhenNoDepsProvided(): void
+    {
+        // Arrange
+        $cache = new TemplateCache($this->cacheDir);
+        $templatePath = $this->createTemplate('page.html', '<p>hello</p>');
+
+        // Act
+        $cache->store($templatePath, '<?php echo "compiled"; ?>');
+
+        // Assert — no header, file is unchanged compile output
+        $contents = file_get_contents($cache->cachePath($templatePath));
+        $this->assertSame('<?php echo "compiled"; ?>', $contents);
+    }
+
+    public function testLoadStripsDependencyHeader(): void
+    {
+        // Arrange
+        $cache = new TemplateCache($this->cacheDir);
+        $templatePath = $this->createTemplate('page.html', '<p>hello</p>');
+        $layoutPath = $this->createTemplate('layout.html', '<html></html>');
+        $cache->store($templatePath, '<?php echo "compiled"; ?>', [$layoutPath]);
+
+        // Act
+        $loaded = $cache->load($templatePath);
+
+        // Assert — header gone, only the original compile output remains
+        $this->assertSame('<?php echo "compiled"; ?>', $loaded);
+    }
+
+    public function testIsFreshReturnsFalseWhenTrackedDependencyIsNewer(): void
+    {
+        // Arrange — store with a layout dep, then make the layout newer
+        // than the cache file. The cache should report stale.
+        $cache = new TemplateCache($this->cacheDir);
+        $templatePath = $this->createTemplate('page.html', '<p>hello</p>');
+        $layoutPath = $this->createTemplate('layout.html', '<html></html>');
+
+        // Make the layout older first so store() captures a baseline.
+        touch($layoutPath, time() - 100);
+        touch($templatePath, time() - 100);
+
+        $cache->store($templatePath, '<?php echo "compiled"; ?>', [$layoutPath]);
+
+        // Backdate the cache file so the layout edit looks "newer"
+        touch($cache->cachePath($templatePath), time() - 100);
+
+        // Now bump the layout's mtime to "now"
+        touch($layoutPath, time());
+
+        // Act & Assert
+        $this->assertFalse($cache->isFresh($templatePath));
+    }
+
+    public function testIsFreshReturnsTrueWhenAllDependenciesAreOlder(): void
+    {
+        // Arrange
+        $cache = new TemplateCache($this->cacheDir);
+        $templatePath = $this->createTemplate('page.html', '<p>hello</p>');
+        $layoutPath = $this->createTemplate('layout.html', '<html></html>');
+        $partialPath = $this->createTemplate('nav.html', '<nav></nav>');
+
+        // All sources older than the cache.
+        touch($layoutPath, time() - 100);
+        touch($partialPath, time() - 100);
+        touch($templatePath, time() - 100);
+
+        $cache->store(
+            $templatePath,
+            '<?php echo "compiled"; ?>',
+            [$layoutPath, $partialPath],
+        );
+
+        // Act & Assert
+        $this->assertTrue($cache->isFresh($templatePath));
+    }
+
+    public function testIsFreshReturnsFalseWhenTrackedDependencyIsDeleted(): void
+    {
+        // Arrange — store with a dep, then delete the dep file. We treat
+        // a missing dep as stale so the recompile surfaces the missing
+        // include error properly instead of serving stale cached output.
+        $cache = new TemplateCache($this->cacheDir);
+        $templatePath = $this->createTemplate('page.html', '<p>hello</p>');
+        $layoutPath = $this->createTemplate('layout.html', '<html></html>');
+
+        $cache->store($templatePath, '<?php echo "compiled"; ?>', [$layoutPath]);
+
+        unlink($layoutPath);
+
+        // Act & Assert
+        $this->assertFalse($cache->isFresh($templatePath));
+    }
+
     public function testClearRemovesCacheDirectory(): void
     {
         // Arrange
