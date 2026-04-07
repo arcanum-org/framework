@@ -358,6 +358,35 @@ At format-time, the `HelperResolver` walks from the root to the DTO's domain nam
 
 Discovery results are cached via PSR-16 (controlled by `cache.helpers.enabled` in `config/cache.php`).
 
+### Per-DTO helpers via `#[WithHelper]`
+
+Some helpers only make sense for one specific DTO — a welcome page's diagnostic helpers, a one-off admin screen, a debug-only inspector. Registering these globally would pollute every render with code only one page uses; putting them in a domain `Helpers.php` would still leak to every DTO under that namespace.
+
+The `#[WithHelper]` attribute lets a DTO declare its own helpers inline:
+
+```php
+use Arcanum\Shodo\Attribute\WithHelper;
+
+#[WithHelper(\App\Helpers\EnvCheckHelper::class)]
+#[WithHelper(\App\Helpers\IncantationHelper::class, alias: 'Tip')]
+final class Index
+{
+    public function __construct(
+        public readonly string $name = 'Arcanum',
+    ) {}
+}
+```
+
+The attribute is repeatable — declare one per helper. The class is resolved from the container at render time, so the helper can ask for any service the container can provide. The alias defaults to the class basename with a trailing `Helper` stripped (`EnvCheckHelper` → `EnvCheck`); pass `alias:` to override.
+
+**Precedence, from least to most specific:**
+
+```
+global registry  ←  domain Helpers.php  ←  #[WithHelper] on the DTO
+```
+
+A `#[WithHelper]` declaration always wins over both global and domain-discovered helpers — the DTO has explicitly named what it needs. Use this for narrow, page-specific helpers; keep `Helpers.php` files for genuinely shared functionality.
+
 ### How it works
 
 ```
@@ -366,7 +395,9 @@ TemplateCompiler
 
 HelperResolver
   for('App\Domain\Shop\Query\Products')
-    → merges global HelperRegistry + domain Helpers.php matches
+    → merges global HelperRegistry
+    → overlays matching domain Helpers.php files
+    → overlays #[WithHelper] attributes from the DTO class
     → returns ['Format' => FormatHelper, 'Route' => RouteHelper, 'Cart' => CartHelper, ...]
 
 HtmlFormatter / PlainTextFormatter / MarkdownFormatter

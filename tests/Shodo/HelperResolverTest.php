@@ -4,9 +4,15 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Shodo;
 
+use Arcanum\Shodo\Attribute\WithHelper;
 use Arcanum\Shodo\HelperDiscovery;
 use Arcanum\Shodo\HelperRegistry;
 use Arcanum\Shodo\HelperResolver;
+use Arcanum\Test\Fixture\Shodo\EnvCheckHelper;
+use Arcanum\Test\Fixture\Shodo\IncantationHelper;
+use Arcanum\Test\Fixture\Shodo\PageOverridingGlobal;
+use Arcanum\Test\Fixture\Shodo\PageWithHelpers;
+use Arcanum\Test\Fixture\Shodo\PageWithoutHelpers;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -14,6 +20,7 @@ use Psr\Container\ContainerInterface;
 
 #[CoversClass(HelperResolver::class)]
 #[UsesClass(HelperRegistry::class)]
+#[UsesClass(WithHelper::class)]
 final class HelperResolverTest extends TestCase
 {
     public function testReturnsGlobalHelpersForAnyDto(): void
@@ -154,6 +161,99 @@ final class HelperResolverTest extends TestCase
 
         // Assert — deeper Checkout overrides Shop
         $this->assertSame($checkoutCart, $helpers['Cart']);
+    }
+
+    public function testAttributeHelpersAreMergedForDeclaringDto(): void
+    {
+        // Arrange
+        $envHelper = new EnvCheckHelper();
+        $tipHelper = new IncantationHelper();
+
+        $registry = new HelperRegistry();
+
+        $container = $this->createStub(ContainerInterface::class);
+        $container->method('get')->willReturnCallback(
+            fn(string $id) => match ($id) {
+                EnvCheckHelper::class => $envHelper,
+                IncantationHelper::class => $tipHelper,
+                default => throw new \RuntimeException("Unexpected: $id"),
+            },
+        );
+
+        $resolver = new HelperResolver($registry, container: $container);
+
+        // Act
+        $helpers = $resolver->for(PageWithHelpers::class);
+
+        // Assert — auto-stripped EnvCheck alias and explicit Tip alias
+        $this->assertSame($envHelper, $helpers['EnvCheck']);
+        $this->assertSame($tipHelper, $helpers['Tip']);
+    }
+
+    public function testAttributeHelpersOnlyAppliedToDeclaringDto(): void
+    {
+        // Arrange
+        $registry = new HelperRegistry();
+        $container = $this->createStub(ContainerInterface::class);
+        $resolver = new HelperResolver($registry, container: $container);
+
+        // Act — DTO with no attributes
+        $helpers = $resolver->for(PageWithoutHelpers::class);
+
+        // Assert — empty, container never queried
+        $this->assertSame([], $helpers);
+    }
+
+    public function testAttributeAliasOverridesGlobal(): void
+    {
+        // Arrange
+        $globalFormat = new \stdClass();
+        $registry = new HelperRegistry();
+        $registry->register('Format', $globalFormat);
+
+        $envHelper = new EnvCheckHelper();
+        $container = $this->createStub(ContainerInterface::class);
+        $container->method('get')->willReturn($envHelper);
+
+        $resolver = new HelperResolver($registry, container: $container);
+
+        // Act — DTO declares EnvCheckHelper aliased as 'Format'
+        $helpers = $resolver->for(PageOverridingGlobal::class);
+
+        // Assert — attribute beat the global
+        $this->assertSame($envHelper, $helpers['Format']);
+    }
+
+    public function testAttributeAliasOverridesDomainDiscovered(): void
+    {
+        // Arrange
+        $domainEnv = new \stdClass();
+        $attributeEnv = new EnvCheckHelper();
+
+        $registry = new HelperRegistry();
+
+        $discovery = $this->createStub(HelperDiscovery::class);
+        $discovery->method('discover')->willReturn([
+            'Arcanum\\Test\\Fixture\\Shodo' => ['EnvCheck' => 'DomainEnvHelper'],
+        ]);
+
+        $container = $this->createStub(ContainerInterface::class);
+        $container->method('get')->willReturnCallback(
+            fn(string $id) => match ($id) {
+                'DomainEnvHelper' => $domainEnv,
+                EnvCheckHelper::class => $attributeEnv,
+                IncantationHelper::class => new IncantationHelper(),
+                default => throw new \RuntimeException("Unexpected: $id"),
+            },
+        );
+
+        $resolver = new HelperResolver($registry, $discovery, $container);
+
+        // Act
+        $helpers = $resolver->for(PageWithHelpers::class);
+
+        // Assert — attribute-declared EnvCheck wins over the domain-discovered one
+        $this->assertSame($attributeEnv, $helpers['EnvCheck']);
     }
 
     public function testResultsAreCachedPerDtoClass(): void

@@ -4,15 +4,22 @@ declare(strict_types=1);
 
 namespace Arcanum\Shodo;
 
+use Arcanum\Shodo\Attribute\WithHelper;
 use Psr\Container\ContainerInterface;
 
 /**
  * Resolves template helpers for a given DTO class.
  *
- * Merges global (framework-provided) helpers with domain-scoped helpers
- * discovered from co-located Helpers.php files. Domain aliases override
- * global ones, so a Shop domain can replace a global helper with a
- * domain-specific implementation.
+ * Three layers, ordered from least to most specific:
+ *
+ *   1. Global helpers from {@see HelperRegistry} (registered in
+ *      `app/Helpers/Helpers.php`).
+ *   2. Domain-scoped helpers discovered by {@see HelperDiscovery} from
+ *      co-located `Helpers.php` files; deeper namespace prefixes win.
+ *   3. Per-DTO helpers declared via the {@see WithHelper} class attribute.
+ *
+ * Each layer overrides the aliases from the layers below it. The DTO's own
+ * attribute-declared helpers always have the final word.
  */
 final class HelperResolver
 {
@@ -44,6 +51,10 @@ final class HelperResolver
         if ($this->discovery !== null && $this->container !== null) {
             $discovered = $this->discovery->discover();
             $helpers = $this->mergeDiscovered($helpers, $discovered, $dtoClass);
+        }
+
+        if ($this->container !== null) {
+            $helpers = $this->mergeAttributes($helpers, $dtoClass);
         }
 
         $this->cache[$dtoClass] = $helpers;
@@ -79,6 +90,37 @@ final class HelperResolver
                 $helper = $this->container->get($className);
                 $helpers[$alias] = $helper;
             }
+        }
+
+        return $helpers;
+    }
+
+    /**
+     * Merge per-DTO helpers declared via the {@see WithHelper} attribute.
+     *
+     * Reads class-level attributes via reflection, resolves each declared
+     * helper class from the container, and merges them onto the helper set
+     * with the highest precedence.
+     *
+     * @param array<string, object> $helpers
+     * @return array<string, object>
+     */
+    private function mergeAttributes(array $helpers, string $dtoClass): array
+    {
+        assert($this->container !== null);
+
+        if (!class_exists($dtoClass)) {
+            return $helpers;
+        }
+
+        $reflection = new \ReflectionClass($dtoClass);
+        $attributes = $reflection->getAttributes(WithHelper::class);
+
+        foreach ($attributes as $attribute) {
+            $withHelper = $attribute->newInstance();
+            /** @var object $helper */
+            $helper = $this->container->get($withHelper->className);
+            $helpers[$withHelper->resolvedAlias()] = $helper;
         }
 
         return $helpers;
