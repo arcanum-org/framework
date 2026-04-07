@@ -194,47 +194,58 @@ The new index combines all three: Symfony's polish, CakePHP's diagnostic checkli
 
 GitHub source and issues URLs will use the real `arcanum-org/framework` repo links — those exist already.
 
-### Shodo conditionals
+### Shodo conditionals (and directive syntax cleanup)
 
-The template compiler currently has no conditional directives. Templates that need to branch on runtime state have to push the entire branch into a helper that returns a raw HTML string (which is what we did for `App::cssTags()`). That works but pulls layout-shaped logic into PHP classes for no good reason.
+Initial plan was based on a wrong premise. Shodo *does* already have `if`/`elseif`/`else`/`endif`/`foreach`/`for`/`while` — they live under bare-keyword syntax with required parens (`{{ if ($foo > 0) }}`). I missed them when researching because I grepped for `@if`. So the actual gap isn't "no conditionals," it's an **inconsistency**: layout/structure directives are `@`-prefixed (`@extends`, `@section`, `@yield`, `@include`, `@csrf`), control structures are bare keywords. Two conventions in the same templates.
 
-**`@if` / `@elseif` / `@else`** (foundation):
+**The fix: drop `@` prefixes from everything.** Single rule for the inside of `{{ }}`:
 
-```
-{{ @if App::debug() }}
-    <script src="https://cdn.tailwindcss.com"></script>
-{{ @elseif App::cssBuilt() }}
-    <link rel="stylesheet" href="/css/app.min.css">
-{{ @else }}
-    <!-- no styles -->
-{{ @endif }}
-```
+| Starts with | Meaning | Example |
+|---|---|---|
+| `$` | variable expression | `{{ $user->name }}` |
+| Uppercase letter | helper call | `{{ Route::url('home') }}` |
+| Lowercase keyword | directive | `{{ extends 'layout' }}`, `{{ if $foo }}`, `{{ csrf }}` |
 
-Compiles to vanilla PHP `if`/`elseif`/`else`. Conditions are full PHP expressions — same model as `{{ $expr }}` interpolation. Templates are already compiled to PHP, so this opens no door that isn't already open.
+Mirrors how PHP itself distinguishes things — variables, classes, keywords. No `@` prefix needed because the first character already tells you what you're looking at.
 
-**`@match` / `@case` / `@default`** (sugar on top):
+**Conditional syntax — preferred form is paren-free, but tolerant of all three:**
 
 ```
-{{ @match $status }}
-    {{ @case 'pending', 'active' }}
+{{ if $foo > 0 }}        // preferred — clean, no ceremony
+{{ if ($foo > 0) }}      // also accepted — PHP-ish, some devs prefer
+{{ if ($foo > 0): }}     // also accepted — full PHP alt syntax
+```
+
+The compiler normalises to canonical `<?php if ($expr): ?>` regardless of input form.
+
+**`match` / `case` / `default`** for switch-style branching:
+
+```
+{{ match $status }}
+    {{ case 'pending', 'active' }}
         <span class="text-success">Active</span>
-    {{ @case 'closed' }}
+    {{ case 'closed' }}
         <span class="text-error">Closed</span>
-    {{ @default }}
+    {{ default }}
         <span class="text-stone">Unknown</span>
-{{ @endmatch }}
+{{ endmatch }}
 ```
 
-Compiles to a PHP `switch` statement (with implicit `break` after each case). Strictly an equality-match-against-subject construct — not a free-form pattern matcher (free-form is just `@if` in different clothing). Comma-separated values in `@case` map to fall-through case lists. The subject is evaluated once.
+Compiles to a PHP `switch` statement with implicit `break` after each case. Strictly an equality-match-against-subject construct. Comma-separated values in `case` map to fall-through case lists. Named `match` (not `switch`) because it's the closer mental model and avoids the C-style fall-through trap.
 
-PHP's native `match` expression can't be used directly because match arms must be expressions, not statement bodies. The compiler emits `switch` under the hood, but the directive is named `@match` because it's the closer mental model and avoids conflating with C-style switch fall-through.
+PHP's native `match` expression can't be used directly because match arms must be expressions, not statement bodies. The compiler emits `switch` under the hood but the developer-facing keyword is `match`.
 
 **Plan items:**
 
-- [ ] **`@if` / `@elseif` / `@else`** — directive parsing in `TemplateCompiler`, compiles to PHP if/elseif/else with raw PHP expression conditions. Supports nested ifs.
-- [ ] **`@match` / `@case` / `@default` / `@endmatch`** — compiles to PHP switch with implicit breaks. Comma-separated values in @case map to fall-through cases.
-- [ ] **Tests** — both directives, nesting, inside layouts/sections, inside includes, mixed with `{{ }}` interpolation.
-- [ ] **Update Shodo README** — document directives, condition expression rules, when to use `@if` vs `@match`.
+- [ ] **Drop `@` prefix from existing directives** — `extends`, `section`, `endsection`, `yield`, `include`, `csrf` all become bare-keyword. Update `TemplateCompiler` regexes (multiple sites: directive matching, layout resolution, fragment mode, section extraction).
+- [ ] **Tolerant `if` / `elseif` / `for` / `while` / `foreach` regex** — accept `{{ if $foo }}`, `{{ if ($foo) }}`, and `{{ if ($foo): }}`. Compiler strips optional outer parens and trailing colon, normalises to canonical PHP.
+- [ ] **`match` / `case` / `default` / `endmatch`** — compiles to PHP switch with implicit breaks. Comma-separated values in `case` map to fall-through cases. Subject evaluated once.
+- [ ] **Migrate test fixtures** — `tests/Fixture/Templates/*.html` currently use `@`-prefixed directives.
+- [ ] **Migrate starter app templates** — `app/Templates/layout.html`, `app/Pages/*.html`, `app/Domain/Query/Health.html`.
+- [ ] **Update existing Shodo tests** — 21 references in `TemplateCompilerTest.php` and 1 in `HtmlFormatterTest.php` use the old `@`-prefixed forms.
+- [ ] **Add tests for the new behaviours** — paren-free `if`, paren-wrapped `if`, `if ... :`, nested `if`, `match` with comma cases, `match` with `default`, `match` with no matching case, directives mixed with `{{ }}` interpolation, lowercase directive vs `$variable` vs `Helper::call` disambiguation.
+- [ ] **Update Shodo README** — rewrite the directive section to document the bare-keyword convention, the three-rule mental model, and the paren-tolerance for conditionals.
+- [ ] **Smoke test on live starter app** — confirm pages still render after the migration.
 
 ### Cache management gaps
 
