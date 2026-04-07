@@ -529,6 +529,168 @@ Each package replaces generic `throw new \RuntimeException(...)` with named exce
 
 ---
 
+## Flow\Sequence + Forge Read/Write Split
+
+**Problem:** `Forge\Result` has two unrelated jobs glued together. For reads it holds a fully materialized `array<int, array<string,mixed>>` (via `PDOStatement::fetchAll()`) — unbounded memory, no way to process a large query row-by-row. For writes it carries `affectedRows` and `lastInsertId`, which have nothing to do with rows at all. The read side blocks exports, batch jobs, reports, and any unbounded query. The write side is structural noise that pollutes the read type.
+
+**Approach:** Split reads and writes into separate types, make streaming the default for reads, and lift the generic sequence primitives into their own Flow subpackage so Forge consumes an abstract interface rather than a concrete class.
+
+```
+Flow\Sequence\Sequence<T>   (interface)       — abstract ordered iterable
+Flow\Sequence\Cursor<T>     implements Sequence — lazy, single-pass
+Flow\Sequence\Series<T>     implements Sequence — eager, multi-pass
+
+Forge\Connection::query()   : Sequence<array<string,mixed>>   (reads, always streams)
+Forge\Connection::execute() : WriteResult                      (writes)
+Forge\WriteResult                                              (affectedRows, lastInsertId)
+Forge\Result                                                   DELETED
+```
+
+Forge programs against the `Sequence` interface. `PdoConnection::query()` returns a `Cursor` in practice (always streams), but the contract is `Sequence`, so test fakes and alternative implementations can return a `Series` directly with no consumer changes. `Cursor::toSeries()` is the explicit escape hatch when a handler needs `count()`, multi-pass iteration, or random access — the cost of materialization is named at the call site.
+
+### Design rationale — what goes on the interface
+
+The `Sequence<T>` interface contains **only operations that are honest on both shapes.** Anything that would force Cursor to silently materialize stays off the interface and lives on `Series` only:
+
+| Operation | On `Sequence`? | Reason |
+|---|---|---|
+| `IteratorAggregate::getIterator()` | ✅ | Foreach-compatible on both |
+| `first(): ?T` | ✅ | O(1) on both — Cursor peeks one row and closes |
+| `each(callable): void` | ✅ | Terminal iteration |
+| `map(callable): Sequence<U>` | ✅ | Lazy on Cursor, eager on Series |
+| `filter(callable): Sequence<T>` | ✅ | Lazy on Cursor, eager on Series |
+| `chunk(int): Sequence<list<T>>` | ✅ | Lazy on Cursor, eager on Series |
+| `take(int): Sequence<T>` | ✅ | Lazy on Cursor, eager on Series |
+| `toSeries(): Series<T>` | ✅ | Walks generator on Cursor; returns `$this` on Series (idempotent) |
+| `count(): int` | ❌ | Forbidden on Cursor — would materialize silently. Devs write `$seq->toSeries()->count()` or `SELECT COUNT(*)`. |
+| `all(): list<T>` | ❌ | Eager-only dump. Lives on Series. |
+| `isEmpty(): bool` | ❌ | Can't be answered without consuming at least one row. Lives on Series. |
+| `scalar()` | ❌ | Database-specific ("first column of first row"). Generic `T` has no columns. Lives in the Forge layer if at all, not on `Sequence`. |
+
+### Cursor contract
+
+- Single-pass. Throws `CursorAlreadyConsumed` on second iteration or on `toSeries()` after any prior iteration (partial or full).
+- Self-closing. `getIterator()` wraps the source generator in `try/finally` that calls `close()`. `__destruct` calls `close()`. `close()` is idempotent and runs exactly once across all paths.
+- `first()` peeks one row via iteration, closes the cursor, returns the row (or `null` if empty). Marks the cursor consumed.
+- `map`/`filter`/`chunk`/`take` are lazy: return a new `Cursor` sharing the same `onClose`. None of them execute until the result is iterated.
+- `toSeries()` walks the generator into a `list<T>` and returns a new `Series<T>`. Legal only on a fresh, unconsumed cursor.
+
+### Series contract
+
+- Eager, multi-pass. Backed by a `list<T>`.
+- All `Sequence` methods plus `count()`, `all(): list<T>`, `isEmpty()`.
+- `map`/`filter`/`chunk`/`take` return new `Series` instances (eagerly applied).
+- `toSeries()` returns `$this`.
+- No consumption tracking — multi-pass iteration is fine.
+
+### Benchmark summary (justification, preserved for context)
+
+Measured with subprocess isolation per cell, 20-column rows, sqlite in-memory, mean of 5–500 iterations depending on size. See conversation history for the full benchmark harness.
+
+| Rows | Eager (current) time | Generator time | Eager peak memory | Generator peak memory |
+|---|---|---|---|---|
+| 1 | 0.0119 ms | 0.0124 ms | 5.7 KB | 4.6 KB |
+| 10 | 0.0344 ms | 0.0338 ms | 33.7 KB | 6.2 KB |
+| 100 | 0.254 ms | 0.239 ms | 329 KB | 6.3 KB |
+| 1,000 | 2.39 ms | 2.26 ms | 3.20 MB | 6.3 KB |
+| 10,000 | 26.3 ms | 22.7 ms | 32.1 MB | 6.3 KB |
+| 100,000 | 288 ms | 237 ms | 320 MB | 6.3 KB |
+| 500,000 | 1629 ms | 1208 ms | 1598 MB | 6.3 KB |
+
+Generator is equal or faster at every row count tested from 10 up (the 1-row −5% sits inside normal noise). Memory scales linearly for eager and **stays flat at 6.3 KB for the generator regardless of result size.** Streaming is never meaningfully slower and always uses constant memory.
+
+### Open questions to resolve before coding
+
+- [ ] **Internal `Model::execute()` shape.** Today it's a single protected method returning `Result` regardless of read/write. New design needs the dispatch split so generated methods can declare tight return types. Options: (a) keep one internal dispatcher returning `Sequence|WriteResult` and let generated methods declare narrower types statically via ModelGenerator's read/write detection; (b) split into two internal methods (`read`/`write` or similar). Decide during Phase 2 implementation — preference is (b) for type cleanliness, but worth confirming that PHPStan is happy with either.
+- [ ] **`Forge\Cast::apply()` placement.** New helper returning a row-mapping closure from a cast map. Lives in `src/Forge/Cast.php`. Reuses `Sql::castValue`. Confirm during Phase 2 that this is the right namespace (vs. `Forge\Sql::caster()` or similar).
+- [ ] **`scalar()` shape in Forge.** Today `Result::scalar()` returns the first column of the first row. In the new design there's no such method on `Sequence`. Options: (a) drop it — let callers write `(int) $seq->first()['count']`; (b) small Forge helper `Forge\Scalar::from($sequence, $column = null)`; (c) a `scalar()` method on Forge's query path that returns `mixed` directly (separate from `query()`, returns the first column of the first row without going through Sequence). Recommend (a) for simplicity unless there are many existing callers that would churn. Check before committing.
+- [ ] **`DbStatusCommand`** — uses `Result` directly (per grep). Identify the exact call sites and confirm the migration path during Phase 2.
+
+### Phase 1 — `Flow\Sequence` subpackage (no Forge changes)
+
+The generic primitives land first with zero Forge coupling. This phase can be reviewed and merged independently.
+
+- [ ] **Create `src/Flow/Sequence/` directory and `tests/Flow/Sequence/`.**
+- [ ] **`Flow\Sequence\Sequence<T>`** — interface extending `\IteratorAggregate<int, T>`. Method set: `first(): ?T`, `each(callable): void`, `map(callable): Sequence`, `filter(callable): Sequence`, `chunk(int): Sequence`, `take(int): Sequence`, `toSeries(): Series`. Full generic annotations for PHPStan.
+- [ ] **`Flow\Sequence\Cursor<T>`** — `final class` implementing `Sequence<T>`. Constructor takes `\Closure(): \Generator<int, T> $source` and `\Closure(): void $onClose`. Tracks `$consumed` flag. `getIterator()` sets `$consumed = true`, yields from source inside `try/finally` that calls `close()`. `close()` is idempotent and invokes `$onClose` exactly once. `__destruct` calls `close()`. `first()` iterates once, returns first value or null, consumes cursor. `map`/`filter`/`chunk`/`take` wrap the source generator into a new `Cursor` sharing `$onClose`. `each()` is foreach + apply (terminal). `toSeries()` walks the full generator into a `list<T>` and returns a `new Series($items)`; throws `CursorAlreadyConsumed` if already consumed.
+- [ ] **`Flow\Sequence\Series<T>`** — `final class` implementing `Sequence<T>`. Constructor takes `list<T> $items`. `first()`, `each()`, `map`/`filter`/`chunk`/`take` operate on `$items` directly. `toSeries()` returns `$this`. Plus eager-only methods: `count(): int`, `all(): list<T>`, `isEmpty(): bool`.
+- [ ] **`Flow\Sequence\CursorAlreadyConsumed`** — exception class extending `\LogicException` with a clear message pointing at `toSeries()` semantics.
+- [ ] **`tests/Flow/Sequence/SequenceContractTest.php`** — parameterized test that exercises both `Cursor` and `Series` against the interface surface (first, each, map, filter, chunk, take, toSeries). Shared assertions, two data providers.
+- [ ] **`tests/Flow/Sequence/CursorTest.php`** — lazy iteration assertion (source generator not invoked until iteration begins), single-pass guard (second iteration throws), close-on-completion, close-on-break, close-on-exception, close-on-destruct, `onClose` invoked exactly once across all paths, `toSeries()` on fresh cursor walks everything, `toSeries()` on consumed cursor throws, `first()` on empty cursor returns null and closes, map/filter/chunk/take chain correctly and don't trigger iteration until terminal.
+- [ ] **`tests/Flow/Sequence/SeriesTest.php`** — eager iteration, multi-pass iteration works, `count()`/`all()`/`isEmpty()`, `toSeries()` returns same instance (`assertSame`), map/filter/chunk/take return new `Series` instances.
+- [ ] **Run `composer check`** and confirm PHPStan is happy with the generic annotations.
+
+### Phase 2 — Forge refactor
+
+With `Flow\Sequence` available, refactor Forge to use it. This phase deletes `Forge\Result` and introduces `Forge\WriteResult` and the `Connection::query`/`Connection::execute` split.
+
+- [ ] **`Forge\WriteResult`** — new `final class`. Immutable. Holds `affectedRows: int`, `lastInsertId: string`. Constructor + accessors. No rows field.
+- [ ] **`Forge\Connection` interface rewrite:**
+  - Remove `run(string $sql, array $params = []): Result`.
+  - Add `query(string $sql, array $params = []): Sequence` with `@return Sequence<array<string, mixed>>` annotation.
+  - Add `execute(string $sql, array $params = []): WriteResult`.
+  - Keep `beginTransaction()`, `commit()`, `rollBack()` unchanged.
+- [ ] **`Forge\PdoConnection::query()`** — prepare + execute; wrap `$statement->fetch()` loop in a generator; construct a `Cursor` with `onClose` calling `$statement->closeCursor()`. No `Sql::isRead()` branch — caller named their intent by choosing `query()`.
+- [ ] **`Forge\PdoConnection::execute()`** — prepare + execute; read `$statement->rowCount()` and `$pdo->lastInsertId() ?: ''`; return `new WriteResult(...)`. No row fetching.
+- [ ] **`Forge\Cast`** — new `final class` with `public static function apply(array<string, string> $casts): \Closure`. The returned closure takes `array<string, mixed> $row` and returns the casted row. Reuses `Sql::castValue`. Pure function, no state.
+- [ ] **Delete `Forge\Result`** — `src/Forge/Result.php` removed. All references to `Arcanum\Forge\Result` deleted across `src/` and `tests/`.
+- [ ] **`Forge\Model` rewrite:**
+  - `__call` return type becomes `Sequence|WriteResult` (union; the dynamic path has to be honest about dispatch).
+  - `__call` dispatches via `Sql::isRead()` to either an internal read path (`query`) or write path (`write`) — exact shape decided per open question above.
+  - Internal read path: loads SQL, loads casts, calls `$connection->query($sql, $params)`, composes `->map(Cast::apply($casts))` if casts declared, returns the `Sequence`.
+  - Internal write path: calls `$connection->execute($sql, $params)`, returns the `WriteResult`.
+  - Delete `loadCasts` cache? No — still useful; casts are still parsed from SQL comments via `Sql::parseCasts()`.
+  - Delete the old `execute()` method (protected dispatcher returning `Result`).
+- [ ] **`Forge\Database`** — scan for Result references, update accordingly.
+- [ ] **`Rune\Command\DbStatusCommand`** — migrate from `Result` to `Sequence`/`Series`/`WriteResult` as appropriate. Determine which during implementation.
+- [ ] **Update all Forge test fakes** — `tests/Forge/ConnectionTest.php` fake connection, any stubs in `ConnectionFactoryTest`, `ConnectionManagerTest`, `DatabaseTest`. All must satisfy the new interface (implement `query` and `execute`).
+- [ ] **Delete `tests/Forge/ResultTest.php`** — the class is gone.
+- [ ] **`tests/Forge/WriteResultTest.php`** — new, covers `WriteResult` getters and immutability.
+- [ ] **`tests/Forge/PdoConnectionQueryTest.php`** — sqlite in-memory, seed ~10k rows, iterate via `query()`, assert peak memory delta is bounded relative to what fetching everything would cost; assert `closeCursor` is called on early `break`; assert `closeCursor` is called when iteration throws.
+- [ ] **`tests/Forge/PdoConnectionExecuteTest.php`** — sqlite in-memory, cover INSERT/UPDATE/DELETE returning correct `WriteResult.affectedRows` and (for INSERT) `lastInsertId`.
+- [ ] **`tests/Forge/CastTest.php`** — new, covers `Cast::apply()` behavior: returned closure casts each column per the map, leaves unmapped columns alone, handles empty cast maps.
+- [ ] **Update `ModelTest`** — adjust existing tests for the new return types. Read methods now return `Sequence` (asserting via `iterator_to_array` or `->toSeries()->all()` where tests previously called `->rows()`). Write methods return `WriteResult`.
+- [ ] **Update `ConnectionTest`, `ConnectionFactoryTest`, `ConnectionManagerTest`, `DatabaseTest`** — any test touching `Result` or `->run()` migrates to `Sequence`/`WriteResult` and `query`/`execute`.
+- [ ] **Run `composer check`.** Expect PHPStan generic warnings during the refactor; resolve each.
+
+### Phase 3 — ModelGenerator + starter app
+
+Generated models and the starter app get updated to the new shapes. This lands after Phase 2 is green.
+
+- [ ] **`src/Rune/Command/stubs/model.stub`** — drop `use Arcanum\Forge\Result`; no explicit import needed (generated methods will import `Sequence` / `WriteResult` at method level or via top-level use).
+- [ ] **`src/Rune/Command/stubs/model_method.stub`** — rewrite. The method body should no longer call `$this->execute()` (old dispatcher is gone). Instead, at generation time ModelGenerator parses the SQL once and picks a path:
+  - Read query → emit a body calling the internal read path with declared return type `Sequence<array<string, mixed>>` (or narrower if a row DTO is declared in the SQL), composing `->map(Cast::apply($casts))` when the SQL declares casts.
+  - Write query → emit a body calling the internal write path with declared return type `WriteResult`.
+  - The stub may need to split into `model_method_read.stub` and `model_method_write.stub`, or use a directive inside a single stub. Decide during implementation.
+- [ ] **`Forge\ModelGenerator::renderMethod()`** — parse SQL via `Sql::isRead()` at generation time, pick the right stub and variables, emit the correct return type annotation in the method signature.
+- [ ] **`tests/Forge/ModelGeneratorTest.php`** — fixture SQL files for read (with and without casts) and write, assert generated method signatures, return types, and body shapes. Include one SQL file with casts declared to verify `Cast::apply` composition.
+- [ ] **Regenerate starter app models** — from `../arcanum/`, run `composer run-script rune -- forge:models` (or the equivalent) and commit the regenerated classes. Per memory, generated models are committed, not gitignored.
+- [ ] **Starter app migration** — sweep the starter app for any call sites that used `->rows()`, `->count()`, `->scalar()`, `->withCasts()`, or relied on `affectedRows`/`lastInsertId`. Migrate: `->rows()` → `->toSeries()->all()` or direct iteration; `->count()` → `->toSeries()->count()` or a `SELECT COUNT(*)` query; reads of write metadata → use methods now returning `WriteResult`.
+- [ ] **Starter app smoke test** — run the app locally, hit every page that touches a model (per CLAUDE.md: always smoke test framework changes affecting HTTP). Confirm reads work, confirm writes return the expected `WriteResult`, confirm casts still apply per column.
+- [ ] **Document the new surface in `src/Forge/README.md`** — remove `Result` references, add `Sequence`/`Cursor`/`Series` explanation with a short example showing iteration + `toSeries()` escape hatch.
+- [ ] **Document `Flow\Sequence` in `src/Flow/Sequence/README.md`** — new doc covering the interface, the two implementations, the `toSeries()` contract, and when to use which. Include the short benchmark table above as justification for why streaming is the default.
+
+### Commit ordering
+
+Each checkbox group above corresponds roughly to one commit. Sensible order:
+
+1. Flow\Sequence interface + Cursor + Series + tests (Phase 1, one commit)
+2. Forge\WriteResult + Cast helper (standalone, no Connection changes yet)
+3. Connection interface split + PdoConnection::query + PdoConnection::execute (breaks the world temporarily)
+4. Model rewrite to use new Connection methods + delete Forge\Result
+5. All Forge test updates (may fold into #4 if the blast radius is small enough)
+6. ModelGenerator + stub rewrite + tests (Phase 3, one commit)
+7. Starter app regeneration + migration + smoke test
+8. Forge README + Flow\Sequence README (docs)
+
+### Open follow-ups (explicitly not in this change)
+
+- **Generic `Flow\Sequence\Sequence` consumers outside Forge** — the subpackage is generic; other framework parts (Echo event replay, Gather iteration, HTTP paginated responses) could adopt it over time. Don't build speculative adapters; wait for a second consumer to appear organically.
+- **Other SQL directive ideas** (`@returns`, `@one`) — explicitly excluded. The current design has zero directives and no naming conventions; adding any is a separate decision that should wait for a real need.
+- **`Cursor::reduce(callable, $initial)`** — useful but not required for Phase 1. Add when the first real caller wants it.
+
+---
+
 ## Long-Distance Future
 
 - **Hyper README** — document PSR-7 message classes, response renderers, exception renderers, format registry, file uploads, URI handling. Currently the only core package without a README.
