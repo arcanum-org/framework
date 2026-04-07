@@ -57,9 +57,29 @@ class Helpers implements Bootstrapper
             ));
         }
 
-        // Domain-scoped helper discovery
+        // App-provided global helpers
         /** @var Kernel $kernel */
         $kernel = $container->get(Kernel::class);
+
+        $appHelpersFile = $kernel->rootDirectory()
+            . DIRECTORY_SEPARATOR . 'app'
+            . DIRECTORY_SEPARATOR . 'Helpers'
+            . DIRECTORY_SEPARATOR . 'Helpers.php';
+
+        if (file_exists($appHelpersFile)) {
+            /** @var mixed $appHelpers */
+            $appHelpers = require $appHelpersFile;
+            if (is_array($appHelpers)) {
+                /** @var array<string, class-string> $appHelpers */
+                foreach ($appHelpers as $alias => $className) {
+                    /** @var object $helper */
+                    $helper = $container->get($className);
+                    $global->register($alias, $helper);
+                }
+            }
+        }
+
+        // Domain-scoped helper discovery
 
         /** @var string $namespace */
         $namespace = $config->get('app.namespace');

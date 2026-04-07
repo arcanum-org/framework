@@ -140,6 +140,61 @@ final class HelperResolutionTest extends TestCase
         $this->assertSame('https://example.com/health', $url);
     }
 
+    public function testAppHelpersFileRegistersGlobalAliases(): void
+    {
+        // Arrange — app/Helpers/Helpers.php registers an app-wide alias
+        // that should be available to every DTO, not just one domain.
+        mkdir($this->rootDir . '/app/Helpers', 0755, true);
+        file_put_contents(
+            $this->rootDir . '/app/Helpers/Helpers.php',
+            "<?php\nreturn ['App' => \\stdClass::class];",
+        );
+
+        $container = $this->bootstrap();
+
+        /** @var HelperResolver $resolver */
+        $resolver = $container->get(HelperResolver::class);
+
+        // Act — resolve helpers for two unrelated DTOs
+        $shopHelpers = $resolver->for('App\\Domain\\Shop\\Query\\Products');
+        $authHelpers = $resolver->for('App\\Pages\\Login');
+
+        // Assert — App alias is present everywhere as a global helper
+        $this->assertArrayHasKey('App', $shopHelpers);
+        $this->assertArrayHasKey('App', $authHelpers);
+    }
+
+    public function testDomainHelpersOverrideAppGlobals(): void
+    {
+        // Arrange — both an app-wide global and a domain-specific override
+        // exist for the same alias. The domain version should win.
+        mkdir($this->rootDir . '/app/Helpers', 0755, true);
+        file_put_contents(
+            $this->rootDir . '/app/Helpers/Helpers.php',
+            "<?php\nreturn ['Tag' => \\stdClass::class];",
+        );
+
+        mkdir($this->rootDir . '/app/Domain/Shop', 0755, true);
+        file_put_contents(
+            $this->rootDir . '/app/Domain/Shop/Helpers.php',
+            "<?php\nreturn ['Tag' => \\ArrayObject::class];",
+        );
+
+        $container = $this->bootstrap();
+
+        /** @var HelperResolver $resolver */
+        $resolver = $container->get(HelperResolver::class);
+
+        // Act
+        $shopHelpers = $resolver->for('App\\Domain\\Shop\\Query\\Products');
+        $otherHelpers = $resolver->for('App\\Pages\\Login');
+
+        // Assert — Shop sees the domain-specific override; everything else
+        // sees the app-wide global.
+        $this->assertInstanceOf(\ArrayObject::class, $shopHelpers['Tag']);
+        $this->assertInstanceOf(\stdClass::class, $otherHelpers['Tag']);
+    }
+
     public function testDomainScopedHelpersDiscovered(): void
     {
         // Arrange — create a Helpers.php in the Shop domain
