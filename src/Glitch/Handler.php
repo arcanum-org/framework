@@ -52,7 +52,7 @@ class Handler implements ErrorHandler, ExceptionHandler, ShutdownHandler, Report
     }
 
     /**
-     * Report an exception to all registered reporters.
+     * Fan an exception out to every reporter that claims it.
      */
     private function report(\Throwable $e): void
     {
@@ -69,7 +69,7 @@ class Handler implements ErrorHandler, ExceptionHandler, ShutdownHandler, Report
      */
     public function __invoke(\Throwable $e): void
     {
-        $this->report($e);
+        $this->handleException($e);
     }
 
     /**
@@ -139,13 +139,22 @@ class Handler implements ErrorHandler, ExceptionHandler, ShutdownHandler, Report
 
     /**
      * Exception handler.
+     *
+     * Logging is the floor: every exception is written to the default
+     * log channel before reporters are notified. This guarantees errors
+     * are never silently dropped, regardless of whether (or how) the
+     * application has wired up its reporter chain. Reporters are then
+     * fanned out as additional sinks (Sentry, Bugsnag, etc.).
      */
     public function handleException(\Throwable $ex): void
     {
+        $this->logException($ex);
+
         try {
             $this->report($ex);
         } catch (\Throwable $e) {
-            // if a reporter throws an exception, we at least try to log it.
+            // if a reporter throws an exception, log that too so the
+            // reporter failure itself is visible.
             $this->logException($e);
         }
     }

@@ -122,8 +122,9 @@ final class HandlerTest extends TestCase
 
     public function testHandleDeprecationFallsBackToHandleExceptionOnLoggerFailure(): void
     {
-        // Arrange — deprecations channel throws, fallback calls handleException→report
-        // Register a reporter so we can verify the fallback path was reached
+        // Arrange — deprecations channel throws, fallback calls handleException
+        // which logs (also fails) and then reports. Reporter is the proof
+        // that the fallback path was reached.
         $reporter = $this->createMock(Reporter::class);
         $reporter->method('handles')->willReturn(true);
         $reporter->expects($this->once())
@@ -141,11 +142,21 @@ final class HandlerTest extends TestCase
         $handler = $this->createHandler(logger: $logger, container: $container);
         $handler->registerReporter(Reporter::class);
 
-        // Act
-        $result = $handler->handleError(\E_DEPRECATED, 'Deprecated', '/file.php', 1);
+        // Redirect error_log to temp file because the new "always log first"
+        // path causes logException to fail and fall back to error_log.
+        $tempLog = tempnam(sys_get_temp_dir(), 'glitch_test_');
+        $originalLog = ini_set('error_log', (string) $tempLog);
 
-        // Assert
-        $this->assertTrue($result);
+        try {
+            // Act
+            $result = $handler->handleError(\E_DEPRECATED, 'Deprecated', '/file.php', 1);
+
+            // Assert
+            $this->assertTrue($result);
+        } finally {
+            ini_set('error_log', (string) $originalLog);
+            @unlink((string) $tempLog);
+        }
     }
 
     // -----------------------------------------------------------
@@ -191,9 +202,11 @@ final class HandlerTest extends TestCase
         $handler->handleException(new \RuntimeException('Test'));
     }
 
-    public function testHandleExceptionFallsBackToLoggerWhenReporterThrows(): void
+    public function testHandleExceptionLogsBothOriginalAndReporterFailure(): void
     {
-        // Arrange
+        // Arrange — with the "always log first" policy, the original
+        // exception is logged BEFORE reporters run. If a reporter then
+        // throws, that failure is also logged. Both must be visible.
         $reporter = $this->createMock(Reporter::class);
         $reporter->expects($this->once())->method('handles')->willReturn(true);
         $reporter->expects($this->once())->method('__invoke')
@@ -203,10 +216,19 @@ final class HandlerTest extends TestCase
         $container->expects($this->once())->method('get')->willReturn($reporter);
 
         $channel = $this->createMock(Channel::class);
-        $channel->expects($this->once())->method('critical')->with('Reporter broke', $this->anything());
+        $channel->expects($this->exactly(2))
+            ->method('critical')
+            ->with(
+                $this->callback(fn(string $msg) =>
+                    $msg === 'Original error' || $msg === 'Reporter broke'),
+                $this->anything(),
+            );
 
         $logger = $this->createMock(ChannelLogger::class);
-        $logger->expects($this->once())->method('channel')->with('default')->willReturn($channel);
+        $logger->expects($this->exactly(2))
+            ->method('channel')
+            ->with('default')
+            ->willReturn($channel);
 
         $handler = $this->createHandler(logger: $logger, container: $container);
         $handler->registerReporter(Reporter::class);
@@ -226,8 +248,11 @@ final class HandlerTest extends TestCase
         $container = $this->createMock(Application::class);
         $container->expects($this->once())->method('get')->willReturn($reporter);
 
+        // Logger throws on every channel() call. The handler will attempt to
+        // log twice: once for the original exception, once for the reporter
+        // failure. Both fall through to error_log.
         $logger = $this->createMock(ChannelLogger::class);
-        $logger->expects($this->once())->method('channel')
+        $logger->expects($this->exactly(2))->method('channel')
             ->willThrowException(new \RuntimeException('Logger also broke'));
 
         $handler = $this->createHandler(logger: $logger, container: $container);
@@ -263,6 +288,63 @@ final class HandlerTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    public function testHandleExceptionAlwaysLogsEvenWithNoReportersRegistered(): void
+    {
+        // Arrange — this is the regression test for the silent-swallow bug.
+        // An exception thrown when zero reporters are wired up MUST still
+        // produce a log entry, otherwise the framework eats errors silently.
+        $channel = $this->createMock(Channel::class);
+        $channel->expects($this->once())
+            ->method('critical')
+            ->with(
+                'Cache key "::1" contains reserved characters',
+                $this->callback(fn(array $ctx) => isset($ctx['exception'])),
+            );
+
+        $logger = $this->createMock(ChannelLogger::class);
+        $logger->expects($this->once())
+            ->method('channel')
+            ->with('default')
+            ->willReturn($channel);
+
+        $handler = $this->createHandler(logger: $logger);
+
+        // Act — no reporters registered at all
+        $handler->handleException(
+            new \RuntimeException('Cache key "::1" contains reserved characters'),
+        );
+    }
+
+    public function testHandleExceptionLogsEvenWhenReporterAlsoHandles(): void
+    {
+        // Arrange — logging is the floor, not a fallback. Even when a
+        // reporter accepts the exception, the log entry must still be
+        // written so app developers always see errors in their log files.
+        $reporter = $this->createMock(Reporter::class);
+        $reporter->method('handles')->willReturn(true);
+        $reporter->expects($this->once())->method('__invoke');
+
+        $container = $this->createMock(Application::class);
+        $container->expects($this->once())->method('get')->willReturn($reporter);
+
+        $channel = $this->createMock(Channel::class);
+        $channel->expects($this->once())
+            ->method('critical')
+            ->with('Reported and logged', $this->anything());
+
+        $logger = $this->createMock(ChannelLogger::class);
+        $logger->expects($this->once())
+            ->method('channel')
+            ->with('default')
+            ->willReturn($channel);
+
+        $handler = $this->createHandler(logger: $logger, container: $container);
+        $handler->registerReporter(Reporter::class);
+
+        // Act
+        $handler->handleException(new \RuntimeException('Reported and logged'));
+    }
+
     // -----------------------------------------------------------
     // registerReporter() and container resolution
     // -----------------------------------------------------------
@@ -270,15 +352,16 @@ final class HandlerTest extends TestCase
     public function testRegisterReporterThrowsIfContainerReturnsNonReporter(): void
     {
         // Arrange — container returns non-Reporter, which triggers RuntimeException
-        // in buildReporters, caught by handleException's fallback logger
+        // in buildReporters, caught by handleException's fallback logger.
+        // Two log calls: once for original exception, once for the buildReporters error.
         $container = $this->createMock(Application::class);
         $container->expects($this->once())->method('get')->willReturn(new \stdClass());
 
         $channel = $this->createMock(Channel::class);
-        $channel->expects($this->once())->method('critical');
+        $channel->expects($this->exactly(2))->method('critical');
 
         $logger = $this->createMock(ChannelLogger::class);
-        $logger->expects($this->once())->method('channel')->willReturn($channel);
+        $logger->expects($this->exactly(2))->method('channel')->willReturn($channel);
 
         $handler = $this->createHandler(logger: $logger, container: $container);
         $handler->registerReporter(\stdClass::class); /** @phpstan-ignore argument.type */
