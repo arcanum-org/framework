@@ -73,7 +73,7 @@ final class TemplateCompilerTest extends TestCase
         $result = $compiler->compile('{{ foreach($items as $item) }}<li>{{ $item }}</li>{{ endforeach }}');
 
         // Assert
-        $this->assertStringContainsString('<?php foreach($items as $item): ?>', $result);
+        $this->assertStringContainsString('<?php foreach ($items as $item): ?>', $result);
         $this->assertStringContainsString('<?php endforeach; ?>', $result);
     }
 
@@ -99,7 +99,7 @@ final class TemplateCompilerTest extends TestCase
         $result = $compiler->compile('{{ if($show) }}<p>yes</p>{{ endif }}');
 
         // Assert
-        $this->assertStringContainsString('<?php if($show): ?>', $result);
+        $this->assertStringContainsString('<?php if ($show): ?>', $result);
         $this->assertStringContainsString('<?php endif; ?>', $result);
     }
 
@@ -114,7 +114,7 @@ final class TemplateCompilerTest extends TestCase
 
         // Assert
         $this->assertSame(
-            '<?php if($a): ?>A<?php elseif($b): ?>B<?php else: ?>C<?php endif; ?>',
+            '<?php if ($a): ?>A<?php elseif ($b): ?>B<?php else: ?>C<?php endif; ?>',
             $result,
         );
     }
@@ -141,7 +141,7 @@ final class TemplateCompilerTest extends TestCase
         $result = $compiler->compile('{{ for($i = 0; $i < 3; $i++) }}{{ $i }}{{ endfor }}');
 
         // Assert
-        $this->assertStringContainsString('<?php for($i = 0; $i < 3; $i++): ?>', $result);
+        $this->assertStringContainsString('<?php for ($i = 0; $i < 3; $i++): ?>', $result);
         $this->assertStringContainsString('<?php endfor; ?>', $result);
     }
 
@@ -154,7 +154,7 @@ final class TemplateCompilerTest extends TestCase
         $result = $compiler->compile('{{ while($running) }}go{{ endwhile }}');
 
         // Assert
-        $this->assertStringContainsString('<?php while($running): ?>', $result);
+        $this->assertStringContainsString('<?php while ($running): ?>', $result);
         $this->assertStringContainsString('<?php endwhile; ?>', $result);
     }
 
@@ -193,8 +193,8 @@ final class TemplateCompilerTest extends TestCase
         $result = $compiler->compile($template);
 
         // Assert
-        $expected = '<?php foreach($rows as $row): ?>'
-            . '<?php if($row): ?>'
+        $expected = '<?php foreach ($rows as $row): ?>'
+            . '<?php if ($row): ?>'
             . '<?= $__escape((string)($row)) ?>'
             . '<?php endif; ?>'
             . '<?php endforeach; ?>';
@@ -240,7 +240,7 @@ final class TemplateCompilerTest extends TestCase
         $result = $compiler->compile('{{ foreach($items as $key => $value) }}{{ $key }}{{ endforeach }}');
 
         // Assert
-        $this->assertStringContainsString('<?php foreach($items as $key => $value): ?>', $result);
+        $this->assertStringContainsString('<?php foreach ($items as $key => $value): ?>', $result);
     }
 
     public function testMixedContentCompilation(): void
@@ -263,7 +263,7 @@ final class TemplateCompilerTest extends TestCase
         $result = $compiler->compile($template);
 
         // Assert
-        $this->assertStringContainsString('<?php foreach($products as $product): ?>', $result);
+        $this->assertStringContainsString('<?php foreach ($products as $product): ?>', $result);
         $this->assertStringContainsString(
             '<?= $__escape((string)($product[\'name\'])) ?>',
             $result,
@@ -283,6 +283,172 @@ final class TemplateCompilerTest extends TestCase
 
         // Assert
         $this->assertSame($withColon, $withoutColon);
+    }
+
+    // -----------------------------------------------------------
+    // Tolerant control structure forms
+    // -----------------------------------------------------------
+
+    public function testIfAcceptsParenFreeForm(): void
+    {
+        // Arrange — preferred form: no parens, just a space and an expression
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ if $foo > 0 }}yes{{ endif }}');
+
+        // Assert
+        $this->assertSame(
+            '<?php if ($foo > 0): ?>yes<?php endif; ?>',
+            $result,
+        );
+    }
+
+    public function testIfThreeFormsCompileToSameOutput(): void
+    {
+        // Arrange — all three accepted forms must normalise to the same PHP
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $bare      = $compiler->compile('{{ if $foo > 0 }}A{{ endif }}');
+        $parens    = $compiler->compile('{{ if ($foo > 0) }}A{{ endif }}');
+        $altSyntax = $compiler->compile('{{ if ($foo > 0): }}A{{ endif }}');
+
+        // Assert
+        $this->assertSame($bare, $parens);
+        $this->assertSame($bare, $altSyntax);
+        $this->assertSame('<?php if ($foo > 0): ?>A<?php endif; ?>', $bare);
+    }
+
+    public function testIfPreservesInternalParensInExpression(): void
+    {
+        // Arrange — outer-paren stripping must NOT misfire on expressions
+        // like `(a) || (b)` where the first `(` and last `)` aren't a pair.
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ if ($a > 0) || ($b < 5) }}x{{ endif }}');
+
+        // Assert — both groups preserved
+        $this->assertSame(
+            '<?php if (($a > 0) || ($b < 5)): ?>x<?php endif; ?>',
+            $result,
+        );
+    }
+
+    public function testForeachAcceptsParenFreeForm(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ foreach $items as $item }}{{ $item }}{{ endforeach }}');
+
+        // Assert
+        $this->assertSame(
+            '<?php foreach ($items as $item): ?><?= $__escape((string)($item)) ?><?php endforeach; ?>',
+            $result,
+        );
+    }
+
+    // -----------------------------------------------------------
+    // match / case / default / endmatch
+    // -----------------------------------------------------------
+
+    public function testMatchCompilesToSwitch(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+        $source = "{{ match \$status }}{{ case 'open' }}A{{ case 'closed' }}B{{ endmatch }}";
+
+        // Act
+        $result = $compiler->compile($source);
+
+        // Assert
+        $this->assertStringContainsString('<?php switch ($status): ?>', $result);
+        $this->assertStringContainsString("<?php case 'open': ?>A<?php break; ?>", $result);
+        $this->assertStringContainsString("<?php case 'closed': ?>B<?php break; ?>", $result);
+        $this->assertStringContainsString('<?php endswitch; ?>', $result);
+    }
+
+    public function testMatchSupportsCommaSeparatedCases(): void
+    {
+        // Arrange — multiple values in a single case become PHP fall-through
+        $compiler = new TemplateCompiler();
+        $source = "{{ match \$status }}{{ case 'pending', 'active' }}live{{ endmatch }}";
+
+        // Act
+        $result = $compiler->compile($source);
+
+        // Assert — both values emit independent case statements that share the body
+        $expected = "<?php case 'pending': ?><?php case 'active': ?>live<?php break; ?>";
+        $this->assertStringContainsString($expected, $result);
+    }
+
+    public function testMatchDefaultCase(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+        $source = "{{ match \$status }}{{ case 'open' }}A{{ default }}other{{ endmatch }}";
+
+        // Act
+        $result = $compiler->compile($source);
+
+        // Assert
+        $this->assertStringContainsString('<?php default: ?>other<?php break; ?>', $result);
+    }
+
+    public function testMatchWithNoCasesProducesEmptySwitch(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+        $source = "{{ match \$status }}{{ endmatch }}";
+
+        // Act
+        $result = $compiler->compile($source);
+
+        // Assert
+        $this->assertSame('<?php switch ($status): ?><?php endswitch; ?>', $result);
+    }
+
+    public function testMatchCaseBodyContainsTemplateSyntaxThatStillCompiles(): void
+    {
+        // Arrange — case bodies are template source, so {{ $var }} inside
+        // a case should compile through the normal escape pass.
+        $compiler = new TemplateCompiler();
+        $source = "{{ match \$role }}{{ case 'admin' }}{{ \$user->name }}{{ endmatch }}";
+
+        // Act
+        $result = $compiler->compile($source);
+
+        // Assert
+        $this->assertStringContainsString('<?= $__escape((string)($user->name)) ?>', $result);
+    }
+
+    public function testMatchSplitsCommaCasesRespectingStrings(): void
+    {
+        // Arrange — comma inside a string literal must NOT split the case
+        $compiler = new TemplateCompiler();
+        $source = "{{ match \$x }}{{ case 'a, b', 'c' }}body{{ endmatch }}";
+
+        // Act
+        $result = $compiler->compile($source);
+
+        // Assert — two cases: 'a, b' and 'c'
+        $this->assertStringContainsString("<?php case 'a, b': ?><?php case 'c': ?>body<?php break; ?>", $result);
+    }
+
+    public function testMatchExpressionEvaluatedOnce(): void
+    {
+        // Arrange — the match subject appears exactly once in the output
+        $compiler = new TemplateCompiler();
+        $source = "{{ match func() }}{{ case 1 }}A{{ case 2 }}B{{ endmatch }}";
+
+        // Act
+        $result = $compiler->compile($source);
+
+        // Assert
+        $this->assertSame(1, substr_count($result, 'switch (func())'));
     }
 
     // -----------------------------------------------------------
@@ -459,7 +625,7 @@ final class TemplateCompilerTest extends TestCase
     }
 
     // -----------------------------------------------------------
-    // @csrf directive
+    // csrf directive
     // -----------------------------------------------------------
 
     public function testCsrfDirectiveCompilesAsRawHelperCall(): void
@@ -468,7 +634,7 @@ final class TemplateCompilerTest extends TestCase
         $compiler = new TemplateCompiler();
 
         // Act
-        $result = $compiler->compile('{{ @csrf }}');
+        $result = $compiler->compile('{{ csrf }}');
 
         // Assert — raw output, no $__escape
         $this->assertSame(
@@ -483,7 +649,7 @@ final class TemplateCompilerTest extends TestCase
         $compiler = new TemplateCompiler();
 
         // Act
-        $result = $compiler->compile('<form>{{ @csrf }}<button>Submit</button></form>');
+        $result = $compiler->compile('<form>{{ csrf }}<button>Submit</button></form>');
 
         // Assert
         $this->assertSame(
@@ -493,14 +659,14 @@ final class TemplateCompilerTest extends TestCase
     }
 
     // -----------------------------------------------------------
-    // @include directive
+    // include directive
     // -----------------------------------------------------------
 
     public function testIncludeInlinesFileContents(): void
     {
         // Arrange
         $compiler = new TemplateCompiler();
-        $source = "<div>{{ @include 'partials/nav' }}</div>";
+        $source = "<div>{{ include 'partials/nav' }}</div>";
 
         // Act
         $result = $compiler->compile($source, self::$fixtureDir);
@@ -513,7 +679,7 @@ final class TemplateCompilerTest extends TestCase
     {
         // Arrange
         $compiler = new TemplateCompiler();
-        $source = "{{ @include 'partials/nav' }}";
+        $source = "{{ include 'partials/nav' }}";
 
         // Act
         $result = $compiler->compile($source, self::$fixtureDir);
@@ -526,7 +692,7 @@ final class TemplateCompilerTest extends TestCase
     {
         // Arrange
         $compiler = new TemplateCompiler();
-        $source = "{{ @include 'partials/nav.html' }}";
+        $source = "{{ include 'partials/nav.html' }}";
 
         // Act
         $result = $compiler->compile($source, self::$fixtureDir);
@@ -554,7 +720,7 @@ final class TemplateCompilerTest extends TestCase
     {
         // Arrange
         $compiler = new TemplateCompiler();
-        $source = "{{ @include 'partials/nonexistent' }}";
+        $source = "{{ include 'partials/nonexistent' }}";
 
         // Assert
         $this->expectException(\RuntimeException::class);
@@ -565,7 +731,7 @@ final class TemplateCompilerTest extends TestCase
     }
 
     // -----------------------------------------------------------
-    // @extends / @section / @yield — layout inheritance
+    // extends / section / yield — layout inheritance
     // -----------------------------------------------------------
 
     public function testLayoutInheritance(): void
@@ -632,7 +798,7 @@ final class TemplateCompilerTest extends TestCase
     {
         // Arrange — page that only fills 'content', not 'title'
         $compiler = new TemplateCompiler();
-        $source = "{{ @extends 'layout' }}\n{{ @section 'content' }}Hello{{ @endsection }}";
+        $source = "{{ extends 'layout' }}\n{{ section 'content' }}Hello{{ endsection }}";
 
         // Act
         $result = $compiler->compile($source, self::$fixtureDir);
@@ -646,7 +812,7 @@ final class TemplateCompilerTest extends TestCase
     {
         // Arrange
         $compiler = new TemplateCompiler();
-        $source = "{{ @extends 'nonexistent' }}\n{{ @section 'content' }}y{{ @endsection }}";
+        $source = "{{ extends 'nonexistent' }}\n{{ section 'content' }}y{{ endsection }}";
 
         // Assert
         $this->expectException(\RuntimeException::class);
@@ -662,7 +828,7 @@ final class TemplateCompilerTest extends TestCase
         $compiler = new TemplateCompiler();
         $source = '<p>{{ $name }}</p>';
 
-        // Act — with a templateDirectory but no @extends
+        // Act — with a templateDirectory but no extends
         $result = $compiler->compile($source, self::$fixtureDir);
 
         // Assert — compiled normally, no layout wrapping
@@ -678,9 +844,9 @@ final class TemplateCompilerTest extends TestCase
         $compiler = new TemplateCompiler(
             templatesDirectory: self::$fixtureDir,
         );
-        $source = "{{ @extends 'layout' }}\n"
-            . "{{ @section 'title' }}OK{{ @endsection }}\n"
-            . "{{ @section 'contnent' }}Typo{{ @endsection }}";
+        $source = "{{ extends 'layout' }}\n"
+            . "{{ section 'title' }}OK{{ endsection }}\n"
+            . "{{ section 'contnent' }}Typo{{ endsection }}";
 
         // Assert
         $this->expectException(\RuntimeException::class);
@@ -695,13 +861,13 @@ final class TemplateCompilerTest extends TestCase
     {
         // Arrange
         $compiler = new TemplateCompiler();
-        $source = "{{ @include 'partials/nav' }}";
+        $source = "{{ include 'partials/nav' }}";
 
-        // Act — no directory, so @include is treated as unknown and compiled
+        // Act — no directory, so include is treated as unknown and compiled
         // as a regular expression (which will be an escaped output)
         $result = $compiler->compile($source);
 
-        // Assert — @include was NOT resolved (no directory to resolve against)
+        // Assert — include was NOT resolved (no directory to resolve against)
         $this->assertStringNotContainsString('<nav>', $result);
     }
 
@@ -728,7 +894,7 @@ final class TemplateCompilerTest extends TestCase
 
     public function testFragmentModeWithNoExtendsPassesThrough(): void
     {
-        // Arrange — template without @extends
+        // Arrange — template without extends
         $compiler = new TemplateCompiler();
         $source = '<p>{{ $name }}</p>';
 
@@ -746,7 +912,7 @@ final class TemplateCompilerTest extends TestCase
     {
         // Arrange — extends layout but only fills 'title', not 'content'
         $compiler = new TemplateCompiler();
-        $source = "{{ @extends 'layout' }}\n{{ @section 'title' }}Title{{ @endsection }}";
+        $source = "{{ extends 'layout' }}\n{{ section 'title' }}Title{{ endsection }}";
 
         // Act
         $result = $compiler->compile($source, self::$fixtureDir, fragment: true);
@@ -829,7 +995,7 @@ final class TemplateCompilerTest extends TestCase
         // Arrange — a template that includes the same partial twice should
         // only have one entry for it.
         $compiler = new TemplateCompiler();
-        $source = "{{ @include 'partials/nav' }}\n{{ @include 'partials/nav' }}";
+        $source = "{{ include 'partials/nav' }}\n{{ include 'partials/nav' }}";
 
         // Act
         $compiler->compile($source, self::$fixtureDir);

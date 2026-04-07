@@ -144,6 +144,18 @@ $formatter->format([
 
 Templates use `{{ }}` delimiters for everything. The compiler is format-agnostic — each formatter injects its own escape function.
 
+### One rule to read them all
+
+What's inside `{{ }}` is one of three things, distinguished by the first character:
+
+| Starts with | Meaning | Example |
+|---|---|---|
+| `$` | Variable expression | `{{ $name }}`, `{{ $user->email }}` |
+| Uppercase letter | Helper call | `{{ Route::url('home') }}`, `{{ Format::number($price, 2) }}` |
+| Lowercase keyword | Directive | `{{ extends 'layout' }}`, `{{ if $foo }}`, `{{ csrf }}` |
+
+Mirrors PHP's own conventions — `$variables`, `ClassNames`, `keywords`. No special prefix is required because the first character already tells you what you're looking at.
+
 ### Output
 
 ```
@@ -155,29 +167,54 @@ Templates use `{{ }}` delimiters for everything. The compiler is format-agnostic
 
 ### Control flow
 
-```
-{{ foreach($items as $item) }}
-    <p>{{ $item }}</p>
-{{ endforeach }}
+The preferred form is paren-free, but the compiler also accepts parens and the PHP alt-syntax trailing colon. All three forms compile to identical output:
 
-{{ if($show) }}
-    <p>Visible</p>
-{{ elseif($other) }}
-    <p>Other</p>
+```
+{{ if $foo > 0 }}        preferred — clean, paren-free
+{{ if ($foo > 0) }}      also accepted
+{{ if ($foo > 0): }}     also accepted (PHP alt syntax)
+```
+
+```
+{{ if $user->isLoggedIn() }}
+    <p>Welcome, {{ $user->name }}!</p>
+{{ elseif $isGuest }}
+    <p>Hello, guest.</p>
 {{ else }}
-    <p>Hidden</p>
+    <p>Please log in.</p>
 {{ endif }}
 
-{{ for($i = 0; $i < 3; $i++) }}
+{{ foreach $items as $item }}
+    <li>{{ $item->name }}</li>
+{{ endforeach }}
+
+{{ for $i = 0; $i < 3; $i++ }}
     <span>{{ $i }}</span>
 {{ endfor }}
 
-{{ while($condition) }}
+{{ while $running }}
     ...
 {{ endwhile }}
 ```
 
-The colon after opening statements is optional: `{{ foreach($items as $item): }}` and `{{ foreach($items as $item) }}` are identical.
+### Match — switch-style branching
+
+For selecting one branch out of N based on a single subject value:
+
+```
+{{ match $status }}
+    {{ case 'pending', 'active' }}
+        <span class="text-success">Active</span>
+    {{ case 'closed' }}
+        <span class="text-error">Closed</span>
+    {{ default }}
+        <span class="text-stone">Unknown</span>
+{{ endmatch }}
+```
+
+Compiles to a PHP `switch` with implicit `break` after every case body. Comma-separated values in `case` map to PHP fall-through case lists. The match subject is evaluated exactly once.
+
+`match` is for equality matching against a single subject. For free-form conditions, use `if`/`elseif`/`else`.
 
 ### Variable binding
 
@@ -189,53 +226,53 @@ The handler's return value becomes the template's variables:
 
 ## Layouts
 
-Templates can extend a layout using `{{ @extends 'layout' }}`. The layout defines `{{ @yield 'name' }}` slots, and child templates fill them with `{{ @section 'name' }}...{{ @endsection }}`:
+Templates can extend a layout using `{{ extends 'layout' }}`. The layout defines `{{ yield 'name' }}` slots, and child templates fill them with `{{ section 'name' }}...{{ endsection }}`:
 
 **Layout** (`app/Pages/layout.html`):
 ```html
 <!DOCTYPE html>
 <html>
-<head><title>{{ @yield 'title' }}</title></head>
+<head><title>{{ yield 'title' }}</title></head>
 <body>
-{{ @include 'partials/nav' }}
-<main>{{ @yield 'content' }}</main>
-{{ @include 'partials/footer' }}
+{{ include 'partials/nav' }}
+<main>{{ yield 'content' }}</main>
+{{ include 'partials/footer' }}
 </body>
 </html>
 ```
 
 **Child template** (`app/Pages/Index.html`):
 ```html
-{{ @extends 'layout' }}
+{{ extends 'layout' }}
 
-{{ @section 'title' }}Home{{ @endsection }}
+{{ section 'title' }}Home{{ endsection }}
 
-{{ @section 'content' }}
+{{ section 'content' }}
 <h1>{{ $name }}</h1>
 <p>{{ $message }}</p>
-{{ @endsection }}
+{{ endsection }}
 ```
 
 Layout resolution walks up directories from the child template's location. A `Pages/layout.html` is found before a top-level `layout.html`, so subdirectories can have their own layouts.
 
-Unfilled `{{ @yield }}` slots produce an empty string.
+Unfilled `{{ yield }}` slots produce an empty string.
 
 ## Includes
 
-The `{{ @include 'path' }}` directive inlines another template file's contents before compilation:
+The `{{ include 'path' }}` directive inlines another template file's contents before compilation:
 
 ```html
-{{ @include 'partials/nav' }}
-{{ @include 'partials/footer.html' }}
+{{ include 'partials/nav' }}
+{{ include 'partials/footer.html' }}
 ```
 
 Paths resolve relative to the current template's directory. The `.html` extension is optional — it's tried automatically when no extension is given.
 
-Includes nest up to 10 levels deep. Included files can themselves use `{{ @include }}`.
+Includes nest up to 10 levels deep. Included files can themselves use `{{ include }}`.
 
 ## Fragment rendering (HTMX)
 
-When a template uses `@extends`, the same file can serve both full-page loads and HTMX partial swaps. In **fragment mode**, only the `content` section is rendered — the layout wrapper (head, nav, footer) is skipped.
+When a template uses `extends`, the same file can serve both full-page loads and HTMX partial swaps. In **fragment mode**, only the `content` section is rendered — the layout wrapper (head, nav, footer) is skipped.
 
 The `HtmlFormatter` exposes `setFragment(bool)`. Call it from middleware when the `HX-Request` header is present:
 
@@ -280,10 +317,10 @@ Template helpers provide reusable functions callable from templates using static
 {{ Route::url('App\\Domain\\Query\\Health') }}
 {{ Str::truncate($description, 100) }}
 {{! Html::csrf() !}}
-{{ @csrf }}
+{{ csrf }}
 ```
 
-The compiler rewrites `Name::method(...)` to `$__helpers['Name']->method(...)`. Escaped output (`{{ }}`) wraps the result in `$__escape`; raw output (`{{! !}}`) does not. The `{{ @csrf }}` directive is shorthand for `{{! Html::csrf() !}}`.
+The compiler rewrites `Name::method(...)` to `$__helpers['Name']->method(...)`. Escaped output (`{{ }}`) wraps the result in `$__escape`; raw output (`{{! !}}`) does not. The `{{ csrf }}` directive is shorthand for `{{! Html::csrf() !}}`.
 
 ### Built-in helpers
 

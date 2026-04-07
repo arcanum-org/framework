@@ -237,15 +237,15 @@ PHP's native `match` expression can't be used directly because match arms must b
 
 **Plan items:**
 
-- [ ] **Drop `@` prefix from existing directives** — `extends`, `section`, `endsection`, `yield`, `include`, `csrf` all become bare-keyword. Update `TemplateCompiler` regexes (multiple sites: directive matching, layout resolution, fragment mode, section extraction).
-- [ ] **Tolerant `if` / `elseif` / `for` / `while` / `foreach` regex** — accept `{{ if $foo }}`, `{{ if ($foo) }}`, and `{{ if ($foo): }}`. Compiler strips optional outer parens and trailing colon, normalises to canonical PHP.
-- [ ] **`match` / `case` / `default` / `endmatch`** — compiles to PHP switch with implicit breaks. Comma-separated values in `case` map to fall-through cases. Subject evaluated once.
-- [ ] **Migrate test fixtures** — `tests/Fixture/Templates/*.html` currently use `@`-prefixed directives.
-- [ ] **Migrate starter app templates** — `app/Templates/layout.html`, `app/Pages/*.html`, `app/Domain/Query/Health.html`.
-- [ ] **Update existing Shodo tests** — 21 references in `TemplateCompilerTest.php` and 1 in `HtmlFormatterTest.php` use the old `@`-prefixed forms.
-- [ ] **Add tests for the new behaviours** — paren-free `if`, paren-wrapped `if`, `if ... :`, nested `if`, `match` with comma cases, `match` with `default`, `match` with no matching case, directives mixed with `{{ }}` interpolation, lowercase directive vs `$variable` vs `Helper::call` disambiguation.
-- [ ] **Update Shodo README** — rewrite the directive section to document the bare-keyword convention, the three-rule mental model, and the paren-tolerance for conditionals.
-- [ ] **Smoke test on live starter app** — confirm pages still render after the migration.
+- [x] **Drop `@` prefix from existing directives** — `extends`, `section`, `endsection`, `yield`, `include`, `csrf` are now bare-keyword. Updated all six regex sites in `TemplateCompiler` (directive compilation, include resolution, layout resolution, fragment mode, yield collection, section extraction).
+- [x] **Tolerant `if` / `elseif` / `for` / `while` / `foreach` regex** — accepts paren-free, paren-wrapped, and PHP-alt-syntax forms. The compiler strips outer parens (only when balanced as a true wrapping pair) and trailing colon, then normalises to canonical `<?php KEYWORD (EXPR): ?>`. Also accepts the `if($foo)` no-space-before-paren form via a lookahead in the regex separator.
+- [x] **`match` / `case` / `default` / `endmatch`** — implemented as a pre-pass that compiles to PHP `switch` alt-syntax with implicit `break` after every case body. Comma-separated values in `case` map to fall-through case lists. Case values are split with a string-and-bracket-aware tokenizer so commas inside `'a, b'` or `[1, 2]` don't break things.
+- [x] **Migrate test fixtures** — 5 files in `tests/Fixture/Templates/`.
+- [x] **Migrate starter app templates** — 4 files: `app/Templates/layout.html`, `app/Pages/Index.html`, `app/Pages/Contact.html`, `app/Domain/Query/Health.html`.
+- [x] **Update existing Shodo tests** — `TemplateCompilerTest.php` and `HtmlFormatterTest.php` migrated from `@`-prefixed forms. Assertions updated to expect the new spaced canonical output (`<?php if ($foo): ?>`).
+- [x] **Add tests for the new behaviours** — 12 new tests covering: paren-free `if`, all-three-forms identity, internal-paren preservation in `($a) || ($b)`, paren-free `foreach`, basic `match`, comma-separated `case` values, `default` case, empty match, case body with template syntax, comma-in-string preservation, single-evaluation of match subject.
+- [x] **Update Shodo README** — rewrote the directive section. Added a "one rule to read them all" table covering the three first-character conventions ($variable / Helper::call / directive). Added the three accepted control flow forms with explanation. Added a `match` example. Migrated every code sample in the file from `@`-prefixed to bare-keyword.
+- [x] **Smoke test on live starter app** — `/`, `/health.html`, `/health.json`, `/contact.html` all return 200 with full HTML bodies after the migration.
 
 ### Cache management gaps
 

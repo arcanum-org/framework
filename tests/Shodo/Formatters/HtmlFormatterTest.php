@@ -354,7 +354,7 @@ final class HtmlFormatterTest extends TestCase
         // Arrange
         file_put_contents(
             $this->rootDir . '/app/Pages/Index.html',
-            '<form>{{ @csrf }}</form>',
+            '<form>{{ csrf }}</form>',
         );
         $helper = new class {
             public function csrf(): string
