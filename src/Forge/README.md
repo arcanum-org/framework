@@ -24,7 +24,9 @@ final class ProductsHandler
 
     public function __invoke(Products $dto): array
     {
-        return $this->db->model->products(category: $dto->category)->rows();
+        return $this->db->model->products(category: $dto->category)
+            ->toSeries()
+            ->all();
     }
 }
 ```
@@ -70,18 +72,39 @@ Named arguments are converted from camelCase to snake_case to match SQL bindings
 
 ## Results
 
-Every query returns a `Result`. You pick the shape you need:
+Reads and writes return different types, because they answer different questions.
+
+**Reads return a `Sequencer<array<string, mixed>>`** — a lazy, streaming view of rows that doesn't buffer the full result set. You iterate it once, either directly with `foreach` or through the sequence operators (`map`, `filter`, `chunk`, `take`, `first`, `each`). When you need a row count, multi-pass iteration, or random access, materialize it with `->toSeries()` — the cost of buffering is named at the call site, not hidden inside the accessor.
 
 ```php
-$result = $db->model->products(category: 'shoes');
+$rows = $db->model->products(category: 'shoes');
 
-$result->rows();          // all rows as associative arrays
-$result->first();         // first row, or null
-$result->scalar();        // first column of first row (throws if empty)
-$result->count();         // number of rows returned
-$result->isEmpty();       // true if zero rows returned/affected
-$result->affectedRows();  // rows affected by INSERT/UPDATE/DELETE
-$result->lastInsertId();  // auto-increment ID from an INSERT
+// Stream
+foreach ($rows as $row) {
+    echo $row['name'], "\n";
+}
+
+// First row (closes the cursor, returns null if empty)
+$row = $db->model->productById(id: 7)->first();
+
+// Chunk into batches of 100 for a background job
+$db->model->allEvents()->chunk(100)->each(fn(array $batch) => $worker->push($batch));
+
+// Materialize when you need count() or multi-pass access
+$series = $db->model->products(category: 'shoes')->toSeries();
+$count = $series->count();
+$all   = $series->all();
+```
+
+The underlying shape — `Sequencer`, `Cursor`, and `Series` — lives in [`Flow\Sequence`](../Flow/Sequence/README.md). Sub-millisecond-sensitive handlers get streaming for free; batch jobs over millions of rows run in constant memory.
+
+**Writes return a `WriteResult`** — an immutable value object carrying the two facts a write produces:
+
+```php
+$result = $db->model->insertOrder(userId: $id, total: $total);
+
+$result->affectedRows(); // rows affected by INSERT/UPDATE/DELETE
+$result->lastInsertId(); // auto-increment ID from an INSERT
 ```
 
 ## Type casting with @cast
@@ -188,7 +211,7 @@ return [
 
 ### Read/write routing
 
-Forge automatically routes queries to the right connection by inspecting the SQL. `SELECT`, `WITH` (CTEs), `EXPLAIN`, `SHOW`, `DESCRIBE`, and `PRAGMA` go to the read connection. Everything else goes to write. You don't think about it.
+When a handler calls `$db->model->foo()`, Forge inspects the underlying SQL file to decide which connection to use. `SELECT`, `WITH` (CTEs), `EXPLAIN`, `SHOW`, `DESCRIBE`, and `PRAGMA` go to the read connection; everything else goes to write. You don't think about it. (At the Connection level, reads and writes are already separated into `query()` and `execute()` — Model's dispatch just picks which one to call per file.)
 
 ### Connection overrides
 
@@ -208,21 +231,41 @@ The `domains` config maps domain names to connections. If your `Analytics` domai
 
 Forge ships with `PdoConnection`, a lightweight PDO wrapper that handles MySQL, PostgreSQL, and SQLite out of the box. For most apps, this is all you need.
 
-If you need advanced driver support — Oracle, SQL Server, connection pooling, driver-specific options — you can provide your own `Connection` implementation. `Connection` is an interface with four methods: `run()`, `beginTransaction()`, `commit()`, `rollBack()`. Wrap Doctrine DBAL, wrap your company's internal library, wrap whatever you want. Forge doesn't care what's behind the interface.
+If you need advanced driver support — Oracle, SQL Server, connection pooling, driver-specific options — you can provide your own `Connection` implementation. The interface has five methods: `query()` (returns a `Sequencer`), `execute()` (returns a `WriteResult`), `beginTransaction()`, `commit()`, `rollBack()`. Wrap Doctrine DBAL, wrap your company's internal library, wrap whatever you want. Forge doesn't care what's behind the interface.
 
 ```php
+use Arcanum\Flow\Sequence\Cursor;
+use Arcanum\Flow\Sequence\Sequencer;
 use Arcanum\Forge\Connection;
-use Arcanum\Forge\Result;
+use Arcanum\Forge\WriteResult;
 use Doctrine\DBAL\Connection as DbalConnection;
 
 final class DoctrineDbalConnection implements Connection
 {
     public function __construct(private readonly DbalConnection $dbal) {}
 
-    public function run(string $sql, array $params = []): Result
+    public function query(string $sql, array $params = []): Sequencer
     {
         $stmt = $this->dbal->executeQuery($sql, $params);
-        // ... build and return a Result
+
+        return Cursor::open(
+            static function () use ($stmt): \Generator {
+                while (($row = $stmt->fetchAssociative()) !== false) {
+                    yield $row;
+                }
+            },
+            static fn() => $stmt->free(),
+        );
+    }
+
+    public function execute(string $sql, array $params = []): WriteResult
+    {
+        $affected = $this->dbal->executeStatement($sql, $params);
+
+        return new WriteResult(
+            affectedRows: $affected,
+            lastInsertId: (string) $this->dbal->lastInsertId(),
+        );
     }
 
     public function beginTransaction(): void { $this->dbal->beginTransaction(); }
@@ -230,6 +273,8 @@ final class DoctrineDbalConnection implements Connection
     public function rollBack(): void { $this->dbal->rollBack(); }
 }
 ```
+
+Cursor guarantees the close callback runs exactly once — on completion, early break, thrown exception, or destruction without iteration — so resource handles are always released.
 
 ## Model generation
 
@@ -243,25 +288,34 @@ This scans every domain's `Model/` directory and generates a typed PHP class:
 
 ```php
 // Auto-generated — app/Domain/Shop/Model.php
+use Arcanum\Flow\Sequence\Sequencer;
+use Arcanum\Forge\Model as BaseModel;
+use Arcanum\Forge\WriteResult;
+
 final class Model extends BaseModel
 {
-    public function products(string $category): Result
+    /**
+     * @return Sequencer<array<string, mixed>>
+     */
+    public function products(string $category): Sequencer
     {
-        return $this->execute('products', ['category' => $category]);
+        return $this->read(__DIR__ . '/Products.sql', ['category' => $category]);
     }
 
-    public function insertOrder(string $userId, string $total): Result
+    public function insertOrder(string $userId, string $total): WriteResult
     {
-        return $this->execute('insertOrder', ['user_id' => $userId, 'total' => $total]);
+        return $this->write(__DIR__ . '/InsertOrder.sql', ['user_id' => $userId, 'total' => $total]);
     }
 }
 ```
+
+The generator parses each SQL file once and picks the right return type per method: reads return `Sequencer<array<string, mixed>>` with `@cast` annotations composed onto the sequence automatically, writes return `WriteResult`. Read-only models don't import `WriteResult`, write-only models don't import `Sequencer`.
 
 Generated classes extend the base `Model`, so `__call` still catches any SQL files that haven't been generated yet. The calling convention is identical — `$db->model->products(category: 'shoes')` works the same whether you've generated or not.
 
 ### Customizing generation
 
-Drop a `stubs/model.stub` or `stubs/model_method.stub` in your project root to customize what gets generated. Same override pattern as `make:command` and other generators.
+Drop `stubs/model.stub`, `stubs/model_method_read.stub`, or `stubs/model_method_write.stub` in your project root to customize what gets generated. Same override pattern as `make:command` and other generators.
 
 ### Dev-mode auto-regeneration
 
@@ -310,15 +364,20 @@ Each subdirectory becomes its own class, named after the directory:
 // Auto-generated — app/Domain/Shop/Model/Products/Products.php
 namespace App\Domain\Shop\Model\Products;
 
+use Arcanum\Flow\Sequence\Sequencer;
+use Arcanum\Forge\Model as BaseModel;
+
 final class Products extends BaseModel
 {
-    public function __construct(ConnectionManager $connections)
-    {
-        parent::__construct(__DIR__, $connections);
-    }
+    /**
+     * @return Sequencer<array<string, mixed>>
+     */
+    public function findAll(): Sequencer { ... }
 
-    public function findAll(): Result { ... }
-    public function findById(int $id): Result { ... }
+    /**
+     * @return Sequencer<array<string, mixed>>
+     */
+    public function findById(int $id): Sequencer { ... }
 }
 ```
 
@@ -333,7 +392,7 @@ final class ProductsHandler
 
     public function __invoke(ProductsQuery $query): array
     {
-        return $this->products->findAll()->rows();
+        return $this->products->findAll()->toSeries()->all();
     }
 }
 ```
@@ -406,8 +465,8 @@ Skips gracefully if `config/database.php` doesn't exist — apps without a datab
 
 ```
 Forge/
-    Connection            — interface for database connections
-    PdoConnection         — built-in PDO implementation
+    Connection            — interface for database connections (query / execute)
+    PdoConnection         — built-in PDO implementation; streams reads row-by-row
     ConnectionFactory     — builds connections from config arrays
     ConnectionManager     — named connections, read/write split, domain mapping
     Database              — developer-facing service ($db->model, transactions)
@@ -415,6 +474,9 @@ Forge/
     DomainContextMiddleware — Conveyor middleware, sets domain from DTO namespace
     Model                 — maps method calls to SQL files (magic + generated)
     ModelGenerator        — generates typed model classes (root + sub-models) from SQL files
-    Result                — query result with typed accessors
+    WriteResult           — affectedRows + lastInsertId from a write
+    Cast                  — produces row-mapping closures from @cast annotations
     Sql                   — SQL string introspection (read detection, @cast, @param, bindings)
 ```
+
+Read results flow through [`Flow\Sequence`](../Flow/Sequence/README.md) — `Sequencer`, `Cursor`, and `Series` — rather than a Forge-specific type.
