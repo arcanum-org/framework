@@ -25,12 +25,18 @@ final class CacheManager
      * @param array<string, array<string, mixed>> $stores Store configs keyed by name.
      * @param array<string, string> $frameworkStores Maps framework cache names to store names.
      * @param string $filesDirectory Base path for relative file driver paths.
+     * @param bool $frameworkCacheEnabled Master switch for framework-internal caches.
+     *        When false, frameworkStore() returns a NullDriver regardless of
+     *        configured driver, so templates / helpers / page discovery /
+     *        middleware discovery all rebuild on every request. Application
+     *        stores accessed via store() are unaffected.
      */
     public function __construct(
         private readonly string $defaultStore,
         private readonly array $stores,
         private readonly array $frameworkStores = [],
         private readonly string $filesDirectory = '',
+        private readonly bool $frameworkCacheEnabled = true,
     ) {
     }
 
@@ -72,12 +78,39 @@ final class CacheManager
      * Get the store assigned to a framework cache purpose.
      *
      * Falls back to the default store if the mapping doesn't exist.
+     * When the framework cache bypass switch is on, returns a NullDriver
+     * so the caller's data is never persisted.
      */
     public function frameworkStore(string $purpose): CacheInterface
     {
+        if (!$this->frameworkCacheEnabled) {
+            return $this->nullDriver();
+        }
+
         $storeName = $this->frameworkStores[$purpose] ?? $this->defaultStore;
 
         return $this->store($storeName);
+    }
+
+    /**
+     * Whether framework-internal caches are enabled.
+     */
+    public function frameworkCacheEnabled(): bool
+    {
+        return $this->frameworkCacheEnabled;
+    }
+
+    /**
+     * Lazily-built shared NullDriver for the framework cache bypass path.
+     */
+    private function nullDriver(): NullDriver
+    {
+        if (!isset($this->resolved['__null__'])) {
+            $this->resolved['__null__'] = new NullDriver();
+        }
+
+        /** @var NullDriver */
+        return $this->resolved['__null__'];
     }
 
     /**

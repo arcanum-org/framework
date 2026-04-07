@@ -45,15 +45,35 @@ class Cache implements Bootstrapper
             ];
         }
 
+        // The framework cache section has two keys:
+        //   'enabled' (bool)        — master bypass switch for framework-internal caches
+        //   'stores'  (array)       — purpose => store-name mapping
+        // Backwards compatible: if 'cache.framework' is itself a flat
+        // [purpose => store] map (the older shape), treat it as stores.
         $rawFramework = $config->get('cache.framework');
+
+        $frameworkCacheEnabled = true;
         /** @var array<string, string> $frameworkStores */
-        $frameworkStores = is_array($rawFramework) ? $rawFramework : [];
+        $frameworkStores = [];
+
+        if (is_array($rawFramework)) {
+            if (array_key_exists('enabled', $rawFramework) || array_key_exists('stores', $rawFramework)) {
+                $frameworkCacheEnabled = ($rawFramework['enabled'] ?? true) === true;
+                /** @var array<string, string> $stores2 */
+                $stores2 = is_array($rawFramework['stores'] ?? null) ? $rawFramework['stores'] : [];
+                $frameworkStores = $stores2;
+            } else {
+                /** @var array<string, string> $rawFramework */
+                $frameworkStores = $rawFramework;
+            }
+        }
 
         $manager = new CacheManager(
             defaultStore: $default,
             stores: $stores,
             frameworkStores: $frameworkStores,
             filesDirectory: $kernel->filesDirectory(),
+            frameworkCacheEnabled: $frameworkCacheEnabled,
         );
 
         $container->instance(CacheManager::class, $manager);

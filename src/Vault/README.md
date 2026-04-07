@@ -104,16 +104,40 @@ File driver paths are relative to the `files/` directory by default. Absolute pa
 
 ### Framework store mapping
 
-The `framework` key maps framework cache purposes to store names. Override to move framework caches to faster drivers:
+The `framework` key has two siblings: `enabled` (master bypass switch) and `stores` (purpose → store-name mapping). Override `stores` to move framework caches to faster drivers:
 
 ```php
 'framework' => [
-    'pages'      => 'apcu',    // move page discovery to APCu
-    'middleware'  => 'redis',   // move middleware discovery to Redis
+    'enabled' => true,
+    'stores' => [
+        'pages'      => 'apcu',    // move page discovery to APCu
+        'middleware'  => 'redis',   // move middleware discovery to Redis
+    ],
 ],
 ```
 
 Access via `$manager->frameworkStore('pages')`.
+
+### Framework cache bypass
+
+Set `cache.framework.enabled` to `false` to disable every framework-internal cache (templates, helpers, page discovery, middleware discovery, configuration). Every call to `frameworkStore()` returns a `NullDriver` regardless of which store was configured, so the framework rebuilds its compiled artefacts on every request.
+
+```php
+'framework' => [
+    'enabled' => false,
+    'stores' => [ /* ... */ ],
+],
+```
+
+This is an orthogonal switch from `app.debug` — a developer can run with caches off while debug is on (or vice versa). Use it when you want a completely fresh pull on every refresh while iterating, without the cache invalidation rules tripping you up.
+
+**What it affects:** every cache the framework writes to via `CacheManager::frameworkStore()`.
+
+**What it does NOT affect:** application caches that the developer wires up via `CacheManager::store()` or by injecting `CacheInterface` directly. Those continue to use whatever driver is configured.
+
+### Backwards-compatible legacy shape
+
+If `cache.framework` is itself a flat `[purpose => store]` map (the older shape, no `enabled`/`stores` wrapper), it is still honoured and treated as the store mapping with the bypass disabled.
 
 ## PrefixedCache
 

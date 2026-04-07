@@ -12,6 +12,7 @@ use Arcanum\Vault\ArrayDriver;
 use Arcanum\Vault\CacheManager;
 use Arcanum\Vault\InvalidArgument;
 use Arcanum\Vault\KeyValidator;
+use Arcanum\Vault\NullDriver;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -27,6 +28,7 @@ use Psr\SimpleCache\CacheInterface;
 #[UsesClass(\Arcanum\Gather\Registry::class)]
 #[UsesClass(CacheManager::class)]
 #[UsesClass(ArrayDriver::class)]
+#[UsesClass(NullDriver::class)]
 #[UsesClass(KeyValidator::class)]
 #[UsesClass(InvalidArgument::class)]
 final class CacheTest extends TestCase
@@ -100,5 +102,79 @@ final class CacheTest extends TestCase
 
         $this->assertTrue($container->has(CacheManager::class));
         $this->assertTrue($container->has(CacheInterface::class));
+    }
+
+    public function testReadsLegacyFlatFrameworkMapping(): void
+    {
+        // Backwards-compat: a flat [purpose => store] under cache.framework
+        // should still be honoured (no enabled/stores wrapper).
+        $container = $this->buildContainer([
+            'default' => 'array',
+            'stores' => [
+                'array' => ['driver' => 'array'],
+                'other' => ['driver' => 'array'],
+            ],
+            'framework' => [
+                'pages' => 'other',
+            ],
+        ]);
+
+        (new Cache())->bootstrap($container);
+
+        /** @var CacheManager $manager */
+        $manager = $container->get(CacheManager::class);
+
+        $this->assertSame(['pages' => 'other'], $manager->frameworkStoreMapping());
+        $this->assertTrue($manager->frameworkCacheEnabled());
+    }
+
+    public function testReadsNewFrameworkConfigShape(): void
+    {
+        // New shape: cache.framework has 'enabled' and 'stores' siblings.
+        $container = $this->buildContainer([
+            'default' => 'array',
+            'stores' => [
+                'array' => ['driver' => 'array'],
+                'other' => ['driver' => 'array'],
+            ],
+            'framework' => [
+                'enabled' => true,
+                'stores' => [
+                    'pages' => 'other',
+                ],
+            ],
+        ]);
+
+        (new Cache())->bootstrap($container);
+
+        /** @var CacheManager $manager */
+        $manager = $container->get(CacheManager::class);
+
+        $this->assertTrue($manager->frameworkCacheEnabled());
+        $this->assertSame(['pages' => 'other'], $manager->frameworkStoreMapping());
+    }
+
+    public function testFrameworkBypassFlagPropagatesToManager(): void
+    {
+        // cache.framework.enabled = false should make every framework
+        // cache surface a NullDriver.
+        $container = $this->buildContainer([
+            'default' => 'array',
+            'stores' => ['array' => ['driver' => 'array']],
+            'framework' => [
+                'enabled' => false,
+                'stores' => [],
+            ],
+        ]);
+
+        (new Cache())->bootstrap($container);
+
+        /** @var CacheManager $manager */
+        $manager = $container->get(CacheManager::class);
+
+        $this->assertFalse($manager->frameworkCacheEnabled());
+        $this->assertInstanceOf(NullDriver::class, $manager->frameworkStore('pages'));
+        // App store is unaffected
+        $this->assertInstanceOf(ArrayDriver::class, $manager->store());
     }
 }

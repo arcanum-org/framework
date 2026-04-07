@@ -140,6 +140,70 @@ final class CacheManagerTest extends TestCase
         $this->assertInstanceOf(ArrayDriver::class, $manager->frameworkStore('pages'));
     }
 
+    public function testFrameworkStoreReturnsNullDriverWhenBypassEnabled(): void
+    {
+        // Arrange — frameworkCacheEnabled=false should make every framework
+        // cache surface a no-op, regardless of which store is configured.
+        $manager = new CacheManager(
+            defaultStore: 'array',
+            stores: [
+                'array' => ['driver' => 'array'],
+                'persist' => ['driver' => 'array'],
+            ],
+            frameworkStores: [
+                'pages' => 'persist',
+                'helpers' => 'persist',
+            ],
+            frameworkCacheEnabled: false,
+        );
+
+        // Act & Assert — every named purpose returns NullDriver
+        $this->assertInstanceOf(NullDriver::class, $manager->frameworkStore('pages'));
+        $this->assertInstanceOf(NullDriver::class, $manager->frameworkStore('helpers'));
+        $this->assertInstanceOf(NullDriver::class, $manager->frameworkStore('templates'));
+    }
+
+    public function testFrameworkBypassDoesNotAffectApplicationStores(): void
+    {
+        // Arrange — bypass is on but store() should still resolve real drivers.
+        // Only frameworkStore() is affected; user-facing caches are untouched.
+        $manager = new CacheManager(
+            defaultStore: 'array',
+            stores: ['array' => ['driver' => 'array']],
+            frameworkCacheEnabled: false,
+        );
+
+        // Act
+        $appStore = $manager->store();
+        $frameworkStore = $manager->frameworkStore('pages');
+
+        // Assert
+        $this->assertInstanceOf(ArrayDriver::class, $appStore);
+        $this->assertInstanceOf(NullDriver::class, $frameworkStore);
+
+        // App store actually persists; framework store does not
+        $appStore->set('app-key', 'app-value');
+        $frameworkStore->set('fw-key', 'fw-value');
+        $this->assertSame('app-value', $appStore->get('app-key'));
+        $this->assertNull($frameworkStore->get('fw-key'));
+    }
+
+    public function testFrameworkCacheEnabledFlagIsExposed(): void
+    {
+        $on = new CacheManager(
+            defaultStore: 'array',
+            stores: ['array' => ['driver' => 'array']],
+        );
+        $off = new CacheManager(
+            defaultStore: 'array',
+            stores: ['array' => ['driver' => 'array']],
+            frameworkCacheEnabled: false,
+        );
+
+        $this->assertTrue($on->frameworkCacheEnabled());
+        $this->assertFalse($off->frameworkCacheEnabled());
+    }
+
     public function testStoreNamesReturnsAllConfigured(): void
     {
         $manager = new CacheManager(
