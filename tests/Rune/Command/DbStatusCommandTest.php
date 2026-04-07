@@ -23,7 +23,9 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(ConnectionManager::class)]
 #[UsesClass(Configuration::class)]
 #[UsesClass(Registry::class)]
-#[UsesClass(\Arcanum\Forge\Result::class)]
+#[UsesClass(\Arcanum\Forge\WriteResult::class)]
+#[UsesClass(\Arcanum\Flow\Sequence\Cursor::class)]
+#[UsesClass(\Arcanum\Flow\Sequence\CloseLatch::class)]
 #[UsesClass(\Arcanum\Forge\Sql::class)]
 final class DbStatusCommandTest extends TestCase
 {

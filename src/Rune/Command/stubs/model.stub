@@ -6,9 +6,10 @@ declare(strict_types=1);
 
 namespace {{! $namespace !}};
 
+use Arcanum\Flow\Sequence\Sequencer;
 use Arcanum\Forge\ConnectionManager;
 use Arcanum\Forge\Model as BaseModel;
-use Arcanum\Forge\Result;
+use Arcanum\Forge\WriteResult;
 
 final class {{! $className !}} extends BaseModel
 {

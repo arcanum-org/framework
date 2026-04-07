@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Forge;
 
+use Arcanum\Flow\Sequence\CloseLatch;
+use Arcanum\Flow\Sequence\Cursor;
+use Arcanum\Flow\Sequence\Sequencer;
+use Arcanum\Flow\Sequence\Series;
+use Arcanum\Forge\Cast;
 use Arcanum\Forge\ConnectionFactory;
 use Arcanum\Forge\ConnectionManager;
 use Arcanum\Forge\Model;
 use Arcanum\Forge\PdoConnection;
-use Arcanum\Forge\Result;
 use Arcanum\Forge\Sql;
+use Arcanum\Forge\WriteResult;
 use Arcanum\Toolkit\Strings;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -19,7 +24,11 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(ConnectionFactory::class)]
 #[UsesClass(ConnectionManager::class)]
 #[UsesClass(PdoConnection::class)]
-#[UsesClass(Result::class)]
+#[UsesClass(WriteResult::class)]
+#[UsesClass(Cursor::class)]
+#[UsesClass(Series::class)]
+#[UsesClass(CloseLatch::class)]
+#[UsesClass(Cast::class)]
 #[UsesClass(Sql::class)]
 #[UsesClass(Strings::class)]
 #[UsesClass(\Arcanum\Parchment\Reader::class)]
@@ -57,7 +66,7 @@ final class ModelTest extends TestCase
 
     private function createProductsTable(PdoConnection $conn): void
     {
-        $conn->run(
+        $conn->execute(
             'CREATE TABLE products ('
             . 'id INTEGER PRIMARY KEY, name TEXT, price REAL, '
             . 'active INTEGER, quantity INTEGER, metadata TEXT'
@@ -90,7 +99,7 @@ final class ModelTest extends TestCase
         $result = $model->allProducts();
 
         // Assert
-        $this->assertInstanceOf(Result::class, $result);
+        $this->assertInstanceOf(Sequencer::class, $result);
     }
 
     public function testCamelCaseToPascalCaseConversion(): void
@@ -106,6 +115,7 @@ final class ModelTest extends TestCase
         $result = $model->insertProduct(name: 'Widget');
 
         // Assert
+        $this->assertInstanceOf(WriteResult::class, $result);
         $this->assertSame('1', $result->lastInsertId());
     }
 
@@ -142,13 +152,13 @@ final class ModelTest extends TestCase
         $result = $model->allProducts();
 
         // Assert
-        $this->assertInstanceOf(Result::class, $result);
+        $this->assertInstanceOf(Sequencer::class, $result);
     }
 
     public function testParameterlessSqlWorks(): void
     {
         // Arrange
-        $this->connection->run(
+        $this->connection->execute(
             'INSERT INTO products (name) VALUES (:name)',
             ['name' => 'Widget'],
         );
@@ -162,7 +172,10 @@ final class ModelTest extends TestCase
         $result = $model->countProducts();
 
         // Assert
-        $this->assertSame(1, $result->scalar());
+        $this->assertInstanceOf(Sequencer::class, $result);
+        $row = $result->first();
+        $this->assertIsArray($row);
+        $this->assertSame(1, $row['cnt']);
     }
 
     // ── Calling convention: named args ───────────────────────────
@@ -185,8 +198,10 @@ final class ModelTest extends TestCase
         $result = $model->productByName(name: 'Widget');
 
         // Assert
-        $this->assertNotNull($result->first());
-        $this->assertSame('Widget', $result->first()['name']);
+        $this->assertInstanceOf(Sequencer::class, $result);
+        $row = $result->first();
+        $this->assertIsArray($row);
+        $this->assertSame('Widget', $row['name']);
     }
 
     public function testCamelCaseNamedArgsConvertToSnakeCase(): void
@@ -208,9 +223,11 @@ final class ModelTest extends TestCase
         $result = $model->productsByMinPrice(minPrice: 10.00);
 
         // Assert
-        $this->assertSame(1, $result->count());
-        $this->assertNotNull($result->first());
-        $this->assertSame('Expensive', $result->first()['name']);
+        $this->assertInstanceOf(Sequencer::class, $result);
+        $rows = $result->toSeries()->all();
+        $this->assertCount(1, $rows);
+        $this->assertIsArray($rows[0]);
+        $this->assertSame('Expensive', $rows[0]['name']);
     }
 
     // ── Calling convention: positional args ──────────────────────
@@ -228,6 +245,7 @@ final class ModelTest extends TestCase
         $result = $model->insertProduct('Widget', 9.99);
 
         // Assert
+        $this->assertInstanceOf(WriteResult::class, $result);
         $this->assertSame('1', $result->lastInsertId());
     }
 
@@ -249,7 +267,7 @@ final class ModelTest extends TestCase
         $model = $this->model();
 
         $model->insertProduct(name: 'Widget', price: 9.99);
-        $this->connection->run(
+        $this->connection->execute(
             'UPDATE products SET active = 1 WHERE name = :name',
             ['name' => 'Widget'],
         );
@@ -258,7 +276,8 @@ final class ModelTest extends TestCase
         $result = $model->searchProducts('Widget', 0, active: 1);
 
         // Assert
-        $this->assertSame(1, $result->count());
+        $this->assertInstanceOf(Sequencer::class, $result);
+        $this->assertSame(1, $result->toSeries()->count());
     }
 
     // ── Read/write connection routing ────────────────────────────
@@ -281,7 +300,7 @@ final class ModelTest extends TestCase
         /** @var PdoConnection $readConn */
         $readConn = $splitManager->readConnection();
         $this->createProductsTable($readConn);
-        $readConn->run(
+        $readConn->execute(
             'INSERT INTO products (name) VALUES (:name)',
             ['name' => 'ReadOnly'],
         );
@@ -297,9 +316,11 @@ final class ModelTest extends TestCase
         $result = $model->allProducts();
 
         // Assert
-        $this->assertSame(1, $result->count());
-        $this->assertNotNull($result->first());
-        $this->assertSame('ReadOnly', $result->first()['name']);
+        $this->assertInstanceOf(Sequencer::class, $result);
+        $rows = $result->toSeries()->all();
+        $this->assertCount(1, $rows);
+        $this->assertIsArray($rows[0]);
+        $this->assertSame('ReadOnly', $rows[0]['name']);
     }
 
     public function testInsertUsesWriteConnection(): void
@@ -335,15 +356,13 @@ final class ModelTest extends TestCase
         $model->insertProduct(name: 'WriteOnly');
 
         // Assert
-        $readResult = $readConn->run('SELECT count(*) as cnt FROM products');
-        $this->assertNotNull($readResult->first());
-        $this->assertSame(0, $readResult->first()['cnt']);
+        $readRow = $readConn->query('SELECT count(*) as cnt FROM products')->first();
+        $this->assertNotNull($readRow);
+        $this->assertSame(0, $readRow['cnt']);
 
-        $writeResult = $writeConn->run(
-            'SELECT count(*) as cnt FROM products',
-        );
-        $this->assertNotNull($writeResult->first());
-        $this->assertSame(1, $writeResult->first()['cnt']);
+        $writeRow = $writeConn->query('SELECT count(*) as cnt FROM products')->first();
+        $this->assertNotNull($writeRow);
+        $this->assertSame(1, $writeRow['cnt']);
     }
 
     // ── @cast annotations ────────────────────────────────────────
@@ -351,7 +370,7 @@ final class ModelTest extends TestCase
     public function testCastInt(): void
     {
         // Arrange
-        $this->connection->run(
+        $this->connection->execute(
             'INSERT INTO products (name, quantity) VALUES (:name, :quantity)',
             ['name' => 'Widget', 'quantity' => 5],
         );
@@ -365,14 +384,16 @@ final class ModelTest extends TestCase
         $result = $model->productQuantities();
 
         // Assert
-        $this->assertNotNull($result->first());
-        $this->assertSame(5, $result->first()['quantity']);
+        $this->assertInstanceOf(Sequencer::class, $result);
+        $row = $result->first();
+        $this->assertIsArray($row);
+        $this->assertSame(5, $row['quantity']);
     }
 
     public function testCastFloat(): void
     {
         // Arrange
-        $this->connection->run(
+        $this->connection->execute(
             'INSERT INTO products (name, price) VALUES (:name, :price)',
             ['name' => 'Widget', 'price' => 19.99],
         );
@@ -386,18 +407,20 @@ final class ModelTest extends TestCase
         $result = $model->productPrices();
 
         // Assert
-        $this->assertNotNull($result->first());
-        $this->assertSame(19.99, $result->first()['price']);
+        $this->assertInstanceOf(Sequencer::class, $result);
+        $row = $result->first();
+        $this->assertIsArray($row);
+        $this->assertSame(19.99, $row['price']);
     }
 
     public function testCastBoolTruthyValues(): void
     {
         // Arrange
-        $this->connection->run(
+        $this->connection->execute(
             'INSERT INTO products (name, active) VALUES (:name, :active)',
             ['name' => 'Active', 'active' => 1],
         );
-        $this->connection->run(
+        $this->connection->execute(
             'INSERT INTO products (name, active) VALUES (:name, :active)',
             ['name' => 'Inactive', 'active' => 0],
         );
@@ -410,9 +433,12 @@ final class ModelTest extends TestCase
 
         // Act
         $result = $model->productStatus();
-        $rows = $result->rows();
 
         // Assert
+        $this->assertInstanceOf(Sequencer::class, $result);
+        $rows = $result->toSeries()->all();
+        $this->assertIsArray($rows[0]);
+        $this->assertIsArray($rows[1]);
         $this->assertTrue($rows[0]['active']);
         $this->assertFalse($rows[1]['active']);
     }
@@ -420,7 +446,7 @@ final class ModelTest extends TestCase
     public function testCastJson(): void
     {
         // Arrange
-        $this->connection->run(
+        $this->connection->execute(
             'INSERT INTO products (name, metadata) VALUES (:name, :metadata)',
             ['name' => 'Widget', 'metadata' => '{"color":"blue","weight":1.5}'],
         );
@@ -434,17 +460,19 @@ final class ModelTest extends TestCase
         $result = $model->productMeta();
 
         // Assert
-        $this->assertNotNull($result->first());
+        $this->assertInstanceOf(Sequencer::class, $result);
+        $row = $result->first();
+        $this->assertIsArray($row);
         $this->assertSame(
             ['color' => 'blue', 'weight' => 1.5],
-            $result->first()['metadata'],
+            $row['metadata'],
         );
     }
 
     public function testNoCastReturnsRawPdoValues(): void
     {
         // Arrange
-        $this->connection->run(
+        $this->connection->execute(
             'INSERT INTO products (name, quantity) VALUES (:name, :quantity)',
             ['name' => 'Widget', 'quantity' => 5],
         );
@@ -458,14 +486,16 @@ final class ModelTest extends TestCase
         $result = $model->rawProducts();
 
         // Assert
-        $this->assertNotNull($result->first());
-        $this->assertIsInt($result->first()['quantity']);
+        $this->assertInstanceOf(Sequencer::class, $result);
+        $row = $result->first();
+        $this->assertIsArray($row);
+        $this->assertIsInt($row['quantity']);
     }
 
     public function testMultipleCastAnnotations(): void
     {
         // Arrange
-        $this->connection->run(
+        $this->connection->execute(
             'INSERT INTO products (name, price, quantity, active) '
             . 'VALUES (:name, :price, :quantity, :active)',
             ['name' => 'Widget', 'price' => 9.99, 'quantity' => 3, 'active' => 1],
@@ -482,8 +512,9 @@ final class ModelTest extends TestCase
         $result = $model->fullProducts();
 
         // Assert
+        $this->assertInstanceOf(Sequencer::class, $result);
         $row = $result->first();
-        $this->assertNotNull($row);
+        $this->assertIsArray($row);
         $this->assertSame(9.99, $row['price']);
         $this->assertSame(3, $row['quantity']);
         $this->assertTrue($row['active']);
@@ -502,6 +533,7 @@ final class ModelTest extends TestCase
         $result = $model->insertProduct(name: 'Widget');
 
         // Assert
+        $this->assertInstanceOf(WriteResult::class, $result);
         $this->assertSame('1', $result->lastInsertId());
     }
 

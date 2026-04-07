@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Forge;
 
+use Arcanum\Flow\Sequence\Sequencer;
 use Arcanum\Parchment\Reader;
 
 /**
@@ -19,10 +20,12 @@ use Arcanum\Parchment\Reader;
  * in order of appearance.
  *
  * SQL content is cached in memory per-request. Read/write routing and @cast
- * annotations are handled automatically.
+ * annotations are handled automatically. Reads return a lazy
+ * {@see Sequencer} of rows (with any declared casts already composed on);
+ * writes return a {@see WriteResult}.
  *
- * Generated model classes extend this class and call execute() directly
- * with absolute SQL file paths, skipping the __call arg resolution.
+ * Generated model classes extend this class and call read() or write()
+ * directly with absolute SQL file paths, skipping the __call arg resolution.
  */
 class Model
 {
@@ -53,15 +56,20 @@ class Model
     }
 
     /**
-     * Magic method dispatch — resolves named/positional/mixed args then delegates to execute().
+     * Magic method dispatch — resolves named/positional/mixed args then delegates.
      *
      * Derives the SQL directory from the concrete class's file location via
      * reflection (cached after first call). This means ungenerated models
      * find SQL files next to wherever their class file lives on disk.
      *
+     * The return type is a union because the dispatch shape is determined by
+     * the loaded SQL at runtime. Generated model methods declare narrower
+     * types by calling {@see read()} or {@see write()} directly.
+     *
      * @param array<int|string, mixed> $args
+     * @return Sequencer<array<string, mixed>>|WriteResult
      */
-    public function __call(string $method, array $args): Result
+    public function __call(string $method, array $args): Sequencer|WriteResult
     {
         if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $method)) {
             throw (new InvalidModelMethod($method))
@@ -77,37 +85,63 @@ class Model
         $bindings = $this->loadBindings($path, $sql);
         $params = $bindings !== [] ? Sql::resolveArgs($args, $bindings) : [];
 
-        return $this->execute($path, $params);
+        return Sql::isRead($sql)
+            ? $this->read($path, $params)
+            : $this->write($path, $params);
     }
 
     /**
-     * Execute a SQL file with pre-resolved parameters.
+     * Execute a read-path SQL file and return a lazy Sequencer of rows.
      *
-     * This is the core execution path. Both __call (after arg resolution)
-     * and generated model methods (with already-typed params) delegate here.
-     * Generated methods pass the absolute path via __DIR__ . '/File.sql'.
+     * Declared `@cast` columns are composed onto the sequence via
+     * {@see Cast::apply()} so callers iterate already-typed rows.
+     *
+     * @param string $sqlPath Absolute path to the .sql file.
+     * @param array<string, mixed> $params Named parameters keyed by SQL binding name.
+     * @return Sequencer<array<string, mixed>>
+     */
+    protected function read(string $sqlPath, array $params = []): Sequencer
+    {
+        $sql = $this->loadSql($sqlPath);
+        $casts = $this->loadCasts($sqlPath, $sql);
+
+        $rows = $this->readConnection()->query($sql, $params);
+
+        return $casts === [] ? $rows : $rows->map(Cast::apply($casts));
+    }
+
+    /**
+     * Dispatch a SQL file by sniffing read vs. write at runtime.
+     *
+     * Generated model methods call this with an absolute path via
+     * `__DIR__ . '/File.sql'` and a pre-built params array, then refine the
+     * return type at the call site via their own signature. Kept as a single
+     * entry point so the generator stub stays one file; {@see ModelGenerator}
+     * may later split reads and writes at generation time for tighter types.
+     *
+     * @param array<string, mixed> $params
+     * @return Sequencer<array<string, mixed>>|WriteResult
+     */
+    protected function dispatch(string $sqlPath, array $params = []): Sequencer|WriteResult
+    {
+        $sql = $this->loadSql($sqlPath);
+
+        return Sql::isRead($sql)
+            ? $this->read($sqlPath, $params)
+            : $this->write($sqlPath, $params);
+    }
+
+    /**
+     * Execute a write-path SQL file and return the WriteResult.
      *
      * @param string $sqlPath Absolute path to the .sql file.
      * @param array<string, mixed> $params Named parameters keyed by SQL binding name.
      */
-    protected function execute(string $sqlPath, array $params = []): Result
+    protected function write(string $sqlPath, array $params = []): WriteResult
     {
         $sql = $this->loadSql($sqlPath);
 
-        $isRead = Sql::isRead($sql);
-        $connection = $isRead ? $this->readConnection() : $this->writeConnection();
-
-        $result = $connection->run($sql, $params);
-
-        if ($isRead) {
-            $casts = $this->loadCasts($sqlPath, $sql);
-
-            if ($casts !== []) {
-                return $result->withCasts($casts);
-            }
-        }
-
-        return $result;
+        return $this->writeConnection()->execute($sql, $params);
     }
 
     /**

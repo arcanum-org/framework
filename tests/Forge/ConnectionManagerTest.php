@@ -7,7 +7,9 @@ namespace Arcanum\Test\Forge;
 use Arcanum\Forge\ConnectionFactory;
 use Arcanum\Forge\ConnectionManager;
 use Arcanum\Forge\PdoConnection;
-use Arcanum\Forge\Result;
+use Arcanum\Flow\Sequence\CloseLatch;
+use Arcanum\Flow\Sequence\Cursor;
+use Arcanum\Forge\WriteResult;
 use Arcanum\Forge\Sql;
 use Arcanum\Gather\Configuration;
 use Arcanum\Gather\Registry;
@@ -20,7 +22,9 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(ConnectionFactory::class)]
 #[UsesClass(Configuration::class)]
 #[UsesClass(Registry::class)]
-#[UsesClass(Result::class)]
+#[UsesClass(WriteResult::class)]
+#[UsesClass(Cursor::class)]
+#[UsesClass(CloseLatch::class)]
 #[UsesClass(Sql::class)]
 final class ConnectionManagerTest extends TestCase
 {
@@ -278,19 +282,19 @@ final class ConnectionManagerTest extends TestCase
 
         // Act — write to primary, read from replica
         $write = $manager->writeConnection();
-        $write->run('CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)');
-        $write->run('INSERT INTO items (name) VALUES (:name)', ['name' => 'Widget']);
+        $write->execute('CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)');
+        $write->execute('INSERT INTO items (name) VALUES (:name)', ['name' => 'Widget']);
 
         $read = $manager->readConnection();
-        $read->run('CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)');
+        $read->execute('CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)');
 
         // Assert — replica has its own state (separate in-memory databases)
-        $readResult = $read->run('SELECT count(*) as cnt FROM items');
-        $this->assertNotNull($readResult->first());
-        $this->assertSame(0, $readResult->first()['cnt']);
+        $readRow = $read->query('SELECT count(*) as cnt FROM items')->first();
+        $this->assertNotNull($readRow);
+        $this->assertSame(0, $readRow['cnt']);
 
-        $writeResult = $write->run('SELECT count(*) as cnt FROM items');
-        $this->assertNotNull($writeResult->first());
-        $this->assertSame(1, $writeResult->first()['cnt']);
+        $writeRow = $write->query('SELECT count(*) as cnt FROM items')->first();
+        $this->assertNotNull($writeRow);
+        $this->assertSame(1, $writeRow['cnt']);
     }
 }

@@ -10,7 +10,11 @@ use Arcanum\Forge\ConnectionManager;
 use Arcanum\Forge\Database;
 use Arcanum\Forge\DomainContext;
 use Arcanum\Forge\Model;
-use Arcanum\Forge\Result;
+use Arcanum\Flow\Sequence\CloseLatch;
+use Arcanum\Flow\Sequence\Cursor;
+use Arcanum\Flow\Sequence\Series;
+use Arcanum\Forge\Cast;
+use Arcanum\Forge\WriteResult;
 use Arcanum\Forge\Sql;
 use Arcanum\Gather\Configuration;
 use Arcanum\Gather\Registry;
@@ -27,7 +31,11 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(Registry::class)]
 #[UsesClass(DomainContext::class)]
 #[UsesClass(Model::class)]
-#[UsesClass(Result::class)]
+#[UsesClass(WriteResult::class)]
+#[UsesClass(Cursor::class)]
+#[UsesClass(Series::class)]
+#[UsesClass(CloseLatch::class)]
+#[UsesClass(Cast::class)]
 #[UsesClass(Sql::class)]
 #[UsesClass(Strings::class)]
 #[UsesClass(\Arcanum\Parchment\Reader::class)]
@@ -112,8 +120,8 @@ final class DatabaseTest extends TestCase
     {
         // Arrange
         $conn = new PdoConnection(dsn: 'sqlite::memory:');
-        $conn->run('CREATE TABLE t (id INTEGER PRIMARY KEY, val TEXT)');
-        $conn->run('INSERT INTO t (val) VALUES (:val)', ['val' => 'hello']);
+        $conn->execute('CREATE TABLE t (id INTEGER PRIMARY KEY, val TEXT)');
+        $conn->execute('INSERT INTO t (val) VALUES (:val)', ['val' => 'hello']);
 
         $manager = new ConnectionManager(
             defaultConnection: 'main',
@@ -136,8 +144,10 @@ final class DatabaseTest extends TestCase
         $result = $db->model->getValue();
 
         // Assert
-        $this->assertNotNull($result->first());
-        $this->assertSame(1, $result->first()['val']);
+        $this->assertInstanceOf(\Arcanum\Flow\Sequence\Sequencer::class, $result);
+        $row = $result->first();
+        $this->assertIsArray($row);
+        $this->assertSame(1, $row['val']);
     }
 
     public function testTransactionCommits(): void
@@ -170,7 +180,8 @@ final class DatabaseTest extends TestCase
 
         // Assert
         $result = $db->model->allItems();
-        $this->assertSame(1, $result->count());
+        $this->assertInstanceOf(\Arcanum\Flow\Sequence\Sequencer::class, $result);
+        $this->assertSame(1, $result->toSeries()->count());
     }
 
     public function testTransactionRollsBack(): void
@@ -208,7 +219,8 @@ final class DatabaseTest extends TestCase
 
         // Assert — should be rolled back
         $result = $db->model->allItems();
-        $this->assertSame(0, $result->count());
+        $this->assertInstanceOf(\Arcanum\Flow\Sequence\Sequencer::class, $result);
+        $this->assertSame(0, $result->toSeries()->count());
     }
 
     public function testConnectionOverrideReturnsDatabaseWithDifferentConnection(): void
@@ -252,8 +264,10 @@ final class DatabaseTest extends TestCase
         $result = $db->model->ping();
 
         // Assert
-        $this->assertNotNull($result->first());
-        $this->assertSame(1, $result->first()['ok']);
+        $this->assertInstanceOf(\Arcanum\Flow\Sequence\Sequencer::class, $result);
+        $row = $result->first();
+        $this->assertIsArray($row);
+        $this->assertSame(1, $row['ok']);
     }
 
     public function testUndefinedPropertyThrows(): void

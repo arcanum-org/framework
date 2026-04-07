@@ -70,7 +70,7 @@ final class DbStatusCommand implements BuiltInCommand
         foreach ($connections->connectionNames() as $name) {
             try {
                 $conn = $connections->connection($name);
-                $conn->run('SELECT 1');
+                $conn->query('SELECT 1')->first();
                 $output->writeLine(sprintf('  %-15s OK', $name));
             } catch (\Throwable $e) {
                 $output->writeLine(sprintf(

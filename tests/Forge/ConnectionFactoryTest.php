@@ -41,8 +41,8 @@ final class ConnectionFactoryTest extends TestCase
         $conn = $factory->make(['driver' => 'sqlite', 'database' => $path]);
 
         // Assert — verify it can connect and create tables
-        $result = $conn->run('CREATE TABLE test (id INTEGER PRIMARY KEY)');
-        $this->assertInstanceOf(\Arcanum\Forge\Result::class, $result);
+        $result = $conn->execute('CREATE TABLE test (id INTEGER PRIMARY KEY)');
+        $this->assertInstanceOf(\Arcanum\Forge\WriteResult::class, $result);
 
         // Cleanup
         @unlink($path);
@@ -57,8 +57,8 @@ final class ConnectionFactoryTest extends TestCase
         $conn = $factory->make(['driver' => 'sqlite']);
 
         // Assert — in-memory databases connect and work
-        $result = $conn->run('CREATE TABLE test (id INTEGER PRIMARY KEY)');
-        $this->assertInstanceOf(\Arcanum\Forge\Result::class, $result);
+        $result = $conn->execute('CREATE TABLE test (id INTEGER PRIMARY KEY)');
+        $this->assertInstanceOf(\Arcanum\Forge\WriteResult::class, $result);
     }
 
     public function testBuildsMysqlDsn(): void

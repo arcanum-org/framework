@@ -4,43 +4,72 @@ declare(strict_types=1);
 
 namespace Arcanum\Forge;
 
+use Arcanum\Flow\Sequence\Cursor;
+use Arcanum\Flow\Sequence\Sequencer;
+
 /**
  * Built-in Connection implementation wrapping PDO.
  *
  * Connects lazily on first use. Sets ERRMODE_EXCEPTION and FETCH_ASSOC
  * defaults. Ships with the framework for zero-dependency setups.
+ *
+ * Reads stream row-by-row through a Cursor — peak memory stays flat
+ * regardless of result size. Writes return a WriteResult carrying the
+ * affected-row count and last insert id.
  */
 final class PdoConnection implements Connection
 {
     private ?\PDO $pdo = null;
 
+    /**
+     * @param array<int, mixed> $options
+     */
     public function __construct(
         private readonly string $dsn,
         private readonly string $username = '',
         private readonly string $password = '',
-        /** @var array<int, mixed> */
         private readonly array $options = [],
     ) {
     }
 
-    public function run(string $sql, array $params = []): Result
+    /**
+     * @return Sequencer<array<string, mixed>>
+     */
+    public function query(string $sql, array $params = []): Sequencer
     {
         $pdo = $this->pdo();
 
         $statement = $pdo->prepare($sql);
         $statement->execute($params);
 
-        $isRead = Sql::isRead($sql);
+        return Cursor::open(
+            static function () use ($statement): \Generator {
+                $index = 0;
+                while (true) {
+                    /** @var array<string, mixed>|false $row */
+                    $row = $statement->fetch();
+                    if ($row === false) {
+                        return;
+                    }
+                    yield $index++ => $row;
+                }
+            },
+            static function () use ($statement): void {
+                $statement->closeCursor();
+            },
+        );
+    }
 
-        /** @var list<array<string, mixed>> $rows */
-        $rows = $isRead ? $statement->fetchAll() : [];
-        $affectedRows = $isRead ? 0 : $statement->rowCount();
-        $lastInsertId = $isRead ? '' : ($pdo->lastInsertId() ?: '');
+    public function execute(string $sql, array $params = []): WriteResult
+    {
+        $pdo = $this->pdo();
 
-        return new Result(
-            rows: $rows,
-            affectedRows: $affectedRows,
-            lastInsertId: $lastInsertId,
+        $statement = $pdo->prepare($sql);
+        $statement->execute($params);
+
+        return new WriteResult(
+            affectedRows: $statement->rowCount(),
+            lastInsertId: $pdo->lastInsertId() ?: '',
         );
     }
 

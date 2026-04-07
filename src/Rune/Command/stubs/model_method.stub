@@ -1,4 +1,4 @@
-    public function {{! $methodName !}}({{! $params !}}): Result
+    public function {{! $methodName !}}({{! $params !}}): Sequencer|WriteResult
     {
-        return $this->execute(__DIR__ . '/{{! $sqlFile !}}', {{! $paramsArray !}});
+        return $this->dispatch(__DIR__ . '/{{! $sqlFile !}}', {{! $paramsArray !}});
     }

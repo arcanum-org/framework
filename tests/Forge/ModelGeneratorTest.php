@@ -158,7 +158,7 @@ final class ModelGeneratorTest extends TestCase
         );
 
         // Assert
-        $this->assertStringContainsString('function countAll(): Result', $source);
+        $this->assertStringContainsString('function countAll(): Sequencer|WriteResult', $source);
         $this->assertStringContainsString("__DIR__ . '/CountAll.sql', []", $source);
     }
 
