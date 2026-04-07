@@ -6,7 +6,7 @@ namespace Arcanum\Test\Fixture\Shodo;
 
 use Arcanum\Shodo\Attribute\WithHelper;
 
-#[WithHelper(EnvCheckHelper::class, alias: 'Format')]
+#[WithHelper(EnvCheckHelper::class, 'Format')]
 final class PageOverridingGlobal
 {
 }

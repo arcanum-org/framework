@@ -13,51 +13,15 @@ final class WithHelperTest extends TestCase
 {
     public function testStoresClassName(): void
     {
-        $attribute = new WithHelper(\stdClass::class);
+        $attribute = new WithHelper(\stdClass::class, 'Std');
 
         $this->assertSame(\stdClass::class, $attribute->className);
     }
 
-    public function testExplicitAliasIsReturned(): void
+    public function testStoresAlias(): void
     {
-        $attribute = new WithHelper(\stdClass::class, alias: 'Std');
+        $attribute = new WithHelper(\stdClass::class, 'Std');
 
-        $this->assertSame('Std', $attribute->resolvedAlias());
-    }
-
-    public function testAliasStripsHelperSuffixFromBasename(): void
-    {
-        $attribute = new WithHelper('App\\Helpers\\EnvCheckHelper');
-
-        $this->assertSame('EnvCheck', $attribute->resolvedAlias());
-    }
-
-    public function testAliasUsesBasenameWhenNoHelperSuffix(): void
-    {
-        $attribute = new WithHelper('App\\Helpers\\Toolbox');
-
-        $this->assertSame('Toolbox', $attribute->resolvedAlias());
-    }
-
-    public function testAliasFallsBackToFullNameWhenNoNamespace(): void
-    {
-        $attribute = new WithHelper('Toolbox');
-
-        $this->assertSame('Toolbox', $attribute->resolvedAlias());
-    }
-
-    public function testAliasDoesNotStripBareHelperName(): void
-    {
-        // A class literally named "Helper" shouldn't become an empty alias.
-        $attribute = new WithHelper('App\\Helpers\\Helper');
-
-        $this->assertSame('Helper', $attribute->resolvedAlias());
-    }
-
-    public function testExplicitAliasOverridesAutoStrip(): void
-    {
-        $attribute = new WithHelper('App\\Helpers\\EnvCheckHelper', alias: 'Env');
-
-        $this->assertSame('Env', $attribute->resolvedAlias());
+        $this->assertSame('Std', $attribute->alias);
     }
 }

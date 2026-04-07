@@ -367,8 +367,8 @@ The `#[WithHelper]` attribute lets a DTO declare its own helpers inline:
 ```php
 use Arcanum\Shodo\Attribute\WithHelper;
 
-#[WithHelper(\App\Helpers\EnvCheckHelper::class)]
-#[WithHelper(\App\Helpers\IncantationHelper::class, alias: 'Tip')]
+#[WithHelper(\App\Helpers\EnvCheckHelper::class, 'Env')]
+#[WithHelper(\App\Helpers\IncantationHelper::class, 'Tip')]
 final class Index
 {
     public function __construct(
@@ -377,7 +377,7 @@ final class Index
 }
 ```
 
-The attribute is repeatable — declare one per helper. The class is resolved from the container at render time, so the helper can ask for any service the container can provide. The alias defaults to the class basename with a trailing `Helper` stripped (`EnvCheckHelper` → `EnvCheck`); pass `alias:` to override.
+The attribute is repeatable — declare one per helper. Both the helper class and the template alias are explicit; there's no auto-derivation. The class is resolved from the container at render time, so the helper can ask for any service the container can provide.
 
 **Precedence, from least to most specific:**
 

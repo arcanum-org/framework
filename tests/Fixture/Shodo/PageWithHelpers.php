@@ -6,8 +6,8 @@ namespace Arcanum\Test\Fixture\Shodo;
 
 use Arcanum\Shodo\Attribute\WithHelper;
 
-#[WithHelper(EnvCheckHelper::class)]
-#[WithHelper(IncantationHelper::class, alias: 'Tip')]
+#[WithHelper(EnvCheckHelper::class, 'EnvCheck')]
+#[WithHelper(IncantationHelper::class, 'Tip')]
 final class PageWithHelpers
 {
 }

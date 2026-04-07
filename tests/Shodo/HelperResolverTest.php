@@ -185,7 +185,7 @@ final class HelperResolverTest extends TestCase
         // Act
         $helpers = $resolver->for(PageWithHelpers::class);
 
-        // Assert — auto-stripped EnvCheck alias and explicit Tip alias
+        // Assert — both attribute-declared aliases resolved
         $this->assertSame($envHelper, $helpers['EnvCheck']);
         $this->assertSame($tipHelper, $helpers['Tip']);
     }

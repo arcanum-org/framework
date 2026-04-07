@@ -120,7 +120,7 @@ final class HelperResolver
             $withHelper = $attribute->newInstance();
             /** @var object $helper */
             $helper = $this->container->get($withHelper->className);
-            $helpers[$withHelper->resolvedAlias()] = $helper;
+            $helpers[$withHelper->alias] = $helper;
         }
 
         return $helpers;
