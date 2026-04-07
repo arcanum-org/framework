@@ -26,6 +26,8 @@ use Arcanum\Parchment\Reader;
  *
  * Generated model classes extend this class and call read() or write()
  * directly with absolute SQL file paths, skipping the __call arg resolution.
+ * The generator picks the right method per SQL file at generation time so
+ * each generated method has a tight, narrow return type.
  */
 class Model
 {
@@ -108,27 +110,6 @@ class Model
         $rows = $this->readConnection()->query($sql, $params);
 
         return $casts === [] ? $rows : $rows->map(Cast::apply($casts));
-    }
-
-    /**
-     * Dispatch a SQL file by sniffing read vs. write at runtime.
-     *
-     * Generated model methods call this with an absolute path via
-     * `__DIR__ . '/File.sql'` and a pre-built params array, then refine the
-     * return type at the call site via their own signature. Kept as a single
-     * entry point so the generator stub stays one file; {@see ModelGenerator}
-     * may later split reads and writes at generation time for tighter types.
-     *
-     * @param array<string, mixed> $params
-     * @return Sequencer<array<string, mixed>>|WriteResult
-     */
-    protected function dispatch(string $sqlPath, array $params = []): Sequencer|WriteResult
-    {
-        $sql = $this->loadSql($sqlPath);
-
-        return Sql::isRead($sql)
-            ? $this->read($sqlPath, $params)
-            : $this->write($sqlPath, $params);
     }
 
     /**

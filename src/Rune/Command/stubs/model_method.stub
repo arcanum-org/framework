@@ -1,4 +1,0 @@
-    public function {{! $methodName !}}({{! $params !}}): Sequencer|WriteResult
-    {
-        return $this->dispatch(__DIR__ . '/{{! $sqlFile !}}', {{! $paramsArray !}});
-    }

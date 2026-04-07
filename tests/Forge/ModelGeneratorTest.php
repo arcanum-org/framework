@@ -158,8 +158,128 @@ final class ModelGeneratorTest extends TestCase
         );
 
         // Assert
-        $this->assertStringContainsString('function countAll(): Sequencer|WriteResult', $source);
+        $this->assertStringContainsString('function countAll(): Sequencer', $source);
         $this->assertStringContainsString("__DIR__ . '/CountAll.sql', []", $source);
+    }
+
+    // ── Read/write method shape ─────────────────────────────────
+
+    public function testReadMethodReturnsSequencerAndCallsRead(): void
+    {
+        // Arrange
+        $this->writeSql('AllProducts.sql', 'SELECT * FROM products');
+        $generator = new ModelGenerator();
+
+        // Act
+        $source = $generator->generate(
+            $this->modelDir,
+            'App\\Domain\\Shop\\Model\\Model',
+        );
+
+        // Assert
+        $this->assertStringContainsString(
+            '@return Sequencer<array<string, mixed>>',
+            $source,
+        );
+        $this->assertStringContainsString(
+            'function allProducts(): Sequencer',
+            $source,
+        );
+        $this->assertStringContainsString(
+            "return \$this->read(__DIR__ . '/AllProducts.sql'",
+            $source,
+        );
+    }
+
+    public function testWriteMethodReturnsWriteResultAndCallsWrite(): void
+    {
+        // Arrange
+        $this->writeSql(
+            'InsertProduct.sql',
+            'INSERT INTO products (name) VALUES (:name)',
+        );
+        $generator = new ModelGenerator();
+
+        // Act
+        $source = $generator->generate(
+            $this->modelDir,
+            'App\\Domain\\Shop\\Model\\Model',
+        );
+
+        // Assert
+        $this->assertStringContainsString(
+            'function insertProduct(string $name): WriteResult',
+            $source,
+        );
+        $this->assertStringContainsString(
+            "return \$this->write(__DIR__ . '/InsertProduct.sql'",
+            $source,
+        );
+    }
+
+    public function testReadOnlyModelOmitsWriteResultImport(): void
+    {
+        // Arrange
+        $this->writeSql('AllProducts.sql', 'SELECT * FROM products');
+        $this->writeSql('GetById.sql', 'SELECT * FROM products WHERE id = :id');
+        $generator = new ModelGenerator();
+
+        // Act
+        $source = $generator->generate(
+            $this->modelDir,
+            'App\\Domain\\Shop\\Model\\Model',
+        );
+
+        // Assert
+        $this->assertStringContainsString('use Arcanum\\Flow\\Sequence\\Sequencer;', $source);
+        $this->assertStringNotContainsString('use Arcanum\\Forge\\WriteResult;', $source);
+    }
+
+    public function testWriteOnlyModelOmitsSequencerImport(): void
+    {
+        // Arrange
+        $this->writeSql(
+            'InsertProduct.sql',
+            'INSERT INTO products (name) VALUES (:name)',
+        );
+        $this->writeSql(
+            'DeleteProduct.sql',
+            'DELETE FROM products WHERE id = :id',
+        );
+        $generator = new ModelGenerator();
+
+        // Act
+        $source = $generator->generate(
+            $this->modelDir,
+            'App\\Domain\\Shop\\Model\\Model',
+        );
+
+        // Assert
+        $this->assertStringContainsString('use Arcanum\\Forge\\WriteResult;', $source);
+        $this->assertStringNotContainsString('use Arcanum\\Flow\\Sequence\\Sequencer;', $source);
+    }
+
+    public function testMixedModelImportsBoth(): void
+    {
+        // Arrange
+        $this->writeSql('AllProducts.sql', 'SELECT * FROM products');
+        $this->writeSql(
+            'InsertProduct.sql',
+            'INSERT INTO products (name) VALUES (:name)',
+        );
+        $generator = new ModelGenerator();
+
+        // Act
+        $source = $generator->generate(
+            $this->modelDir,
+            'App\\Domain\\Shop\\Model\\Model',
+        );
+
+        // Assert
+        $this->assertStringContainsString('use Arcanum\\Flow\\Sequence\\Sequencer;', $source);
+        $this->assertStringContainsString('use Arcanum\\Forge\\WriteResult;', $source);
+        $this->assertStringContainsString('function allProducts(): Sequencer', $source);
+        $this->assertStringContainsString('function insertProduct(string $name): WriteResult', $source);
     }
 
     public function testGenerateAndWriteCreatesFile(): void

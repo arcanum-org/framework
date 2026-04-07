@@ -46,11 +46,17 @@ final class ModelGenerator
         $sqlFiles = $this->discoverSqlFiles($modelDir);
 
         $methods = [];
+        $hasRead = false;
+        $hasWrite = false;
+
         foreach ($sqlFiles as $file) {
-            $methods[] = $this->renderMethod($file);
+            $isRead = Sql::isRead($this->reader->read($file));
+            $methods[] = $this->renderMethod($file, $isRead);
+            $hasRead = $hasRead || $isRead;
+            $hasWrite = $hasWrite || !$isRead;
         }
 
-        return $this->renderClass($classNamespace, $methods);
+        return $this->renderClass($classNamespace, $methods, $hasRead, $hasWrite);
     }
 
     /**
@@ -155,7 +161,7 @@ final class ModelGenerator
         return $dirs;
     }
 
-    private function renderMethod(string $sqlFile): string
+    private function renderMethod(string $sqlFile, bool $isRead): string
     {
         $filename = basename($sqlFile, '.sql');
         $methodName = lcfirst($filename);
@@ -167,7 +173,7 @@ final class ModelGenerator
         $params = $this->buildParamSignature($bindings, $paramAnnotations);
         $paramsArray = $this->buildParamsArray($bindings);
 
-        $stub = $this->loadStub('model_method');
+        $stub = $this->loadStub($isRead ? 'model_method_read' : 'model_method_write');
 
         return $this->compiler->render($stub, [
             'methodName' => $methodName,
@@ -180,15 +186,37 @@ final class ModelGenerator
     /**
      * @param list<string> $methods Pre-rendered method strings.
      */
-    private function renderClass(string $classNamespace, array $methods): string
-    {
+    private function renderClass(
+        string $classNamespace,
+        array $methods,
+        bool $hasRead,
+        bool $hasWrite,
+    ): string {
         $stub = $this->loadStub('model');
 
         return $this->compiler->render($stub, [
             'namespace' => Strings::classNamespace($classNamespace),
             'className' => Strings::classBaseName($classNamespace),
+            'imports' => $this->buildImports($hasRead, $hasWrite),
             'methods' => implode("\n\n", $methods),
         ]);
+    }
+
+    private function buildImports(bool $hasRead, bool $hasWrite): string
+    {
+        $imports = ['use Arcanum\\Forge\\Model as BaseModel;'];
+
+        if ($hasRead) {
+            $imports[] = 'use Arcanum\\Flow\\Sequence\\Sequencer;';
+        }
+
+        if ($hasWrite) {
+            $imports[] = 'use Arcanum\\Forge\\WriteResult;';
+        }
+
+        sort($imports);
+
+        return implode("\n", $imports);
     }
 
     /**
