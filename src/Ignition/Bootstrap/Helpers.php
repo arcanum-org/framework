@@ -104,6 +104,7 @@ class Helpers implements Bootstrapper
         );
 
         $resolver = new HelperResolver($global, $discovery, $container);
+        $container->instance(HelperRegistry::class, $global);
         $container->instance(HelperResolver::class, $resolver);
         $container->instance(HelperDiscovery::class, $discovery);
     }
