@@ -38,7 +38,8 @@
         "symfony/finder": "^6.3 || ^7.0",
         "monolog/monolog": "^3.4",
         "voku/portable-ascii": "^2.0",
-        "psr/simple-cache": "^3.0"
+        "psr/simple-cache": "^3.0",
+        "psr/clock": "^1.0"
     },
     "scripts": {
         "post-install-cmd": [
