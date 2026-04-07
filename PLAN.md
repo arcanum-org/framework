@@ -204,7 +204,7 @@ Design decisions:
 
 **Starter app — request logging listener:**
 
-- [ ] **`App\Http\Listener\RequestLogger`** — listens to `RequestReceived` (records start time on request attribute) and `RequestHandled` (logs method, path, status, duration). Uses `LoggerInterface`. Log level by status: 2xx→info, 4xx→warning, 5xx→error.
+- [x] **`App\Http\Listener\RequestLogger`** — listens to `RequestReceived` (records start time on request attribute) and `RequestHandled` (logs method, path, status, duration). Uses `LoggerInterface`. Log level by status: 2xx→info, 4xx→warning, 5xx→error.
 - [x] **Register listener** — via Echo subscriber registration in bootstrap or config.
 - [x] **Add `requests` channel to `config/log.php`** — separate log file for HTTP access logs.
 
