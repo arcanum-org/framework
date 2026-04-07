@@ -127,6 +127,73 @@ Full CQRS pipeline: Router → Hydrator → Conveyor → Renderer. Example Query
 
 ## Upcoming Work
 
+### Starter app — index page redesign
+
+Researched the Symfony 8 and CakePHP 5 welcome pages for comparison. Symfony is polished and resource-focused (welcome banner, "Next Step" CTA, three columns of links). CakePHP is diagnostic and reassuring (version banner, environment/filesystem/database health checks with green and red bullets, link directories). Our current index is a hero + two CTAs + a CQRS explainer card grid — sparse, no version, no environment info, no resource links. New users get no signal that the framework is healthy or where to look for more information.
+
+The new index combines all three: Symfony's polish, CakePHP's diagnostic checklist, and our CQRS explainer (which is uniquely valuable — neither competitor explains its own mental model on the first page).
+
+**Wireframe:**
+
+```
+┌────────────────────────────────────────────┐
+│ Welcome to Arcanum {version}               │
+│ Tagline                                     │
+│ This page lives at app/Pages/Index.html —  │
+│ replace it to make it your own.             │
+└────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────┐
+│ NEXT STEP                                   │
+│ → Read the Getting Started guide            │
+│ Or generate your first page:                │
+│   php bin/arcanum make:page Home            │
+└────────────────────────────────────────────┘
+
+┌──────────────┐  ┌──────────────────────────┐
+│ ENVIRONMENT  │  │ APPLICATION              │
+│ ✓ PHP 8.4.3  │  │ ✓ Cache: file (writable) │
+│ ✓ ext-sodium │  │ ✓ Logs: writable         │
+│ ✓ files/ wr  │  │ ✓ Sessions: file         │
+│ ⚠ CSS bundle │  │ ✓ Database: sqlite       │
+│   not built  │  │ ✓ Debug mode ON          │
+└──────────────┘  └──────────────────────────┘
+
+──── How Arcanum Works (existing CQRS cards) ────
+
+┌──────────┐ ┌─────────────┐ ┌──────────┐
+│ LEARN    │ │ COMMUNITY   │ │ BUILD    │
+│ Docs     │ │ GitHub      │ │ make:cmd │
+│ Tutorial │ │ Issues      │ │ make:qry │
+│ API ref  │ │ Discussions │ │ make:page│
+└──────────┘ └─────────────┘ └──────────┘
+```
+
+**Design decisions:**
+
+- **Static checks**, not cached. The index page only renders in dev mode and is called rarely; running `file_exists()` and `extension_loaded()` per page load is cheap. Keeps the page accurate without a manual cache bust after install.
+- **Page is not auto-disabled in production.** The user replaces `app/Pages/Index.html` themselves. No magic — replacing the file is the explicit signal that they're making the app their own.
+- **Status checks live in a new `EnvCheck` helper** under `app/Helpers/EnvCheckHelper.php`, registered via `app/Helpers/Helpers.php` as the `Env` alias. Returns booleans, version strings, and status records per check. Keeps `AppHelper` focused on view-related concerns.
+- **Framework version from `Composer\InstalledVersions::getVersion('arcanum-org/framework')`** — the standard PSR-compatible way, no need to parse files.
+
+**Plan items — starter app:**
+
+- [ ] **`App\Helpers\EnvCheckHelper`** — registered as the `Env` alias. Methods: `phpVersion()`, `phpVersionOk()`, `extensions(): array<string,bool>`, `filesWritable()`, `cacheWritable()`, `logsWritable()`, `sessionsWritable()`, `cacheDriver()`, `sessionDriver()`, `databaseConnection(): ?string` (returns the working driver name or null), `cssBuilt()`, `debugMode()`, `frameworkVersion()`.
+- [ ] **Index page redesign** — rewrite `app/Pages/Index.html` to match the wireframe. Five sections: welcome banner, next step CTA, environment + application checks (two-column grid), CQRS cards (existing, polish), resource link grid (three columns).
+- [ ] **`Index.php` DTO** — keep `name` and `message`, add nothing else. The helper does the data lookup, the DTO stays simple.
+- [ ] **CSS for status bullets** — green check, yellow warning, red cross variants. Inline Tailwind classes; no new CSS file needed.
+- [ ] **Use placeholder example.com URLs** for documentation links. Create a separate plan item to swap them out once real docs exist.
+- [ ] **Smoke test** — confirm the page renders correctly with all checks green on a fresh starter app, and that a contrived failure (e.g. chmod -w on `files/cache/`) flips the right bullet to red.
+
+**Plan items — placeholder URL cleanup (deferred until real docs exist):**
+
+- [ ] **Replace `https://example.com/docs`** in starter app Index page with real documentation URL.
+- [ ] **Replace `https://example.com/tutorial`** with real tutorial URL.
+- [ ] **Replace `https://example.com/api`** with real API reference URL.
+- [ ] **Replace `https://example.com/discussions`** with real community URL (Discord/Slack/GitHub Discussions).
+
+GitHub source and issues URLs will use the real `arcanum-org/framework` repo links — those exist already.
+
 ### Shodo conditionals
 
 The template compiler currently has no conditional directives. Templates that need to branch on runtime state have to push the entire branch into a helper that returns a raw HTML string (which is what we did for `App::cssTags()`). That works but pulls layout-shaped logic into PHP classes for no good reason.
