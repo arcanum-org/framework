@@ -709,6 +709,76 @@ final class HyperKernelTest extends TestCase
         $this->assertTrue($middlewareRan);
     }
 
+    public function testExceptionRendererHonoursDefaultFormatWhenNoExtension(): void
+    {
+        // Arrange — request a URL with no extension. The kernel should
+        // consult formats.default (html in this case) and render the
+        // exception through HtmlExceptionResponseRenderer, not the
+        // generic JSON ExceptionRenderer.
+        $thrown = new \RuntimeException('Boom from handler');
+
+        $htmlResponse = $this->createStub(ResponseInterface::class);
+        $jsonResponse = $this->createStub(ResponseInterface::class);
+
+        $htmlRenderer = $this->createMock(\Arcanum\Hyper\HtmlExceptionResponseRenderer::class);
+        $htmlRenderer->expects($this->once())
+            ->method('render')
+            ->with($thrown)
+            ->willReturn($htmlResponse);
+
+        $jsonRenderer = $this->createMock(ExceptionRenderer::class);
+        $jsonRenderer->expects($this->never())->method('render');
+
+        $config = $this->createStub(\Arcanum\Gather\Configuration::class);
+        $config->method('get')->willReturnCallback(
+            fn(string $key) => $key === 'formats.default' ? 'html' : null,
+        );
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturnMap([
+            [ExceptionHandler::class, false],
+            [ExceptionRenderer::class, true],
+            [\Arcanum\Hyper\HtmlExceptionResponseRenderer::class, true],
+            [\Arcanum\Gather\Configuration::class, true],
+            [EventDispatcherInterface::class, false],
+        ]);
+        $container->method('get')->willReturnCallback(
+            fn(string $id) => match ($id) {
+                ExceptionRenderer::class => $jsonRenderer,
+                \Arcanum\Hyper\HtmlExceptionResponseRenderer::class => $htmlRenderer,
+                \Arcanum\Gather\Configuration::class => $config,
+                default => $bootstrapper,
+            }
+        );
+
+        $kernel = new class ('/app', $thrown) extends HyperKernel {
+            public function __construct(string $rootDirectory, private \Throwable $error)
+            {
+                parent::__construct($rootDirectory);
+            }
+
+            protected function handleRequest(ServerRequestInterface $request): ResponseInterface
+            {
+                throw $this->error;
+            }
+        };
+        $kernel->bootstrap($container);
+
+        $uri = $this->createStub(\Psr\Http\Message\UriInterface::class);
+        $uri->method('getPath')->willReturn('/health');
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getUri')->willReturn($uri);
+
+        // Act
+        $response = $kernel->handle($request);
+
+        // Assert — HTML renderer was used because formats.default = 'html'
+        $this->assertSame($htmlResponse, $response);
+    }
+
     public function testExceptionThrownInMiddlewareIsCaughtAndRendered(): void
     {
         // Arrange — middleware throws before reaching the core handler.

@@ -301,9 +301,11 @@ class HyperKernel implements Kernel, RequestHandlerInterface
      * Reports the exception via the ExceptionHandler, then renders
      * it into a ResponseInterface via the ExceptionRenderer.
      *
-     * When a request is available, the format is extracted from the
-     * URL extension. HTML requests get the HtmlExceptionResponseRenderer
-     * if registered; all others use the default ExceptionRenderer.
+     * Format selection mirrors the success path: the URL extension
+     * picks the format, and when there is no extension we fall back
+     * to the configured `formats.default`. HTML requests get the
+     * HtmlExceptionResponseRenderer if registered; all others use
+     * the default ExceptionRenderer.
      */
     protected function handleException(
         \Throwable $e,
@@ -317,8 +319,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
 
         // Use format-specific renderer when the request indicates HTML.
         if ($request !== null) {
-            $path = $request->getUri()->getPath();
-            $extension = pathinfo($path, PATHINFO_EXTENSION);
+            $extension = $this->resolveResponseFormat($request);
 
             if (
                 $extension === 'html'
@@ -339,6 +340,40 @@ class HyperKernel implements Kernel, RequestHandlerInterface
         }
 
         throw $e;
+    }
+
+    /**
+     * Resolve the response format for a request.
+     *
+     * Uses the URL extension when present, otherwise falls back to the
+     * configured `formats.default`. Returns an empty string if neither
+     * is available. This method must never throw — it is called from
+     * the exception handling path, and a failure here would mask the
+     * original exception.
+     */
+    private function resolveResponseFormat(ServerRequestInterface $request): string
+    {
+        try {
+            $path = $request->getUri()->getPath();
+            $extension = pathinfo($path, PATHINFO_EXTENSION);
+
+            if ($extension !== '') {
+                return $extension;
+            }
+
+            if ($this->container->has(\Arcanum\Gather\Configuration::class)) {
+                /** @var \Arcanum\Gather\Configuration $config */
+                $config = $this->container->get(\Arcanum\Gather\Configuration::class);
+                $default = $config->get('formats.default');
+                if (is_string($default)) {
+                    return $default;
+                }
+            }
+        } catch (\Throwable) {
+            // Format resolution is best-effort; fall through to default.
+        }
+
+        return '';
     }
 
     /**
