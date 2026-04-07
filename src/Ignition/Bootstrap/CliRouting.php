@@ -253,14 +253,37 @@ class CliRouting implements Bootstrapper
                 ? $container->get(ConfigurationCache::class)
                 : null;
 
-            $templateCache = $container->has(TemplateCache::class)
-                ? $container->get(TemplateCache::class)
-                : null;
+            // TemplateCache is normally registered by Bootstrap\Formats,
+            // which only runs in HTTP contexts. Build one directly from
+            // the kernel's files directory so cache:clear can purge the
+            // templates cache from CLI without needing the formatter
+            // bootstrap chain.
+            if ($container->has(TemplateCache::class)) {
+                /** @var TemplateCache $templateCache */
+                $templateCache = $container->get(TemplateCache::class);
+            } else {
+                /** @var Kernel $kernel */
+                $kernel = $container->get(Kernel::class);
+                $templateCache = new TemplateCache(
+                    $kernel->filesDirectory()
+                        . DIRECTORY_SEPARATOR . 'cache'
+                        . DIRECTORY_SEPARATOR . 'templates',
+                );
+            }
+
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+            $frameworkCacheDirectory = $kernel->filesDirectory()
+                . DIRECTORY_SEPARATOR . 'cache';
 
             /** @var CacheManager|null $cacheManager */
             /** @var ConfigurationCache|null $configCache */
-            /** @var TemplateCache|null $templateCache */
-            return new CacheClearCommand($cacheManager, $configCache, $templateCache);
+            return new CacheClearCommand(
+                $cacheManager,
+                $configCache,
+                $templateCache,
+                $frameworkCacheDirectory,
+            );
         });
 
         $container->factory(CacheStatusCommand::class, function () use ($container) {

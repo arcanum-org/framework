@@ -170,7 +170,28 @@ php arcanum cache:clear              # clear all stores + framework caches
 php arcanum cache:clear --store=file # clear only the file store
 ```
 
-Clears all configured Vault stores plus framework caches (ConfigurationCache, TemplateCache).
+With no arguments, clears every cache surface in three passes:
+
+1. **Configured Vault stores** — every store registered in `cache.stores`, via `CacheManager::store($name)->clear()`. Includes the file driver, array driver, and any custom drivers like Redis or APCu.
+2. **Structured framework caches** — `ConfigurationCache` (`files/cache/config.php`) and `TemplateCache` (`files/cache/templates/`).
+3. **Stray framework cache subdirectories** — walks `files/cache/` and clears any subdirectory not already handled by step 1 or 2. Catches helper discovery, page discovery, middleware discovery, and any future framework cache surfaces that haven't been formally injected into the command. Subdirectories themselves remain in place (so file drivers don't lose their root); only their contents are removed.
+
+The command works in both HTTP and CLI bootstraps. `TemplateCache` is constructed directly from `Kernel::filesDirectory()` in CLI contexts where `Bootstrap\Formats` doesn't run.
+
+## Framework cache inventory
+
+Every place the framework writes a cache, ordered by bootstrap stage:
+
+| Cache | Path / driver | Cleared by |
+|---|---|---|
+| Configuration snapshot | `files/cache/config.php` | `cache:clear` (structured) |
+| Compiled templates | `files/cache/templates/<md5>.php` | `cache:clear` (structured) |
+| Page discovery | `frameworkStore('pages')` (via `CacheManager`) | `cache:clear` (Vault store pass + stray walk) |
+| Middleware discovery | `frameworkStore('middleware')` (via `CacheManager`) | `cache:clear` (Vault store pass + stray walk) |
+| Helper discovery | `frameworkStore('helpers')` (via `CacheManager`) | `cache:clear` (Vault store pass + stray walk) |
+| Application caches | `CacheManager::store($name)` | `cache:clear` (Vault store pass) or `--store=NAME` |
+
+All framework caches respect the master `cache.framework.enabled` switch. Application caches (used by `RateLimit`, app code, etc.) are independent of that switch — they're always honoured.
 
 ## At a glance
 
