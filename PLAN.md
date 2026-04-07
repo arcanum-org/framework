@@ -176,14 +176,82 @@ The new index combines all three: Symfony's polish, CakePHP's diagnostic checkli
 - **Status checks live in a new `EnvCheck` helper** under `app/Helpers/EnvCheckHelper.php`, registered via `app/Helpers/Helpers.php` as the `Env` alias. Returns booleans, version strings, and status records per check. Keeps `AppHelper` focused on view-related concerns.
 - **Framework version from `Composer\InstalledVersions::getVersion('arcanum-org/framework')`** — the standard PSR-compatible way, no need to parse files.
 
-**Plan items — starter app:**
+**Expanded scope — late-night brainstorm, agreed direction:**
 
-- [ ] **`App\Helpers\EnvCheckHelper`** — registered as the `Env` alias. Methods: `phpVersion()`, `phpVersionOk()`, `extensions(): array<string,bool>`, `filesWritable()`, `cacheWritable()`, `logsWritable()`, `sessionsWritable()`, `cacheDriver()`, `sessionDriver()`, `databaseConnection(): ?string` (returns the working driver name or null), `cssBuilt()`, `debugMode()`, `frameworkVersion()`.
-- [ ] **Index page redesign** — rewrite `app/Pages/Index.html` to match the wireframe. Five sections: welcome banner, next step CTA, environment + application checks (two-column grid), CQRS cards (existing, polish), resource link grid (three columns).
-- [ ] **`Index.php` DTO** — keep `name` and `message`, add nothing else. The helper does the data lookup, the DTO stays simple.
-- [ ] **CSS for status bullets** — green check, yellow warning, red cross variants. Inline Tailwind classes; no new CSS file needed.
-- [ ] **Use placeholder example.com URLs** for documentation links. Create a separate plan item to swap them out once real docs exist.
-- [ ] **Smoke test** — confirm the page renders correctly with all checks green on a fresh starter app, and that a contrived failure (e.g. chmod -w on `files/cache/`) flips the right bullet to red.
+The wireframe is the skeleton. On top of it we layer personality and signal density. The page should tell a new dev: (1) the framework is alive and healthy, (2) what's wired up right now, (3) what to do in the next 60 seconds, and (4) why CQRS instead of MVC — without being preachy.
+
+**Sections, top to bottom:**
+
+1. **Heartbeat badge** (#9) — single dense monospace line at the very top: `Arcanum v0.x.y · PHP 8.4.3 · env: local · db: sqlite · debug: ON`. Replaces the version-only banner. Symfony-style; the most useful single line on the page.
+
+2. **Welcome banner** — `Welcome to Arcanum`, tagline, and the "this page lives at app/Pages/Index.html — replace it" hint. Keep short.
+
+3. **Today's incantation** (#1) — rotating tip-of-the-day card. Hardcoded array of ~15 real Arcanum tricks (the `match` directive, `#[RequiresAuth]`, `make:query`, `cache:clear`, `Env::extensions()`, etc). Picked deterministically by `date('z') % count` so it changes daily but is stable within a day. Format: short title, one-line explanation, optional code snippet. Free onboarding without a docs site.
+
+4. **Diagnostics — two columns** — Environment checks (PHP version, extensions, writable dirs) and Application checks (cache driver, logs, sessions, database, CSS bundle, debug mode). Plain professional language, no theme cuteness — green check / yellow warning / red cross bullets. Static checks per request, no caching.
+
+5. **What's wired up** (#4) — small introspection panel showing live counts: `12 services · 3 commands · 4 queries · 2 pages · 5 middleware · 6 helpers`. Pulled from Cabinet and the discovery caches. Doubles as a smoke test — `0 commands` instantly tells a new dev discovery didn't run.
+
+6. **Why CQRS (not MVC)** — replaces the generic three-card "How It Works" grid. Two short paragraphs framing the choice as deliberate, not contrarian. Tone: confident, not marketing-y. They already installed it; we're just affirming the wise choice. Headline angle: *MVC controllers grow into junk drawers. CQRS keeps each operation small, named, and testable.* Beneath the prose, **inline mini demo** (#8): tabbed code block (pure CSS `:target` tabs) showing a 4-line Query, a 4-line Command, and a 4-line Page side-by-side. Devs learn by reading code.
+
+7. **Your next 60 seconds / 10 minutes / 1 hour** (#7) — three progressive-commitment cards replacing the LEARN/COMMUNITY/BUILD grid:
+   - **60 seconds** — copy a `make:page Home` command (with copy button #5). Instant action.
+   - **10 minutes** — inline 3-paragraph CQRS primer + link to a deeper write-up.
+   - **1 hour** — getting-started guide, source link, GitHub repo.
+   Each command/snippet on the page has a tiny **copy-to-clipboard button** (#5) — vanilla JS one-liner, no dependency.
+
+8. **Footer crumb** (#3) — single understated line: `This page rendered in 3.2ms. You are request #47 since boot.` Pulled from the lifecycle events shipped earlier (`RequestReceived` timestamp + an APCu/file counter incremented in a listener). Demonstrates the events package without ever mentioning it.
+
+9. **ASCII rune in the corner** (#10) — small SVG or pre-formatted ASCII glyph in the page footer. Subtle. Because we're called Arcanum and it'd be a crime not to.
+
+10. **Nice-to-have: `?debug=1` easter egg** (#6) — toggling the query param replaces the welcome banner with a visualization of the resolved bootstrap order (Environment → Configuration → Logger → Exceptions → ...). Completely optional, ship only if the rest lands cleanly.
+
+**Plan items — helpers and data:**
+
+- [ ] **`App\Helpers\EnvCheckHelper`** — registered as the `Env` alias. Methods: `phpVersion()`, `phpVersionOk()`, `extensions(): array<string,bool>`, `filesWritable()`, `cacheWritable()`, `logsWritable()`, `sessionsWritable()`, `cacheDriver()`, `sessionDriver()`, `databaseConnection(): ?string`, `cssBuilt()`, `debugMode()`, `frameworkVersion()`, `appEnvironment()`.
+- [ ] **`App\Helpers\WiredUpHelper`** — registered as the `Wired` alias. Introspects Cabinet + discovery caches and returns counts: `services()`, `commands()`, `queries()`, `pages()`, `middleware()`, `helpers()`. Read from the existing discovery caches where available; fall back to filesystem scan.
+- [ ] **`App\Helpers\IncantationHelper`** — registered as the `Incantation` alias. Hardcoded array of ~15 tip records (`['title' => ..., 'body' => ..., 'code' => ?]`). `today()` returns `$tips[date('z') % count($tips)]`. Pure, no I/O.
+- [ ] **`App\Http\Listener\RequestCounter`** — listens to `RequestHandled`, increments a counter in Vault (`framework.requests` key). Exposed via a new `Env::requestCount()` reader. Also stamps render duration onto the request attribute from the `RequestReceived` listener already present.
+- [ ] **`Env::renderDurationMs()`** — reads the start timestamp set by the existing `RequestLogger` listener and returns elapsed ms at render time.
+
+**Plan items — page and templates:**
+
+- [ ] **Index page redesign** — rewrite `app/Pages/Index.html` to the nine-section structure above. One file, no partials (this is the welcome page, it should be readable as a single document).
+- [ ] **`Index.php` DTO** — keep `name` and `message` only. All other data flows through helpers.
+- [ ] **CSS — status bullets** — green check / yellow warning / red cross via Tailwind utility classes. No new CSS file.
+- [ ] **CSS — `:target` tabs** — pure CSS tabbed code block for the inline CQRS mini demo. No JS.
+- [ ] **Copy-to-clipboard buttons** — one tiny inline `<script>` block at the bottom of the page wiring `[data-copy]` buttons to `navigator.clipboard.writeText`. Visual feedback on click (text swap to "Copied!" for 1.5s).
+- [ ] **ASCII/SVG rune mark** — small decorative glyph in the footer area.
+- [ ] **Placeholder example.com URLs** for docs/tutorial/api links. Tracked in the cleanup section below.
+
+**Plan items — content:**
+
+- [ ] **Write the "Why CQRS" prose** — two short paragraphs. Confident, not preachy. Frame MVC controllers as junk drawers; frame CQRS handlers as small, named, testable. No marketing fluff.
+- [ ] **Write the 15 incantations** — short, real, useful. Lean toward things a new user wouldn't discover from skimming the README.
+- [ ] **Write the three progressive-commitment card bodies** — 60s / 10min / 1hr.
+
+**Plan items — verification:**
+
+- [ ] **Smoke test happy path** — fresh starter app, all checks green, all counts non-zero, render duration shows, request counter increments across reloads, incantation rotates with `date('z')`.
+- [ ] **Smoke test failure path** — `chmod -w files/cache/` flips the cache bullet red without crashing the page; dropping the database file flips the database bullet without crashing.
+- [ ] **Tab demo works without JS** — disable JS in browser, confirm `:target` tabs still switch.
+- [ ] **Copy buttons work** — click each, confirm clipboard contents and visual feedback.
+
+**Nice-to-have (defer if time runs short):**
+
+- [ ] **`?debug=1` bootstrap visualization** — replaces welcome banner with bootstrap order list when query param is set.
+
+**Plan items — remove the Contact feature:**
+
+The Contact form/page/command was useful early on as a smoke test for the full CQRS write-path (DTO → validation → handler → Forge persistence → redirect → re-read query). It's served its purpose. The upcoming todo app will cover the same ground in a more meaningful way, and keeping Contact around now just clutters the starter and competes with the new index for attention. Yank it cleanly so the starter is welcome page + health check only until the todo app lands.
+
+- [x] **Delete the Contact domain** — `app/Domain/Contact/` (Command/Submit DTO + handler, Query/Messages DTO + handler, Model/ subdirectory with `Save.sql`, `FindAll.sql`, `CreateTable.sql`, any generated model classes).
+- [x] **Delete the Contact page** — `app/Pages/Contact.php`, `app/Pages/Contact.html`.
+- [x] **Remove Contact links from navigation** — `app/Templates/partials/nav.html`.
+- [x] **Remove Contact references from the index page** — "Get in Touch" CTA dropped from current Index; README examples swapped to a generic Orders feature.
+- [x] **Drop the contacts table migration / SQL** — gone with the Contact domain delete; nothing else wired it.
+- [x] **Keep `config/database.php` and the SQLite connection** — left intact for the todo app and `Env::databaseConnection()`.
+- [x] **Smoke test** — `/`, `/health.html`, `/health.json` all 200; `/contact.html` now 404; `composer check` clean (3 tests, PHPStan green).
 
 **Plan items — placeholder URL cleanup (deferred until real docs exist):**
 
