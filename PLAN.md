@@ -262,6 +262,55 @@ The Contact form/page/command was useful early on as a smoke test for the full C
 
 GitHub source and issues URLs will use the real `arcanum-org/framework` repo links — those exist already.
 
+### Shodo — expression-aware helper call rewriting
+
+Surfaced while wiring the welcome page index helpers. The `IncantationHelper::today()` method returns an array shape `{title, body, code}`, and the natural way to read the title from a template is `{{ Tip::today()['title'] }}`. Today, that throws `Class "Tip" not found` because Shodo's helper-rewrite regex matches only the exact form `{{ Name::method(args) }}` with no trailing PHP. The leftover `['title']` between the captured method call and `}}` defeats the regex, so the rewrite doesn't fire and PHP later tries to resolve a literal class named `Tip`.
+
+The current shape of the compiler:
+
+```php
+private const HELPER_PATTERN = '([A-Z][a-zA-Z0-9]*)::(\w+)((?:\(...\)))';
+
+// Helper calls in escaped output: {{ Route::url('x') }}
+$compiled = $this->replaceCallback(
+    '/\{\{\s*' . self::HELPER_PATTERN . '\s*\}\}/s',
+    fn (array $m) => '<?= $__escape((string)($__helpers[\'' . $m[1] . '\']->' . $m[2] . $m[3] . ')) ?>',
+    $compiled,
+);
+```
+
+The regex captures `Name::method(args)` and demands `\}\}` immediately after. No room for `[...]`, `->next()`, `+ 1`, ternaries, `??`, or any other PHP expression continuation. Devs hit this the moment their helper returns anything other than a scalar.
+
+**The fix: treat the body of `{{ ... }}` as a PHP expression.** Instead of matching the entire expression with one regex, the compile pass becomes:
+
+1. Find `{{ ... }}` (escaped) or `{{! ... !}}` (raw) and capture the inside.
+2. Rewrite *every* `Name::method(args)` occurrence inside the captured body via `preg_replace_callback`. Each match becomes `$__helpers['Name']->method(args)`.
+3. Wrap the result in `<?= $__escape((string)(...)) ?>` (escaped) or `<?= ... ?>` (raw).
+
+After step 2 the body is valid PHP. Anything PHP allows after a method call — `[...]`, `->`, `?->`, `+`, `*`, ternary, `??`, `instanceof` — Just Works because PHP itself parses the result. Multiple helper calls in one expression compose: `{{ Format::number(Math::pi(), 2) }}` rewrites both occurrences.
+
+The dedicated "Helper calls in escaped output" and "Helper calls in raw output" passes go away — the rewriter lives inside the general output pass. Net code reduction in `TemplateCompiler::compile()`.
+
+**Decisions, settled:**
+
+- **The uppercase-first-letter rule is the contract.** A real PHP static call inside a template would be a name collision against an alias. Rare, but the escape hatch is the FQCN with leading `\` (e.g. `\App\Foo::bar()` — the leading backslash means the regex won't match). Document this in the README.
+- **String literals are out of scope.** The current regex doesn't handle `'A::b()'` either, and it has never been a problem because templates don't quote helper-shaped strings. Leaving it unhandled keeps the regex tractable.
+- **Single output pass per body.** The rewrite happens inside the body capture for both `{{ }}` and `{{! !}}` callbacks. No separate "helper-only" pass.
+
+**Plan items:**
+
+- [ ] **`TemplateCompiler::compile()` rewrite** — replace the dedicated helper-call passes with a body-aware rewrite inside the escaped/raw output passes. The escaped output callback runs the helper rewriter on the captured body, then wraps in `$__escape((string)(...))`. Same for raw output. Delete the four lines defining the standalone helper-call patterns.
+- [ ] **`HELPER_PATTERN` simplification** — the constant becomes the inner pattern used by the body rewriter, no longer anchored to `\{\{` / `\}\}`. May rename to `HELPER_CALL_PATTERN` to reflect its new role.
+- [ ] **`tests/Shodo/TemplateCompilerTest.php`** — add cases for: array access (`Tip::today()['title']`), arrow access (`User::current()->name`), arithmetic (`Math::pi() + 1`), ternary (`Env::debugMode() ? 'on' : 'off'`), null coalesce, nested helper calls (`Format::number(Math::pi(), 2)`), helper call followed by string concatenation. Plus: helper call inside an `if` condition (`{{ if Env::debugMode() }}`), inside a `foreach` (`{{ foreach Wired::list() as $item }}`).
+- [ ] **`tests/Shodo/HelperResolverTest.php`** — no change needed; the resolver doesn't care about call shape.
+- [ ] **README update** — note that the inside of `{{ }}` is "any PHP expression with helper calls auto-rewritten", document the FQCN escape hatch, mention the multi-helper-per-expression composition.
+- [ ] **Test fixture migration** — if any existing template fixtures use the workaround (variable binding to a helper-call result), simplify them to the natural form to verify the new path. Most fixtures use scalar-returning helpers and won't need changes.
+
+**Open follow-ups (defer):**
+
+- **String-literal awareness.** If a template ever needs to print the literal text `Foo::bar()`, the rewrite will mangle it. Could be addressed with a string-literal scanner like the one in `Forge\SqlScanner`, but the current need is zero. Revisit when a real fixture surfaces it.
+- **`{{ if Helper::method() }}` syntax.** The control-structure regex has its own helper-call awareness today; verify the new body rewriter doesn't double-process. May need to apply the helper rewriter to control-structure expression captures too — covered by the test items above.
+
 ### Stopwatch — framework-wide lifecycle timing
 
 Surfaced while writing the starter app's `RenderMetrics` holder for the welcome page footer crumb. That class wanted to be one specific thing (request-scoped start time) but already aspirationally named itself for a broader concept (render metrics). The honest design is a generic, framework-level **stopwatch** that records named checkpoints across the request lifecycle and exposes them to anyone who asks. The welcome page's "rendered in X ms" is then just one of many consumers — a debug toolbar, log lines with phase breakdowns, slow-test detection in CI, and per-middleware profiling all sit on top of the same primitive.
