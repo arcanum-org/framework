@@ -214,4 +214,4 @@ What apps get **today** for testing their own code: nothing yet. Writing a handl
 
 - **`PLAN.md`** — what's been built, what's coming, and the load-bearing decisions distilled into tenets.
 - **`src/<Package>/README.md`** — the authoritative reference for each package. Cabinet, Codex, Atlas, Forge, Shodo, Hourglass, and the rest each have their own.
-- **`../arcanum/README.md`** (the starter app) — getting-started guide, quick-start, directory conventions.
+- **[arcanum-org/arcanum](https://github.com/arcanum-org/arcanum)** (the starter app) — getting-started guide, quick-start, directory conventions.
