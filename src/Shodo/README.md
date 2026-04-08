@@ -327,7 +327,7 @@ The compiler rewrites `Name::method(...)` to `$__helpers['Name']->method(...)`. 
 The body of `{{ }}` (and `{{! !}}`) is treated as an arbitrary PHP expression. Every helper-call occurrence inside it is rewritten in a single pass — anything PHP allows after a method call composes naturally:
 
 ```html
-{{ Tip::today()['title'] }}                    array access
+{{ Tip::pick()['title'] }}                     array access
 {{ User::current()->name }}                    method chain
 {{ Math::pi() + 1 }}                           arithmetic
 {{ Env::debugMode() ? 'on' : 'off' }}          ternary
@@ -363,12 +363,29 @@ The lookbehind also leaves `$Format::method()` (variable static call) and partia
 
 Format, Str, and Arr are always available. Route and Html are registered by the HTTP bootstrap when their dependencies exist (UrlResolver, ActiveSession).
 
+### App-wide helpers (`app/Helpers/Helpers.php`)
+
+For helpers available to *every* template — including Pages — register them in a special file at `app/Helpers/Helpers.php`. `Bootstrap\Helpers` reads this file explicitly at boot time and merges its entries into the global `HelperRegistry`:
+
+```php
+<?php
+// app/Helpers/Helpers.php
+
+return [
+    'App' => \App\Helpers\AppHelper::class,
+];
+```
+
+This is the file the starter app ships to register its `App::cssTags()` helper. Anything registered here is reachable from any template by its alias.
+
+> **Note.** `app/Helpers/Helpers.php` is a hardcoded special path that `Bootstrap\Helpers` reads directly. It is *not* discovered by `HelperDiscovery`, which only walks `app/Domain/` (see below). The asymmetry exists for historical reasons and is tracked under `PLAN.md` for future cleanup — global helpers will eventually move to `config/helpers.php` to parallel `config/middleware.php`.
+
 ### Domain-scoped helpers
 
-Custom helpers are registered via co-located `Helpers.php` files, following the same convention as `Middleware.php`:
+Custom helpers can also be registered via co-located `Helpers.php` files inside `app/Domain/`. `HelperDiscovery` walks `app/Domain/` only, so files outside that subtree are not picked up:
 
 ```
-app/Domain/Helpers.php              → available to all domains
+app/Domain/Helpers.php              → available to all DTOs under App\Domain\*
 app/Domain/Shop/Helpers.php         → only Shop queries/commands
 app/Domain/Shop/Checkout/Helpers.php → only Checkout subdomain
 ```
@@ -383,9 +400,11 @@ return [
 ];
 ```
 
-At format-time, the `HelperResolver` walks from the root to the DTO's domain namespace, accumulating helpers. Deeper domains override shallower ones — a `Cart` alias in `Shop/Checkout/Helpers.php` overrides the same alias in `Shop/Helpers.php`.
+At format-time, the `HelperResolver` walks from the root to the DTO's namespace, accumulating helpers. Deeper directories override shallower ones — a `Cart` alias in `Shop/Checkout/Helpers.php` overrides the same alias in `Shop/Helpers.php`.
 
 Discovery results are cached via PSR-16 (controlled by `cache.helpers.enabled` in `config/cache.php`).
+
+> **Pages cannot have a discovered `Helpers.php`.** `HelperDiscovery` only walks `app/Domain/`, so a file at `app/Pages/Helpers.php` is not picked up. Pages get the global helpers from `app/Helpers/Helpers.php`, plus whatever they declare via `#[WithHelper]` on the Page DTO class itself. This is asymmetric with `Middleware.php` (which is discovered across the whole `app/` tree); both halves of the asymmetry are tracked in `PLAN.md` for future cleanup.
 
 ### Per-DTO helpers via `#[WithHelper]`
 
@@ -412,6 +431,9 @@ The attribute is repeatable — declare one per helper. Both the helper class an
 
 ```
 global registry  ←  domain Helpers.php  ←  #[WithHelper] on the DTO
+   (built-ins         (discovered under          (declared on the
+    + app/Helpers/      app/Domain/, walked        DTO class itself,
+    Helpers.php)        from root to leaf)         highest priority)
 ```
 
 A `#[WithHelper]` declaration always wins over both global and domain-discovered helpers — the DTO has explicitly named what it needs. Use this for narrow, page-specific helpers; keep `Helpers.php` files for genuinely shared functionality.

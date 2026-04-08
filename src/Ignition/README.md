@@ -83,34 +83,66 @@ Bootstrappers run once, in order, the first time `bootstrap()` is called. Each o
 
 | Order | Bootstrapper | What it does |
 |---|---|---|
-| 1 | `Environment` | Loads `.env` file, validates required vars, registers `Environment` in container |
-| 2 | `Configuration` | Loads `config/*.php` files (or cache), registers `Configuration` in container |
-| 3 | `Security` | Reads `APP_KEY`, registers `Encryptor`, `Signer`, and `Hasher` in container |
-| 4 | `Cache` | Reads `config/cache.php`, registers `CacheManager` and default `CacheInterface` |
-| 5 | `Database` | Reads `config/database.php`, registers `ConnectionManager`, `DomainContext`, `Database`. Skips if no config |
-| 6 | `Sessions` | Reads `config/session.php`, registers session handler and `ActiveSession` |
-| 7 | `Auth` | Reads `config/auth.php`, registers guards, `ActiveIdentity` |
-| 8 | `Routing` | Registers router, format registry, response renderers, page discovery, hydrator, Conveyor middleware |
-| 9 | `RouteMiddleware` | Discovers per-route middleware from attributes and `Middleware.php` files |
-| 10 | `Logger` | Builds Monolog handlers and channels from config |
-| 11 | `Exceptions` | Sets PHP error/exception/shutdown handlers |
-| 12 | `Middleware` | Registers global HTTP middleware from config |
+| 1 | `Stopwatch` | Builds the framework `Stopwatch`, reads `ARCANUM_START` if defined, registers it as a singleton, and installs it as the process-global. Must run first so every later bootstrapper can `tap()` instants. |
+| 2 | `Environment` | Loads `.env` file, validates required vars, registers `Environment` in container |
+| 3 | `Configuration` | Loads `config/*.php` files (or cache), registers `Configuration` in container |
+| 4 | `Security` | Reads `APP_KEY`, registers `Encryptor`, `Signer`, and `Hasher` in container |
+| 5 | `Cache` | Reads `config/cache.php`, registers `CacheManager` and default `CacheInterface` |
+| 6 | `Database` | Reads `config/database.php`, registers `ConnectionManager`, `DomainContext`, `Database`. Skips if no config |
+| 7 | `Sessions` | Reads `config/session.php`, registers session handler and `ActiveSession` |
+| 8 | `Auth` | Reads `config/auth.php`, registers guards, `ActiveIdentity` |
+| 9 | `Routing` | Registers router, page discovery, hydrator, Conveyor middleware |
+| 10 | `Helpers` | Registers global helpers (built-in + `app/Helpers/Helpers.php`), `HelperRegistry`, `HelperResolver`, `HelperDiscovery` |
+| 11 | `Formats` | Registers Shodo formatters, `FormatRegistry`, and the response renderers (`Json`, `Html`, `Csv`, `PlainText`, `Markdown`, exception renderers) |
+| 12 | `RouteMiddleware` | Discovers per-route middleware from attributes and `Middleware.php` files |
+| 13 | `Logger` | Builds Monolog handlers and channels from config |
+| 14 | `Exceptions` | Sets PHP error/exception/shutdown handlers |
+| 15 | `Middleware` | Registers global HTTP middleware from config |
 
 ### CLI bootstrappers
 
 | Order | Bootstrapper | What it does |
 |---|---|---|
-| 1 | `Environment` | Same as HTTP — shared |
-| 2 | `Configuration` | Same as HTTP — shared |
-| 3 | `Security` | Same as HTTP — shared |
-| 4 | `Cache` | Same as HTTP — shared |
-| 5 | `Database` | Same as HTTP — shared. Skips if no config |
-| 6 | `Auth` | Same as HTTP — shared |
-| 7 | `CliRouting` | Registers CLI router, format registry, formatters, output, built-in commands, Conveyor middleware |
-| 8 | `Logger` | Same as HTTP — shared |
-| 9 | `Exceptions` | Same as HTTP — shared |
+| 1 | `Stopwatch` | Same as HTTP — shared. Runs first so the rest of the boot sequence can mark instants. |
+| 2 | `Environment` | Same as HTTP — shared |
+| 3 | `Configuration` | Same as HTTP — shared |
+| 4 | `Security` | Same as HTTP — shared |
+| 5 | `Cache` | Same as HTTP — shared |
+| 6 | `Database` | Same as HTTP — shared. Skips if no config |
+| 7 | `Auth` | Same as HTTP — shared |
+| 8 | `CliRouting` | Registers CLI router, format registry, formatters, output, built-in commands, Conveyor middleware |
+| 9 | `Logger` | Same as HTTP — shared |
+| 10 | `Exceptions` | Same as HTTP — shared |
 
-Notice that `Environment`, `Configuration`, `Security`, `Cache`, `Database`, `Auth`, `Logger`, and `Exceptions` are **shared** between both transports. Only the routing and middleware bootstrappers differ — HTTP needs `Routing`, `RouteMiddleware`, `Sessions`, and `Middleware`; CLI needs `CliRouting`.
+Notice that `Stopwatch`, `Environment`, `Configuration`, `Security`, `Cache`, `Database`, `Auth`, `Logger`, and `Exceptions` are **shared** between both transports. Only the routing, helper, format, and middleware bootstrappers differ — HTTP needs `Routing`, `Helpers`, `Formats`, `RouteMiddleware`, `Sessions`, and `Middleware`; CLI needs `CliRouting`.
+
+### Lifecycle marks
+
+Both kernels record built-in instants on the framework `Stopwatch` (from the [Hourglass](../Hourglass/README.md) package) at every important point in the request lifecycle:
+
+| Mark | When | Recorded by |
+|---|---|---|
+| `arcanum.start` | Front controller line 1 (via `ARCANUM_START`) or Stopwatch construction | `Bootstrap\Stopwatch` |
+| `boot.complete` | After all bootstrappers finish | `HyperKernel`/`RuneKernel::bootstrap()` |
+| `request.received` | Before any HTTP middleware runs | `HyperKernel::dispatchRequestReceived()` |
+| `handler.start` | Conveyor `MiddlewareBus::dispatch()` entry | `Flow\Conveyor\MiddlewareBus` |
+| `handler.complete` | Conveyor `MiddlewareBus::dispatch()` exit (in `finally`) | `Flow\Conveyor\MiddlewareBus` |
+| `render.start` | `ResponseRenderer::render()` entry | the five HTTP response renderers |
+| `render.complete` | `ResponseRenderer::render()` exit (in `finally`) | the five HTTP response renderers |
+| `request.handled` | After the response is built, before `terminate()` | `HyperKernel::dispatchRequestHandled()` |
+| `response.sent` | After `fastcgi_finish_request()` releases the client connection | `HyperKernel::terminate()` |
+| `arcanum.complete` | End of `terminate()` — last thing the framework does before process exit | both kernels |
+
+Read elapsed time from anywhere via the static accessor:
+
+```php
+use Arcanum\Hourglass\Stopwatch;
+
+$totalProcessMs = Stopwatch::current()->timeBetween('arcanum.start', 'arcanum.complete');
+$justTheRequest = Stopwatch::current()->timeSince('request.received');
+```
+
+The Hourglass README has the full Stopwatch API. Marking is always on; the cost per mark is single-digit nanoseconds.
 
 ### Customizing bootstrappers
 
@@ -348,10 +380,13 @@ Kernel interface
     └── renderResult()    — format output via CliFormatRegistry
 
 Shared bootstrappers:        HTTP-only:            CLI-only:
-├── Environment              ├── Routing           └── CliRouting
-├── Configuration            ├── RouteMiddleware
-├── Security                 └── Middleware
-├── Cache
+├── Stopwatch                ├── Sessions          └── CliRouting
+├── Environment              ├── Routing
+├── Configuration            ├── Helpers
+├── Security                 ├── Formats
+├── Cache                    ├── RouteMiddleware
+├── Database                 └── Middleware
+├── Auth
 ├── Logger
 └── Exceptions
 

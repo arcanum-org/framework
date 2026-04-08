@@ -386,6 +386,10 @@ return [
 ];
 ```
 
+### Reserved filename — `Middleware.php` inside `app/Pages/`
+
+`MiddlewareDiscovery` walks the entire `app/` tree, so a file at `app/Pages/Middleware.php` is picked up as scoped middleware for every Page DTO under `App\Pages\*`. That's the intended behavior — but it also means **`Middleware.php` is a reserved filename inside `app/Pages/`**: a developer who wants to make `/middleware.html` a real page route by creating `app/Pages/Middleware.php` will hit a collision between `PageDiscovery` and `MiddlewareDiscovery` instead. Until the future fix lands (a per-Page `#[WithMiddleware]` attribute plus cross-aware discovery, tracked in `PLAN.md`), avoid naming any Page DTO `Middleware`. If you need that route, register an alias in `config/routes.php` instead.
+
 ### Middleware that applies to everything
 
 If you want middleware on *every* handler in your app (not just global HTTP middleware), place a `Middleware.php` at the root of your app directory:
