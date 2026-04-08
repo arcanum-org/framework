@@ -8,6 +8,52 @@
 
 Concrete, walkable lists. Everything else in this file is informational — context, history, decisions, and future work that hasn't been broken into steps yet. When something becomes a checklist, it lives here.
 
+### Hourglass Clock integration — active
+
+Integrate `Hourglass\Clock` throughout the framework and starter app so every wall-clock read crosses an injectable boundary. Built once, then `FrozenClock` makes Sessions/Auth/Throttle/Vault tests deterministic without `sleep()` and without any test-only time mocking. This is the foundation for the broader testing-utilities arc (`TestKernel`, `Factory`, `Fake\`) — those build on a fakeable Clock and become much cheaper once it's in place.
+
+**Scope decisions made during discovery:**
+- **Migrate** every site that reads "now" and crosses a testability boundary (TTL math, expiry checks, persisted timestamps).
+- **Skip** deterministic `DateInterval`-to-int converters in `ApcuDriver`/`RedisDriver` (they don't read now), the `FormatHelper::date()` formatter (it formats caller-provided values), and `Stopwatch`'s `microtime(true)` calls (Stopwatch is high-resolution monotonic-ish elapsed time, Clock is wall-clock; intentionally separate concerns).
+- **Test-only sites** in `tests/` and starter app entry points (`public/index.php`, `bin/arcanum` defining `ARCANUM_START`) are not migration targets — they're either test fixtures or the legitimate source of truth.
+
+**Order:** bootstrap → Vault → Throttle → Auth → starter app → docs. Vault first because it's a dependency of Throttle (Throttle stores its state through Vault), and starting with the dependency means downstream packages compile against an already-Clock-aware Vault. Each item is its own commit.
+
+#### Bootstrap
+
+- [ ] **Register `Clock` in the container.** Either extend `Bootstrap\Stopwatch` to also bind `Clock::class → SystemClock::class` (and rename it to `Bootstrap\Hourglass`), or add a new `Bootstrap\Clock` bootstrapper. Prefer extending+renaming — Hourglass is one cohesive package, two bootstrappers for it would split the bootstrap order awkwardly. Both `HyperKernel` and `RuneKernel` bootstrap lists need updating to reference the renamed bootstrapper.
+- [ ] **Test the registration.** Add a bootstrapper test that resolves `Clock::class` from the container and asserts it's an instance of `SystemClock`. Mirror existing `Bootstrap\StopwatchTest` patterns.
+
+#### Vault
+
+- [ ] **`ArrayDriver` — inject Clock, migrate two `time()` sites.** Add `Clock` constructor parameter; replace `time()` at line 30 (expiry check in `get()`) and line 110 (TTL math in expiry calc) with `$this->clock->now()->getTimestamp()`. Update `ArrayDriverTest` to construct with `FrozenClock` and add at least one deterministic-expiry test that walks the clock past the TTL via `FrozenClock::advance()`.
+- [ ] **`FileDriver` — inject Clock, migrate two `time()` sites.** Same migration pattern at line 58 (expiry check) and line 160 (TTL math). Update `FileDriverTest` similarly.
+- [ ] **`ApcuDriver` / `RedisDriver` — verify no Clock dependency needed.** Re-read the `(new DateTime())->setTimestamp(0)->add($ttl)` lines to confirm they're pure interval-to-int converters and not now-reads. If true, no migration. If discovery missed something, migrate.
+- [ ] **Vault README — document the Clock dependency.** Note that `ArrayDriver` and `FileDriver` now take a `Clock` constructor argument (auto-wired via container), and that `FrozenClock` enables deterministic TTL tests.
+
+#### Throttle
+
+- [ ] **`TokenBucket` — inject Clock, migrate one `time()` site.** Throttler classes currently have no constructors; add one that takes `Clock`. Replace `time()` at line 22. Update `TokenBucketTest` to construct with `FrozenClock` and test window math via `advance()`.
+- [ ] **`SlidingWindow` — inject Clock, migrate one `time()` site.** Same pattern at line 24. Update `SlidingWindowTest`.
+- [ ] **`Quota` — inject Clock, migrate `headers()` `time()` site.** Quota is currently a pure value object constructed by Throttler results. The `time()` call is inside `headers()` (only used when `!allowed`, for `Retry-After`). Two options: (a) inject Clock into `Quota` (changes the constructor signature for every Throttler), or (b) compute `Retry-After` at construction time and store it. **Option (b) is cleaner** — `Quota` stays a pure value object, the Throttler computes `retryAfter` once when building the result. Migrate accordingly. Update `QuotaTest`.
+- [ ] **Throttle README — document the Clock dependency.** Note that `TokenBucket` and `SlidingWindow` now take Clock, and `Quota` is unchanged (still a value object).
+
+#### Auth
+
+- [ ] **`CliSession` — inject Clock, migrate two `time()` sites.** Add Clock to constructor; replace `time() + $ttl` at line 38 (`save()`) and `$expires <= time()` at line 76 (`load()`). Update `CliSessionTest` to use `FrozenClock`, including a test that asserts a session expires correctly when the clock advances past TTL.
+- [ ] **Auth README — document the Clock dependency.** Add a one-liner about `CliSession` taking Clock.
+
+#### Starter app
+
+- [ ] **`app/Domain/Query/HealthHandler` — migrate the verbose-mode `time()` call.** Inject Clock via constructor; replace `time()` with `$this->clock->now()->getTimestamp()`. The handler becomes deterministic for tests once a `FrozenClock` is bound. Smoke test: `curl /health.json?verbose=true` still returns a valid timestamp.
+- [ ] **Verify starter app boots and serves requests after the framework migration.** Run `php bin/arcanum cache:clear`, `php bin/arcanum validate:handlers`, then hit the starter app with a few requests (`/`, `/health.json`, `/health.json?verbose=true`) using the bench harness or `php -S` to confirm nothing regressed.
+
+#### Cross-cutting
+
+- [ ] **Run `composer check` after each commit.** PHPStan will catch any missed call sites or constructor mismatches; PHPUnit will catch any test that broke without an obvious symptom.
+- [ ] **Update COMPENDIUM.md.** Add a note in the Hourglass entry that `Clock` is now used by Sessions, Auth, Throttle, and Vault. Per the maintenance rule at the top of PLAN.md and COMPENDIUM.md, this is part of done, not a follow-up.
+- [ ] **Final sweep.** After all migrations, re-run the discovery grep (`time(`, `new DateTime`, `new DateTimeImmutable`) across `src/` to confirm only the explicitly-skipped sites remain. Update this checklist with any stragglers found.
+
 ### Welcome page — nice-to-haves (deferred)
 
 The Index redesign landed (nine-section structure, real diagnostics, CSS-only tabs, copy buttons, ASCII rune). The leftovers are explicitly optional:
