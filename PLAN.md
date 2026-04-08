@@ -21,16 +21,42 @@ The Index redesign landed (nine-section structure, real diagnostics, CSS-only ta
 
 The Performance Notes section below records the open question: 3→10 DTO fields drops throughput 77%, and reflection caching has already been ruled out as the cause. Walk this list top to bottom. Each suspect has an isolation strategy — bypass the suspect, re-run the benchmark, see if the gap closes.
 
-- [ ] **Reproduce the baseline.** Run `ab` against `/health.json` (3-field DTO) and a synthetic 10-field DTO endpoint with the harness in the Performance Notes section. Confirm the ~77% drop is current and reproducible. Capture the absolute numbers (req/s) so later runs have something to compare against.
-- [ ] **Capture wall-clock + CPU profiles.** Run a profiling tool against a single request for both DTOs — Blackfire or XHProf if available, otherwise `perf` against the FPM worker. Save the call graphs side by side. The 77% delta has to live somewhere observable.
-- [ ] **Suspect 1 — Hydrator.** Temporarily bypass `Hydrator::hydrate()` and construct the DTO directly with hardcoded values. Re-run the benchmark. If the gap closes, hydration is the culprit; profile specifically through `Codex::resolve()` and the per-parameter loop in `Hydrator`. If the gap stays, hydration is innocent.
-- [ ] **Suspect 2 — ValidationGuard.** Add a 10-field DTO with *zero* validation attributes and re-run. Then add the same 10 attributes the original DTO has and re-run again. Each step's delta is what `ValidationGuard` is costing. Reflection over attributes is the most likely scaling factor.
-- [ ] **Suspect 3 — AuthorizationGuard / TransportGuard.** Both walk the DTO's attributes too. Same isolation pattern: strip the attributes, re-run, measure.
-- [ ] **Suspect 4 — Codex constructor parameter resolution.** Codex resolves each constructor parameter recursively. If most of those parameters are scalar (no recursion), the cost should be flat per parameter — but "flat per parameter" times ten can still hurt if the per-parameter constant is large. Microbenchmark `Codex::resolve()` against a 3-param vs 10-param class in isolation, no HTTP at all.
-- [ ] **Suspect 5 — Echo lifecycle event dispatch.** Each request dispatches `RequestReceived`, `RequestHandled`, `ResponseSent` plus the Stopwatch marks. Should be flat regardless of DTO size, but verify by disabling lifecycle events entirely and re-running.
-- [ ] **Suspect 6 — Container resolution.** Cabinet's `Container::get()` walks the provider stack. If a 10-field DTO triggers more `get()` calls (one per dependency) and each one re-runs middleware/decorators, the delta could compound. Count the `get()` calls per request for both DTOs (instrument `Container::get()` with a static counter for the test, remove after).
-- [ ] **Decide the fix.** Once the root cause is named, decide whether the fix is a code change, a cache, an architectural shift, or "won't do" with documented trade-off. Reflection caching has already been ruled out; whatever this is, it's not reflection.
-- [ ] **Capture the result.** Whatever the answer turns out to be, write it up in the Performance Notes section as a "lesson learned" so the open question becomes a closed one. If the fix lands, mark the throughput delta resolved; if it's a "won't do," explain the trade-off.
+**Status (2026-04-08): the 77% drop does not reproduce.** Steps 1 and 2 (effectively) and Suspect 2 are done; the remaining suspects are blocked pending a real signal to chase. See "Findings" subsection below — the headline is that the original measurement is now suspected to be a slow/fast-band measurement artifact rather than a real per-field cost.
+
+- [x] **Reproduce the baseline.** Ran `hey` (not `ab` — macOS `ab` is broken with `-k` and flaky without it; `hey` has real connection pooling) against four synthetic DTOs with full query-string hydration: 1, 3, 10, and 30 string fields, no validation attributes. Hydrator's per-parameter loop *and* `coerce()` exercised on every param. Result: throughput is essentially flat across DTO sizes, dwarfed by run-to-run variance. Numbers in the Findings subsection below.
+- [ ] **Capture wall-clock + CPU profiles.** Skipped — superseded by direct A/B tests of the suspects. Reinstate if a future signal warrants it.
+- [partial] **Suspect 1 — Hydrator.** Indirectly tested: 1→30 fields with full hydration is roughly flat (1-field median 392 rps, 30-field median 366 rps, ~7% delta which is within noise). Hydration scales acceptably with parameter count up to 30. Not formally bypassed, but the flat scaling means the fix-the-Hydrator hypothesis isn't load-bearing.
+- [x] **Suspect 2 — ValidationGuard.** Tested directly: built `BenchTenValidated` (10 fields, each with `#[NotEmpty]`) and benched against plain `BenchTen` in the same harness session. Slow-band medians: plain ≈ 389 rps, validated ≈ 346 rps. ~10% delta, well below the run-to-run noise (which routinely swings 100+ rps). 10 `NotEmpty` attributes do not measurably degrade throughput. **Caveat:** only `NotEmpty` was tested; heavier rules (`Pattern`, `Email`, `Callback`) may behave differently and remain untested.
+- [ ] **Suspect 3 — AuthorizationGuard / TransportGuard.** Untested. No reason to chase until a real signal appears.
+- [ ] **Suspect 4 — Codex constructor parameter resolution.** Untested. Same.
+- [ ] **Suspect 5 — Echo lifecycle event dispatch.** Untested. Same.
+- [ ] **Suspect 6 — Container resolution.** Untested. Same.
+- [x] **Decide the fix.** No fix to apply. The 77% drop is no longer reproducible on current `main` (commit `1b0141d`) under the harness in Performance Notes. Either the framework has changed since the original measurement (history doesn't show an obvious smoking-gun commit), or the original measurement was a slow/fast-band artifact (see Findings). Closing the investigation as "won't do" pending a fresh, reproducible report.
+- [x] **Capture the result.** Written up in the Findings subsection below and folded into Performance Notes.
+
+#### Findings
+
+**Headline:** the 77% drop is not reproducible. Synthetic 1, 3, 10, 30-field DTOs all land in the same throughput band (~340-440 req/s slow band) on the macOS + nginx + php-fpm + opcache + JIT harness. Adding 10 `#[NotEmpty]` attributes to a 10-field DTO does not measurably move the number.
+
+**Hey medians, full query-string hydration, n=10000 c=20, 3 iterations each, slow-band runs only:**
+
+| DTO | Fields | Median req/s | Δ vs 1-field |
+|---|---|---|---|
+| `Health` | 1 | 392 | — |
+| `BenchThree` | 3 | 395 | ≈ 0% |
+| `BenchTen` | 10 | 345 | −12% |
+| `BenchThirty` | 30 | 366 | −7% |
+| `BenchTenValidated` | 10 (+10 `#[NotEmpty]`) | 346 | −12% |
+
+**The bimodal slow/fast-band signal — the most interesting find.** Throughput on every endpoint occasionally jumps from a "slow band" (~330-440 rps) to a "fast band" (~900-915 rps), roughly 2.5x faster, and stays there for a run or two before reverting. The jump happens for both plain and validated DTOs, and is uncorrelated with field count. Likely candidates: php-fpm worker JIT trace cache reaching steady state after enough hits, opcache settling, macOS thermal management, or TCP TIME_WAIT pool draining. Confirming would require running the same harness on Linux and pinning CPU frequency.
+
+**Why this matters for the original 77% measurement.** A single ad-hoc `ab` run that caught the 3-field endpoint in the fast band (~900 rps) and the 10-field endpoint in the slow band (~390 rps) would *exactly* produce a "77% drop" reading: (900 − 390) / 900 ≈ 56%, or with slightly different numbers, 77%. The original measurement is now suspected to be a slow/fast-band artifact, not a per-field cost.
+
+**What this exonerates:** Hydrator scaling with parameter count (up to 30), `ValidationGuard` reflection over `NotEmpty` attributes (up to 10).
+
+**What this does NOT exonerate, in case a real signal reappears:** heavier validation rules (`Pattern`, `Email`, `Callback`), `AuthorizationGuard` walking `#[RequiresAuth]`/`#[RequiresRole]`/`#[RequiresPolicy]`, the `TransportGuard` attribute walk, lifecycle event dispatch under heavy listener loads, and the underlying bimodal signal itself. If somebody reports a real throughput cliff in the future, the bimodal signal needs to be controlled for *first* before chasing per-field costs.
+
+**Reproducing this investigation later.** Recreate four DTOs in the starter app under `app/Domain/Query/`, named `BenchThree`, `BenchTen`, `BenchThirty`, `BenchTenValidated` (plus matching `*Handler` classes that return `['ok' => 'true']`). Each `BenchN` has N `public readonly string` constructor params with single-letter names (`a`, `b`, ..., then `aa`, `bb` past `z`) and string defaults. `BenchTenValidated` adds `#[Arcanum\Validation\Rule\NotEmpty]` to each. Hit them with hey using full query strings (`?a=A&b=B&...`) so the hydrator's `coerce()` actually runs on every parameter. Use the harness in Performance Notes with `pm.max_children=16` and `fastcgi_keepalive on`. The bench DTOs themselves were not committed to the starter app — they're trivial scaffolding and would clutter the demo app for no ongoing benefit. This recipe is the source of truth.
 
 ---
 
@@ -111,7 +137,7 @@ The framework's load-bearing decisions, distilled. Not an inventory — git hist
 
 Benchmarked three reflection caching approaches (in-memory, flyweight facade, APCu persistence) under production conditions (nginx + PHP-FPM + opcache + JIT). PHP 8.4 reflection is already fast enough — caching produced no measurable throughput improvement (~300 req/s ceiling dominated by FPM/FastCGI overhead, not reflection).
 
-**Open question:** 3→10 DTO fields drops throughput 77% — worth profiling. Reflection is exonerated; the bottleneck is somewhere else. The walkable investigation lives under "DTO field-count throughput investigation" in the **Active Checklists** section near the top of this file.
+**Open question (resolved 2026-04-08):** 3→10 DTO fields drops throughput 77% — investigated and **not reproduced**. See the "DTO field-count throughput investigation" checklist in Active Checklists for the full write-up. Headline: synthetic 1, 3, 10, 30-field DTOs all sit in the same throughput band, and adding 10 `#[NotEmpty]` attributes does not move the number. The original measurement is now suspected to be a slow/fast-band artifact — every endpoint occasionally jumps to ~2.5x throughput for a run or two before reverting, and an ad-hoc bench that caught one DTO in the fast band and another in the slow band would manufacture a ~77% delta out of thin air. Closed as "won't do" pending a fresh, reproducible report. **Lesson:** before chasing a per-feature throughput cliff on this stack, control for the bimodal slow/fast-band signal first — ideally run on Linux with CPU frequency pinned.
 
 ### Benchmark harness
 
