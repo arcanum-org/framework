@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Throttle;
 
+use Arcanum\Hourglass\FrozenClock;
+use Arcanum\Hourglass\SystemClock;
 use Arcanum\Throttle\Quota;
 use Arcanum\Throttle\TokenBucket;
 use Arcanum\Vault\ArrayDriver;
@@ -14,6 +16,8 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[CoversClass(TokenBucket::class)]
 #[UsesClass(Quota::class)]
 #[UsesClass(ArrayDriver::class)]
+#[UsesClass(FrozenClock::class)]
+#[UsesClass(SystemClock::class)]
 final class TokenBucketTest extends TestCase
 {
     public function testFirstRequestIsAllowed(): void
@@ -120,5 +124,49 @@ final class TokenBucketTest extends TestCase
         $quota = $bucket->attempt($cache, 'test', 10, 60);
 
         $this->assertGreaterThanOrEqual($now + 60, $quota->resetAt);
+    }
+
+    public function testFrozenClockMakesTokenRefillDeterministic(): void
+    {
+        $clock = new FrozenClock(new \DateTimeImmutable('2026-04-08 12:00:00'));
+        $cache = new ArrayDriver($clock);
+        $bucket = new TokenBucket($clock);
+
+        // Exhaust the bucket: 5 tokens, 5 successful attempts.
+        for ($i = 0; $i < 5; $i++) {
+            $allowed = $bucket->attempt($cache, 'user', 5, 60);
+            $this->assertTrue($allowed->isAllowed());
+        }
+
+        // Sixth attempt is denied — bucket is empty.
+        $denied = $bucket->attempt($cache, 'user', 5, 60);
+        $this->assertFalse($denied->isAllowed());
+
+        // Advance the clock by 60 seconds. Refill rate is 5/60, so the bucket
+        // should have refilled by 5 tokens — back to full.
+        $clock->advance(new \DateInterval('PT60S'));
+
+        $refilled = $bucket->attempt($cache, 'user', 5, 60);
+        $this->assertTrue($refilled->isAllowed());
+        // 5 tokens refilled, 1 consumed — 4 remaining.
+        $this->assertSame(4, $refilled->remaining);
+    }
+
+    public function testDeniedQuotaCarriesRetryAfterFromClock(): void
+    {
+        $clock = new FrozenClock(new \DateTimeImmutable('2026-04-08 12:00:00'));
+        $cache = new ArrayDriver($clock);
+        $bucket = new TokenBucket($clock);
+
+        // Drain the bucket.
+        for ($i = 0; $i < 10; $i++) {
+            $bucket->attempt($cache, 'user', 10, 60);
+        }
+
+        $denied = $bucket->attempt($cache, 'user', 10, 60);
+        $this->assertFalse($denied->isAllowed());
+        $this->assertGreaterThan(0, $denied->retryAfter);
+        // Retry-After should match resetAt - now precisely under FrozenClock.
+        $this->assertSame($denied->resetAt - $clock->now()->getTimestamp(), $denied->retryAfter);
     }
 }

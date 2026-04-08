@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Throttle;
 
+use Arcanum\Hourglass\Clock;
+use Arcanum\Hourglass\SystemClock;
 use Psr\SimpleCache\CacheInterface;
 
 /**
@@ -17,9 +19,14 @@ use Psr\SimpleCache\CacheInterface;
  */
 final class TokenBucket implements Throttler
 {
+    public function __construct(
+        private readonly Clock $clock = new SystemClock(),
+    ) {
+    }
+
     public function attempt(CacheInterface $cache, string $key, int $limit, int $windowSeconds): Quota
     {
-        $now = time();
+        $now = $this->clock->now()->getTimestamp();
         $refillRate = $limit / $windowSeconds;
 
         /** @var array{tokens: float, lastRefill: int}|null $bucket */
@@ -47,6 +54,8 @@ final class TokenBucket implements Throttler
             ? $now + $windowSeconds
             : $now + (int) ceil((1.0 - $tokens) / $refillRate);
 
-        return new Quota($allowed, $remaining, $limit, $resetAt);
+        $retryAfter = $allowed ? 0 : max(0, $resetAt - $now);
+
+        return new Quota($allowed, $remaining, $limit, $resetAt, $retryAfter);
     }
 }
