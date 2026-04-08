@@ -70,12 +70,7 @@ The framework's load-bearing decisions, distilled. Not an inventory — git hist
 - **Streaming is the default.** `Flow\Sequence\Cursor` streams row-by-row at constant memory (6.3 KB at 500k rows vs 1.6 GB eager). `toSeries()` is the explicit opt-in to materialize.
 - **HTTP status codes are part of the API.** 204/201/202/405/406/422/429 — never collapse to 200/404/500. The exception infrastructure carries titles + suggestions and is RFC 9457 forward-compatible.
 - **Build-time validation beats runtime discovery.** `validate:handlers`, `validate:models`, page discovery cache, bootstrapper-order enforcement. Cheaper than reflection-walking on every request, and the failure modes name the actual problem.
-
-### What Arcanum is *not*
-
-- **Not a full template engine.** Shodo is intentionally lightweight. The body of `{{ }}` is a PHP expression after helper rewriting, not a custom DSL. No filters, no inheritance gymnastics beyond `extends`/`section`/`yield`/`include`.
-- **Not an asset pipeline.** JS/CSS tooling handles its own world. Arcanum ships Tailwind via CDN in dev and a built bundle in prod, with a guardrail warning when the bundle is missing — but it doesn't compile anything itself.
-- **Not a runtime auto-discovery framework.** Discovery happens at build time via CLI commands. The container is PSR-11; services don't enumerate.
+- **Front-end defaults are opinions, not requirements.** htmx for interactivity (composes naturally with CQRS — every action is its own URL, no client-state mirror, no JSON API mirroring the page routes). Tailwind for styling (utility classes are AI-readable with no hidden semantics — friendly to humans *and* to AI agents reading the same template). Arcanum doesn't compile, bundle, hash, or transpile assets — that's its own world. Both defaults are swappable, both will get more first-class framework support over time. Captured in the COMPENDIUM's "Front-end defaults" section.
 
 ### Design lessons learned the hard way
 
