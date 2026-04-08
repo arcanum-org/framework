@@ -137,18 +137,25 @@ The body of `{{ }}` is an arbitrary PHP expression. Helper calls inside it are r
 - `#[WithHelper(EnvCheckHelper::class, alias: 'Env')]` on a DTO → that helper is available in the DTO's template under that alias.
 - `#[CliOnly]` / `#[HttpOnly]` → `TransportGuard` rejects the DTO from the wrong transport.
 
-### Namespace-scoped files
+### Convention-based discovery
 
-Drop a file with the right name in any directory and Arcanum picks it up. Scoping is by **namespace prefix**, not by conceptual "domain": a file at `app/Foo/Helpers.php` applies to DTOs whose class lives under `App\Foo\*` and nowhere else.
+Two file conventions Arcanum picks up automatically. They look similar but the discovery rules are **not the same** — read carefully.
 
-- `app/Helpers.php` — top-level. Helpers available to every DTO in the app, including Pages. Returns an alias → class map.
-- `app/Domain/Shop/Helpers.php` — applies only to `App\Domain\Shop\*`. Pages under `App\Pages\*` will not see these.
-- `app/Pages/Helpers.php` — applies only to Page DTOs. The right place for helpers a Page needs but other domains don't.
-- Same rules and locations work for `Middleware.php`, which returns a list of middleware class-strings instead of an alias map.
+**`Helpers.php`** has two distinct loading mechanisms:
 
-Deeper namespace prefixes override shallower ones — `app/Domain/Shop/Checkout/Helpers.php` wins over `app/Domain/Shop/Helpers.php` for a DTO in `Checkout`.
+- `app/Helpers/Helpers.php` — a hardcoded special path. `Bootstrap\Helpers` loads it explicitly and registers everything in it as a **global** helper, available to every template including Pages. This is the file the starter ships and how an `App` alias gets registered for use across the app.
+- `app/Domain/<Anything>/Helpers.php` — discovered by `HelperDiscovery`, which walks the `app/Domain/` subtree only. The file's path becomes a namespace prefix, so `app/Domain/Shop/Helpers.php` applies to DTOs under `App\Domain\Shop\*`. Deeper directories override shallower ones (`Checkout/Helpers.php` wins over `Shop/Helpers.php` for `Checkout` DTOs).
+- **Pages cannot have their own scoped `Helpers.php`** via discovery — `HelperDiscovery` only walks `app/Domain/`. Pages get the global helpers from `app/Helpers/Helpers.php`, plus whatever they declare via `#[WithHelper]` on the Page DTO class itself. For per-DTO helpers, `#[WithHelper]` is the right tool — see the welcome page's `Index.php` for an example.
 
-For helpers that should belong to *one specific DTO* and nothing else, prefer the `#[WithHelper]` attribute on the DTO class itself — see the welcome page's `Index.php` for an example.
+**`Middleware.php`** uses a different rule. `MiddlewareDiscovery` walks all of `app/` (not just `app/Domain/`), so the conventional namespace-prefix scoping works in any directory:
+
+- `app/Middleware.php` — applies to every DTO under `App\*`, including Pages.
+- `app/Domain/Shop/Middleware.php` — applies only to `App\Domain\Shop\*`.
+- `app/Pages/Middleware.php` — applies only to Pages.
+
+Returns a list of middleware class-strings rather than an alias → class map.
+
+> **Note on the asymmetry.** That `Helpers.php` has a special hardcoded global path while `Middleware.php` uses uniform namespace-prefix discovery is a design wart, not an intentional distinction. Tracked under PLAN.md long-distance future as something to align — the natural fix is to teach `HelperDiscovery` to walk `app/` like `MiddlewareDiscovery` does, then drop the special path in `Bootstrap\Helpers`.
 
 ### HTTP status codes are part of the API
 
