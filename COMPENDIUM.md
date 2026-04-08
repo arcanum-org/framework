@@ -1,0 +1,205 @@
+# Arcanum Compendium
+
+A guided tour of what Arcanum is, what's in it, and how the pieces fit together. Written for the framework's own author six months from now and for anyone building documentation from it.
+
+> **Maintenance note.** If any framework functionality changes, is added, or is removed, this file MUST be updated to match. Out-of-date entries here are worse than no entry at all. PLAN.md carries the same note.
+
+---
+
+## What Arcanum is
+
+Arcanum is an opinionated, batteries-included **CQRS PHP framework** for building websites and services that stay readable as they grow. The defining stance: every read is a Query, every write is a Command, each one is its own DTO with its own handler — discovered by convention, validated by attribute, dispatched through middleware. Handlers stay tiny because the framework absorbs the ceremony.
+
+It is **not** an MVC framework, **not** an ORM, and **not** a full template engine. It is built for developers who want fast handlers, real SQL, and a small mental model that doesn't grow with the codebase.
+
+Targets PHP 8.4+. PHPStan level 9 throughout. Comprehensive test coverage.
+
+---
+
+## The shape of an Arcanum app
+
+A typical request walks through the framework like this:
+
+```
+HTTP request
+  → HyperKernel (lifecycle events, middleware stack)
+    → Atlas Router (URL → Route + DTO class)
+      → Hydrator (request data → typed DTO)
+        → Conveyor MiddlewareBus (ValidationGuard, AuthorizationGuard, before-middleware)
+          → Handler (the small function that returns the result)
+        → Conveyor MiddlewareBus (after-middleware)
+      → ResponseRenderer (Shodo formatter → HTTP response)
+  → terminate (fastcgi_finish_request, deferred listeners)
+```
+
+The CLI mirrors it: `RuneKernel` parses argv, routes through `CliRouter`, hydrates the DTO, dispatches through the same Conveyor bus, and writes the result via `Output`.
+
+A typical CQRS app folder layout:
+
+```
+app/
+├── Domain/
+│   └── Shop/
+│       ├── Command/
+│       │   ├── PlaceOrder.php          # the DTO with constructor params + attributes
+│       │   └── PlaceOrderHandler.php   # __invoke(PlaceOrder $cmd): void
+│       ├── Query/
+│       │   ├── Products.php
+│       │   ├── ProductsHandler.php
+│       │   └── Products.html           # co-located template
+│       ├── Helpers.php                 # domain-scoped template helpers
+│       └── Middleware.php              # domain-scoped middleware
+├── Pages/
+│   └── Index.html                      # template-driven routes, no handler needed
+├── Http/Kernel.php
+└── Cli/Kernel.php
+```
+
+---
+
+## The packages
+
+21 framework packages, each with its own README. Grouped here by what they do.
+
+### Foundation
+
+- **Cabinet** — PSR-11 DI container. Services, factories, singletons, prototypes, decorators, middleware-on-services. Uses Codex for auto-wiring.
+- **Codex** — Reflection-based class resolver. Recursively resolves constructor dependencies. Supports specifications (`when X needs Y give Z`).
+- **Toolkit** — Small reusable utilities: `Strings` (case conversion, ASCII transliteration), `Random`, `Hex`, plus security primitives (`SodiumEncryptor`, `BcryptHasher`, `Argon2Hasher`, `SodiumSigner`).
+- **Parchment** — Filesystem reader utilities.
+- **Gather** — Typed key-value registries: `Configuration` (dot-notation), `Environment` (no serialize/clone), `IgnoreCaseRegistry` (HTTP headers).
+
+### Data flow
+
+- **Flow\Pipeline** — Linear stage chain (`object → object → object`).
+- **Flow\Continuum** — Middleware pattern (each stage calls `$next`).
+- **Flow\Conveyor** — Command bus. `MiddlewareBus` dispatches DTOs to handlers by naming convention (`PlaceOrder` → `PlaceOrderHandler`). Combines Pipeline + Continuum for before/after middleware.
+- **Flow\River** — PSR-7 stream implementations.
+- **Flow\Sequence** — Generic ordered iterables. `Sequencer<T>` interface; `Cursor<T>` (lazy, single-pass, self-closing) and `Series<T>` (eager, multi-pass).
+
+### HTTP & CLI transports
+
+- **Hyper** — PSR-7 HTTP messages, `HyperKernel`, response renderers (`Json`, `Html`, `Csv`, `PlainText`, `Markdown`, `EmptyResponseRenderer`, `JsonExceptionResponseRenderer`, `HtmlExceptionResponseRenderer`), `FormatRegistry`. Lifecycle events: `RequestReceived` (mutable), `RequestHandled` / `RequestFailed` / `ResponseSent` (read-only).
+- **Rune** — CLI infrastructure. `RuneKernel`, `Input` parsing, `Output`, `BuiltInRegistry`, `CliExceptionWriter`, `HelpWriter`. Built-in commands listed below.
+- **Atlas** — Convention-based CQRS router. `HttpRouter`, `CliRouter`, `ConventionResolver`, `PageDiscovery`, `MiddlewareDiscovery`, `LocationResolver`, `UrlResolver`. Maps inputs to Query/Command namespaces; transport-agnostic core.
+- **Ignition** — Bootstrap kernels. `HyperKernel` and `RuneKernel` extend the `Kernel` interface. Each runs a list of `Bootstrapper` classes once. Per-route middleware via `RouteDispatcher`.
+- **Shodo** — Output formatting. `JsonFormatter`, `HtmlFormatter`, `CsvFormatter`, `PlainTextFormatter`, `MarkdownFormatter`, `KeyValueFormatter`, `TableFormatter`, plus their fallback variants. `TemplateCompiler` translates `{{ }}` syntax into PHP via regex passes; the body of `{{ }}` is treated as a real PHP expression with helper-call rewriting. `HelperRegistry`, `HelperResolver` (domain-scoped via co-located `Helpers.php`), `HelperDiscovery`, plus the `#[WithHelper]` per-DTO attribute.
+
+### Persistence & state
+
+- **Forge** — SQL files as first-class methods. `Connection` interface, `PdoConnection` (MySQL, PostgreSQL, SQLite), `ConnectionManager` with read/write split and domain mapping. `Model::__call` maps to `.sql` files with PHP named/positional/mixed args. `@cast` (int, float, bool, json) and `@param` annotations. `SqlScanner` for comment/string-aware parsing. Streaming via `Sequencer`/`Cursor`; writes return immutable `WriteResult`. `ModelGenerator` produces type-safe sub-model classes.
+- **Vault** — PSR-16 caching. Five drivers (`File`, `Array`, `Null`, `APCu`, `Redis`). `CacheManager` for named stores. `PrefixedCache` decorator. Framework caches (config, templates, pages, middleware, helpers) all live on Vault.
+- **Session** — HTTP session management. Configurable drivers (file, cookie, cache). `ActiveSession` request-scoped holder. `SessionMiddleware` handles start/save/cookie. CSRF protection via `CsrfMiddleware` + `{{ csrf }}` directive.
+
+### Identity & access
+
+- **Auth** — Authentication and authorization. `Identity` interface, `SimpleIdentity`, `ActiveIdentity`. Guards: `SessionGuard`, `TokenGuard`, `CompositeGuard`. `AuthMiddleware` (HTTP), `CliAuthResolver` (CLI), `Prompter`, `CliSession` (encrypted file store). DTO authorization attributes: `#[RequiresAuth]`, `#[RequiresRole]`, `#[RequiresPolicy]`, plus the `Policy` interface. `AuthorizationGuard` runs them as Conveyor middleware.
+
+### Validation, observability, throttling
+
+- **Validation** — Attribute-based validation on DTO constructor params. 11 built-in rules: `NotEmpty`, `MinLength`, `MaxLength`, `Min`, `Max`, `Email`, `Pattern`, `In`, `Url`, `Uuid`, `Callback`. `ValidationGuard` Conveyor middleware fires before handlers. Custom rules via the `Rule` interface.
+- **Glitch** — Error/exception/shutdown handling. `ExceptionHandler`, `ExceptionRenderer`, `HttpException` with the full `StatusCode` enum. `ArcanumException` interface gives every framework exception a `getTitle()` and `getSuggestion()` (RFC 9457 forward-compatible).
+- **Quill** — Multi-channel PSR-3 logger over Monolog. `ChannelLogger` for named channels.
+- **Echo** — PSR-14 event dispatcher. Uses Flow Pipeline internally. Stoppable propagation, mutable events.
+- **Throttle** — Rate limiting. `Throttler` interface, `TokenBucket` and `SlidingWindow` strategies, `RateLimiter`, `Quota` value object with `isAllowed()` and `headers()` (X-RateLimit-* + Retry-After).
+- **Hourglass** — Time primitives. `Clock` interface extending PSR-20, `SystemClock`, `FrozenClock` (caller-controlled pinned clock — useful for replay, batch jobs, simulations, deterministic tests). `Stopwatch` records labeled `Instant`s across the process lifetime. Built-in marks: `arcanum.start`, `boot.complete`, `request.received`, `handler.start`/`complete`, `render.start`/`complete`, `request.handled`, `response.sent`, `arcanum.complete`. Static accessor `Stopwatch::tap()` is write-only and no-ops when uninstalled; `Stopwatch::current()` throws when uninstalled (read sites should fail loudly).
+
+---
+
+## Conventions that hold it all together
+
+Arcanum's small mental model comes from a handful of conventions that show up everywhere. Learn these once and most of the framework explains itself.
+
+### Naming derives behavior
+
+- `Foo` DTO → `FooHandler` class. The Conveyor bus finds the handler by appending `Handler` to the DTO's class name.
+- `app/Domain/Shop/Query/Products.php` → URL `/shop/products`. Atlas walks the namespace; PSR-4 paths become URL paths via PascalCase → kebab-case.
+- `Products.php` (Query DTO) → `Products.html` (template) co-located in the same directory. Shodo finds the template by file extension next to the DTO.
+- `Products.html` → also `Products.json`, `Products.csv`, `Products.md`, `Products.txt`. Same handler, five formatters, picked by URL extension.
+
+### What's inside `{{ }}`
+
+Shodo templates have one rule for what's inside the delimiters, distinguished by the first character:
+
+| Starts with | Meaning | Example |
+|---|---|---|
+| `$` | Variable expression | `{{ $name }}`, `{{ $user->email }}` |
+| Uppercase letter | Helper call | `{{ Route::url('home') }}` |
+| Lowercase keyword | Directive | `{{ if $foo }}`, `{{ csrf }}`, `{{ extends 'layout' }}` |
+
+The body of `{{ }}` is an arbitrary PHP expression. Helper calls inside it are rewritten recursively, so array access, method chains, ternaries, null coalesce, and nested helpers all compose.
+
+### Attributes carry metadata
+
+- `#[NotEmpty]`, `#[Email]`, `#[MinLength(8)]`, etc. on DTO constructor params → `ValidationGuard` rejects invalid input with 422.
+- `#[RequiresAuth]`, `#[RequiresRole('admin')]`, `#[RequiresPolicy(Foo::class)]` on DTO classes → `AuthorizationGuard` rejects unauthorized requests with 401/403.
+- `#[AllowedFormats('json', 'csv')]` on a Query DTO → 406 Not Acceptable for any other format.
+- `#[WithHelper(EnvCheckHelper::class, alias: 'Env')]` on a DTO → that helper is available in the DTO's template under that alias.
+- `#[CliOnly]` / `#[HttpOnly]` → `TransportGuard` rejects the DTO from the wrong transport.
+
+### Domain-scoped files
+
+Drop a file with the right name next to a domain folder and Arcanum picks it up:
+
+- `app/Domain/Shop/Helpers.php` — template helpers available to every Query/Command/Page in `Shop`. Returns an alias → class map.
+- `app/Domain/Shop/Middleware.php` — middleware that wraps every dispatch from `Shop`. Returns a list of class-strings.
+
+Deeper directories override shallower ones.
+
+### HTTP status codes are part of the API
+
+Arcanum embraces the full status code spectrum. Commands return `EmptyDTO` (204), `AcceptedDTO` (202), or a Query DTO that becomes 201 Created with a Location header. Wrong HTTP method = 405 (not 404). Unsupported format = 406 (not 400). Validation failure = 422. Rate limit = 429.
+
+---
+
+## The CLI surface (`bin/arcanum`)
+
+The starter app's CLI entry point. Built-in commands shipped by Rune:
+
+| Command | What it does |
+|---|---|
+| `list` | Show all available commands |
+| `help <command>` | Show parameter info for a command |
+| `login` / `logout` | CLI session auth |
+| `make:key` | Generate an APP_KEY |
+| `make:command <name>` | Scaffold a Command DTO + handler |
+| `make:query <name>` | Scaffold a Query DTO + handler + template |
+| `make:page <name>` | Scaffold a Page DTO + template |
+| `make:middleware <name>` | Scaffold a middleware class |
+| `cache:clear` | Clear all framework caches and Vault stores. `--store=NAME` targets one Vault store. |
+| `cache:status` | Show cache configuration and current state |
+| `forge:models` | Generate Forge model classes from `.sql` files |
+| `validate:models` | Verify generated Forge models are up to date |
+| `validate:handlers` | Verify every Command/Query DTO has a registered handler |
+| `db:status` | Show database connection status |
+
+App developers add their own commands by defining DTOs under `app/Cli/Command/` (or wherever `app.namespace` points) and the same Conveyor bus dispatches them.
+
+---
+
+## Testing today
+
+The framework itself uses PHPUnit 13 with the `#[CoversClass]` attribute on every test class (strict coverage required). Tests mirror `src/` structure: `src/Hyper/Headers.php` → `tests/Hyper/HeadersTest.php`. Arrange-Act-Assert pattern throughout.
+
+What apps get **today** for testing their own code: nothing yet. Writing a handler test means manually constructing a Cabinet container, registering services, faking PSR-7 requests. This is the next big arc — see PLAN.md's "Testing utilities + PSR-20 Clock adoption" entry, which will land `TestKernel`, `Factory`, and `Fake\` namespaces under `Arcanum\Test\`.
+
+---
+
+## What Arcanum deliberately is *not*
+
+Worth knowing to set expectations:
+
+- **Not a full template engine.** Shodo is intentionally lightweight. No filters, no inheritance gymnastics beyond `extends`/`section`/`yield`/`include`.
+- **Not an ORM.** Forge maps to SQL files. No query builder, no Active Record. Both fight CQRS.
+- **Not an asset pipeline.** JS/CSS tooling lives in its own world. The starter ships Tailwind via CDN in dev and a built bundle in prod.
+- **Not a runtime auto-discovery framework.** Discovery happens at build time via CLI commands. The container is PSR-11; services don't enumerate.
+- **Not a real-time / WebSocket framework.** That's a separate concern Arcanum doesn't try to absorb.
+- **Not yet on a non-FCGI runtime.** RoadRunner / FrankenPHP / Swoole support is a known gap, tracked under "FastCGI / post-response work patterns" in PLAN.md.
+
+---
+
+## Where to read next
+
+- **`PLAN.md`** — what's been built, what's coming, and the load-bearing decisions distilled into tenets.
+- **`src/<Package>/README.md`** — the authoritative reference for each package. Cabinet, Codex, Atlas, Forge, Shodo, Hourglass, and the rest each have their own.
+- **`../arcanum/README.md`** (the starter app) — getting-started guide, quick-start, directory conventions.
