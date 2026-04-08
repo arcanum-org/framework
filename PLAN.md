@@ -25,8 +25,8 @@ Integrate `Hourglass\Clock` throughout the framework and starter app so every wa
 
 #### Bootstrap
 
-- [ ] **Register `Clock` in the container.** Either extend `Bootstrap\Stopwatch` to also bind `Clock::class → SystemClock::class` (and rename it to `Bootstrap\Hourglass`), or add a new `Bootstrap\Clock` bootstrapper. Prefer extending+renaming — Hourglass is one cohesive package, two bootstrappers for it would split the bootstrap order awkwardly. Both `HyperKernel` and `RuneKernel` bootstrap lists need updating to reference the renamed bootstrapper.
-- [ ] **Test the registration.** Add a bootstrapper test that resolves `Clock::class` from the container and asserts it's an instance of `SystemClock`. Mirror existing `Bootstrap\StopwatchTest` patterns.
+- [x] **Register `Clock` in the container.** Renamed `Bootstrap\Stopwatch` → `Bootstrap\Hourglass`, added `Clock::class → SystemClock` singleton binding alongside the existing Stopwatch wiring. `HyperKernel` and `RuneKernel` bootstrap lists updated; Ignition README built-in marks table updated.
+- [x] **Test the registration.** Added `tests/Ignition/Bootstrap/HourglassTest.php` covering both bindings — no test existed for the old `Bootstrap\Stopwatch`, so this is a fresh slate. Five test methods: Stopwatch singleton, Stopwatch process-global install, `arcanum.start` instant recorded, Clock bound to SystemClock, Clock resolves as singleton.
 
 #### Vault
 
