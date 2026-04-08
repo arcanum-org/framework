@@ -39,7 +39,7 @@ Integrate `Hourglass\Clock` throughout the framework and starter app so every wa
 - [x] **`TokenBucket` — inject Clock, migrate one `time()` site.** New constructor takes `Clock $clock = new SystemClock()`; the lone `time()` read is now `$this->clock->now()->getTimestamp()`. Throttler also computes `retryAfter` and passes it to `Quota`. Two new `FrozenClock`-based tests: deterministic refill across `advance()`, and an explicit retryAfter assertion under a frozen clock.
 - [x] **`SlidingWindow` — inject Clock, migrate one `time()` site.** Same pattern as `TokenBucket`: constructor takes `Clock $clock = new SystemClock()`, `time()` becomes `$this->clock->now()->getTimestamp()`, denied Quotas get an explicit `retryAfter`. Two new `FrozenClock`-based tests cover deterministic window rotation and the explicit retryAfter assertion.
 - [x] **`Quota` — accept retryAfter at construction (Option B from the plan).** Quota now takes an optional `int $retryAfter = 0` constructor param; `headers()` uses it directly when non-zero, falls back to wall-clock subtraction when zero. The fallback exists only so this commit can land before the Throttlers are updated; once both Throttlers pass the explicit value (next commits), the fallback can be removed in a final cleanup pass. Two new QuotaTest assertions cover both paths.
-- [ ] **Throttle README — document the Clock dependency.** Note that `TokenBucket` and `SlidingWindow` now take Clock, and `Quota` is unchanged (still a value object).
+- [x] **Throttle README — document the Clock dependency.** Quota table now lists `$retryAfter` and a sentence noting Quota stays Clock-free. New `### Deterministic tests with FrozenClock` subsection with a worked TokenBucket example.
 
 #### Auth
 

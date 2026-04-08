@@ -56,6 +56,32 @@ use Arcanum\Throttle\SlidingWindow;
 $limiter = new RateLimiter($cache, new SlidingWindow());
 ```
 
+### Deterministic tests with FrozenClock
+
+Both built-in Throttlers accept an optional `Hourglass\Clock` (defaulting to `SystemClock`). Pass a `FrozenClock` and `advance()` it to test refill / window-rotation logic without any `sleep()`:
+
+```php
+use Arcanum\Hourglass\FrozenClock;
+use Arcanum\Throttle\TokenBucket;
+use Arcanum\Vault\ArrayDriver;
+
+$clock = new FrozenClock(new \DateTimeImmutable('2026-04-08 12:00:00'));
+$cache = new ArrayDriver($clock);
+$bucket = new TokenBucket($clock);
+
+// Drain the bucket.
+for ($i = 0; $i < 5; $i++) {
+    $bucket->attempt($cache, 'user', 5, 60);
+}
+$bucket->attempt($cache, 'user', 5, 60)->isAllowed();   // false
+
+// Advance past the window — bucket refills.
+$clock->advance(new \DateInterval('PT60S'));
+$bucket->attempt($cache, 'user', 5, 60)->isAllowed();   // true
+```
+
+In production the container-bound `SystemClock` is auto-wired by Codex.
+
 ### Custom strategies
 
 Implement the `Throttler` interface:
@@ -84,6 +110,9 @@ final class FixedWindow implements Throttler
 | `$remaining` | `int` | Requests left in the current window |
 | `$limit` | `int` | Maximum requests per window |
 | `$resetAt` | `int` | Unix timestamp when the window resets |
+| `$retryAfter` | `int` | Seconds to wait before retrying (only meaningful when denied) |
+
+`Quota` is a pure value object — it does not depend on `Hourglass\Clock` or read wall-clock time anywhere. The Throttler that builds the Quota holds the Clock and computes `retryAfter` once at construction time.
 
 ### Headers
 
