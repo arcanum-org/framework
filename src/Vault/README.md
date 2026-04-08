@@ -35,7 +35,7 @@ $cache = new FileDriver('/path/to/cache/directory');
 $cache->set('key', ['data' => true], 3600);
 ```
 
-Keys are hashed to safe filenames (`md5($key).cache`). Writes are atomic (temp file + rename). Expired entries are lazily deleted on access.
+Keys are hashed to safe filenames (`md5($key).cache`). Writes are atomic (temp file + rename). Expired entries are lazily deleted on access. The constructor accepts an optional `Hourglass\Clock` (defaults to `SystemClock`); pass a `FrozenClock` for deterministic expiry tests.
 
 ### ArrayDriver
 
@@ -44,7 +44,7 @@ $cache = new ArrayDriver();
 $cache->set('key', 'value', 60);
 ```
 
-Data lives only for the current process. Respects TTL via expiry timestamps. New instance = empty cache.
+Data lives only for the current process. Respects TTL via expiry timestamps. New instance = empty cache. Like `FileDriver`, accepts an optional `Hourglass\Clock` for fakeable expiry.
 
 ### NullDriver
 
@@ -65,6 +65,28 @@ $redis = new \Redis();
 $redis->connect('127.0.0.1', 6379);
 $cache = new RedisDriver($redis);
 ```
+
+## Deterministic expiry tests
+
+`FileDriver` and `ArrayDriver` both accept an optional `Hourglass\Clock` (defaults to `SystemClock`). Pass a `FrozenClock` to make TTL behavior fakeable in tests — no `sleep()`, no flake:
+
+```php
+use Arcanum\Hourglass\FrozenClock;
+use Arcanum\Vault\ArrayDriver;
+
+$clock = new FrozenClock(new \DateTimeImmutable('2026-04-08 12:00:00'));
+$cache = new ArrayDriver($clock);
+
+$cache->set('key', 'value', 60);
+
+$clock->advance(new \DateInterval('PT30S'));
+$cache->get('key');                                    // 'value' — within TTL
+
+$clock->advance(new \DateInterval('PT31S'));
+$cache->get('key');                                    // null — expired
+```
+
+In production, the container-bound `SystemClock` is auto-wired by Codex; you only construct drivers explicitly in tests. `ApcuDriver` and `RedisDriver` do not take a `Clock` because their backing stores manage expiry natively.
 
 ## CacheManager
 
