@@ -124,7 +124,7 @@ final class TemplateCompiler
      * include inlining and extends/section/yield layout inheritance.
      *
      * When $fragment is true, layout inheritance is skipped — only the
-     * 'content' section is rendered. This is used for HTMX partial swaps
+     * 'content' section is rendered. This is used for htmx partial swaps
      * where the layout wrapper (head, nav, footer) is not needed.
      */
     public function compile(

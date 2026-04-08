@@ -270,9 +270,9 @@ Paths resolve relative to the current template's directory. The `.html` extensio
 
 Includes nest up to 10 levels deep. Included files can themselves use `{{ include }}`.
 
-## Fragment rendering (HTMX)
+## Fragment rendering (htmx)
 
-When a template uses `extends`, the same file can serve both full-page loads and HTMX partial swaps. In **fragment mode**, only the `content` section is rendered — the layout wrapper (head, nav, footer) is skipped.
+When a template uses `extends`, the same file can serve both full-page loads and htmx partial swaps. In **fragment mode**, only the `content` section is rendered — the layout wrapper (head, nav, footer) is skipped.
 
 The `HtmlFormatter` exposes `setFragment(bool)`. Call it from middleware when the `HX-Request` header is present:
 
@@ -282,7 +282,7 @@ if ($request->hasHeader('HX-Request')) {
 }
 ```
 
-Full page load returns the complete layout. HTMX request returns just the content — ready for `hx-swap`.
+Full page load returns the complete layout. htmx request returns just the content — ready for `hx-swap`.
 
 ## Template discovery
 

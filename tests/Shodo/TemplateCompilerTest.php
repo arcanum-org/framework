@@ -1042,7 +1042,7 @@ final class TemplateCompilerTest extends TestCase
     }
 
     // -----------------------------------------------------------
-    // Fragment rendering (HTMX partial swaps)
+    // Fragment rendering (htmx partial swaps)
     // -----------------------------------------------------------
 
     public function testFragmentModeRendersOnlyContentSection(): void

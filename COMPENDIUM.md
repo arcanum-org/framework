@@ -57,6 +57,20 @@ app/
 
 ---
 
+## Front-end defaults
+
+Arcanum has opinions about the front end. They aren't required — you can swap either one out — but they're chosen deliberately and the framework invests in them over time.
+
+**htmx for interactivity.** htmx composes naturally with CQRS: every action is already its own URL with its own handler, which is exactly what htmx wants on the wire. There's no parallel client-state model to keep in sync, no JSON API mirroring the page routes, no JavaScript framework to learn. The same Query handler that returns HTML for a full page load returns an HTML fragment for an htmx request — the framework's `HtmlFormatter` checks for the `HX-Request` header and skips the layout wrapper automatically. The starter ships htmx 2.0.4 pinned, plus an `HtmxMiddleware` that translates `Location` headers into `HX-Location` so command redirects work without special-casing.
+
+**Tailwind for styling.** Tailwind utility classes are visible at the call site — no hidden semantics, no jumping into a `.scss` file to find out what `.btn-primary` actually does. That's friendly for humans skimming a template *and* friendly for AI coding agents reading the same template, because the styles are right there in the markup as plain text. The starter ships Tailwind via the CDN play script in development, with a build pipeline (`composer css:build` / `css:watch`) for production. A guardrail in `public/index.php` logs a warning if the production build is missing and the CDN is being served instead.
+
+**What Arcanum doesn't do.** No bundling, hashing, or transpiling. Asset tooling is its own world and the JS ecosystem already does it well — Arcanum just emits the right `<link>` and `<script>` tags via `AppHelper::cssTags()` and trusts the build. Bring your own bundler if you want one.
+
+**Swappable.** Both defaults are swappable. A team that wants Vue, React, or Alpine instead of htmx can drop htmx and the `HtmxMiddleware` from the starter; nothing in the framework requires them. Same for Tailwind — replace `AppHelper::cssTags()` with whatever your styling system needs and the rest of Arcanum doesn't care. The framework's job is the request lifecycle and the rendering boundary, not the front-end stack.
+
+---
+
 ## The packages
 
 21 framework packages, each with its own README. Grouped here by what they do.
@@ -200,11 +214,7 @@ What apps get **today** for testing their own code: nothing yet. Writing a handl
 
 Worth knowing to set expectations:
 
-- **Not a full template engine.** Shodo is intentionally lightweight. No filters, no inheritance gymnastics beyond `extends`/`section`/`yield`/`include`.
-- **Not an ORM.** Forge maps to SQL files. No query builder, no Active Record. Both fight CQRS.
-- **Not an asset pipeline.** JS/CSS tooling lives in its own world. The starter ships Tailwind via CDN in dev and a built bundle in prod.
-- **Not a runtime auto-discovery framework.** Discovery happens at build time via CLI commands. The container is PSR-11; services don't enumerate.
-- **Not a real-time / WebSocket framework.** That's a separate concern Arcanum doesn't try to absorb.
+- **Not an ORM.** SQL is a first-class citizen — Forge maps `.sql` files to model methods. No query builder, no Active Record.
 - **Not yet on a non-FCGI runtime.** RoadRunner / FrankenPHP / Swoole support is a known gap, tracked under "FastCGI / post-response work patterns" in PLAN.md.
 
 ---
