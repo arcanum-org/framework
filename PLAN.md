@@ -92,6 +92,19 @@ Benchmarked three reflection caching approaches (in-memory, flyweight facade, AP
 
 **Open question:** 3→10 DTO fields drops throughput 77% — worth profiling. Reflection is exonerated; the bottleneck is somewhere else.
 
+### Investigation checklist — DTO field-count throughput drop
+
+- [ ] **Reproduce the baseline.** Run `ab` against `/health.json` (3-field DTO) and a synthetic 10-field DTO endpoint with the harness above. Confirm the ~77% drop is current and reproducible. Capture the absolute numbers (req/s) so later runs have something to compare against.
+- [ ] **Capture wall-clock + CPU profiles.** Run a profiling tool against a single request for both DTOs — Blackfire or XHProf if available, otherwise `perf` against the FPM worker. Save the call graphs side by side. The 77% delta has to live somewhere observable.
+- [ ] **Suspect 1 — Hydrator.** Temporarily bypass `Hydrator::hydrate()` and construct the DTO directly with hardcoded values. Re-run the benchmark. If the gap closes, hydration is the culprit; profile specifically through `Codex::resolve()` and the per-parameter loop in `Hydrator`. If the gap stays, hydration is innocent.
+- [ ] **Suspect 2 — ValidationGuard.** Add a 10-field DTO with *zero* validation attributes and re-run. Then add the same 10 attributes the original DTO has and re-run again. Each step's delta is what `ValidationGuard` is costing. Reflection over attributes is the most likely scaling factor.
+- [ ] **Suspect 3 — AuthorizationGuard / TransportGuard.** Both walk the DTO's attributes too. Same isolation pattern: strip the attributes, re-run, measure.
+- [ ] **Suspect 4 — Codex constructor parameter resolution.** Codex resolves each constructor parameter recursively. If most of those parameters are scalar (no recursion), the cost should be flat per parameter — but "flat per parameter" times ten can still hurt if the per-parameter constant is large. Microbenchmark `Codex::resolve()` against a 3-param vs 10-param class in isolation, no HTTP at all.
+- [ ] **Suspect 5 — Echo lifecycle event dispatch.** Each request dispatches `RequestReceived`, `RequestHandled`, `ResponseSent` plus the Stopwatch marks. Should be flat regardless of DTO size, but verify by disabling lifecycle events entirely and re-running.
+- [ ] **Suspect 6 — Container resolution.** Cabinet's `Container::get()` walks the provider stack. If a 10-field DTO triggers more `get()` calls (one per dependency) and each one re-runs middleware/decorators, the delta could compound. Count the `get()` calls per request for both DTOs (instrument `Container::get()` with a static counter for the test, remove after).
+- [ ] **Decide the fix.** Once the root cause is named, decide whether the fix is a code change, a cache, an architectural shift, or "won't do" with documented trade-off. Reflection caching has already been ruled out; whatever this is, it's not reflection.
+- [ ] **Capture the result.** Whatever the answer turns out to be, write it up in this section as a "lesson learned" so the open question becomes a closed one. If the fix lands, mark the throughput delta resolved; if it's a "won't do," explain the trade-off.
+
 ### Benchmark harness
 
 ```bash
