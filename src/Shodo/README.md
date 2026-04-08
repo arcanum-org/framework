@@ -322,6 +322,35 @@ Template helpers provide reusable functions callable from templates using static
 
 The compiler rewrites `Name::method(...)` to `$__helpers['Name']->method(...)`. Escaped output (`{{ }}`) wraps the result in `$__escape`; raw output (`{{! !}}`) does not. The `{{ csrf }}` directive is shorthand for `{{! Html::csrf() !}}`.
 
+### Helper calls inside expressions
+
+The body of `{{ }}` (and `{{! !}}`) is treated as an arbitrary PHP expression. Every helper-call occurrence inside it is rewritten in a single pass — anything PHP allows after a method call composes naturally:
+
+```html
+{{ Tip::today()['title'] }}                    array access
+{{ User::current()->name }}                    method chain
+{{ Math::pi() + 1 }}                           arithmetic
+{{ Env::debugMode() ? 'on' : 'off' }}          ternary
+{{ User::current() ?? 'guest' }}               null coalesce
+{{ Format::number(Math::pi(), 2) }}            nested helper calls
+{{ Str::upper($name) . '!' }}                  concatenation
+```
+
+Helper calls also work inside control-structure conditions:
+
+```html
+{{ if Env::debugMode() }}...{{ endif }}
+{{ foreach Wired::list() as $item }}...{{ endforeach }}
+```
+
+**Escape hatch — fully-qualified static calls.** A real PHP static call inside a template would normally collide with a helper alias. Lead with a backslash to opt out of the rewrite:
+
+```html
+{{ \App\Foo::bar() }}
+```
+
+The lookbehind also leaves `$Format::method()` (variable static call) and partially-qualified `Namespace\Foo::bar()` alone. String literals containing helper-shaped text are out of scope — the rewriter operates on the raw expression body and would mangle `'A::b()'`. Templates don't quote helper-shaped strings in practice; revisit if a real fixture needs it.
+
 ### Built-in helpers
 
 | Alias | Class | Methods |

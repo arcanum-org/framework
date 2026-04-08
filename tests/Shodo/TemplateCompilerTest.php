@@ -609,6 +609,176 @@ final class TemplateCompilerTest extends TestCase
         );
     }
 
+    public function testHelperCallWithArrayAccess(): void
+    {
+        // Arrange — the case that originally surfaced the rewrite need.
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ Tip::today()[\'title\'] }}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__escape((string)($__helpers[\'Tip\']->today()[\'title\'])) ?>',
+            $result,
+        );
+    }
+
+    public function testHelperCallWithMethodChain(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ User::current()->name }}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__escape((string)($__helpers[\'User\']->current()->name)) ?>',
+            $result,
+        );
+    }
+
+    public function testHelperCallInArithmetic(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ Math::pi() + 1 }}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__escape((string)($__helpers[\'Math\']->pi() + 1)) ?>',
+            $result,
+        );
+    }
+
+    public function testHelperCallInTernary(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ Env::debugMode() ? \'on\' : \'off\' }}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__escape((string)($__helpers[\'Env\']->debugMode() ? \'on\' : \'off\')) ?>',
+            $result,
+        );
+    }
+
+    public function testHelperCallWithNullCoalesce(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ User::current() ?? \'guest\' }}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__escape((string)($__helpers[\'User\']->current() ?? \'guest\')) ?>',
+            $result,
+        );
+    }
+
+    public function testNestedHelperCallsInOneExpression(): void
+    {
+        // Arrange — both helper occurrences rewrite in a single pass.
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ Format::number(Math::pi(), 2) }}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__escape((string)($__helpers[\'Format\']->number($__helpers[\'Math\']->pi(), 2))) ?>',
+            $result,
+        );
+    }
+
+    public function testHelperCallFollowedByConcatenation(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ Str::upper($name) . \'!\' }}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__escape((string)($__helpers[\'Str\']->upper($name) . \'!\')) ?>',
+            $result,
+        );
+    }
+
+    public function testHelperCallInIfCondition(): void
+    {
+        // Arrange — previously a silent bug: control-structure expressions
+        // were not run through the helper rewriter, so this compiled to a
+        // literal PHP static call to a class named Env.
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ if Env::debugMode() }}on{{ endif }}');
+
+        // Assert
+        $this->assertSame(
+            '<?php if ($__helpers[\'Env\']->debugMode()): ?>on<?php endif; ?>',
+            $result,
+        );
+    }
+
+    public function testHelperCallInForeachExpression(): void
+    {
+        // Arrange
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ foreach Wired::list() as $item }}{{ $item }}{{ endforeach }}');
+
+        // Assert
+        $this->assertSame(
+            '<?php foreach ($__helpers[\'Wired\']->list() as $item): ?>'
+            . '<?= $__escape((string)($item)) ?>'
+            . '<?php endforeach; ?>',
+            $result,
+        );
+    }
+
+    public function testVariableStaticCallIsLeftAlone(): void
+    {
+        // Arrange — `$Foo::method()` is a variable static call, not a helper.
+        // The lookbehind in HELPER_CALL_PATTERN excludes a preceding `$`.
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ $Foo::method() }}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__escape((string)($Foo::method())) ?>',
+            $result,
+        );
+    }
+
+    public function testPartiallyQualifiedStaticCallIsLeftAlone(): void
+    {
+        // Arrange — preceded by `\`, so the lookbehind blocks the rewrite.
+        $compiler = new TemplateCompiler();
+
+        // Act
+        $result = $compiler->compile('{{ App\Foo::bar() }}');
+
+        // Assert
+        $this->assertSame(
+            '<?= $__escape((string)(App\Foo::bar())) ?>',
+            $result,
+        );
+    }
+
     public function testHelperCallWithNestedParentheses(): void
     {
         // Arrange

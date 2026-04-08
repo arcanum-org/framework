@@ -36,7 +36,26 @@ namespace Arcanum\Shodo;
  */
 final class TemplateCompiler
 {
-    private const HELPER_PATTERN = '([A-Z][a-zA-Z0-9]*)::(\w+)((?:\((?:[^()]*+|\((?:[^()]*+|\([^()]*+\))*\))*\)))';
+    /**
+     * Standalone helper-call pattern, applied inside captured `{{ }}` /
+     * `{{! !}}` / control-structure expression bodies.
+     *
+     * The lookbehind keeps the rewriter from clobbering names that look
+     * like helpers but are not — specifically:
+     *   - `\App\Foo::bar()`        — fully-qualified call (preceded by `\`)
+     *   - `Namespace\Foo::bar()`   — partially-qualified call (preceded by `\`)
+     *   - `$Format::method()`      — variable static call (preceded by `$`)
+     *   - `MyFoo::bar()` inside an identifier — preceded by a word char
+     *
+     * The argument list allows up to three levels of nested parens, which
+     * covers every realistic case (`Format::number(count($items), 0)`,
+     * `Format::number(Math::min($a, $b), 2)`, etc.). Calls deeper than
+     * three levels still rewrite correctly because each helper-call inside
+     * the body will be matched by its own occurrence of the pattern — the
+     * rewrite is one pass over the body, not recursive.
+     */
+    private const HELPER_CALL_PATTERN = '(?<![\\\\\w$])([A-Z][a-zA-Z0-9]*)::(\w+)'
+        . '((?:\((?:[^()]*+|\((?:[^()]*+|\([^()]*+\))*\))*\)))';
 
     /**
      * Files touched by the most recent compile() call, in the order they
@@ -129,29 +148,29 @@ final class TemplateCompiler
         // template syntax that those passes will compile.
         $source = $this->resolveMatch($source);
 
-        // Order matters: raw output before escaped output to avoid double-matching.
-        // Helper calls must be rewritten before the raw/escaped passes consume them,
-        // otherwise Name::method() would compile as a real PHP static call.
         $compiled = $source;
 
         // Directives: {{ csrf }} — raw output, no escape (intentional HTML).
+        // Runs before the body-capture passes so the bare keyword is not
+        // mistaken for a generic expression.
         $compiled = $this->replace(
             '/\{\{\s*csrf\s*\}\}/',
             '<?= $__helpers[\'Html\']->csrf() ?>',
             $compiled,
         );
 
-        // Helper calls in raw output: {{! Route::url('x') !}}
+        /*
+         * Raw output: {{! $expr !}}
+         *
+         * Captures the body as a PHP expression, runs the helper-call
+         * rewriter on it (so `{{! Html::csrf() !}}` and friends compile
+         * through the same path as raw scalars), and emits a raw echo
+         * tag. Must run before the escaped output pass so the `!`
+         * boundaries are consumed first.
+         */
         $compiled = $this->replaceCallback(
-            '/\{\{!\s*' . self::HELPER_PATTERN . '\s*!\}\}/s',
-            fn (array $m) => '<?= $__helpers[\'' . $m[1] . '\']->' . $m[2] . $m[3] . ' ?>',
-            $compiled,
-        );
-
-        // Raw output: {{! $expr !}}
-        $compiled = $this->replace(
             '/\{\{!\s*(.+?)\s*!\}\}/s',
-            '<?= $1 ?>',
+            fn (array $m) => '<?= ' . $this->rewriteHelperCalls($m[1]) . ' ?>',
             $compiled,
         );
 
@@ -164,11 +183,16 @@ final class TemplateCompiler
          *   {{ if ($foo > 0): }}     — also accepted (PHP alt syntax)
          *
          * Normalised to canonical PHP alt-syntax with explicit parens.
+         * Helper calls inside the condition are rewritten so that
+         * `{{ if Env::debugMode() }}` and `{{ foreach Wired::list() as $item }}`
+         * resolve through the helper registry rather than compiling to
+         * literal PHP static calls.
          */
         $compiled = $this->replaceCallback(
             '/\{\{\s*(foreach|if|elseif|for|while)(?:\s+|(?=\())(.+?)\s*\}\}/s',
             function (array $m): string {
                 $expr = $this->normaliseControlExpression($m[2]);
+                $expr = $this->rewriteHelperCalls($expr);
                 return '<?php ' . $m[1] . ' (' . $expr . '): ?>';
             },
             $compiled,
@@ -188,21 +212,45 @@ final class TemplateCompiler
             $compiled,
         );
 
-        // Helper calls in escaped output: {{ Route::url('x') }}
+        // Escaped output: {{ $expr }} — calls $__escape provided by the renderer.
+        //
+        // The body is treated as an arbitrary PHP expression. Helper-call
+        // occurrences inside it are rewritten to $__helpers[...]->method(...),
+        // so anything PHP allows after a method call — `[...]`, `->`, `?->`,
+        // arithmetic, ternary, `??`, `instanceof`, nested helper calls — Just
+        // Works because PHP itself parses the result. Multiple helper calls
+        // in one expression compose: `{{ Format::number(Math::pi(), 2) }}`
+        // rewrites both occurrences in a single pass.
         $compiled = $this->replaceCallback(
-            '/\{\{\s*' . self::HELPER_PATTERN . '\s*\}\}/s',
-            fn (array $m) => '<?= $__escape((string)($__helpers[\'' . $m[1] . '\']->' . $m[2] . $m[3] . ')) ?>',
-            $compiled,
-        );
-
-        // Escaped output: {{ $expr }} — calls $__escape provided by the renderer
-        $compiled = $this->replace(
             '/\{\{\s*(.+?)\s*\}\}/s',
-            '<?= $__escape((string)($1)) ?>',
+            fn (array $m) => '<?= $__escape((string)(' . $this->rewriteHelperCalls($m[1]) . ')) ?>',
             $compiled,
         );
 
         return $compiled;
+    }
+
+    /**
+     * Rewrite every helper-call occurrence inside an expression body.
+     *
+     * Each `Name::method(args)` match becomes `$__helpers['Name']->method(args)`.
+     * Names that are part of a fully-qualified call (`\App\Foo::bar()`),
+     * a variable static call (`$Format::method()`), or an identifier suffix
+     * are left alone — see HELPER_CALL_PATTERN for the lookbehind details.
+     */
+    private function rewriteHelperCalls(string $body): string
+    {
+        return $this->replaceCallback(
+            '/' . self::HELPER_CALL_PATTERN . '/s',
+            function (array $m): string {
+                // Recurse into the captured argument list so nested helper
+                // calls compose: Format::number(Math::pi(), 2) rewrites both
+                // helpers in a single pass over the body.
+                $args = $this->rewriteHelperCalls($m[3]);
+                return '$__helpers[\'' . $m[1] . '\']->' . $m[2] . $args;
+            },
+            $body,
+        );
     }
 
     private function replace(string $pattern, string $replacement, string $subject): string
