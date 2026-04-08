@@ -137,14 +137,18 @@ The body of `{{ }}` is an arbitrary PHP expression. Helper calls inside it are r
 - `#[WithHelper(EnvCheckHelper::class, alias: 'Env')]` on a DTO → that helper is available in the DTO's template under that alias.
 - `#[CliOnly]` / `#[HttpOnly]` → `TransportGuard` rejects the DTO from the wrong transport.
 
-### Domain-scoped files
+### Namespace-scoped files
 
-Drop a file with the right name next to a domain folder and Arcanum picks it up:
+Drop a file with the right name in any directory and Arcanum picks it up. Scoping is by **namespace prefix**, not by conceptual "domain": a file at `app/Foo/Helpers.php` applies to DTOs whose class lives under `App\Foo\*` and nowhere else.
 
-- `app/Domain/Shop/Helpers.php` — template helpers available to every Query/Command/Page in `Shop`. Returns an alias → class map.
-- `app/Domain/Shop/Middleware.php` — middleware that wraps every dispatch from `Shop`. Returns a list of class-strings.
+- `app/Helpers.php` — top-level. Helpers available to every DTO in the app, including Pages. Returns an alias → class map.
+- `app/Domain/Shop/Helpers.php` — applies only to `App\Domain\Shop\*`. Pages under `App\Pages\*` will not see these.
+- `app/Pages/Helpers.php` — applies only to Page DTOs. The right place for helpers a Page needs but other domains don't.
+- Same rules and locations work for `Middleware.php`, which returns a list of middleware class-strings instead of an alias map.
 
-Deeper directories override shallower ones.
+Deeper namespace prefixes override shallower ones — `app/Domain/Shop/Checkout/Helpers.php` wins over `app/Domain/Shop/Helpers.php` for a DTO in `Checkout`.
+
+For helpers that should belong to *one specific DTO* and nothing else, prefer the `#[WithHelper]` attribute on the DTO class itself — see the welcome page's `Index.php` for an example.
 
 ### HTTP status codes are part of the API
 
