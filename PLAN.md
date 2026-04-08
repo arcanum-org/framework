@@ -54,7 +54,7 @@ Integrate `Hourglass\Clock` throughout the framework and starter app so every wa
 #### Cross-cutting
 
 - [ ] **Run `composer check` after each commit.** PHPStan will catch any missed call sites or constructor mismatches; PHPUnit will catch any test that broke without an obvious symptom.
-- [ ] **Update COMPENDIUM.md.** Add a note in the Hourglass entry that `Clock` is now used by Sessions, Auth, Throttle, and Vault. Per the maintenance rule at the top of PLAN.md and COMPENDIUM.md, this is part of done, not a follow-up.
+- [x] **Update COMPENDIUM.md.** Hourglass entry now names the consumers (Vault `ArrayDriver`/`FileDriver`, Throttle `TokenBucket`/`SlidingWindow`, Auth `CliSession`), notes the bootstrap binding, and explicitly calls out that Stopwatch deliberately bypasses Clock for precision reasons. Testing-section paragraph updated to reflect that the Clock half of the testing-utilities arc is in progress.
 - [ ] **Final sweep.** After all migrations, re-run the discovery grep (`time(`, `new DateTime`, `new DateTimeImmutable`) across `src/` to confirm only the explicitly-skipped sites remain. Update this checklist with any stragglers found.
 
 ### Welcome page — nice-to-haves (deferred)
