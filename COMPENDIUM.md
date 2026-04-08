@@ -10,7 +10,7 @@ A guided tour of what Arcanum is, what's in it, and how the pieces fit together.
 
 Arcanum is an opinionated, batteries-included **CQRS PHP framework** for building websites and services that stay readable as they grow. The defining stance: every read is a Query, every write is a Command, each one is its own DTO with its own handler — discovered by convention, validated by attribute, dispatched through middleware. Handlers stay tiny because the framework absorbs the ceremony.
 
-It is **not** an MVC framework, **not** an ORM, and **not** a full template engine. It is built for developers who want fast handlers, real SQL, and a small mental model that doesn't grow with the codebase.
+It is **not** an MVC framework and **not** an ORM. It is built for developers who want fast handlers, real SQL, and a small mental model that doesn't grow with the codebase.
 
 Targets PHP 8.4+. PHPStan level 9 throughout. Comprehensive test coverage.
 
@@ -207,15 +207,6 @@ App developers add their own commands by defining DTOs under `app/Cli/Command/` 
 The framework itself uses PHPUnit 13 with the `#[CoversClass]` attribute on every test class (strict coverage required). Tests mirror `src/` structure: `src/Hyper/Headers.php` → `tests/Hyper/HeadersTest.php`. Arrange-Act-Assert pattern throughout.
 
 What apps get **today** for testing their own code: nothing yet. Writing a handler test means manually constructing a Cabinet container, registering services, faking PSR-7 requests. This is the next big arc — see PLAN.md's "Testing utilities + PSR-20 Clock adoption" entry, which will land `TestKernel`, `Factory`, and `Fake\` namespaces under `Arcanum\Test\`.
-
----
-
-## What Arcanum deliberately is *not*
-
-Worth knowing to set expectations:
-
-- **Not an ORM.** SQL is a first-class citizen — Forge maps `.sql` files to model methods. No query builder, no Active Record.
-- **Not yet on a non-FCGI runtime.** RoadRunner / FrankenPHP / Swoole support is a known gap, tracked under "FastCGI / post-response work patterns" in PLAN.md.
 
 ---
 
