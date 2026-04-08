@@ -30,7 +30,7 @@ Integrate `Hourglass\Clock` throughout the framework and starter app so every wa
 
 #### Vault
 
-- [ ] **`ArrayDriver` — inject Clock, migrate two `time()` sites.** Add `Clock` constructor parameter; replace `time()` at line 30 (expiry check in `get()`) and line 110 (TTL math in expiry calc) with `$this->clock->now()->getTimestamp()`. Update `ArrayDriverTest` to construct with `FrozenClock` and add at least one deterministic-expiry test that walks the clock past the TTL via `FrozenClock::advance()`.
+- [x] **`ArrayDriver` — inject Clock, migrate two `time()` sites.** Constructor now takes `Clock $clock = new SystemClock()` so existing call sites stay green and Codex auto-wires the container-bound clock in production. Three new deterministic tests using `FrozenClock::advance()`: still-valid before expiry, expired after, and a multi-step `DateInterval` walk.
 - [ ] **`FileDriver` — inject Clock, migrate two `time()` sites.** Same migration pattern at line 58 (expiry check) and line 160 (TTL math). Update `FileDriverTest` similarly.
 - [ ] **Vault README — document the Clock dependency.** Note that `ArrayDriver` and `FileDriver` now take a `Clock` constructor argument (auto-wired via container), and that `FrozenClock` enables deterministic TTL tests.
 

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Vault;
 
+use Arcanum\Hourglass\FrozenClock;
+use Arcanum\Hourglass\SystemClock;
 use Arcanum\Vault\ArrayDriver;
 use Arcanum\Vault\InvalidArgument;
 use Arcanum\Vault\KeyValidator;
@@ -14,6 +16,8 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[CoversClass(ArrayDriver::class)]
 #[UsesClass(KeyValidator::class)]
 #[UsesClass(InvalidArgument::class)]
+#[UsesClass(FrozenClock::class)]
+#[UsesClass(SystemClock::class)]
 final class ArrayDriverTest extends TestCase
 {
     public function testSetGetRoundTrip(): void
@@ -169,5 +173,41 @@ final class ArrayDriverTest extends TestCase
         $this->assertSame(['nested' => ['data' => true]], $cache->get('array'));
         $this->assertSame(42, $cache->get('int'));
         $this->assertNull($cache->get('null'));
+    }
+
+    public function testEntryIsValidBeforeFrozenClockReachesExpiry(): void
+    {
+        $clock = new FrozenClock(new \DateTimeImmutable('2026-04-08 12:00:00'));
+        $cache = new ArrayDriver($clock);
+
+        $cache->set('key', 'value', 60);
+        $clock->advance(new \DateInterval('PT30S'));
+
+        $this->assertSame('value', $cache->get('key'));
+    }
+
+    public function testEntryExpiresWhenFrozenClockAdvancesPastTtl(): void
+    {
+        $clock = new FrozenClock(new \DateTimeImmutable('2026-04-08 12:00:00'));
+        $cache = new ArrayDriver($clock);
+
+        $cache->set('key', 'value', 60);
+        $clock->advance(new \DateInterval('PT61S'));
+
+        $this->assertNull($cache->get('key'));
+    }
+
+    public function testDateIntervalTtlExpiresWhenFrozenClockAdvancesPast(): void
+    {
+        $clock = new FrozenClock(new \DateTimeImmutable('2026-04-08 12:00:00'));
+        $cache = new ArrayDriver($clock);
+
+        $cache->set('key', 'value', new \DateInterval('PT5M'));
+
+        $clock->advance(new \DateInterval('PT4M'));
+        $this->assertSame('value', $cache->get('key'));
+
+        $clock->advance(new \DateInterval('PT2M'));
+        $this->assertNull($cache->get('key'));
     }
 }

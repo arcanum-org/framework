@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Vault;
 
+use Arcanum\Hourglass\Clock;
+use Arcanum\Hourglass\SystemClock;
 use Psr\SimpleCache\CacheInterface;
 
 /**
@@ -17,6 +19,11 @@ final class ArrayDriver implements CacheInterface
     /** @var array<string, array{value: mixed, expiry: int|null}> */
     private array $store = [];
 
+    public function __construct(
+        private readonly Clock $clock = new SystemClock(),
+    ) {
+    }
+
     public function get(string $key, mixed $default = null): mixed
     {
         KeyValidator::validate($key);
@@ -27,7 +34,7 @@ final class ArrayDriver implements CacheInterface
 
         $entry = $this->store[$key];
 
-        if ($entry['expiry'] !== null && $entry['expiry'] <= time()) {
+        if ($entry['expiry'] !== null && $entry['expiry'] <= $this->clock->now()->getTimestamp()) {
             unset($this->store[$key]);
             return $default;
         }
@@ -99,14 +106,16 @@ final class ArrayDriver implements CacheInterface
             return null;
         }
 
+        $now = $this->clock->now()->getTimestamp();
+
         if ($ttl instanceof \DateInterval) {
-            return time() + (int) (new \DateTime())->setTimestamp(0)->add($ttl)->getTimestamp();
+            return $now + (int) (new \DateTime())->setTimestamp(0)->add($ttl)->getTimestamp();
         }
 
         if ($ttl <= 0) {
             return 0; // already expired
         }
 
-        return time() + $ttl;
+        return $now + $ttl;
     }
 }
