@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Auth;
 
+use Arcanum\Hourglass\Clock;
+use Arcanum\Hourglass\SystemClock;
 use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Writer;
@@ -25,6 +27,7 @@ class CliSession
         private readonly Reader $reader = new Reader(),
         private readonly Writer $writer = new Writer(),
         private readonly FileSystem $fileSystem = new FileSystem(),
+        private readonly Clock $clock = new SystemClock(),
     ) {
     }
 
@@ -35,7 +38,7 @@ class CliSession
     {
         $payload = json_encode([
             'id' => $identityId,
-            'expires' => time() + $ttl,
+            'expires' => $this->clock->now()->getTimestamp() + $ttl,
         ], \JSON_THROW_ON_ERROR);
 
         $encrypted = $this->encryptor->encrypt($payload);
@@ -73,7 +76,7 @@ class CliSession
         $id = $data['id'] ?? null;
         $expires = $data['expires'] ?? 0;
 
-        if (!is_string($id) || !is_int($expires) || $expires <= time()) {
+        if (!is_string($id) || !is_int($expires) || $expires <= $this->clock->now()->getTimestamp()) {
             $this->clear();
             return null;
         }

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Arcanum\Test\Auth;
 
 use Arcanum\Auth\CliSession;
+use Arcanum\Hourglass\FrozenClock;
+use Arcanum\Hourglass\SystemClock;
 use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Writer;
@@ -20,6 +22,8 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(Reader::class)]
 #[UsesClass(Writer::class)]
 #[UsesClass(FileSystem::class)]
+#[UsesClass(FrozenClock::class)]
+#[UsesClass(SystemClock::class)]
 final class CliSessionTest extends TestCase
 {
     private string $path;
@@ -42,6 +46,15 @@ final class CliSessionTest extends TestCase
         return new CliSession(encryptor: $this->encryptor, path: $this->path);
     }
 
+    private function sessionWithClock(FrozenClock $clock): CliSession
+    {
+        return new CliSession(
+            encryptor: $this->encryptor,
+            path: $this->path,
+            clock: $clock,
+        );
+    }
+
     public function testStoreAndLoadRoundTrip(): void
     {
         // Arrange
@@ -57,19 +70,34 @@ final class CliSessionTest extends TestCase
 
     public function testExpiredReturnsNullAndDeletesFile(): void
     {
-        // Arrange — store with TTL of 0 (already expired)
-        $session = $this->session();
-        $session->store('user-42', 0);
+        // Arrange — frozen clock lets us cross the TTL deterministically
+        // without sleep().
+        $clock = new FrozenClock(new \DateTimeImmutable('2026-04-08 12:00:00'));
+        $session = $this->sessionWithClock($clock);
+        $session->store('user-42', 60);
 
-        // Need to wait 1 second for time() to advance past expiry
-        sleep(1);
-
-        // Act
+        // Act — advance past the TTL and load.
+        $clock->advance(new \DateInterval('PT61S'));
         $id = $session->load();
 
         // Assert
         $this->assertNull($id);
         $this->assertFileDoesNotExist($this->path);
+    }
+
+    public function testStillValidBeforeFrozenClockReachesExpiry(): void
+    {
+        // Arrange
+        $clock = new FrozenClock(new \DateTimeImmutable('2026-04-08 12:00:00'));
+        $session = $this->sessionWithClock($clock);
+        $session->store('user-42', 60);
+
+        // Act — advance partway through the TTL.
+        $clock->advance(new \DateInterval('PT30S'));
+        $id = $session->load();
+
+        // Assert
+        $this->assertSame('user-42', $id);
     }
 
     public function testCorruptFileReturnsNull(): void

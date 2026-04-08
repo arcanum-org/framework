@@ -43,7 +43,7 @@ Integrate `Hourglass\Clock` throughout the framework and starter app so every wa
 
 #### Auth
 
-- [ ] **`CliSession` — inject Clock, migrate two `time()` sites.** Add Clock to constructor; replace `time() + $ttl` at line 38 (`save()`) and `$expires <= time()` at line 76 (`load()`). Update `CliSessionTest` to use `FrozenClock`, including a test that asserts a session expires correctly when the clock advances past TTL.
+- [x] **`CliSession` — inject Clock, migrate two `time()` sites.** Constructor now takes `Clock $clock = new SystemClock()`; both `time()` reads in `store()` and `load()` migrated. The existing `testExpiredReturnsNullAndDeletesFile` test was using `sleep(1)` to wait for wall-clock advance — refactored to use `FrozenClock::advance()` with no sleep. Added a complementary "still valid before expiry" test. Test suite is ~1 second faster as a side benefit.
 - [ ] **Auth README — document the Clock dependency.** Add a one-liner about `CliSession` taking Clock.
 
 #### Starter app
