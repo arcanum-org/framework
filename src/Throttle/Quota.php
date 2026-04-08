@@ -13,11 +13,8 @@ namespace Arcanum\Throttle;
  *
  * Quota stays a pure value object — it does not depend on Hourglass\Clock.
  * The Throttler that constructs the Quota holds the Clock and computes
- * `retryAfter` once at construction time, so headers() can render
- * `Retry-After` deterministically without re-reading "now". When `retryAfter`
- * is left at the default 0, headers() falls back to a wall-clock subtraction
- * for backward compat — that fallback will go away once every Throttler in
- * the framework passes the explicit value.
+ * `retryAfter` once at construction time, so `headers()` can render
+ * `Retry-After` deterministically without re-reading "now".
  */
 final class Quota
 {
@@ -52,10 +49,7 @@ final class Quota
         ];
 
         if (! $this->allowed) {
-            $retryAfter = $this->retryAfter > 0
-                ? $this->retryAfter
-                : max(0, $this->resetAt - time());
-            $headers['Retry-After'] = (string) $retryAfter;
+            $headers['Retry-After'] = (string) max(0, $this->retryAfter);
         }
 
         return $headers;

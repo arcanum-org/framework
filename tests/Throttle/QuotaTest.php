@@ -42,16 +42,20 @@ final class QuotaTest extends TestCase
 
     public function testHeadersOnDeniedRequestIncludesRetryAfter(): void
     {
-        $resetAt = time() + 30;
-        $quota = new Quota(allowed: false, remaining: 0, limit: 10, resetAt: $resetAt);
+        $quota = new Quota(
+            allowed: false,
+            remaining: 0,
+            limit: 10,
+            resetAt: 1700000030,
+            retryAfter: 30,
+        );
 
         $headers = $quota->headers();
 
         $this->assertSame('10', $headers['X-RateLimit-Limit']);
         $this->assertSame('0', $headers['X-RateLimit-Remaining']);
-        $this->assertSame((string) $resetAt, $headers['X-RateLimit-Reset']);
-        $this->assertArrayHasKey('Retry-After', $headers);
-        $this->assertGreaterThanOrEqual(0, (int) $headers['Retry-After']);
+        $this->assertSame('1700000030', $headers['X-RateLimit-Reset']);
+        $this->assertSame('30', $headers['Retry-After']);
     }
 
     public function testRemainingNeverNegativeInHeaders(): void
@@ -78,15 +82,15 @@ final class QuotaTest extends TestCase
         $this->assertSame('42', $headers['Retry-After']);
     }
 
-    public function testRetryAfterFallsBackToResetAtMinusNowWhenZero(): void
+    public function testRetryAfterDefaultsToZeroWhenNotPassed(): void
     {
-        $resetAt = time() + 30;
-        $quota = new Quota(allowed: false, remaining: 0, limit: 10, resetAt: $resetAt);
+        // A denied Quota constructed without retryAfter renders Retry-After: 0.
+        // In practice every framework Throttler passes the value explicitly;
+        // this test pins the contract for any third-party code that doesn't.
+        $quota = new Quota(allowed: false, remaining: 0, limit: 10, resetAt: 1700000000);
 
         $headers = $quota->headers();
 
-        // No explicit retryAfter passed → fallback path computes seconds remaining.
-        $this->assertGreaterThanOrEqual(29, (int) $headers['Retry-After']);
-        $this->assertLessThanOrEqual(30, (int) $headers['Retry-After']);
+        $this->assertSame('0', $headers['Retry-After']);
     }
 }
