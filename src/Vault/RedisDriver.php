@@ -103,14 +103,10 @@ final class RedisDriver implements CacheInterface
     /**
      * Normalize a PSR-16 TTL into a positive integer count of seconds.
      *
-     * The DateInterval branch anchors a DateTime at the unix epoch (timestamp 0),
-     * adds the interval, and reads the resulting timestamp — i.e. it converts
-     * the interval into "total seconds in the interval." This deliberately does
-     * NOT use Hourglass\Clock: the computation never reads wall-clock "now",
-     * so there is no testability boundary to cross. The driver hands the
-     * resulting int to Redis, which manages expiry natively. If you change this
-     * to read "now," you must inject Clock — but please don't, the current form
-     * is intentional.
+     * The DateInterval branch converts the interval into total seconds via an
+     * epoch-anchored DateTime — it never reads wall-clock "now," so it does
+     * not cross a Hourglass\Clock testability boundary. Redis handles expiry
+     * natively from the int we hand it.
      */
     private function resolveTtl(\DateInterval|int|null $ttl): int|null
     {

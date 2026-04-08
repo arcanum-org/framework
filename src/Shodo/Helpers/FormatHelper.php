@@ -25,13 +25,10 @@ final class FormatHelper
     /**
      * Format a caller-provided timestamp.
      *
-     * This is a pure formatter — every call site passes the timestamp it wants
-     * formatted, and the function returns the rendered string. It deliberately
-     * does NOT use Hourglass\Clock: there is no "now" being read here, so there
-     * is no testability boundary to cross. (The strtotime() branch can interpret
-     * relative strings like "+1 day" against the system clock, but choosing to
-     * pass such a string is the caller's decision; the helper itself stays
-     * value-in / value-out.)
+     * Pure value-in / value-out — never reads wall-clock "now," so it does
+     * not cross a Hourglass\Clock testability boundary. (A relative strtotime
+     * string like "+1 day" reads "now," but choosing to pass one is on the
+     * caller, not the helper.)
      */
     public function date(
         int|string|\DateTimeInterface $timestamp,
