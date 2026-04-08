@@ -4,65 +4,16 @@
 
 ## Upcoming Work
 
-### Starter app — index page redesign (Groups 2–5)
+### Testing utilities + PSR-20 `Clock` adoption — next focus
 
-**Group 1 (data layer)** is done — `EnvCheckHelper`, `WiredUpHelper`, `IncantationHelper`, `RequestCounter`, and the `#[WithHelper]` wiring on `Index.php` all live in the starter app. `EnvCheckHelper::renderDurationMs()` now reads from the framework Stopwatch (the request-scoped `RenderMetrics` holder is gone). What remains is the actual page redesign that consumes those helpers, plus content writing and verification.
+The single highest-leverage item left. See the long-distance entry below for the concrete shape; promote to upcoming when ready to start.
 
-#### Design narrative + section spec
+### Welcome page — nice-to-haves (deferred)
 
-Researched the Symfony 8 and CakePHP 5 welcome pages. Symfony is polished and resource-focused (banner, "Next Step" CTA, three columns of links). CakePHP is diagnostic and reassuring (version banner, filesystem/database health checks with green/red bullets). Our current index is sparse — hero + two CTAs + a CQRS card grid, no version, no environment info. The new index combines all three: Symfony's polish, CakePHP's diagnostic checklist, and our CQRS explainer (uniquely valuable — neither competitor explains its own mental model on the first page).
+The Index redesign landed (nine-section structure, real diagnostics, CSS-only tabs, copy buttons, ASCII rune). The two leftovers are explicitly optional:
 
-The page should tell a new dev: (1) the framework is alive and healthy, (2) what's wired up right now, (3) what to do in the next 60 seconds, and (4) why CQRS instead of MVC — without being preachy.
-
-**Sections, top to bottom:**
-
-1. **Heartbeat badge** — single dense monospace line at the very top: `Arcanum v0.x.y · PHP 8.4.3 · env: local · db: sqlite · debug: ON`. Symfony-style; the most useful single line on the page.
-2. **Welcome banner** — `Welcome to Arcanum`, tagline, and "this page lives at app/Pages/Index.html — replace it" hint.
-3. **Today's incantation** — rotating tip-of-the-day card from `IncantationHelper::today()`. Format: short title, one-line explanation, optional code snippet.
-4. **Diagnostics — two columns** — Environment checks (PHP version, extensions, writable dirs) and Application checks (cache driver, logs, sessions, database, CSS bundle, debug mode). Plain professional language, green check / yellow warning / red cross bullets via Tailwind.
-5. **What's wired up** — small introspection panel showing live counts from `WiredUpHelper`: `commands · queries · pages · middleware · helpers`. Doubles as a smoke test.
-6. **Why CQRS (not MVC)** — replaces the generic three-card "How It Works" grid. Two short paragraphs framing the choice as deliberate. Headline angle: *MVC controllers grow into junk drawers. CQRS keeps each operation small, named, and testable.* Beneath the prose, **inline mini demo**: tabbed code block (pure CSS `:target` tabs) showing a 4-line Query, a 4-line Command, and a 4-line Page side-by-side.
-7. **Your next 60 seconds / 10 minutes / 1 hour** — three progressive-commitment cards replacing the LEARN/COMMUNITY/BUILD grid. 60s = copy a `make:page Home` command. 10min = inline 3-paragraph CQRS primer. 1hr = getting-started guide, source link, GitHub repo. Each command/snippet has a tiny copy-to-clipboard button (vanilla JS).
-8. **Footer crumb** — single understated line: `This page rendered in 3.2ms. You are request #47 since boot.` Pulled from `EnvCheckHelper::renderDurationMs()` and `requestCount()`.
-9. **ASCII rune in the corner** — small SVG or pre-formatted ASCII glyph in the page footer.
-10. **Nice-to-have: `?debug=1` easter egg** — toggling the query param replaces the welcome banner with a visualization of the resolved bootstrap order. Optional, ship only if the rest lands cleanly.
-
-**Design decisions, settled:** static checks per request (no caching — page renders rarely, accuracy matters); page is not auto-disabled in production (the user replaces `app/Pages/Index.html` themselves — replacing the file is the explicit signal that they're making the app their own); framework version via `Composer\InstalledVersions::getVersion('arcanum-org/framework')`.
-
-**Plan items — page and templates:**
-
-- [ ] **Index page redesign** — rewrite `app/Pages/Index.html` to the nine-section structure above. One file, no partials (this is the welcome page, it should be readable as a single document).
-- [ ] **CSS — status bullets** — green check / yellow warning / red cross via Tailwind utility classes. No new CSS file.
-- [ ] **CSS — `:target` tabs** — pure CSS tabbed code block for the inline CQRS mini demo. No JS.
-- [ ] **Copy-to-clipboard buttons** — one tiny inline `<script>` block at the bottom of the page wiring `[data-copy]` buttons to `navigator.clipboard.writeText`. Visual feedback on click (text swap to "Copied!" for 1.5s).
-- [ ] **ASCII/SVG rune mark** — small decorative glyph in the footer area.
-- [ ] **Placeholder example.com URLs** for docs/tutorial/api links. Tracked in the cleanup section below.
-
-**Plan items — content:**
-
-- [ ] **Write the "Why CQRS" prose** — two short paragraphs. Confident, not preachy. Frame MVC controllers as junk drawers; frame CQRS handlers as small, named, testable. No marketing fluff.
-- [ ] **Write the 15 incantations** — short, real, useful. Lean toward things a new user wouldn't discover from skimming the README. Replaces the placeholder set currently in `IncantationHelper`.
-- [ ] **Write the three progressive-commitment card bodies** — 60s / 10min / 1hr.
-
-**Plan items — verification:**
-
-- [ ] **Smoke test happy path** — fresh starter app, all checks green, all counts non-zero, render duration shows, request counter increments across reloads, incantation rotates with `date('z')`.
-- [ ] **Smoke test failure path** — `chmod -w files/cache/` flips the cache bullet red without crashing the page; dropping the database file flips the database bullet without crashing.
-- [ ] **Tab demo works without JS** — disable JS in browser, confirm `:target` tabs still switch.
-- [ ] **Copy buttons work** — click each, confirm clipboard contents and visual feedback.
-
-**Nice-to-have (defer if time runs short):**
-
-- [ ] **`?debug=1` bootstrap visualization** — replaces welcome banner with bootstrap order list when query param is set.
-
-**Plan items — placeholder URL cleanup (deferred until real docs exist):**
-
-- [ ] **Replace `https://example.com/docs`** in starter app Index page with real documentation URL.
-- [ ] **Replace `https://example.com/tutorial`** with real tutorial URL.
-- [ ] **Replace `https://example.com/api`** with real API reference URL.
-- [ ] **Replace `https://example.com/discussions`** with real community URL (Discord/Slack/GitHub Discussions).
-
-GitHub source and issues URLs will use the real `arcanum-org/framework` repo links — those exist already.
+- [ ] **`?debug=1` bootstrap visualization** — replaces welcome banner with bootstrap order list when the query param is set. Easter egg.
+- [ ] **Placeholder URL cleanup** — replace `https://example.com/{docs,tutorial,api,discussions}` references in the Index page with real URLs once real docs / tutorial / community channels exist. GitHub repo links are already real.
 
 ---
 
