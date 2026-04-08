@@ -122,7 +122,7 @@ Both kernels record built-in instants on the framework `Stopwatch` (from the [Ho
 
 | Mark | When | Recorded by |
 |---|---|---|
-| `arcanum.start` | Front controller line 1 (via `ARCANUM_START`) or Stopwatch construction | `Bootstrap\Stopwatch` |
+| `arcanum.start` | Front controller line 1 (via `ARCANUM_START`) or Stopwatch construction | `Bootstrap\Hourglass` |
 | `boot.complete` | After all bootstrappers finish | `HyperKernel`/`RuneKernel::bootstrap()` |
 | `request.received` | Before any HTTP middleware runs | `HyperKernel::dispatchRequestReceived()` |
 | `handler.start` | Conveyor `MiddlewareBus::dispatch()` entry | `Flow\Conveyor\MiddlewareBus` |

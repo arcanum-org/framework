@@ -58,7 +58,7 @@ class RuneKernel implements Kernel
      * @var class-string<Bootstrapper>[]
      */
     protected array $bootstrappers = [
-        Bootstrap\Stopwatch::class,
+        Bootstrap\Hourglass::class,
         Bootstrap\Environment::class,
         Bootstrap\Configuration::class,
         Bootstrap\Security::class,
