@@ -93,6 +93,18 @@ final class ApcuDriver implements CacheInterface
         return true;
     }
 
+    /**
+     * Normalize a PSR-16 TTL into a positive integer count of seconds.
+     *
+     * The DateInterval branch anchors a DateTime at the unix epoch (timestamp 0),
+     * adds the interval, and reads the resulting timestamp — i.e. it converts
+     * the interval into "total seconds in the interval." This deliberately does
+     * NOT use Hourglass\Clock: the computation never reads wall-clock "now",
+     * so there is no testability boundary to cross. The driver hands the
+     * resulting int to APCu, which manages expiry natively. If you change this
+     * to read "now," you must inject Clock — but please don't, the current form
+     * is intentional.
+     */
     private function resolveTtl(\DateInterval|int|null $ttl): int|null
     {
         if ($ttl === null) {

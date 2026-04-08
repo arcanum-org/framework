@@ -24,6 +24,21 @@ use RuntimeException;
  * resolved instance via Stopwatch::install(); call sites then read it via
  * Stopwatch::current(). Tests should install a fresh instance per test and
  * uninstall it in tearDown.
+ *
+ * Why Stopwatch uses microtime(true) directly instead of Hourglass\Clock:
+ * Stopwatch and Clock solve different problems and stay deliberately
+ * uncoupled. Clock is the wall-clock "now" boundary for time-sensitive
+ * business logic (TTL math, session expiry, scheduled jobs) — the kind of
+ * thing tests need to fake with FrozenClock. Stopwatch is high-resolution
+ * elapsed-time telemetry for the process's own timeline (request received,
+ * handler complete, response sent) — and microtime(true) is the right tool
+ * for that, because it produces a sub-millisecond float that DateTimeImmutable
+ * cannot. Routing telemetry through Clock would force every elapsed-time
+ * measurement to round-trip through DateTimeImmutable, lose precision, and
+ * couple two unrelated concerns. For tests that need deterministic Stopwatch
+ * timelines, every recording method (constructor, mark()) accepts an
+ * explicit `?float $time` argument so the test passes the value it wants
+ * recorded. That's the testability seam — not Clock injection.
  */
 final class Stopwatch
 {

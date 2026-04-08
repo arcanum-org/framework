@@ -19,6 +19,10 @@ Integrate `Hourglass\Clock` throughout the framework and starter app so every wa
 
 **Order:** bootstrap → Vault → Throttle → Auth → starter app → docs. Vault first because it's a dependency of Throttle (Throttle stores its state through Vault), and starting with the dependency means downstream packages compile against an already-Clock-aware Vault. Each item is its own commit.
 
+#### Documentation of deliberately-skipped sites
+
+- [x] **Land explanation comments at every skipped time-using site** so future maintainers (or future Claude) don't "fix" what isn't broken. Covers `Vault\ApcuDriver::resolveTtl`, `Vault\RedisDriver::resolveTtl` (interval-to-int converters that never read "now"), `Shodo\Helpers\FormatHelper::date` (caller-provided value formatter), and `Hourglass\Stopwatch` (high-resolution elapsed-time telemetry that intentionally bypasses Clock — different concern, different precision requirement). Each comment names Hourglass\Clock explicitly and explains the why so the decision is locally legible without needing to read PLAN.md.
+
 #### Bootstrap
 
 - [ ] **Register `Clock` in the container.** Either extend `Bootstrap\Stopwatch` to also bind `Clock::class → SystemClock::class` (and rename it to `Bootstrap\Hourglass`), or add a new `Bootstrap\Clock` bootstrapper. Prefer extending+renaming — Hourglass is one cohesive package, two bootstrappers for it would split the bootstrap order awkwardly. Both `HyperKernel` and `RuneKernel` bootstrap lists need updating to reference the renamed bootstrapper.
@@ -28,7 +32,6 @@ Integrate `Hourglass\Clock` throughout the framework and starter app so every wa
 
 - [ ] **`ArrayDriver` — inject Clock, migrate two `time()` sites.** Add `Clock` constructor parameter; replace `time()` at line 30 (expiry check in `get()`) and line 110 (TTL math in expiry calc) with `$this->clock->now()->getTimestamp()`. Update `ArrayDriverTest` to construct with `FrozenClock` and add at least one deterministic-expiry test that walks the clock past the TTL via `FrozenClock::advance()`.
 - [ ] **`FileDriver` — inject Clock, migrate two `time()` sites.** Same migration pattern at line 58 (expiry check) and line 160 (TTL math). Update `FileDriverTest` similarly.
-- [ ] **`ApcuDriver` / `RedisDriver` — verify no Clock dependency needed.** Re-read the `(new DateTime())->setTimestamp(0)->add($ttl)` lines to confirm they're pure interval-to-int converters and not now-reads. If true, no migration. If discovery missed something, migrate.
 - [ ] **Vault README — document the Clock dependency.** Note that `ArrayDriver` and `FileDriver` now take a `Clock` constructor argument (auto-wired via container), and that `FrozenClock` enables deterministic TTL tests.
 
 #### Throttle
