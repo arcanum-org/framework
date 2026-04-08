@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Throttle;
 
+use Arcanum\Hourglass\FrozenClock;
+use Arcanum\Hourglass\SystemClock;
 use Arcanum\Throttle\Quota;
 use Arcanum\Throttle\SlidingWindow;
 use Arcanum\Vault\ArrayDriver;
@@ -14,6 +16,8 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[CoversClass(SlidingWindow::class)]
 #[UsesClass(Quota::class)]
 #[UsesClass(ArrayDriver::class)]
+#[UsesClass(FrozenClock::class)]
+#[UsesClass(SystemClock::class)]
 final class SlidingWindowTest extends TestCase
 {
     public function testFirstRequestIsAllowed(): void
@@ -142,5 +146,47 @@ final class SlidingWindowTest extends TestCase
         $quota = $window->attempt($cache, 'test', 10, 60);
 
         $this->assertGreaterThanOrEqual($now + 60, $quota->resetAt);
+    }
+
+    public function testFrozenClockMakesWindowRotationDeterministic(): void
+    {
+        $clock = new FrozenClock(new \DateTimeImmutable('2026-04-08 12:00:00'));
+        $cache = new ArrayDriver($clock);
+        $window = new SlidingWindow($clock);
+
+        // Fill the window to its limit.
+        for ($i = 0; $i < 10; $i++) {
+            $allowed = $window->attempt($cache, 'user', 10, 60);
+            $this->assertTrue($allowed->isAllowed());
+        }
+
+        // Eleventh attempt is denied.
+        $denied = $window->attempt($cache, 'user', 10, 60);
+        $this->assertFalse($denied->isAllowed());
+
+        // Advance the clock past the window. The current window rotates to
+        // previous; previous overlap is now 0, so the full limit is available.
+        $clock->advance(new \DateInterval('PT60S'));
+
+        $allowedAgain = $window->attempt($cache, 'user', 10, 60);
+        $this->assertTrue($allowedAgain->isAllowed());
+        $this->assertSame(9, $allowedAgain->remaining);
+    }
+
+    public function testDeniedQuotaCarriesRetryAfterFromClock(): void
+    {
+        $clock = new FrozenClock(new \DateTimeImmutable('2026-04-08 12:00:00'));
+        $cache = new ArrayDriver($clock);
+        $window = new SlidingWindow($clock);
+
+        // Saturate the window.
+        for ($i = 0; $i < 10; $i++) {
+            $window->attempt($cache, 'user', 10, 60);
+        }
+
+        $denied = $window->attempt($cache, 'user', 10, 60);
+        $this->assertFalse($denied->isAllowed());
+        $this->assertGreaterThan(0, $denied->retryAfter);
+        $this->assertSame($denied->resetAt - $clock->now()->getTimestamp(), $denied->retryAfter);
     }
 }

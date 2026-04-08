@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Throttle;
 
+use Arcanum\Hourglass\Clock;
+use Arcanum\Hourglass\SystemClock;
 use Psr\SimpleCache\CacheInterface;
 
 /**
@@ -19,9 +21,14 @@ use Psr\SimpleCache\CacheInterface;
  */
 final class SlidingWindow implements Throttler
 {
+    public function __construct(
+        private readonly Clock $clock = new SystemClock(),
+    ) {
+    }
+
     public function attempt(CacheInterface $cache, string $key, int $limit, int $windowSeconds): Quota
     {
-        $now = time();
+        $now = $this->clock->now()->getTimestamp();
 
         $curKey = $key . '_cur';
         $prevKey = $key . '_prev';
@@ -58,7 +65,7 @@ final class SlidingWindow implements Throttler
         if ($estimatedCount >= $limit) {
             $resetAt = $current['windowStart'] + $windowSeconds;
 
-            return new Quota(false, 0, $limit, $resetAt);
+            return new Quota(false, 0, $limit, $resetAt, max(0, $resetAt - $now));
         }
 
         $current['count']++;
