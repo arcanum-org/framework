@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Vault;
 
+use Arcanum\Hourglass\FrozenClock;
+use Arcanum\Hourglass\SystemClock;
+use Arcanum\Parchment\FileSystem;
+use Arcanum\Parchment\Reader;
+use Arcanum\Parchment\Writer;
 use Arcanum\Vault\FileDriver;
 use Arcanum\Vault\InvalidArgument;
 use Arcanum\Vault\KeyValidator;
@@ -18,6 +23,8 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(\Arcanum\Parchment\Writer::class)]
 #[UsesClass(\Arcanum\Parchment\FileSystem::class)]
 #[UsesClass(\Arcanum\Parchment\Searcher::class)]
+#[UsesClass(FrozenClock::class)]
+#[UsesClass(SystemClock::class)]
 final class FileDriverTest extends TestCase
 {
     private string $cacheDir;
@@ -196,5 +203,59 @@ final class FileDriverTest extends TestCase
         $cache->set('key', null);
 
         $this->assertTrue($cache->has('key'));
+    }
+
+    public function testEntryIsValidBeforeFrozenClockReachesExpiry(): void
+    {
+        $clock = new FrozenClock(new \DateTimeImmutable('2026-04-08 12:00:00'));
+        $cache = new FileDriver(
+            $this->cacheDir,
+            new Reader(),
+            new Writer(),
+            new FileSystem(),
+            $clock,
+        );
+
+        $cache->set('key', 'value', 60);
+        $clock->advance(new \DateInterval('PT30S'));
+
+        $this->assertSame('value', $cache->get('key'));
+    }
+
+    public function testEntryExpiresWhenFrozenClockAdvancesPastTtl(): void
+    {
+        $clock = new FrozenClock(new \DateTimeImmutable('2026-04-08 12:00:00'));
+        $cache = new FileDriver(
+            $this->cacheDir,
+            new Reader(),
+            new Writer(),
+            new FileSystem(),
+            $clock,
+        );
+
+        $cache->set('key', 'value', 60);
+        $clock->advance(new \DateInterval('PT61S'));
+
+        $this->assertNull($cache->get('key'));
+    }
+
+    public function testDateIntervalTtlExpiresWhenFrozenClockAdvancesPast(): void
+    {
+        $clock = new FrozenClock(new \DateTimeImmutable('2026-04-08 12:00:00'));
+        $cache = new FileDriver(
+            $this->cacheDir,
+            new Reader(),
+            new Writer(),
+            new FileSystem(),
+            $clock,
+        );
+
+        $cache->set('key', 'value', new \DateInterval('PT5M'));
+
+        $clock->advance(new \DateInterval('PT4M'));
+        $this->assertSame('value', $cache->get('key'));
+
+        $clock->advance(new \DateInterval('PT2M'));
+        $this->assertNull($cache->get('key'));
     }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Vault;
 
+use Arcanum\Hourglass\Clock;
+use Arcanum\Hourglass\SystemClock;
 use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Searcher;
@@ -22,16 +24,19 @@ final class FileDriver implements CacheInterface
     private readonly Reader $reader;
     private readonly Writer $writer;
     private readonly FileSystem $fileSystem;
+    private readonly Clock $clock;
 
     public function __construct(
         private readonly string $directory,
         Reader $reader = new Reader(),
         Writer $writer = new Writer(),
         FileSystem $fileSystem = new FileSystem(),
+        Clock $clock = new SystemClock(),
     ) {
         $this->reader = $reader;
         $this->writer = $writer;
         $this->fileSystem = $fileSystem;
+        $this->clock = $clock;
 
         if (!$this->fileSystem->isDirectory($this->directory)) {
             $this->fileSystem->mkdir($this->directory);
@@ -55,7 +60,8 @@ final class FileDriver implements CacheInterface
             return $default;
         }
 
-        if (isset($data['expiry']) && is_int($data['expiry']) && $data['expiry'] <= time()) {
+        $now = $this->clock->now()->getTimestamp();
+        if (isset($data['expiry']) && is_int($data['expiry']) && $data['expiry'] <= $now) {
             $this->fileSystem->delete($path);
             return $default;
         }
@@ -149,14 +155,16 @@ final class FileDriver implements CacheInterface
             return null;
         }
 
+        $now = $this->clock->now()->getTimestamp();
+
         if ($ttl instanceof \DateInterval) {
-            return time() + (int) (new \DateTime())->setTimestamp(0)->add($ttl)->getTimestamp();
+            return $now + (int) (new \DateTime())->setTimestamp(0)->add($ttl)->getTimestamp();
         }
 
         if ($ttl <= 0) {
             return 0;
         }
 
-        return time() + $ttl;
+        return $now + $ttl;
     }
 }
