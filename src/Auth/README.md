@@ -161,6 +161,8 @@ The `login` command prompts for credentials (configurable fields), validates the
 
 Sessions are encrypted at rest using the framework's `Encryptor` (your `APP_KEY`). They contain only the identity ID and an expiry timestamp — never the raw credentials. Sessions expire after the configured TTL (default: 24 hours).
 
+`CliSession` takes an optional `Hourglass\Clock` constructor parameter (defaults to `SystemClock`) for the expiry math. Production code lets the container auto-wire it; tests pass a `FrozenClock` to assert expiry behavior deterministically without `sleep()`.
+
 ```
 php arcanum login        # prompts for email + password
 php arcanum logout       # clears the stored session
