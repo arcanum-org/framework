@@ -62,4 +62,31 @@ final class QuotaTest extends TestCase
 
         $this->assertSame('0', $headers['X-RateLimit-Remaining']);
     }
+
+    public function testExplicitRetryAfterIsUsedInHeaders(): void
+    {
+        $quota = new Quota(
+            allowed: false,
+            remaining: 0,
+            limit: 10,
+            resetAt: 1700000000,
+            retryAfter: 42,
+        );
+
+        $headers = $quota->headers();
+
+        $this->assertSame('42', $headers['Retry-After']);
+    }
+
+    public function testRetryAfterFallsBackToResetAtMinusNowWhenZero(): void
+    {
+        $resetAt = time() + 30;
+        $quota = new Quota(allowed: false, remaining: 0, limit: 10, resetAt: $resetAt);
+
+        $headers = $quota->headers();
+
+        // No explicit retryAfter passed → fallback path computes seconds remaining.
+        $this->assertGreaterThanOrEqual(29, (int) $headers['Retry-After']);
+        $this->assertLessThanOrEqual(30, (int) $headers['Retry-After']);
+    }
 }

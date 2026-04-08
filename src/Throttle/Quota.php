@@ -8,7 +8,16 @@ namespace Arcanum\Throttle;
  * Immutable result of a rate-limit attempt.
  *
  * Carries whether the request was allowed, how many requests remain,
- * the configured limit, and when the window resets.
+ * the configured limit, when the window resets, and (when denied) how many
+ * seconds the caller should wait before retrying.
+ *
+ * Quota stays a pure value object — it does not depend on Hourglass\Clock.
+ * The Throttler that constructs the Quota holds the Clock and computes
+ * `retryAfter` once at construction time, so headers() can render
+ * `Retry-After` deterministically without re-reading "now". When `retryAfter`
+ * is left at the default 0, headers() falls back to a wall-clock subtraction
+ * for backward compat — that fallback will go away once every Throttler in
+ * the framework passes the explicit value.
  */
 final class Quota
 {
@@ -17,6 +26,7 @@ final class Quota
         public readonly int $remaining,
         public readonly int $limit,
         public readonly int $resetAt,
+        public readonly int $retryAfter = 0,
     ) {
     }
 
@@ -42,7 +52,9 @@ final class Quota
         ];
 
         if (! $this->allowed) {
-            $retryAfter = max(0, $this->resetAt - time());
+            $retryAfter = $this->retryAfter > 0
+                ? $this->retryAfter
+                : max(0, $this->resetAt - time());
             $headers['Retry-After'] = (string) $retryAfter;
         }
 

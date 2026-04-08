@@ -38,7 +38,7 @@ Integrate `Hourglass\Clock` throughout the framework and starter app so every wa
 
 - [ ] **`TokenBucket` — inject Clock, migrate one `time()` site.** Throttler classes currently have no constructors; add one that takes `Clock`. Replace `time()` at line 22. Update `TokenBucketTest` to construct with `FrozenClock` and test window math via `advance()`.
 - [ ] **`SlidingWindow` — inject Clock, migrate one `time()` site.** Same pattern at line 24. Update `SlidingWindowTest`.
-- [ ] **`Quota` — inject Clock, migrate `headers()` `time()` site.** Quota is currently a pure value object constructed by Throttler results. The `time()` call is inside `headers()` (only used when `!allowed`, for `Retry-After`). Two options: (a) inject Clock into `Quota` (changes the constructor signature for every Throttler), or (b) compute `Retry-After` at construction time and store it. **Option (b) is cleaner** — `Quota` stays a pure value object, the Throttler computes `retryAfter` once when building the result. Migrate accordingly. Update `QuotaTest`.
+- [x] **`Quota` — accept retryAfter at construction (Option B from the plan).** Quota now takes an optional `int $retryAfter = 0` constructor param; `headers()` uses it directly when non-zero, falls back to wall-clock subtraction when zero. The fallback exists only so this commit can land before the Throttlers are updated; once both Throttlers pass the explicit value (next commits), the fallback can be removed in a final cleanup pass. Two new QuotaTest assertions cover both paths.
 - [ ] **Throttle README — document the Clock dependency.** Note that `TokenBucket` and `SlidingWindow` now take Clock, and `Quota` is unchanged (still a value object).
 
 #### Auth
