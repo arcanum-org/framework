@@ -608,6 +608,59 @@ final class HtmlFormatterTest extends TestCase
         $this->assertStringContainsString('val', $result);
     }
 
+    public function testRenderElementByIdUsesFragmentExtractorWhenSet(): void
+    {
+        // Arrange — template with an explicit fragment marker inside a div.
+        // The fragment extractor should return the inner content (no wrapper),
+        // while element-by-id extraction would return the full div (outerHTML).
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<div id="panel">{{ fragment \'panel\' }}<p>{{ $message }}</p>{{ endfragment }}</div>',
+        );
+        $formatter = $this->createFormatter();
+        $formatter->setFragmentExtractor(function (string $source, string $id): ?string {
+            $escaped = preg_quote($id, '/');
+            $pattern = '/\{\{\s*fragment\s+\'' . $escaped . '\'\s*\}\}(.*?)\{\{\s*endfragment\s*\}\}/s';
+            if (preg_match($pattern, $source, $m)) {
+                return $m[1];
+            }
+            return null;
+        });
+
+        // Act
+        $result = $formatter->renderElementById(
+            'panel',
+            ['message' => 'Hello'],
+            'App\\Pages\\Index',
+        );
+
+        // Assert — innerHTML only: <p>Hello</p>, not the wrapper <div id="panel">
+        $this->assertStringContainsString('<p>Hello</p>', $result);
+        $this->assertStringNotContainsString('<div id="panel">', $result);
+    }
+
+    public function testRenderElementByIdFallsBackToElementExtractionWhenFragmentNotFound(): void
+    {
+        // Arrange — template with no fragment marker, but fragment extractor is set
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<div id="box"><p>{{ $name }}</p></div>',
+        );
+        $formatter = $this->createFormatter();
+        $formatter->setFragmentExtractor(fn (string $source, string $id) => null);
+
+        // Act
+        $result = $formatter->renderElementById(
+            'box',
+            ['name' => 'World'],
+            'App\\Pages\\Index',
+        );
+
+        // Assert — outerHTML: includes the wrapper div
+        $this->assertStringContainsString('<div id="box">', $result);
+        $this->assertStringContainsString('<p>World</p>', $result);
+    }
+
     public function testRenderElementByIdEscapesOutput(): void
     {
         // Arrange

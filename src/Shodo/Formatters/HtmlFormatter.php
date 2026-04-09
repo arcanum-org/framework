@@ -37,6 +37,17 @@ class HtmlFormatter implements Formatter
     }
 
     /**
+     * Optional fragment extractor for innerHTML rendering.
+     *
+     * When set, renderElementById() checks for explicit fragment markers
+     * in the raw template source before falling back to HTML id extraction.
+     * The callable signature is: (string $source, string $id) => ?string.
+     *
+     * @var null|callable(string, string): ?string
+     */
+    private $fragmentExtractor = null;
+
+    /**
      * Enable fragment mode for the current request.
      *
      * When enabled, templates that use @extends will render only the
@@ -46,6 +57,21 @@ class HtmlFormatter implements Formatter
     public function setFragment(bool $fragment): void
     {
         $this->fragment = $fragment;
+    }
+
+    /**
+     * Set a fragment extractor for innerHTML rendering.
+     *
+     * The extractor receives the raw template source and a target id,
+     * returning the fragment inner content or null. When set,
+     * renderElementById() checks for explicit fragment markers before
+     * falling back to HTML element id extraction (outerHTML).
+     *
+     * @param callable(string, string): ?string $extractor
+     */
+    public function setFragmentExtractor(callable $extractor): void
+    {
+        $this->fragmentExtractor = $extractor;
     }
 
     public function format(mixed $data, string $dtoClass = ''): string
@@ -88,29 +114,44 @@ class HtmlFormatter implements Formatter
         } else {
             $source = $this->reader->read($templatePath);
 
-            // Extract the content section first (no layout wrapper).
-            $contentSource = $this->compiler->compile(
-                $source,
-                dirname($templatePath),
-                fragment: true,
-            );
+            // Check for explicit fragment markers before element extraction.
+            // Fragment markers provide innerHTML (no wrapper element) — the
+            // opt-in for innerHTML/afterbegin/beforeend swap modes.
+            $fragmentContent = $this->fragmentExtractor !== null
+                ? ($this->fragmentExtractor)($source, $id)
+                : null;
 
-            $extraction = $this->compiler->extractElementById(
-                $contentSource,
-                $id,
-            );
-
-            if ($extraction === null) {
-                $this->logger?->warning(
-                    'Element with id "{id}" not found in template "{template}"'
-                        . ' — falling back to content section.',
-                    ['id' => $id, 'template' => $templatePath],
+            if ($fragmentContent !== null) {
+                $compiled = $this->compiler->compile(
+                    $fragmentContent,
+                    dirname($templatePath),
+                );
+            } else {
+                // Extract the content section first (no layout wrapper).
+                $contentSource = $this->compiler->compile(
+                    $source,
+                    dirname($templatePath),
+                    fragment: true,
                 );
 
-                return $this->renderContentSection($templatePath, $source, $data, $dtoClass);
+                $extraction = $this->compiler->extractElementById(
+                    $contentSource,
+                    $id,
+                );
+
+                if ($extraction === null) {
+                    $this->logger?->warning(
+                        'Element with id "{id}" not found in template "{template}"'
+                            . ' — falling back to content section.',
+                        ['id' => $id, 'template' => $templatePath],
+                    );
+
+                    return $this->renderContentSection($templatePath, $source, $data, $dtoClass);
+                }
+
+                $compiled = $this->compiler->compile($extraction->outerHtml);
             }
 
-            $compiled = $this->compiler->compile($extraction->outerHtml);
             $this->cache->store(
                 $templatePath,
                 $compiled,
