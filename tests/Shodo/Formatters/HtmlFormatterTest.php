@@ -12,9 +12,11 @@ use Arcanum\Shodo\HelperResolver;
 use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\TemplateCache;
+use Arcanum\Shodo\ElementExtraction;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Shodo\TemplateAnalyzer;
 use Arcanum\Shodo\TemplateResolver;
+use Psr\Log\LoggerInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -27,6 +29,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(TemplateCache::class)]
 #[UsesClass(HtmlFallbackFormatter::class)]
 #[UsesClass(TemplateAnalyzer::class)]
+#[UsesClass(ElementExtraction::class)]
 #[UsesClass(Reader::class)]
 #[UsesClass(Writer::class)]
 #[UsesClass(FileSystem::class)]
@@ -73,13 +76,22 @@ final class HtmlFormatterTest extends TestCase
         string $cacheDir = '',
         ?HelperResolver $helpers = null,
         bool $debug = false,
+        ?LoggerInterface $logger = null,
     ): HtmlFormatter {
         $resolver = new TemplateResolver($this->rootDir, 'App');
         $compiler = new TemplateCompiler();
         $cache = new TemplateCache($cacheDir ?: $this->cacheDir);
         $fallback = new HtmlFallbackFormatter();
 
-        return new HtmlFormatter($resolver, $compiler, $cache, $fallback, helpers: $helpers, debug: $debug);
+        return new HtmlFormatter(
+            $resolver,
+            $compiler,
+            $cache,
+            $fallback,
+            helpers: $helpers,
+            debug: $debug,
+            logger: $logger,
+        );
     }
 
     public function testFormatReturnsNonEmptyOutput(): void
@@ -493,5 +505,174 @@ final class HtmlFormatterTest extends TestCase
 
         // Assert — no notice triggered
         $this->assertSame('', $noticed);
+    }
+
+    // -----------------------------------------------------------
+    // renderElementById — auto-fragment extraction
+    // -----------------------------------------------------------
+
+    public function testRenderElementByIdOuterHtml(): void
+    {
+        // Arrange
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<h1>Title</h1><div id="sidebar"><p>{{ $greeting }}</p></div>',
+        );
+        $formatter = $this->createFormatter();
+
+        // Act
+        $result = $formatter->renderElementById(
+            'sidebar',
+            'outerHTML',
+            ['greeting' => 'Hello'],
+            'App\\Pages\\Index',
+        );
+
+        // Assert — includes the element itself
+        $this->assertStringContainsString('<div id="sidebar">', $result);
+        $this->assertStringContainsString('<p>Hello</p>', $result);
+        $this->assertStringNotContainsString('<h1>Title</h1>', $result);
+    }
+
+    public function testRenderElementByIdInnerHtml(): void
+    {
+        // Arrange
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<div id="sidebar"><p>{{ $greeting }}</p></div>',
+        );
+        $formatter = $this->createFormatter();
+
+        // Act
+        $result = $formatter->renderElementById(
+            'sidebar',
+            'innerHTML',
+            ['greeting' => 'Hello'],
+            'App\\Pages\\Index',
+        );
+
+        // Assert — just the children, no wrapper element
+        $this->assertStringContainsString('<p>Hello</p>', $result);
+        $this->assertStringNotContainsString('<div id="sidebar">', $result);
+    }
+
+    public function testRenderElementByIdUsesCache(): void
+    {
+        // Arrange
+        $templatePath = $this->rootDir . '/app/Pages/Index.html';
+        file_put_contents(
+            $templatePath,
+            '<div id="box"><span>{{ $name }}</span></div>',
+        );
+        $formatter = $this->createFormatter();
+
+        // Act — first call compiles and caches
+        $formatter->renderElementById('box', 'outerHTML', ['name' => 'first'], 'App\\Pages\\Index');
+
+        // Verify cache entry exists
+        $cache = new TemplateCache($this->cacheDir);
+        $this->assertTrue($cache->isFresh($templatePath, 'box'));
+
+        // Act — second call uses cache
+        $result = $formatter->renderElementById('box', 'outerHTML', ['name' => 'second'], 'App\\Pages\\Index');
+
+        // Assert
+        $this->assertStringContainsString('second', $result);
+    }
+
+    public function testRenderElementByIdCachesSeparatelyPerSwapMode(): void
+    {
+        // Arrange
+        $templatePath = $this->rootDir . '/app/Pages/Index.html';
+        file_put_contents(
+            $templatePath,
+            '<div id="box"><p>Content</p></div>',
+        );
+        $formatter = $this->createFormatter();
+
+        // Act — cache both modes
+        $outer = $formatter->renderElementById('box', 'outerHTML', [], 'App\\Pages\\Index');
+        $inner = $formatter->renderElementById('box', 'innerHTML', [], 'App\\Pages\\Index');
+
+        // Assert — different output, separately cached
+        $this->assertStringContainsString('<div id="box">', $outer);
+        $this->assertStringNotContainsString('<div id="box">', $inner);
+        $this->assertStringContainsString('<p>Content</p>', $inner);
+    }
+
+    public function testRenderElementByIdFallsBackOnMissingId(): void
+    {
+        // Arrange
+        mkdir($this->rootDir . '/app/Templates', 0755, true);
+        file_put_contents(
+            $this->rootDir . '/app/Templates/layout.html',
+            "<html>{{ yield 'content' }}</html>",
+        );
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            "{{ extends 'layout' }}\n{{ section 'title' }}T{{ endsection }}\n"
+                . "{{ section 'content' }}<p>Full content</p>{{ endsection }}",
+        );
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('warning')
+            ->with(
+                $this->stringContains('not found'),
+                $this->callback(fn(array $ctx) => ($ctx['id'] ?? '') === 'nonexistent'),
+            );
+
+        $formatter = $this->createFormatter(logger: $logger);
+
+        // Act
+        $result = $formatter->renderElementById(
+            'nonexistent',
+            'outerHTML',
+            [],
+            'App\\Pages\\Index',
+        );
+
+        // Assert — falls back to content section
+        $this->assertStringContainsString('<p>Full content</p>', $result);
+        $this->assertStringNotContainsString('<html>', $result);
+    }
+
+    public function testRenderElementByIdFallsBackToFallbackWhenNoTemplate(): void
+    {
+        // Arrange
+        $formatter = $this->createFormatter();
+
+        // Act
+        $result = $formatter->renderElementById(
+            'anything',
+            'outerHTML',
+            ['key' => 'val'],
+            'App\\Domain\\Query\\Missing',
+        );
+
+        // Assert — fallback formatter output
+        $this->assertStringContainsString('<!DOCTYPE html>', $result);
+        $this->assertStringContainsString('val', $result);
+    }
+
+    public function testRenderElementByIdEscapesOutput(): void
+    {
+        // Arrange
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<div id="box"><p>{{ $name }}</p></div>',
+        );
+        $formatter = $this->createFormatter();
+
+        // Act
+        $result = $formatter->renderElementById(
+            'box',
+            'outerHTML',
+            ['name' => '<script>xss</script>'],
+            'App\\Pages\\Index',
+        );
+
+        // Assert
+        $this->assertStringContainsString('&lt;script&gt;', $result);
+        $this->assertStringNotContainsString('<script>xss', $result);
     }
 }
