@@ -49,7 +49,7 @@ First-class htmx support baked into the framework, targeting **htmx 4** directly
 - **Don't override htmx's default `hx-swap`.** Keep upstream docs accurate for Arcanum users. Recommend `outerHTML` in package README + starter examples, since it pairs most naturally with the id-based extraction (the target element survives the swap).
 - **Top-level `src/Htmx/` package**, not nested under Hyper. Cross-cuts Echo, Session, Auth, Shodo, Validation, Hyper, Glitch, Ignition — the cross-cutting nature makes a sub-package wrong. Parallel to `Arcanum\Testing` in placement and dependency shape.
 - **Soft fall-through on missing ids**: when `HX-Target` carries an id with no matching element in the template, the renderer falls back to the content section and logs a warning. Strict failure would 404 real users for typos.
-- **The `{{ fragment }}` directive remains as a fallback.** Already landed in Shodo, it handles edge cases where the extractable region doesn't correspond to a single HTML element (unusual layouts, multi-element groups). Auto-detection is the primary path; `{{ fragment }}` is the escape hatch. Review whether the directive is still needed after the package is complete.
+- **Nested ids work naturally.** A `<div id="main">` containing `<div id="subsection-a">` and `<div id="subsection-b">` produces three addressable fragments. Each extraction is independent — search for the target id, depth-count from there. No nesting constraints to enforce because HTML element structure is unambiguous (unlike flat text markers where the parser can't tell which close tag matches which open tag).
 
 #### Foundation
 
@@ -66,7 +66,7 @@ First-class htmx support baked into the framework, targeting **htmx 4** directly
 
 - [ ] **Add `HtmxResponse` internal builder.** Immutable PSR-7-style decorator with `withLocation`, `withPushUrl`, `withReplaceUrl`, `withRedirect`, `withRefresh`, `withRetarget`, `withReswap`, `withReselect`, `withTrigger`, `withTriggerAfterSwap`, `withTriggerAfterSettle`, `withVary`, `toResponse()`. Trigger methods merge into a single header per timing slot. Tests cover all builder methods + trigger merging.
 - [ ] **Add `HtmxLocation` value object** for the JSON-envelope form of `HX-Location`. Fields per the htmx spec: `path`, `target`, `swap`, `source`, `event`, `handler`, `values`, `headers`, `select`. JSON-serializable. Tests cover the simple `path`-only case + the full envelope.
-- [ ] **Extend `HtmlResponseRenderer` (or add `HtmxAwareResponseRenderer`) to read `HX-Request-Type` and `HX-Target` from the request and pick the rendering shape.** Three modes: (1) full + layout (non-htmx), (2) full content section without layout (htmx full-type), (3) auto-extracted element by id from `HX-Target` (htmx partial-type). Falls back to content section + log warning when element id lookup fails. Falls back to `{{ fragment }}` lookup when auto-detection finds nothing (bridge to the explicit directive). Tests cover all three modes + both fall-throughs.
+- [ ] **Extend `HtmlResponseRenderer` (or add `HtmxAwareResponseRenderer`) to read `HX-Request-Type` and `HX-Target` from the request and pick the rendering shape.** Three modes: (1) full + layout (non-htmx), (2) full content section without layout (htmx full-type), (3) auto-extracted element by id from `HX-Target` (htmx partial-type). Falls back to content section + log warning when element id lookup fails. Tests cover all three modes + the fall-through.
 
 #### Middleware
 
