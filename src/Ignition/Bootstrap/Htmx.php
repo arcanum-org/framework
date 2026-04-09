@@ -56,38 +56,23 @@ class Htmx implements Bootstrapper
         /** @var bool $useRefresh */
         $useRefresh = $config->get('htmx.auth_refresh') === true;
 
-        // Auto-wired: Codex resolves HtmlFormatter from the container.
         $container->service(HtmxAwareResponseRenderer::class);
+        $container->service(EventCapture::class);
+        $container->service(HtmxEventTriggerMiddleware::class);
+        $container->service(HtmxCsrfController::class);
 
-        // Alias so FormatRegistry resolves the htmx-aware renderer
-        // when the HTML format is requested.
+        // Alias so FormatRegistry resolves the htmx-aware renderer.
         $container->factory(HtmlResponseRenderer::class, function () use ($container) {
             return $container->get(HtmxAwareResponseRenderer::class);
         });
 
-        // Auto-wired: Codex resolves EventDispatcherInterface from the container.
-        $container->service(EventCapture::class);
+        // Scalar constructor params via specify.
+        $container->specify(HtmxRequestMiddleware::class, '$addVaryHeader', $addVary);
+        $container->service(HtmxRequestMiddleware::class);
 
-        // Auto-wired: Codex resolves EventCapture from the container.
-        $container->service(HtmxEventTriggerMiddleware::class);
-
-        // Auto-wired: Codex resolves HtmxAwareResponseRenderer. The bool
-        // $addVary scalar can't be auto-wired — needs a factory.
-        // TODO: Use $container->specify() once it's on the Application interface.
-        $container->factory(HtmxRequestMiddleware::class, function () use ($container, $addVary) {
-            /** @var HtmxAwareResponseRenderer $renderer */
-            $renderer = $container->get(HtmxAwareResponseRenderer::class);
-            return new HtmxRequestMiddleware($renderer, $addVary);
-        });
-
-        // Scalar constructor params ($loginUrl, $useRefresh) can't be auto-wired.
-        // TODO: Use $container->specify() once it's on the Application interface.
-        $container->factory(HtmxAuthRedirectMiddleware::class, function () use ($loginUrl, $useRefresh) {
-            return new HtmxAuthRedirectMiddleware($loginUrl, $useRefresh);
-        });
-
-        // Auto-wired: no constructor params.
-        $container->service(HtmxCsrfController::class);
+        $container->specify(HtmxAuthRedirectMiddleware::class, '$loginUrl', $loginUrl);
+        $container->specify(HtmxAuthRedirectMiddleware::class, '$useRefresh', $useRefresh);
+        $container->service(HtmxAuthRedirectMiddleware::class);
 
         // Template helper: {{! Htmx::script() !}}, {{! Htmx::csrf() !}}
         if ($container->has(HelperRegistry::class)) {
