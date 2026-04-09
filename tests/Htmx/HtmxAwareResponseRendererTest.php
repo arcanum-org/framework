@@ -194,33 +194,10 @@ final class HtmxAwareResponseRendererTest extends TestCase
         $this->assertStringNotContainsString('<footer>', $body);
     }
 
-    public function testHtmxPartialWithTargetRespectsInnerHtmlSwap(): void
+    public function testHtmxPartialAlwaysReturnsOuterHtml(): void
     {
-        // Arrange
-        file_put_contents(
-            $this->rootDir . '/app/Pages/Index.html',
-            '<div id="box"><p>{{ $name }}</p></div>',
-        );
-        $renderer = $this->createRenderer();
-        $renderer->setHtmxRequest($this->htmxRequest([
-            'HX-Request' => 'true',
-            'HX-Request-Type' => 'partial',
-            'HX-Target' => 'box',
-            'HX-Swap' => 'innerHTML',
-        ]));
-
-        // Act
-        $response = $renderer->render(['name' => 'World'], 'App\\Pages\\Index');
-
-        // Assert — children only, no wrapper element
-        $body = (string) $response->getBody();
-        $this->assertStringContainsString('<p>World</p>', $body);
-        $this->assertStringNotContainsString('<div id="box">', $body);
-    }
-
-    public function testHtmxPartialDefaultsToInnerHtmlWhenNoSwapHeader(): void
-    {
-        // Arrange — no HX-Swap header means htmx default (innerHTML)
+        // Arrange — htmx doesn't send HX-Swap as a request header,
+        // so the server always returns outerHTML (the full element).
         file_put_contents(
             $this->rootDir . '/app/Pages/Index.html',
             '<div id="box"><span>Content</span></div>',
@@ -235,34 +212,10 @@ final class HtmxAwareResponseRendererTest extends TestCase
         // Act
         $response = $renderer->render([], 'App\\Pages\\Index');
 
-        // Assert — innerHTML (the default swap mode)
+        // Assert — outerHTML: includes the element itself
         $body = (string) $response->getBody();
+        $this->assertStringContainsString('<div id="box">', $body);
         $this->assertStringContainsString('<span>Content</span>', $body);
-        $this->assertStringNotContainsString('<div id="box">', $body);
-    }
-
-    public function testHtmxPartialWithOuterHtmlSwap(): void
-    {
-        // Arrange
-        file_put_contents(
-            $this->rootDir . '/app/Pages/Index.html',
-            '<div id="card"><p>Inside</p></div>',
-        );
-        $renderer = $this->createRenderer();
-        $renderer->setHtmxRequest($this->htmxRequest([
-            'HX-Request' => 'true',
-            'HX-Request-Type' => 'partial',
-            'HX-Target' => 'card',
-            'HX-Swap' => 'outerHTML',
-        ]));
-
-        // Act
-        $response = $renderer->render([], 'App\\Pages\\Index');
-
-        // Assert — includes the element itself
-        $body = (string) $response->getBody();
-        $this->assertStringContainsString('<div id="card">', $body);
-        $this->assertStringContainsString('<p>Inside</p>', $body);
     }
 
     // ------------------------------------------------------------------

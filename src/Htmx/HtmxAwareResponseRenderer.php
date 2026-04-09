@@ -29,10 +29,13 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
     private ?HtmxRequest $htmxRequest = null;
 
     /**
-     * The default swap mode when HX-Swap is not sent by the client.
-     * htmx defaults to innerHTML.
+     * The server always returns outerHTML (the full element including its
+     * tags). htmx doesn't send HX-Swap as a request header, so the server
+     * can't know the client's swap mode. outerHTML is the safe default
+     * because the framework recommends hx-swap="outerHTML" — the element
+     * id survives the swap and subsequent requests keep working.
      */
-    private const DEFAULT_SWAP_MODE = 'innerHTML';
+    private const SERVER_SWAP_MODE = 'outerHTML';
 
     public function __construct(
         private readonly HtmlFormatter $formatter,
@@ -75,11 +78,9 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
 
         // Mode 3: Partial with a target id — auto-extract the element.
         if ($type === HtmxRequestType::Partial && $target !== null) {
-            $swapMode = $this->htmxRequest->swapMode() ?? self::DEFAULT_SWAP_MODE;
-
             return $this->formatter->renderElementById(
                 $target,
-                $swapMode,
+                self::SERVER_SWAP_MODE,
                 $data,
                 $dtoClass,
             );
