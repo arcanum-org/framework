@@ -24,7 +24,7 @@ Prerequisite for the htmx package below. Shodo currently has `{{ section 'name' 
 
 - [x] **Add `{{ fragment 'name' }} … {{ endfragment }}` recognition to `TemplateCompiler`.** Parses the directive into a captured callable per fragment, keyed by name. Errors clearly on mismatched/unclosed fragment blocks. Tests cover happy path, multiple fragments per section, fragments-with-conditionals, fragments-with-includes, and the error cases.
 - [x] **Extend `TemplateCache` to key by template path + fragment name.** Existing whole-template cache entries keep working; new fragment entries live alongside them. Cache invalidation already handles dependency tracking; the fragment entries inherit it.
-- [ ] **Add `HtmlFormatter::renderFragment(string $template, string $name, mixed $data): string`.** Returns just the rendered fragment, no layout, no surrounding section. Follows the same dependency-resolution and template-resolver path as the full render.
+- [x] **Add `HtmlFormatter::renderFragment(string $template, string $name, mixed $data): string`.** Returns just the rendered fragment, no layout, no surrounding section. Follows the same dependency-resolution and template-resolver path as the full render.
 
 #### Documentation
 
