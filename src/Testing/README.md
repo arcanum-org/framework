@@ -25,7 +25,7 @@ $kernel = new TestKernel();
 $kernel->actingAs(new SimpleIdentity('alice'));
 ```
 
-`actingAs(Identity)` is a chained setter following the universal Laravel/Symfony/Cake convention. The identity lives on the shared `ActiveIdentity` so both the HTTP and CLI surfaces see it.
+`actingAs(Identity)` is a chained setter following a widely-used convention across PHP test harnesses. The identity lives on the shared `ActiveIdentity` so both the HTTP and CLI surfaces see it.
 
 ### Constructor overrides
 

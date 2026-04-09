@@ -75,8 +75,9 @@ final class TestKernel
     /**
      * Bind an Identity for the current test.
      *
-     * Named after the universal `actingAs` convention from Laravel, Symfony,
-     * and Cake — reads naturally in tests: `$kernel->actingAs($alice)->http()...`.
+     * Named after the widely-used `actingAs` convention across PHP test
+     * harnesses — reads naturally in tests:
+     * `$kernel->actingAs($alice)->http()...`.
      */
     public function actingAs(Identity $identity): self
     {

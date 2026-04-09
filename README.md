@@ -29,7 +29,7 @@ Arcanum is a collection of packages that work together to create a robust, scala
 [Flow](https://github.com/arcanum-org/framework/tree/main/src/Flow) is all about moving data through your application from point A to point B. Everything in Flow builds on the `Stage` interface — a callable that takes an object in and sends an object out. It's composed of four subpackages:
 
 1. [Pipeline](https://github.com/arcanum-org/framework/tree/main/src/Flow/Pipeline) chains stages in a straight line — the output of one becomes the input of the next. If you have a series of steps, Pipeline wraps them up in a nice, neat system.
-2. [Continuum](https://github.com/arcanum-org/framework/tree/main/src/Flow/Continuum) is middleware. Each stage gets a `$next` callback it must call to continue the chain, just like middleware in Laravel or Express. This lets stages run logic both before and after the inner stages.
+2. [Continuum](https://github.com/arcanum-org/framework/tree/main/src/Flow/Continuum) is middleware. Each stage gets a `$next` callback it must call to continue the chain, just like middleware in Express. This lets stages run logic both before and after the inner stages.
 3. [Conveyor](https://github.com/arcanum-org/framework/tree/main/src/Flow/Conveyor) is Arcanum's Command Bus. It combines Pipeline and Continuum to dispatch objects to handlers with before/after middleware. Handlers are resolved by convention — `PlaceOrder` dispatches to `PlaceOrderHandler`.
 4. [River](https://github.com/arcanum-org/framework/tree/main/src/Flow/River) is a PSR-7 Stream implementation. It wraps PHP's low-level stream resources into type-safe objects that auto-close, support caching for non-seekable streams, and generally make working with streams a breeze.
 

@@ -1,6 +1,6 @@
 # Arcanum Flow: Continuum
 
-Continuum is middleware. Each stage wraps around the rest of the chain, running code before and after the inner stages. It's the same pattern as middleware in Laravel or Express.js.
+Continuum is middleware. Each stage wraps around the rest of the chain, running code before and after the inner stages. It's the same pattern as middleware in Express.js.
 
 ## How it works
 
