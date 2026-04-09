@@ -44,7 +44,7 @@ final class TemplateCache
     }
 
     /**
-     * Check whether a cached compiled template is fresh.
+     * Check whether a cached compiled template (or named fragment) is fresh.
      *
      * Returns false when:
      *   - caching is disabled (empty cache directory)
@@ -52,14 +52,17 @@ final class TemplateCache
      *   - the cache file is older than the main template
      *   - any tracked dependency (layout, include, partial) is newer
      *     than the cache file
+     *
+     * @param string $fragmentName When non-empty, checks the fragment-specific
+     *     cache entry rather than the whole-template entry.
      */
-    public function isFresh(string $templatePath): bool
+    public function isFresh(string $templatePath, string $fragmentName = ''): bool
     {
         if ($this->cacheDirectory === '') {
             return false;
         }
 
-        $cachePath = $this->cachePath($templatePath);
+        $cachePath = $this->cachePath($templatePath, $fragmentName);
 
         if (!$this->fileSystem->isFile($cachePath)) {
             return false;
@@ -90,13 +93,21 @@ final class TemplateCache
     }
 
     /**
-     * Deterministic cache file path for a given template.
+     * Deterministic cache file path for a given template or fragment.
+     *
+     * When $fragmentName is provided, the cache key incorporates both
+     * the template path and the fragment name, producing a separate
+     * cache file alongside the whole-template entry.
      */
-    public function cachePath(string $templatePath): string
+    public function cachePath(string $templatePath, string $fragmentName = ''): string
     {
+        $key = $fragmentName !== ''
+            ? $templatePath . '#' . $fragmentName
+            : $templatePath;
+
         return $this->cacheDirectory
             . DIRECTORY_SEPARATOR
-            . md5($templatePath)
+            . md5($key)
             . '.php';
     }
 
@@ -106,10 +117,13 @@ final class TemplateCache
      * If the cache file has a dependency-tracking header, it's stripped
      * before returning so the caller gets pure compiled PHP suitable for
      * eval() or include.
+     *
+     * @param string $fragmentName When non-empty, loads the fragment-specific
+     *     cache entry.
      */
-    public function load(string $templatePath): string
+    public function load(string $templatePath, string $fragmentName = ''): string
     {
-        $contents = $this->reader->read($this->cachePath($templatePath));
+        $contents = $this->reader->read($this->cachePath($templatePath, $fragmentName));
 
         return $this->stripDependencyHeader($contents);
     }
@@ -123,15 +137,21 @@ final class TemplateCache
      * "disabled" sentinel can't accidentally write to the filesystem root.
      *
      * @param list<string> $dependencies
+     * @param string $fragmentName When non-empty, stores to a fragment-specific
+     *     cache entry alongside the whole-template entry.
      */
-    public function store(string $templatePath, string $compiledPhp, array $dependencies = []): void
-    {
+    public function store(
+        string $templatePath,
+        string $compiledPhp,
+        array $dependencies = [],
+        string $fragmentName = '',
+    ): void {
         if ($this->cacheDirectory === '') {
             return;
         }
 
         $payload = $this->buildDependencyHeader($dependencies) . $compiledPhp;
-        $this->writer->write($this->cachePath($templatePath), $payload);
+        $this->writer->write($this->cachePath($templatePath, $fragmentName), $payload);
     }
 
     /**

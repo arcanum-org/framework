@@ -330,4 +330,116 @@ final class TemplateCacheTest extends TestCase
         // Assert
         $this->assertDirectoryDoesNotExist($nonexistent);
     }
+
+    // ------------------------------------------------------------------
+    // Fragment-keyed cache entries
+    // ------------------------------------------------------------------
+
+    public function testFragmentCachePathDiffersFromWholeTemplate(): void
+    {
+        // Arrange
+        $cache = new TemplateCache($this->cacheDir);
+        $templatePath = '/some/path/template.html';
+
+        // Act
+        $wholePath = $cache->cachePath($templatePath);
+        $fragmentPath = $cache->cachePath($templatePath, 'sidebar');
+
+        // Assert — different cache files for the same template
+        $this->assertNotSame($wholePath, $fragmentPath);
+    }
+
+    public function testFragmentCachePathIsDeterministic(): void
+    {
+        // Arrange
+        $cache = new TemplateCache($this->cacheDir);
+        $templatePath = '/some/path/template.html';
+
+        // Act
+        $path1 = $cache->cachePath($templatePath, 'sidebar');
+        $path2 = $cache->cachePath($templatePath, 'sidebar');
+
+        // Assert
+        $this->assertSame($path1, $path2);
+    }
+
+    public function testFragmentCachePathDiffersPerFragmentName(): void
+    {
+        // Arrange
+        $cache = new TemplateCache($this->cacheDir);
+        $templatePath = '/some/path/template.html';
+
+        // Act
+        $sidebarPath = $cache->cachePath($templatePath, 'sidebar');
+        $listPath = $cache->cachePath($templatePath, 'product-list');
+
+        // Assert
+        $this->assertNotSame($sidebarPath, $listPath);
+    }
+
+    public function testFragmentStoreAndLoadRoundtrip(): void
+    {
+        // Arrange
+        $cache = new TemplateCache($this->cacheDir);
+        $templatePath = $this->createTemplate('page.html', '<p>original</p>');
+        $compiled = '<aside><?= $__escape((string)($title)) ?></aside>';
+
+        // Act
+        $cache->store($templatePath, $compiled, [], 'sidebar');
+        $loaded = $cache->load($templatePath, 'sidebar');
+
+        // Assert
+        $this->assertSame($compiled, $loaded);
+    }
+
+    public function testFragmentCacheIsFreshIndependently(): void
+    {
+        // Arrange
+        $cache = new TemplateCache($this->cacheDir);
+        $templatePath = $this->createTemplate('page.html', '<p>hello</p>');
+        touch($templatePath, time() - 10);
+
+        // Store whole-template and fragment entries
+        $cache->store($templatePath, '<?php echo "whole"; ?>');
+        $cache->store($templatePath, '<?php echo "fragment"; ?>', [], 'sidebar');
+
+        // Act & Assert — both are fresh
+        $this->assertTrue($cache->isFresh($templatePath));
+        $this->assertTrue($cache->isFresh($templatePath, 'sidebar'));
+    }
+
+    public function testFragmentCacheIsFreshReturnsFalseWhenNotCached(): void
+    {
+        // Arrange — whole template is cached, but fragment is not
+        $cache = new TemplateCache($this->cacheDir);
+        $templatePath = $this->createTemplate('page.html', '<p>hello</p>');
+        touch($templatePath, time() - 10);
+        $cache->store($templatePath, '<?php echo "whole"; ?>');
+
+        // Act & Assert
+        $this->assertTrue($cache->isFresh($templatePath));
+        $this->assertFalse($cache->isFresh($templatePath, 'sidebar'));
+    }
+
+    public function testFragmentCacheInheritsDependencyTracking(): void
+    {
+        // Arrange
+        $cache = new TemplateCache($this->cacheDir);
+        $templatePath = $this->createTemplate('page.html', '<p>hello</p>');
+        $layoutPath = $this->createTemplate('layout.html', '<html></html>');
+
+        touch($templatePath, time() - 100);
+        touch($layoutPath, time() - 100);
+
+        $cache->store($templatePath, '<?php echo "frag"; ?>', [$layoutPath], 'sidebar');
+
+        // Act & Assert — fresh when deps are older
+        $this->assertTrue($cache->isFresh($templatePath, 'sidebar'));
+
+        // Bump the layout — fragment cache should go stale
+        touch($cache->cachePath($templatePath, 'sidebar'), time() - 100);
+        touch($layoutPath, time());
+
+        $this->assertFalse($cache->isFresh($templatePath, 'sidebar'));
+    }
 }
