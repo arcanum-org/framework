@@ -9,6 +9,7 @@ use Arcanum\Auth\SimpleIdentity;
 use Arcanum\Cabinet\Application;
 use Arcanum\Hourglass\Clock;
 use Arcanum\Hourglass\FrozenClock;
+use Arcanum\Ignition\Kernel;
 use Arcanum\Testing\TestKernel;
 use Arcanum\Vault\ArrayDriver;
 use DateInterval;
@@ -30,7 +31,10 @@ final class TestKernelTest extends TestCase
             $kernel->clock()->now()->format(DATE_ATOM),
         );
         $this->assertInstanceOf(ArrayDriver::class, $kernel->cache());
-        $this->assertNull($kernel->rootDirectory());
+        $this->assertSame('/app', $kernel->rootDirectory());
+        $this->assertSame('/app/config', $kernel->configDirectory());
+        $this->assertSame('/app/files', $kernel->filesDirectory());
+        $this->assertSame([], $kernel->requiredEnvironmentVariables());
     }
 
     public function testContainerExposesBoundServices(): void
@@ -42,6 +46,31 @@ final class TestKernelTest extends TestCase
         $this->assertSame($kernel->clock(), $container->get(Clock::class));
         $this->assertSame($kernel->cache(), $container->get(CacheInterface::class));
         $this->assertInstanceOf(ActiveIdentity::class, $container->get(ActiveIdentity::class));
+        $this->assertSame($kernel, $container->get(Kernel::class));
+    }
+
+    public function testImplementsKernelInterfaceForServicesThatJustNeedRootDirectory(): void
+    {
+        $kernel = new TestKernel(rootDirectory: '/tmp/app/');
+
+        $this->assertInstanceOf(Kernel::class, $kernel);
+        // Trailing separator stripped, parallel to HyperKernel/RuneKernel.
+        $this->assertSame('/tmp/app', $kernel->rootDirectory());
+        $this->assertSame('/tmp/app/config', $kernel->configDirectory());
+        $this->assertSame('/tmp/app/files', $kernel->filesDirectory());
+    }
+
+    public function testBootstrapAndTerminateAreNoOps(): void
+    {
+        // TestKernel owns its own pre-built container; bootstrap() and
+        // terminate() exist purely to satisfy the Kernel interface so
+        // TestKernel can be passed to helpers/services that take a Kernel.
+        $kernel = new TestKernel();
+
+        $kernel->bootstrap($kernel->container());
+        $kernel->terminate();
+
+        $this->assertSame($kernel, $kernel->container()->get(Kernel::class));
     }
 
     public function testConstructorOverridesAreRespected(): void
