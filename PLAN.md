@@ -108,13 +108,13 @@ The problem: `{{ fragment }}` is an htmx concern, not a core Shodo concern. Baki
 
 - [x] **Write `src/Htmx/README.md`.** End-to-end package reference covering the three rendering modes, `HtmxRequest` accessors, auto-fragment extraction (outerHTML vs innerHTML via `{{ fragment }}`), lazy closures, `ClientBroadcast` event projection with timing control, CSRF integration, auth-redirect handling, `HtmxResponse` builder, `Vary` header, dynamic ids and the CQRS decomposition pattern, configuration reference, middleware registration, and a pointer to `four.htmx.org`.
 - [x] **Update COMPENDIUM.** Replaced the "Front-end defaults" htmx paragraph with the package description. Added Htmx as the 23rd package entry.
-- [ ] **Update starter README.** Walk through the welcome-page guestbook feature and the upscales. Document the htmx pin config and how to bump it. Replace the existing "Front-End: Tailwind CSS + htmx" section.
+- [x] **Update starter README.** Replaced the outdated htmx patterns section with the guestbook demo walkthrough, documented config/htmx.php version pin, ClientBroadcast event projection, element extraction. Fixed template syntax (`extends` not `@extends`). Added Guestbook and htmx.php to directory structure.
 
 #### Cross-cutting
 
-- [ ] **Run `composer check` after each commit.** Pre-commit hook enforces.
+- [x] **Run `composer check` after each commit.** Pre-commit hook enforces. All commits in this arc verified.
 - [ ] **Smoke-test the starter app end-to-end** after the package lands. Boot via `php -S`, click through the welcome page, exercise the guestbook (add entry, validation failure, success), refresh each upscaled card, verify all htmx interactions return the right fragments and the cross-component refresh fires.
-- [ ] **Final sweep.** Grep for `HX-` references across `framework/` and `arcanum/` to confirm only the framework package handles htmx headers; no leftover ad-hoc header reads in handlers or templates. Confirm the starter app's `App\Http\Middleware\Htmx` is gone.
+- [x] **Final sweep.** Grep confirmed: all `HX-` header handling is in `src/Htmx/` only. No ad-hoc reads in handlers or templates. Old `App\Http\Middleware\Htmx` is gone. No v2 CDN references. Layout uses `Htmx::script()` and `Htmx::csrf()` helpers.
 
 ### Welcome page — nice-to-haves (deferred)
 
