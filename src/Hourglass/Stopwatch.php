@@ -7,36 +7,23 @@ namespace Arcanum\Hourglass;
 use RuntimeException;
 
 /**
- * Records labeled instants across a process lifetime.
+ * Records labeled instants across a process lifetime — the framework's
+ * elapsed-time telemetry recorder.
  *
- * Stopwatch is the framework-wide timeline recorder. The constructor captures
- * an `arcanum.start` instant — pass an explicit start time (e.g. the value of
- * an early `ARCANUM_START` constant defined as the first line of the entry
- * point) so the recorded start reflects the true earliest moment of the process,
- * not the moment the container resolved the Stopwatch.
+ * Pass an explicit start time (e.g. an `ARCANUM_START` constant defined as
+ * the first line of the entry point) so the `arcanum.start` instant reflects
+ * the true earliest moment, not when the container resolved the Stopwatch.
+ * Duplicate labels are preserved — the timeline is the truth.
  *
- * Storage is an insertion-ordered list of Instants. Duplicate labels are
- * preserved — the same label may be marked multiple times across a request,
- * and the timeline is the truth.
+ * Bootstrap installs the resolved instance via `install()` so call sites
+ * where injection would be noisy (middleware, formatter boundaries) can
+ * use the static `tap()` / `current()` accessors.
  *
- * For ergonomic access from call sites where injection would be noisy
- * (middleware, formatter boundaries), the bootstrap layer installs the
- * resolved instance via Stopwatch::install(); call sites then read it via
- * Stopwatch::current(). Tests should install a fresh instance per test and
- * uninstall it in tearDown.
- *
- * Stopwatch deliberately uses microtime(true) instead of Hourglass\Clock —
- * they model different things. Clock is the *wall-clock* "now" boundary
- * for time-sensitive business logic (TTL, expiry, scheduled jobs), the kind
- * of thing tests need to fake with FrozenClock. Stopwatch is *elapsed-time
- * telemetry* for the process timeline (request received, handler complete,
- * response sent). Routing one through the other would conflate "what time
- * is it?" with "how much time has passed?" — and a test that froze Clock
- * to assert TTL behavior would then also freeze Stopwatch, hiding real
- * elapsed time from the very code the test wants to observe. The testability
- * seam for Stopwatch is the explicit `?float $time` argument every recording
- * method accepts; tests pass the value they want recorded, leaving Clock-
- * faking and Stopwatch-faking independent.
+ * Stopwatch and `Hourglass\Clock` model different things and stay
+ * uncoupled: Clock answers "what time is it?", Stopwatch answers "how much
+ * time has passed?". Freezing Clock in a test must not freeze elapsed-time
+ * measurement. The testability seam is the explicit `?float $time` argument
+ * every recording method accepts.
  */
 final class Stopwatch
 {
