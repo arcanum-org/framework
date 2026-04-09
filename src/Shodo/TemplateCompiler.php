@@ -126,20 +126,38 @@ final class TemplateCompiler
      * When $fragment is true, layout inheritance is skipped — only the
      * 'content' section is rendered. This is used for htmx partial swaps
      * where the layout wrapper (head, nav, footer) is not needed.
+     *
+     * When $fragmentName is provided, the compiler extracts the named
+     * fragment from within the content section and compiles only that.
+     * Named fragments are declared with {{ fragment 'name' }}...{{ endfragment }}.
+     * Returns an empty string when the fragment name doesn't exist.
      */
     public function compile(
         string $source,
         string $templateDirectory = '',
         bool $fragment = false,
+        string $fragmentName = '',
     ): string {
         $this->lastDependencies = [];
 
         if ($templateDirectory !== '') {
             $source = $this->resolveIncludes($source, $templateDirectory);
-            $source = $fragment
-                ? $this->resolveFragment($source, $templateDirectory)
-                : $this->resolveLayout($source, $templateDirectory);
+
+            if ($fragmentName !== '') {
+                $source = $this->resolveNamedFragment($source, $templateDirectory, $fragmentName);
+            } elseif ($fragment) {
+                $source = $this->resolveFragment($source, $templateDirectory);
+            } else {
+                $source = $this->resolveLayout($source, $templateDirectory);
+            }
         }
+
+        // Strip fragment delimiters — in the full-render path, fragments
+        // are transparent containers (their content renders inline as part
+        // of the section). Only the named-fragment compilation path above
+        // extracts them; here we just remove the markers so they don't hit
+        // the escaped-output fallback.
+        $source = $this->stripFragmentDelimiters($source);
 
         // Match / case / default → PHP switch alt syntax with implicit
         // breaks. Done as a pre-pass because case fall-through needs to
@@ -542,6 +560,150 @@ final class TemplateCompiler
         $sections = $this->extractSections($childSource);
 
         return $sections['content'] ?? '';
+    }
+
+    /**
+     * Remove {{ fragment 'name' }} and {{ endfragment }} markers, keeping
+     * the content between them intact. Used in the full-render path where
+     * fragments are transparent — their content is part of the section.
+     *
+     * Validates structure first so unclosed/nested fragments fail loudly
+     * even when the template is rendered in full mode.
+     */
+    private function stripFragmentDelimiters(string $source): string
+    {
+        $this->validateFragmentBlocks($source);
+
+        $source = $this->replace(
+            '/\{\{\s*fragment\s+\'[^\']+\'\s*\}\}/',
+            '',
+            $source,
+        );
+
+        return $this->replace(
+            '/\{\{\s*endfragment\s*\}\}/',
+            '',
+            $source,
+        );
+    }
+
+    /**
+     * Resolve a named fragment from the content section, skipping the layout.
+     *
+     * Named fragments are declared inside a section with
+     * {{ fragment 'name' }}...{{ endfragment }}. This method extracts
+     * the content section (like resolveFragment), then finds the named
+     * fragment within it. Returns an empty string when the fragment
+     * doesn't exist — the renderer handles fall-through.
+     */
+    private function resolveNamedFragment(
+        string $source,
+        string $templateDirectory,
+        string $fragmentName,
+    ): string {
+        // For templates without a layout, search the entire source.
+        if (!preg_match('/^\s*\{\{\s*extends\s+\'([^\']+)\'\s*\}\}/s', $source, $extendsMatch)) {
+            $fragments = $this->extractFragments($source);
+
+            return $fragments[$fragmentName] ?? '';
+        }
+
+        // Extract the content section first, then find the fragment within it.
+        $childSource = substr($source, strlen($extendsMatch[0]));
+        $sections = $this->extractSections($childSource);
+        $content = $sections['content'] ?? '';
+
+        $fragments = $this->extractFragments($content);
+
+        return $fragments[$fragmentName] ?? '';
+    }
+
+    /**
+     * Extract {{ fragment 'name' }}...{{ endfragment }} blocks from source.
+     *
+     * Validates that all opened fragments are closed and that no fragment
+     * blocks are nested (nesting is disallowed — fragments are flat regions).
+     *
+     * @return array<string, string> Fragment name → content (untrimmed).
+     */
+    private function extractFragments(string $source): array
+    {
+        // Validate: check for unclosed or nested fragments.
+        $this->validateFragmentBlocks($source);
+
+        $fragments = [];
+
+        preg_match_all(
+            '/\{\{\s*fragment\s+\'([^\']+)\'\s*\}\}(.*?)\{\{\s*endfragment\s*\}\}/s',
+            $source,
+            $matches,
+            PREG_SET_ORDER,
+        );
+
+        foreach ($matches as $match) {
+            $fragments[$match[1]] = $match[2];
+        }
+
+        return $fragments;
+    }
+
+    /**
+     * Validate that fragment blocks are well-formed.
+     *
+     * Checks for:
+     * - Unclosed {{ fragment 'name' }} without a matching {{ endfragment }}
+     * - {{ endfragment }} without a preceding {{ fragment 'name' }}
+     * - Nested fragment blocks (not allowed)
+     *
+     * @throws \RuntimeException On any structural error.
+     */
+    private function validateFragmentBlocks(string $source): void
+    {
+        // Find all fragment-related directives in order of appearance.
+        preg_match_all(
+            '/\{\{\s*(fragment\s+\'([^\']+)\'|endfragment)\s*\}\}/',
+            $source,
+            $matches,
+            PREG_SET_ORDER,
+        );
+
+        $openName = null;
+
+        foreach ($matches as $match) {
+            $directive = $match[1];
+
+            if (isset($match[2])) {
+                $name = $match[2];
+
+                if ($openName !== null) {
+                    throw new \RuntimeException(sprintf(
+                        'Nested fragment blocks are not allowed:'
+                            . " '{{ fragment '%s' }}' opened inside '{{ fragment '%s' }}'."
+                            . ' Close the outer fragment first.',
+                        $name,
+                        $openName,
+                    ));
+                }
+
+                $openName = $name;
+            } else {
+                // endfragment
+                if ($openName === null) {
+                    throw new \RuntimeException(
+                        "'{{ endfragment }}' found without a matching '{{ fragment }}' directive.",
+                    );
+                }
+
+                $openName = null;
+            }
+        }
+
+        if ($openName !== null) {
+            throw new \RuntimeException(sprintf(
+                "Unclosed fragment block: '{{ fragment '%s' }}' has no matching '{{ endfragment }}'.",
+                $openName,
+            ));
+        }
     }
 
     /**
