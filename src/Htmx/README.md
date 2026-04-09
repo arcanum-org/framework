@@ -1,26 +1,89 @@
 # Arcanum Htmx
 
-First-class htmx support for the Arcanum framework, targeting **htmx 4** directly.
+First-class htmx support for the Arcanum framework, targeting **htmx 4**.
 
-htmx composes naturally with CQRS: every action is already its own URL with its own handler, which is exactly what htmx wants on the wire. The same handler that returns data for a full page load returns the same data for an htmx partial — the framework decides what slice to render. Handlers stay transport-agnostic.
+If you're new to htmx, the short version is: htmx lets you make parts of a page interactive without writing JavaScript. You add attributes like `hx-get` and `hx-swap` to your HTML elements, and htmx handles fetching new content from the server and swapping it into the page. Arcanum's Htmx package makes the server side of that story seamless — your handlers don't need to know whether they're serving a full page or a small fragment.
+
+This README covers everything the package does, how to set it up, and how the pieces fit together. If you're looking for the htmx client-side attribute reference (`hx-get`, `hx-swap`, `hx-trigger`, etc.), that lives at [four.htmx.org](https://four.htmx.org).
 
 ---
 
-## The three rendering modes
+## How it works: the three rendering modes
 
-When an HTTP request arrives, the `HtmxAwareResponseRenderer` picks the rendering shape based on the htmx headers:
+When a browser makes a request to your Arcanum app, the Htmx package looks at the incoming HTTP headers to figure out what kind of request it is. Based on that, it picks one of three rendering modes automatically. Your handler code doesn't change between modes — it always returns the same data, and the framework decides how much of the page to render.
 
-| Mode | Condition | Output |
-|---|---|---|
-| **Full** | Non-htmx request | Complete HTML page with layout |
-| **Content section** | htmx Full type (boosted nav) or Partial without target | Content section only, no layout wrapper |
-| **Element extraction** | htmx Partial with `HX-Target` | Just the target element (or fragment) |
+**Mode 1: Full page.** This is a normal browser request (no htmx involved). The framework renders the complete HTML page, including the layout — `<html>`, `<head>`, navigation, footer, everything. This is what happens when someone types a URL into their address bar or follows a regular link.
 
-Handlers never choose the mode. They return data; the framework picks the shape.
+**Mode 2: Content section only.** This happens when htmx makes a "boosted" navigation request (a link with `hx-boost`). The browser already has the layout (nav, footer, etc.) from the initial page load, so the framework skips the layout wrapper and returns just the content section. htmx swaps it into the page, and it feels like an instant page transition.
 
-### Element extraction: the zero-ceremony default
+**Mode 3: Element extraction.** This is the most interesting mode. When htmx sends a partial request targeting a specific element (via `HX-Target`), the framework finds that element in the template by its `id` attribute, extracts just that piece, and returns it. The rest of the page is never rendered at all. This is what makes htmx + Arcanum efficient — a button click that refreshes a sidebar only renders the sidebar, not the entire page.
 
-Developers write normal HTML with `id` attributes:
+Here's the key insight: **your handler always returns the same data.** A handler that powers a dashboard page returns `['stats' => ..., 'sidebar' => ..., 'title' => ...]` regardless of whether the browser wants the full page or just the sidebar. The framework handles the rest.
+
+---
+
+## Getting started
+
+### 1. Set up your layout
+
+Your layout template needs three things in the `<head>`:
+
+```html
+<head>
+    {{! Htmx::script() !}}
+    <meta name="csrf-token" content="{{ Html::csrfToken() }}">
+    {{! Htmx::csrf() !}}
+</head>
+```
+
+`Htmx::script()` outputs the `<script>` tag that loads htmx from a CDN. `Htmx::csrf()` loads a small JS helper that automatically attaches your CSRF token to every htmx request (more on that below). The `<meta>` tag is where the CSRF token lives so the JS helper can find it.
+
+### 2. Register the middleware
+
+In your `config/middleware.php`, add the three Htmx middleware to the global stack:
+
+```php
+'global' => [
+    // ... your other middleware ...
+    \Arcanum\Htmx\HtmxRequestMiddleware::class,
+    \Arcanum\Htmx\HtmxEventTriggerMiddleware::class,
+    \Arcanum\Htmx\HtmxAuthRedirectMiddleware::class,
+],
+```
+
+Order matters here. `HtmxRequestMiddleware` must come first because it sets up the request context that the other two middleware read from.
+
+Here's what each one does:
+
+- **HtmxRequestMiddleware** reads the htmx headers from the incoming request and tells the rendering pipeline what kind of request it is (full page, content section, or element extraction). It also adds a `Vary: HX-Request` header to the response and serves the CSRF JS helper at `/_htmx/csrf.js`.
+- **HtmxEventTriggerMiddleware** watches for domain events that should notify the browser (more on this in the event projection section below) and adds them as `HX-Trigger` response headers.
+- **HtmxAuthRedirectMiddleware** handles the case where an htmx request hits a login wall (401/403). Instead of returning the login page HTML — which htmx would swap into a random element — it sends an `HX-Location` header that tells htmx to navigate the whole browser to the login page.
+
+### 3. Add htmx attributes to your templates
+
+Now you can start adding htmx attributes to your HTML. Here's a simple example — a refresh button that reloads a section of the page:
+
+```html
+<div id="stats">
+    <h2>Statistics</h2>
+    <p>Active users: {{ $activeUsers }}</p>
+    <button hx-get="/dashboard.html" hx-target="#stats" hx-swap="outerHTML">
+        Refresh
+    </button>
+</div>
+```
+
+When the button is clicked, htmx sends a GET request to `/dashboard.html` with an `HX-Target: stats` header. Arcanum sees that header, finds the `<div id="stats">` in the template, and returns just that element. htmx swaps it into the page, and the stats are refreshed without a full page reload.
+
+Notice that the handler doesn't need to do anything special. It returns the same data it always does — `['activeUsers' => 42, ...]` — and the framework handles the extraction.
+
+---
+
+## Element extraction in detail
+
+When htmx targets a specific element, Arcanum extracts it from your template by searching for the matching `id` attribute. This extraction works on the compiled template output, so it sees your HTML structure with all the template expressions already compiled.
+
+By default, the extraction returns **outerHTML** — that means the response includes the element itself, along with everything inside it. For example, if your template has:
 
 ```html
 <h1>Dashboard</h1>
@@ -28,92 +91,105 @@ Developers write normal HTML with `id` attributes:
 <div id="main"><p>{{ $content }}</p></div>
 ```
 
-When htmx sends `HX-Target: sidebar`, the framework finds `<div id="sidebar">` in the compiled template, extracts just that element, and returns it. The `<h1>` and `#main` are never rendered.
-
-This is outerHTML extraction — the response includes the element's own tags. It pairs naturally with `hx-swap="outerHTML"` (recommended) and the positional swap modes (`beforebegin`, `afterend`).
-
-### Explicit fragment markers for innerHTML
-
-Three swap modes need just the inner content without the wrapper element: `innerHTML`, `afterbegin`, `beforeend`. The `{{ fragment }}` directive is the opt-in:
+...and htmx targets `sidebar`, the response is:
 
 ```html
-<div id="main">
-    {{ fragment 'main' }}
-    <p>This content is returned without the wrapper div.</p>
+<div id="sidebar"><p>42 active users</p></div>
+```
+
+The `<h1>` and `#main` are never rendered. This is efficient — expensive data for other sections of the page is never computed (especially when combined with lazy closures, covered below).
+
+**What happens when the id doesn't exist?** If the template doesn't have an element with the requested id, the framework logs a warning and falls back to returning the entire content section (without the layout). This is a soft failure — the user sees a working page, and you see a log entry telling you which id was missing from which template.
+
+**Important: htmx only sends `HX-Target` when the target element has an `id`.** If you write `hx-target="#sidebar"`, htmx sends `HX-Target: sidebar`. But if you write `hx-target="closest div"` or target an element without an id, htmx doesn't send the header at all, and Arcanum falls back to content-section rendering. The rule is simple: if you want server-side element extraction, give your target element an `id`.
+
+### Fragment markers for innerHTML swap modes
+
+The default outerHTML extraction works great with `hx-swap="outerHTML"` — the response replaces the entire element, including its wrapper tag. But three swap modes need just the inner content without the wrapper: `innerHTML`, `afterbegin`, and `beforeend`.
+
+For those cases, you can add explicit fragment markers to your template:
+
+```html
+<ul id="notifications">
+    {{ fragment 'notifications' }}
+    {{ foreach $items as $item }}
+    <li>{{ $item }}</li>
+    {{ endforeach }}
     {{ endfragment }}
-</div>
+</ul>
 ```
 
-When `HX-Target: main` arrives and a `{{ fragment 'main' }}` marker exists, the framework returns the inner content only. When no marker exists, it falls back to outerHTML. The markers are stripped during normal (non-htmx) rendering — they're transparent.
+When htmx targets `notifications` and the framework finds a `{{ fragment 'notifications' }}` marker, it returns only the content between the markers — the `<li>` items without the `<ul>` wrapper. This is exactly what `hx-swap="innerHTML"` or `hx-swap="beforeend"` expects.
 
-`{{ fragment }}` is a custom directive registered by the Htmx package via the Shodo `CompilerDirective` system. Without the Htmx package, the directive doesn't exist.
+When there's no fragment marker for the target id, the framework falls back to outerHTML extraction as usual. The markers are completely transparent during normal full-page rendering — they're stripped out and have no effect on the output.
 
-### Lazy data via closures
-
-Handlers can return closures for expensive data. On partial renders, only closures whose variables appear in the rendered slice are invoked:
-
-```php
-return [
-    'sidebar' => fn() => $this->db->model->recentPosts(),   // invoked only if $sidebar is in the fragment
-    'stats'   => fn() => $this->db->model->expensiveStats(), // skipped if not referenced
-    'title'   => 'Dashboard',                                 // plain values always available
-];
-```
-
-On full renders, all closures are invoked. Closures must be pure data suppliers — no side effects, no event dispatching. Events belong in the handler.
+You don't need fragment markers most of the time. The default outerHTML extraction with `hx-swap="outerHTML"` is the recommended approach. Fragment markers are the escape hatch for the specific swap modes that need inner content.
 
 ---
 
-## Inspecting htmx requests
+## Lazy data with closures
 
-`HtmxRequest` is a read-side decorator over `ServerRequestInterface`. Handlers that need to inspect htmx headers receive it via dependency injection:
+This feature becomes really valuable as your pages grow. Consider a dashboard handler that returns data for several sections:
 
 ```php
-public function __invoke(GetDashboard $query, HtmxRequest $htmx): array
+public function __invoke(GetDashboard $query): array
 {
-    if ($htmx->isHtmx()) {
-        // htmx request — target() gives the element id
-        $target = $htmx->target();  // 'sidebar', or null
-    }
-
-    return ['stats' => $this->loadStats()];
+    return [
+        'title'   => 'Dashboard',
+        'stats'   => $this->db->model->computeStats(),     // expensive query
+        'sidebar' => $this->db->model->recentActivity(),   // another expensive query
+        'chart'   => $this->db->model->chartData(),        // yet another
+    ];
 }
 ```
 
-Most handlers don't need this — the rendering pipeline reads the headers automatically. `HtmxRequest` is for the rare handler that wants to vary its data based on request type.
+When htmx refreshes just the sidebar, all three expensive queries still run, even though only `$sidebar` is used in the rendered fragment. That's wasteful.
 
-### Accessors
+The fix is to wrap expensive values in closures:
 
-| Method | Returns | Header |
-|---|---|---|
-| `isHtmx()` | `bool` | `HX-Request` |
-| `isBoosted()` | `bool` | `HX-Boosted` |
-| `isHistoryRestore()` | `bool` | `HX-History-Restore-Request` |
-| `type()` | `?HtmxRequestType` | `HX-Request-Type` (`Full` or `Partial`) |
-| `target()` | `?string` | `HX-Target` (normalized to bare id) |
-| `targetRaw()` | `?string` | `HX-Target` (raw, v4 sends `tagName#id`) |
-| `swapMode()` | `?string` | `HX-Swap` |
-| `triggerId()` | `?string` | `HX-Trigger` |
-| `triggerName()` | `?string` | `HX-Trigger-Name` |
-| `currentUrl()` | `?string` | `HX-Current-URL` |
-| `prompt()` | `?string` | `HX-Prompt` |
+```php
+public function __invoke(GetDashboard $query): array
+{
+    return [
+        'title'   => 'Dashboard',
+        'stats'   => fn() => $this->db->model->computeStats(),
+        'sidebar' => fn() => $this->db->model->recentActivity(),
+        'chart'   => fn() => $this->db->model->chartData(),
+    ];
+}
+```
 
-`target()` normalizes htmx v4's `tagName#id` format to a bare id. `targetRaw()` returns the raw header value.
+Now the framework is smart about it. Before rendering, it scans the compiled template fragment for `$variable` references. Only closures whose variable names actually appear in the fragment are invoked. The rest are skipped entirely — no query, no computation, no wasted time.
+
+On a full page render, all closures are invoked (the full page needs all the data). The optimization only kicks in for partial renders where element extraction or fragment rendering narrows the scope.
+
+A few things to keep in mind:
+
+- **Closures must be pure data suppliers.** They should fetch and return data, nothing else. Don't dispatch events or trigger side effects from inside a closure — those belong in the handler itself, where the framework's event capture is active.
+- **The scan is text-based.** If a variable name appears anywhere in the fragment source — even inside a `{{ if false }}` block that never executes — the closure will be invoked. This is a deliberate tradeoff. The big win is skipping closures for data that belongs to entirely different sections of the page, and that works perfectly.
+- **Plain values work exactly as before.** You can mix closures and regular values freely. `'title' => 'Dashboard'` is always available; `'stats' => fn() => ...` is resolved on demand.
 
 ---
 
-## Event projection: domain events as HX-Trigger
+## Event projection: making components refresh each other
 
-The CQRS-native cross-component refresh story. A command handler dispatches a domain event through Echo; htmx elements listening for that event refresh automatically.
+This is one of the most powerful patterns in Arcanum + htmx. When a command handler does something (like adding a guestbook entry), you often want other parts of the page to update in response (like the entry list). With traditional approaches, you'd need JavaScript to coordinate this. With Arcanum's event projection, it happens automatically.
 
-### 1. Define a broadcast event
+The idea is straightforward: your command handler dispatches a domain event (something it probably does already). The Htmx package intercepts that event and sends it to the browser as an `HX-Trigger` response header. Any htmx element that's listening for that event will automatically refresh itself.
 
-Implement `ClientBroadcast` on any Echo event:
+Here's a complete example using a guestbook.
+
+### Step 1: Create an event that implements ClientBroadcast
 
 ```php
+use Arcanum\Htmx\ClientBroadcast;
+
 final readonly class EntryAdded implements ClientBroadcast
 {
-    public function __construct(public string $name) {}
+    public function __construct(
+        public string $name,
+    ) {
+    }
 
     public function eventName(): string
     {
@@ -127,95 +203,100 @@ final readonly class EntryAdded implements ClientBroadcast
 }
 ```
 
-### 2. Dispatch it from the handler
+The `ClientBroadcast` interface requires two methods: `eventName()` returns the name of the event that htmx will fire on the browser side, and `payload()` returns any data you want to send along with it (or an empty array for a signal-only event).
+
+### Step 2: Dispatch the event from your command handler
 
 ```php
 public function __invoke(AddEntry $command): void
 {
-    // ... insert the entry ...
+    // ... insert the entry into the database ...
+
     $this->dispatcher->dispatch(new EntryAdded($command->name));
 }
 ```
 
-### 3. Listen in the template
+This is a normal Echo event dispatch — the same thing you'd do even without htmx. The `HtmxEventTriggerMiddleware` captures any `ClientBroadcast` events that were dispatched during the request and adds them to the response headers automatically.
+
+### Step 3: Listen for the event in your template
 
 ```html
 <div id="guestbook-list"
      hx-get="/guestbook/get-entries.html"
      hx-trigger="guestbook:entry:added from:body"
      hx-swap="outerHTML">
-    <!-- entries rendered here -->
+    {{ foreach $entries as $entry }}
+    <li>{{ $entry['name'] }}: {{ $entry['message'] }}</li>
+    {{ endforeach }}
 </div>
 ```
 
-When the command completes, `HtmxEventTriggerMiddleware` reads the captured `EntryAdded` event and adds `HX-Trigger: {"guestbook:entry:added": {"name": "Alice"}}` to the response. htmx fires the event on the document body; the `<div>` hears it and re-fetches its content.
+The `hx-trigger="guestbook:entry:added from:body"` attribute tells htmx to watch for a `guestbook:entry:added` event on the document body. When the `AddEntry` command completes, the response includes an `HX-Trigger` header with the event name. htmx fires that event on the body, the `<div>` hears it, and it re-fetches its content from `/guestbook/get-entries.html`. The list updates without any JavaScript.
 
-### Timing control
+The `from:body` part is important — `HX-Trigger` events are fired on the body element, so your listening element needs to listen there.
 
-By default, `HX-Trigger` fires immediately (before the swap). For events that should fire after the swap or after the settle step:
+### Controlling when the event fires
 
-| Implement | Header | Fires |
+By default, `HX-Trigger` events fire immediately — before htmx swaps the response content into the page. If you need the event to fire at a different point in the lifecycle, implement one of the timing sub-interfaces instead:
+
+| Interface | When the event fires | Use case |
 |---|---|---|
-| `ClientBroadcast` | `HX-Trigger` | Before swap |
-| `BroadcastAfterSwap` | `HX-Trigger-After-Swap` | After swap completes |
-| `BroadcastAfterSettle` | `HX-Trigger-After-Settle` | After settle completes |
+| `ClientBroadcast` | Before the swap | Most cases — trigger a refresh of another element |
+| `BroadcastAfterSwap` | After the swap completes | When the listening element needs to see the new content first |
+| `BroadcastAfterSettle` | After the settle step | When you need CSS transitions or attribute changes to finish |
 
-The sub-interfaces extend `ClientBroadcast` — same `eventName()` and `payload()` contract, different timing.
+The sub-interfaces extend `ClientBroadcast`, so they have the same `eventName()` and `payload()` methods. They're just type-level markers that tell the middleware which response header to use (`HX-Trigger`, `HX-Trigger-After-Swap`, or `HX-Trigger-After-Settle`).
 
-### Command redirects
+### Command redirects work automatically
 
-`HtmxEventTriggerMiddleware` also copies `Location` headers to `HX-Location` for htmx requests. A command that returns a 201 Created with a `Location` header works without special-casing — htmx navigates to the new URL.
+When a command handler returns a 201 Created response with a `Location` header (which is the standard Arcanum pattern for commands that create resources), the `HtmxEventTriggerMiddleware` automatically copies it to an `HX-Location` header for htmx requests. This means htmx navigates to the new URL after the command completes, without any special handling in the handler.
 
 ---
 
 ## CSRF protection
 
-htmx sends requests via `XMLHttpRequest`, which doesn't carry CSRF tokens automatically. The package provides a lightweight JS shim:
+htmx sends requests using `XMLHttpRequest` under the hood. Unlike regular form submissions, XHR requests don't automatically include CSRF tokens. The Htmx package solves this with a small JavaScript helper that runs automatically.
 
-### Setup in the layout
+When you include `{{! Htmx::csrf() !}}` in your layout's `<head>`, it loads a tiny script from `/_htmx/csrf.js`. This script listens for htmx's `htmx:configRequest` event (which fires before every htmx request) and does the following:
 
-```html
-<head>
-    {{! Htmx::script() !}}
-    <meta name="csrf-token" content="{{ Html::csrfToken() }}">
-    {{! Htmx::csrf() !}}
-</head>
-```
+1. Checks if the request method is something that modifies data (POST, PUT, PATCH, DELETE — anything except GET, HEAD, and OPTIONS).
+2. Reads the CSRF token from the `<meta name="csrf-token">` tag in your page's `<head>`.
+3. Adds it as an `X-CSRF-TOKEN` header on the outgoing request.
 
-`Htmx::script()` renders the htmx `<script>` tag from CDN with the pinned version. `Htmx::csrf()` renders `<script src="/_htmx/csrf.js"></script>`.
+This happens automatically for every htmx request. You don't need to add hidden inputs to your forms or manually set headers. Just make sure the `<meta name="csrf-token">` tag is in your layout (the starter app includes it), and everything works.
 
-### How it works
+The script also handles token rotation during boosted navigation — when htmx replaces the page content, the meta tag might contain a new token, and the script picks it up automatically.
 
-The `/_htmx/csrf.js` endpoint (served by `HtmxCsrfController` via `HtmxRequestMiddleware`) returns a JS shim that:
-
-1. Listens to `htmx:configRequest`
-2. On every non-GET request, reads the CSRF token from `<meta name="csrf-token">`
-3. Adds it as `X-CSRF-TOKEN` to the request headers
-
-The shim handles boosted-navigation token rotation by reading the updated meta tag after each full page swap. The response is cacheable (`Cache-Control: public, max-age=86400`).
+The `/_htmx/csrf.js` endpoint is served by the framework (via `HtmxRequestMiddleware`) and is cached by the browser for 24 hours.
 
 ---
 
-## Auth redirect handling
+## Authentication redirects
 
-When an htmx request receives a 401 or 403, the normal redirect-to-login pattern breaks — htmx would swap the login page HTML into whatever element triggered the request. `HtmxAuthRedirectMiddleware` intercepts the error and returns an empty body with `HX-Location: /login` (or `HX-Refresh: true`), telling htmx to perform a full client-side navigation instead.
+There's a subtle problem with htmx and login redirects. Normally, when a user hits a protected page without being logged in, the server returns a redirect to `/login`. The browser follows the redirect and shows the login page. Simple.
 
-Non-htmx requests pass through unchanged.
+But with htmx, the request might be targeting a small element — say, a sidebar. If the server returns the login page HTML, htmx will swap it into the sidebar element. Now your sidebar contains an entire login page. Not great.
 
-Configure via `config/htmx.php`:
+`HtmxAuthRedirectMiddleware` catches this case. When an htmx request gets a 401 (Unauthorized) or 403 (Forbidden) response, the middleware replaces it with an empty response that includes an `HX-Location: /login` header. This tells htmx to perform a full browser navigation to the login page instead of swapping content.
+
+You can configure the redirect URL and behavior in `config/htmx.php`:
 
 ```php
-'auth_redirect' => '/login',  // URL to navigate to
-'auth_refresh'  => false,     // true = HX-Refresh instead of HX-Location
+'auth_redirect' => '/login',   // where to send the user
+'auth_refresh'  => false,       // set to true to use HX-Refresh (full page reload) instead
 ```
+
+Non-htmx requests are not affected — they pass through the middleware unchanged.
 
 ---
 
-## Vary header
+## The Vary header
 
-`HtmxRequestMiddleware` auto-adds `Vary: HX-Request` to every response (via `withAddedHeader`, preserving existing Vary values). This tells HTTP caches to distinguish between htmx and full-page responses — without it, a CDN could serve a partial HTML fragment to a full-page request, or vice versa.
+When you have a mix of htmx and non-htmx requests going to the same URL, HTTP caches (CDNs, browser caches, reverse proxies) need to know that the responses are different. A full-page response and an htmx partial response have the same URL but very different content.
 
-Disable in config if you manage Vary headers yourself:
+`HtmxRequestMiddleware` handles this by adding `Vary: HX-Request` to every response. This tells caches to store separate versions based on whether the `HX-Request` header was present. Without this, a CDN could cache the partial response from an htmx request and serve it to a user who navigated to the URL directly — they'd see a fragment instead of a full page.
+
+If you manage Vary headers yourself (or don't use a CDN), you can disable this in `config/htmx.php`:
 
 ```php
 'vary' => false,
@@ -223,40 +304,59 @@ Disable in config if you manage Vary headers yourself:
 
 ---
 
-## Configuration
+## Configuration reference
 
-All config lives in `config/htmx.php`:
+All configuration lives in `config/htmx.php`. Here's every option:
 
-| Key | Default | Purpose |
+| Key | Default | What it does |
 |---|---|---|
-| `version` | `'4.0.0-beta1'` | htmx version for CDN URL |
-| `cdn_url` | unpkg template | CDN URL with `{version}` placeholder |
-| `integrity` | `''` | SRI hash (empty skips integrity check) |
-| `vary` | `true` | Auto-add `Vary: HX-Request` |
-| `auth_redirect` | `'/login'` | Auth redirect URL for 401/403 |
-| `auth_refresh` | `false` | Use `HX-Refresh` instead of `HX-Location` |
+| `version` | `'4.0.0-beta1'` | The htmx version to load from CDN. Used by `Htmx::script()`. |
+| `cdn_url` | unpkg URL template | CDN URL with a `{version}` placeholder that gets replaced. |
+| `integrity` | `''` | Subresource Integrity hash for the CDN script. Leave empty to skip the check (useful during beta). |
+| `vary` | `true` | Whether to auto-add `Vary: HX-Request` to every response. |
+| `auth_redirect` | `'/login'` | Where to redirect htmx requests that get a 401 or 403. |
+| `auth_refresh` | `false` | When `true`, uses `HX-Refresh` (full page reload) instead of `HX-Location` for auth redirects. |
 
 ---
 
-## Middleware registration
+## Inspecting htmx requests in handlers
 
-Register the three middleware in `config/middleware.php`:
+Most of the time, you don't need to know whether a request came from htmx or not — your handler returns data, and the framework picks the rendering mode. But occasionally, a handler needs to vary its behavior based on the request type.
+
+For those cases, you can type-hint `HtmxRequest` in your handler's constructor or `__invoke` method:
 
 ```php
-'global' => [
-    \Arcanum\Htmx\HtmxRequestMiddleware::class,
-    \Arcanum\Htmx\HtmxEventTriggerMiddleware::class,
-    \Arcanum\Htmx\HtmxAuthRedirectMiddleware::class,
-],
+public function __invoke(GetDashboard $query, HtmxRequest $htmx): array
+{
+    if ($htmx->isHtmx()) {
+        $target = $htmx->target(); // 'sidebar', or null if no target
+    }
+
+    return ['stats' => $this->loadStats()];
+}
 ```
 
-Order matters: `HtmxRequestMiddleware` must run first (it sets up the request context that the other two read).
+`HtmxRequest` is a thin wrapper around the PSR-7 `ServerRequestInterface` that gives you typed access to all the htmx headers:
+
+| Method | What it returns | Which header |
+|---|---|---|
+| `isHtmx()` | Whether this is an htmx request | `HX-Request` |
+| `isBoosted()` | Whether the request was triggered by `hx-boost` | `HX-Boosted` |
+| `isHistoryRestore()` | Whether this is a history restoration request | `HX-History-Restore-Request` |
+| `type()` | `HtmxRequestType::Full`, `Partial`, or `null` | `HX-Request-Type` |
+| `target()` | The target element's id (bare id, normalized) | `HX-Target` |
+| `targetRaw()` | The raw `HX-Target` value (v4 sends `tagName#id`) | `HX-Target` |
+| `swapMode()` | The swap mode (`innerHTML`, `outerHTML`, etc.) | `HX-Swap` |
+| `triggerId()` | The id of the element that triggered the request | `HX-Trigger` |
+| `triggerName()` | The name of the triggering element | `HX-Trigger-Name` |
+| `currentUrl()` | The URL the browser was on when the request was made | `HX-Current-URL` |
+| `prompt()` | The user's response to an `hx-prompt` dialog | `HX-Prompt` |
 
 ---
 
-## HtmxResponse builder
+## Building htmx response headers
 
-For middleware that needs to compose htmx response headers, `HtmxResponse` is an immutable builder:
+The package includes `HtmxResponse`, an immutable builder for composing htmx response headers. You probably won't need this in application code — the middleware handles the common cases automatically. But if you're writing custom middleware that needs fine-grained control over the htmx response, it's available:
 
 ```php
 $response = (new HtmxResponse($originalResponse))
@@ -266,52 +366,58 @@ $response = (new HtmxResponse($originalResponse))
     ->toResponse();
 ```
 
-Trigger methods merge — multiple `withTrigger()` calls accumulate into a single `HX-Trigger` JSON header. All builder methods return new instances (immutable).
+Every method returns a new instance (the builder is immutable). Trigger methods merge — calling `withTrigger()` multiple times accumulates events into a single JSON header rather than overwriting.
 
-`HtmxLocation` is a value object for the JSON-envelope form of `HX-Location` when you need to specify a target, swap mode, or other navigation options beyond a simple path.
+For the `HX-Location` header's JSON envelope form (when you need to specify a target, swap mode, or other navigation options), there's an `HtmxLocation` value object:
 
-App code rarely uses `HtmxResponse` directly — the middleware handles the common cases. It's available for custom middleware that needs fine-grained control over htmx response headers.
+```php
+$location = new HtmxLocation(
+    path: '/items/42',
+    target: '#main',
+    swap: 'innerHTML',
+);
+
+$response = (new HtmxResponse($originalResponse))
+    ->withLocation($location)
+    ->toResponse();
+```
 
 ---
 
-## HX-Target is id-only
+## A note on dynamic ids
 
-htmx only sends `HX-Target` when the target element has an `id` attribute (confirmed in the htmx source: `getAttributeValue(target, 'id')`). When the target has no id, the header is omitted entirely. This means auto-extraction is the only viable server-side partial rendering — the server never receives CSS selectors, only ids (or nothing).
+You might be tempted to do something like this inside a `{{ foreach }}` loop:
 
-The convention is self-enforcing: if you want server-side partial rendering, put an `id` on the target element. If you don't, htmx swaps the full response and the server renders normally.
+```html
+{{ foreach $items as $item }}
+<div id="item-{{ $item['id'] }}">{{ $item['name'] }}</div>
+{{ endforeach }}
+```
 
----
+This won't work with element extraction, because the id is dynamic — it contains a template expression that only resolves at render time. The framework can't find `id="item-42"` in the raw template source because the template source says `id="item-{{ $item['id'] }}"`.
 
-## Dynamic ids and the CQRS decomposition
-
-`<div id="item-{{ $id }}">` inside a `{{ foreach }}` can't be extracted at the template level — the id is only known after rendering, and the loop variable `$item` would be undefined outside its scope.
-
-The CQRS answer: if something is independently addressable via htmx, it should be its own query with its own handler and template. Per-item updates route to a single-item query (`GET /items/42`), not a fragment of the list query. This aligns with CQRS — each independently updatable region is its own query, with its own URL, handler, and template.
+The CQRS solution is cleaner anyway: if an individual item needs to be independently refreshable via htmx, it should be its own query with its own handler and template. Instead of extracting one item from a list template, create a `GET /items/42` route that returns just that item. Each independently updatable region of your page is its own query — its own URL, its own handler, its own template. This keeps everything simple and predictable.
 
 ---
 
 ## Package contents
 
-| Class | Purpose |
+Here's everything in the package, for reference:
+
+| Class | What it does |
 |---|---|
-| `HtmxRequest` | Read-side decorator with typed accessors for htmx headers |
-| `HtmxRequestType` | Enum: `Full` or `Partial` |
-| `HtmxResponse` | Immutable builder for htmx response headers |
-| `HtmxLocation` | Value object for JSON-form `HX-Location` |
-| `ClientBroadcast` | Interface for events projected as `HX-Trigger` |
-| `BroadcastAfterSwap` | Timing sub-interface: fires after swap |
-| `BroadcastAfterSettle` | Timing sub-interface: fires after settle |
-| `EventCapture` | Decorator that records `ClientBroadcast` events |
-| `FragmentDirective` | Custom `CompilerDirective` for `{{ fragment }}` markers |
-| `HtmxAwareResponseRenderer` | Picks rendering mode from htmx headers |
-| `HtmxRequestMiddleware` | Sets up request context, serves CSRF endpoint, adds Vary |
-| `HtmxEventTriggerMiddleware` | Projects captured events into HX-Trigger headers |
-| `HtmxAuthRedirectMiddleware` | Converts 401/403 to HX-Location for htmx requests |
-| `HtmxCsrfController` | Serves the CSRF JS shim at `/_htmx/csrf.js` |
-| `HtmxHelper` | Template helper: `Htmx::script()`, `Htmx::csrf()` |
-
----
-
-## htmx reference
-
-This package handles the server side. For the `hx-*` attribute reference, swap modes, event lifecycle, and everything else on the client side, see [four.htmx.org](https://four.htmx.org).
+| `HtmxRequest` | Wraps the PSR-7 request with typed accessors for htmx headers |
+| `HtmxRequestType` | Enum with two values: `Full` and `Partial` |
+| `HtmxResponse` | Immutable builder for composing htmx response headers |
+| `HtmxLocation` | Value object for the JSON form of `HX-Location` |
+| `ClientBroadcast` | Interface for domain events that should notify the browser |
+| `BroadcastAfterSwap` | Timing variant: event fires after the swap completes |
+| `BroadcastAfterSettle` | Timing variant: event fires after the settle step |
+| `EventCapture` | Decorator around Echo's dispatcher that records broadcast events |
+| `FragmentDirective` | Custom compiler directive for `{{ fragment }}` / `{{ endfragment }}` markers |
+| `HtmxAwareResponseRenderer` | Picks the rendering mode based on htmx request headers |
+| `HtmxRequestMiddleware` | Sets up request context, serves the CSRF endpoint, adds Vary |
+| `HtmxEventTriggerMiddleware` | Turns captured broadcast events into `HX-Trigger` response headers |
+| `HtmxAuthRedirectMiddleware` | Redirects htmx requests to the login page on 401/403 |
+| `HtmxCsrfController` | Serves the CSRF JS helper at `/_htmx/csrf.js` |
+| `HtmxHelper` | Template helper: `Htmx::script()` and `Htmx::csrf()` |
