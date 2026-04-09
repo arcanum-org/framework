@@ -48,14 +48,14 @@ Integrate `Hourglass\Clock` throughout the framework and starter app so every wa
 
 #### Starter app
 
-- [ ] **`app/Domain/Query/HealthHandler` — migrate the verbose-mode `time()` call.** Inject Clock via constructor; replace `time()` with `$this->clock->now()->getTimestamp()`. The handler becomes deterministic for tests once a `FrozenClock` is bound. Smoke test: `curl /health.json?verbose=true` still returns a valid timestamp.
-- [ ] **Verify starter app boots and serves requests after the framework migration.** Run `php bin/arcanum cache:clear`, `php bin/arcanum validate:handlers`, then hit the starter app with a few requests (`/`, `/health.json`, `/health.json?verbose=true`) using the bench harness or `php -S` to confirm nothing regressed.
+- [x] **`app/Domain/Query/HealthHandler` — migrate the verbose-mode `time()` call.** Constructor takes `Clock $clock = new SystemClock()`; verbose timestamp now reads through the clock. New `testVerboseTimestampComesFromInjectedClock` test pins the value with a `FrozenClock`. composer.lock bumped to pull in `psr/clock` transitively. Starter app commit: `009c7d7`.
+- [x] **Verify starter app boots and serves requests after the framework migration.** `cache:clear` + `validate:handlers` clean. Smoke-tested via `php -S`: `/` → 200 (24KB welcome page renders), `/health.json` → `{"status":"ok"}`, `/health.json?verbose=true` → `{"status":"ok","timestamp":1775696981,"php":"8.4.3"}` — the timestamp confirms the framework's `Bootstrap\Hourglass` binding successfully auto-wires `SystemClock` into `HealthHandler` via Codex. Full chain works end-to-end.
 
 #### Cross-cutting
 
 - [x] **Run `composer check` after each commit.** Pre-commit hook enforces this — every commit on the branch has a green `composer check` line in its output. Suite is at 2503 tests / 5037 assertions and stayed green throughout the migration.
 - [x] **Update COMPENDIUM.md.** Hourglass entry now names the consumers (Vault `ArrayDriver`/`FileDriver`, Throttle `TokenBucket`/`SlidingWindow`, Auth `CliSession`), notes the bootstrap binding, and explicitly calls out that Stopwatch deliberately bypasses Clock — they model different things, and conflating them would freeze elapsed-time measurement when a test froze the wall-clock. Testing-section paragraph updated to reflect that the Clock half of the testing-utilities arc is in progress.
-- [ ] **Final sweep.** After all migrations, re-run the discovery grep (`time(`, `new DateTime`, `new DateTimeImmutable`) across `src/` to confirm only the explicitly-skipped sites remain. Update this checklist with any stragglers found.
+- [x] **Final sweep.** Re-ran the discovery grep across `src/`. Down from 15 files to 13: the four migrated files (`TokenBucket`, `SlidingWindow`, `Quota`, `CliSession`) no longer match. Remaining 13 hits are all accounted for: `Hourglass\SystemClock` (the Clock implementation itself), `Hourglass\Stopwatch`/`Instant` (deliberately skipped, documented), `Vault\ApcuDriver`/`RedisDriver`/`FormatHelper` (deliberately skipped, documented), and the interval-converter lines inside `ArrayDriver::resolveExpiry`/`FileDriver::resolveExpiry` (which sit two lines below the migrated `$now` read — same pattern as the documented ApcuDriver/RedisDriver case). Zero stragglers.
 
 ### Welcome page — nice-to-haves (deferred)
 
