@@ -25,12 +25,18 @@ use RuntimeException;
  * Stopwatch::current(). Tests should install a fresh instance per test and
  * uninstall it in tearDown.
  *
- * Stopwatch deliberately uses microtime(true) instead of Hourglass\Clock.
- * Different concerns: Clock is the wall-clock "now" boundary for time-
- * sensitive business logic (TTL, expiry); Stopwatch is sub-millisecond
- * elapsed-time telemetry that DateTimeImmutable can't carry. The testability
- * seam is the explicit `?float $time` argument every recording method
- * accepts — not Clock injection.
+ * Stopwatch deliberately uses microtime(true) instead of Hourglass\Clock —
+ * they model different things. Clock is the *wall-clock* "now" boundary
+ * for time-sensitive business logic (TTL, expiry, scheduled jobs), the kind
+ * of thing tests need to fake with FrozenClock. Stopwatch is *elapsed-time
+ * telemetry* for the process timeline (request received, handler complete,
+ * response sent). Routing one through the other would conflate "what time
+ * is it?" with "how much time has passed?" — and a test that froze Clock
+ * to assert TTL behavior would then also freeze Stopwatch, hiding real
+ * elapsed time from the very code the test wants to observe. The testability
+ * seam for Stopwatch is the explicit `?float $time` argument every recording
+ * method accepts; tests pass the value they want recorded, leaving Clock-
+ * faking and Stopwatch-faking independent.
  */
 final class Stopwatch
 {

@@ -21,7 +21,7 @@ Integrate `Hourglass\Clock` throughout the framework and starter app so every wa
 
 #### Documentation of deliberately-skipped sites
 
-- [x] **Land explanation comments at every skipped time-using site** so future maintainers (or future Claude) don't "fix" what isn't broken. Covers `Vault\ApcuDriver::resolveTtl`, `Vault\RedisDriver::resolveTtl` (interval-to-int converters that never read "now"), `Shodo\Helpers\FormatHelper::date` (caller-provided value formatter), and `Hourglass\Stopwatch` (high-resolution elapsed-time telemetry that intentionally bypasses Clock — different concern, different precision requirement). Each comment names Hourglass\Clock explicitly and explains the why so the decision is locally legible without needing to read PLAN.md.
+- [x] **Land explanation comments at every skipped time-using site** so future maintainers (or future Claude) don't "fix" what isn't broken. Covers `Vault\ApcuDriver::resolveTtl`, `Vault\RedisDriver::resolveTtl` (interval-to-int converters that never read "now"), `Shodo\Helpers\FormatHelper::date` (caller-provided value formatter), and `Hourglass\Stopwatch` (elapsed-time telemetry — Clock and Stopwatch model different things, conflating them would mean a test that froze Clock would also freeze elapsed-time measurement). Each comment names Hourglass\Clock explicitly and explains the why so the decision is locally legible without needing to read PLAN.md.
 
 #### Bootstrap
 
@@ -54,7 +54,7 @@ Integrate `Hourglass\Clock` throughout the framework and starter app so every wa
 #### Cross-cutting
 
 - [ ] **Run `composer check` after each commit.** PHPStan will catch any missed call sites or constructor mismatches; PHPUnit will catch any test that broke without an obvious symptom.
-- [x] **Update COMPENDIUM.md.** Hourglass entry now names the consumers (Vault `ArrayDriver`/`FileDriver`, Throttle `TokenBucket`/`SlidingWindow`, Auth `CliSession`), notes the bootstrap binding, and explicitly calls out that Stopwatch deliberately bypasses Clock for precision reasons. Testing-section paragraph updated to reflect that the Clock half of the testing-utilities arc is in progress.
+- [x] **Update COMPENDIUM.md.** Hourglass entry now names the consumers (Vault `ArrayDriver`/`FileDriver`, Throttle `TokenBucket`/`SlidingWindow`, Auth `CliSession`), notes the bootstrap binding, and explicitly calls out that Stopwatch deliberately bypasses Clock — they model different things, and conflating them would freeze elapsed-time measurement when a test froze the wall-clock. Testing-section paragraph updated to reflect that the Clock half of the testing-utilities arc is in progress.
 - [ ] **Final sweep.** After all migrations, re-run the discovery grep (`time(`, `new DateTime`, `new DateTimeImmutable`) across `src/` to confirm only the explicitly-skipped sites remain. Update this checklist with any stragglers found.
 
 ### Welcome page — nice-to-haves (deferred)
