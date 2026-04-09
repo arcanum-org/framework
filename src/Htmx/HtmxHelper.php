@@ -26,11 +26,12 @@ final class HtmxHelper
     public function script(): string
     {
         $url = str_replace('{version}', $this->version, $this->cdnUrl);
+        $esc = static fn(string $v): string => htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
 
-        $tag = '<script src="' . $url . '"';
+        $tag = '<script src="' . $esc($url) . '"';
 
         if ($this->integrity !== '') {
-            $tag .= ' integrity="' . $this->integrity . '" crossorigin="anonymous"';
+            $tag .= ' integrity="' . $esc($this->integrity) . '" crossorigin="anonymous"';
         }
 
         return $tag . '></script>';

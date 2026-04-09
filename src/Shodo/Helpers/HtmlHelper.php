@@ -27,7 +27,11 @@ final class HtmlHelper
      */
     public function csrf(): string
     {
-        $token = $this->session->get()->csrfToken();
+        $token = htmlspecialchars(
+            (string) $this->session->get()->csrfToken(),
+            ENT_QUOTES,
+            'UTF-8',
+        );
 
         return '<input type="hidden" name="_token" value="' . $token . '">';
     }
