@@ -118,6 +118,150 @@ final class TemplateCompiler
     }
 
     /**
+     * HTML void elements — self-closing, never have children or a close tag.
+     */
+    private const VOID_ELEMENTS = [
+        'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+        'link', 'meta', 'param', 'source', 'track', 'wbr',
+    ];
+
+    /**
+     * Extract an HTML element by its id attribute from raw template source.
+     *
+     * Searches the source for an element with the given literal id value,
+     * determines the tag name, and depth-counts open/close tags of that
+     * type to find the matching close tag. Returns an ElementExtraction
+     * with both the outerHTML (full element) and innerHTML (children only),
+     * or null when no element with that id exists.
+     *
+     * Works on raw template source — Shodo directives ({{ if }}, {{ foreach }},
+     * etc.) are treated as opaque text and pass through. The extraction
+     * operates on HTML structure only.
+     *
+     * Supports nested ids naturally — extracting 'outer' returns everything
+     * including inner elements with their own ids.
+     *
+     * Skips dynamic ids (id="{{ $foo }}") — only literal id="value" matches.
+     */
+    public function extractElementById(string $source, string $id): ?ElementExtraction
+    {
+        // Find the opening tag that contains id="$id" or id='$id'.
+        // The pattern matches the tag name and everything up to the >.
+        $escapedId = preg_quote($id, '/');
+        $pattern = '/<([a-zA-Z][a-zA-Z0-9]*)\b([^>]*?\bid\s*=\s*["\']' . $escapedId . '["\'][^>]*)>/s';
+
+        if (!preg_match($pattern, $source, $match, PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+
+        $tagName = strtolower($match[1][0]);
+        $openTagStart = $match[0][1];
+        $openTagEnd = $openTagStart + strlen($match[0][0]);
+
+        // Void elements have no children and no close tag.
+        if (in_array($tagName, self::VOID_ELEMENTS, true)) {
+            return new ElementExtraction(
+                outerHtml: $match[0][0],
+                innerHtml: '',
+            );
+        }
+
+        // Depth-count to find the matching close tag.
+        $depth = 1;
+        $pos = $openTagEnd;
+        $len = strlen($source);
+
+        while ($depth > 0 && $pos < $len) {
+            // Find the next opening or closing tag of the same name.
+            $nextTag = $this->findNextTag($source, $tagName, $pos);
+
+            if ($nextTag === null) {
+                // No more tags found — unclosed element. Return what we have
+                // up to end of source as a best-effort extraction.
+                break;
+            }
+
+            if ($nextTag['type'] === 'open') {
+                $depth++;
+            } else {
+                $depth--;
+            }
+
+            $pos = $nextTag['end'];
+        }
+
+        $outerHtml = substr($source, $openTagStart, $pos - $openTagStart);
+        $innerHtml = substr($source, $openTagEnd, $pos - strlen("</$tagName>") - $openTagEnd);
+
+        return new ElementExtraction(
+            outerHtml: $outerHtml,
+            innerHtml: $innerHtml,
+        );
+    }
+
+    /**
+     * Find the next opening or closing tag of the given name after $offset.
+     *
+     * Returns ['type' => 'open'|'close', 'end' => int] or null.
+     * Skips self-closing tags (e.g. <div />) since they don't affect depth.
+     *
+     * @return array{type: 'open'|'close', end: int}|null
+     */
+    private function findNextTag(string $source, string $tagName, int $offset): ?array
+    {
+        $len = strlen($source);
+
+        while ($offset < $len) {
+            $ltPos = strpos($source, '<', $offset);
+            if ($ltPos === false) {
+                return null;
+            }
+
+            // Check for closing tag: </tagName>
+            $closePrefix = '</' . $tagName;
+            if (
+                substr_compare($source, $closePrefix, $ltPos, strlen($closePrefix), true) === 0
+                && isset($source[$ltPos + strlen($closePrefix)])
+                && ($source[$ltPos + strlen($closePrefix)] === '>'
+                    || ctype_space($source[$ltPos + strlen($closePrefix)]))
+            ) {
+                $gtPos = strpos($source, '>', $ltPos);
+                if ($gtPos === false) {
+                    return null;
+                }
+                return ['type' => 'close', 'end' => $gtPos + 1];
+            }
+
+            // Check for opening tag: <tagName (with word boundary)
+            $openPrefix = '<' . $tagName;
+            if (
+                substr_compare($source, $openPrefix, $ltPos, strlen($openPrefix), true) === 0
+                && isset($source[$ltPos + strlen($openPrefix)])
+                && !ctype_alnum($source[$ltPos + strlen($openPrefix)])
+                && $source[$ltPos + strlen($openPrefix)] !== '-'
+            ) {
+                $gtPos = strpos($source, '>', $ltPos);
+                if ($gtPos === false) {
+                    return null;
+                }
+
+                // Skip self-closing tags: <tag ... />
+                if ($source[$gtPos - 1] === '/') {
+                    $offset = $gtPos + 1;
+                    continue;
+                }
+
+                return ['type' => 'open', 'end' => $gtPos + 1];
+            }
+
+            // Not a matching tag — advance past this <
+            $offset = $ltPos + 1;
+        }
+
+        return null;
+    }
+
+    /**
      * Compile template source into PHP.
      *
      * When $templateDirectory is provided, pre-compilation passes run first:
