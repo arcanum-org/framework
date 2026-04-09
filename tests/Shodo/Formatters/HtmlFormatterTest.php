@@ -666,6 +666,137 @@ final class HtmlFormatterTest extends TestCase
         $this->assertStringNotContainsString('<script>xss', $result);
     }
 
+    // -----------------------------------------------------------
+    // Lazy closure resolution
+    // -----------------------------------------------------------
+
+    public function testClosuresAreInvokedOnFullRender(): void
+    {
+        // Arrange
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<p>{{ $name }}</p><p>{{ $count }}</p>',
+        );
+        $formatter = $this->createFormatter();
+        $invoked = [];
+
+        // Act
+        $result = $formatter->format([
+            'name' => function () use (&$invoked) {
+                $invoked[] = 'name';
+                return 'Alice';
+            },
+            'count' => function () use (&$invoked) {
+                $invoked[] = 'count';
+                return '42';
+            },
+        ], 'App\\Pages\\Index');
+
+        // Assert — both closures invoked, values rendered
+        $this->assertSame(['name', 'count'], $invoked);
+        $this->assertStringContainsString('<p>Alice</p>', $result);
+        $this->assertStringContainsString('<p>42</p>', $result);
+    }
+
+    public function testClosuresAreSelectivelyInvokedOnElementRender(): void
+    {
+        // Arrange — template has two sections, but we only extract "sidebar"
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<div id="main"><p>{{ $title }}</p></div>'
+                . '<div id="sidebar"><p>{{ $greeting }}</p></div>',
+        );
+        $formatter = $this->createFormatter();
+        $invoked = [];
+
+        // Act — render only the sidebar element
+        $result = $formatter->renderElementById(
+            'sidebar',
+            [
+                'title' => function () use (&$invoked) {
+                    $invoked[] = 'title';
+                    return 'Page Title';
+                },
+                'greeting' => function () use (&$invoked) {
+                    $invoked[] = 'greeting';
+                    return 'Hello';
+                },
+            ],
+            'App\\Pages\\Index',
+        );
+
+        // Assert — only 'greeting' invoked (referenced in the sidebar element),
+        // 'title' skipped (only referenced in #main, not rendered)
+        $this->assertSame(['greeting'], $invoked);
+        $this->assertStringContainsString('<p>Hello</p>', $result);
+        $this->assertStringNotContainsString('Page Title', $result);
+    }
+
+    public function testClosuresAreSelectivelyInvokedOnSliceRender(): void
+    {
+        // Arrange
+        $formatter = $this->createFormatter();
+        $invoked = [];
+
+        // Act — render a slice that only references $name
+        $result = $formatter->renderSlice(
+            '<p>{{ $name }}</p>',
+            $this->rootDir,
+            [
+                'name' => function () use (&$invoked) {
+                    $invoked[] = 'name';
+                    return 'Bob';
+                },
+                'unused' => function () use (&$invoked) {
+                    $invoked[] = 'unused';
+                    return 'should not run';
+                },
+            ],
+        );
+
+        // Assert — only 'name' invoked
+        $this->assertSame(['name'], $invoked);
+        $this->assertStringContainsString('<p>Bob</p>', $result);
+    }
+
+    public function testPlainValuesPassThroughUnchanged(): void
+    {
+        // Arrange — mix of closures and plain values
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<p>{{ $name }}</p><p>{{ $role }}</p>',
+        );
+        $formatter = $this->createFormatter();
+
+        // Act
+        $result = $formatter->format([
+            'name' => fn() => 'Alice',
+            'role' => 'admin',
+        ], 'App\\Pages\\Index');
+
+        // Assert — both rendered correctly
+        $this->assertStringContainsString('<p>Alice</p>', $result);
+        $this->assertStringContainsString('<p>admin</p>', $result);
+    }
+
+    public function testClosureExceptionSurfacesBeforeTemplateExecution(): void
+    {
+        // Arrange — closure that throws
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<p>{{ $data }}</p>',
+        );
+        $formatter = $this->createFormatter();
+
+        // Act & Assert — exception surfaces cleanly, not from eval
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Database connection failed');
+
+        $formatter->format([
+            'data' => fn() => throw new \RuntimeException('Database connection failed'),
+        ], 'App\\Pages\\Index');
+    }
+
     public function testRenderElementByIdEscapesOutput(): void
     {
         // Arrange

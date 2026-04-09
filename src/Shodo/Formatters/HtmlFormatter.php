@@ -86,6 +86,7 @@ class HtmlFormatter implements Formatter
         $compiled = $this->compiler->compile($source, $templateDirectory);
 
         $variables = $this->extractVariables($data);
+        $this->resolveClosures($variables, $compiled);
         $variables['__escape'] = static fn(string $value): string =>
             htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
         $variables['__helpers'] = $this->helpers !== null
@@ -155,6 +156,7 @@ class HtmlFormatter implements Formatter
         }
 
         $variables = $this->extractVariables($data);
+        $this->resolveClosures($variables, $compiled);
         $variables['__escape'] = static fn(string $value): string =>
             htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
         $variables['__helpers'] = $this->helpers !== null
@@ -180,6 +182,7 @@ class HtmlFormatter implements Formatter
         );
 
         $variables = $this->extractVariables($data);
+        $this->resolveClosures($variables);
         $variables['__escape'] = static fn(string $value): string =>
             htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
         $variables['__helpers'] = $this->helpers !== null
@@ -214,6 +217,7 @@ class HtmlFormatter implements Formatter
         }
 
         $variables = $this->extractVariables($data);
+        $this->resolveClosures($variables);
         $variables['__escape'] = static fn(string $value): string =>
             htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
         $variables['__helpers'] = $this->helpers !== null ? $this->helpers->for($dtoClass) : [];
@@ -241,6 +245,46 @@ class HtmlFormatter implements Formatter
         }
 
         return ['data' => $data];
+    }
+
+    /**
+     * Resolve closure-valued template variables.
+     *
+     * Handlers can return closures as lazy data suppliers:
+     *
+     *   return [
+     *       'posts'  => fn() => $this->db->model->recentPosts(),
+     *       'stats'  => fn() => $this->db->model->expensiveStats(),
+     *       'title'  => 'Dashboard',
+     *   ];
+     *
+     * On full renders ($compiledSource is null), all closures are invoked —
+     * every variable is needed. On partial renders (element-by-id, slices),
+     * only closures whose variable names appear in the compiled source are
+     * invoked. Unreferenced closures are removed from the array entirely.
+     *
+     * Closures must be pure data suppliers — no side effects, no event
+     * dispatching. Events belong in the handler, not in lazy data.
+     *
+     * The scan is text-based: a $variable inside {{ if false }} still
+     * triggers invocation. The main win — skipping closures for data in
+     * other fragments — is preserved.
+     *
+     * @param array<string, mixed> $variables
+     */
+    private function resolveClosures(array &$variables, ?string $compiledSource = null): void
+    {
+        foreach ($variables as $key => $value) {
+            if (!($value instanceof \Closure)) {
+                continue;
+            }
+
+            if ($compiledSource === null || str_contains($compiledSource, '$' . $key)) {
+                $variables[$key] = $value();
+            } else {
+                unset($variables[$key]);
+            }
+        }
     }
 
     /**
