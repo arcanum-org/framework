@@ -299,6 +299,10 @@ final class TemplateCompiler
             $source = $directive->process($source, $context);
         }
 
+        // Detect unknown directive keywords — any {{ lowercase_word ... }}
+        // not claimed by a registered directive is an error.
+        $this->detectUnknownDirectives($source);
+
         /*
          * Raw output: {{! $expr !}}
          *
@@ -330,5 +334,42 @@ final class TemplateCompiler
         );
 
         return $source;
+    }
+
+    /**
+     * Detect unknown directive keywords after all registered directives
+     * have processed the source.
+     *
+     * Any remaining {{ lowercase_word ... }} pattern where the keyword
+     * is not claimed by any registered directive is an error — it means
+     * the developer wrote a directive name that doesn't exist.
+     *
+     * Keywords from registered-but-skipped directives (e.g. 'include'
+     * when no templateDirectory was provided) are still considered known,
+     * so they fall through to the expression catch-all as before.
+     *
+     * @throws UnknownDirective
+     */
+    private function detectUnknownDirectives(string $source): void
+    {
+        $knownKeywords = $this->directives->keywords();
+
+        if (
+            !preg_match_all(
+                '/\{\{\s*([a-z][a-z0-9_]*)\b/s',
+                $source,
+                $matches,
+            )
+        ) {
+            return;
+        }
+
+        $unknown = array_values(array_unique(
+            array_diff($matches[1], $knownKeywords),
+        ));
+
+        if ($unknown !== []) {
+            throw new UnknownDirective($unknown, $knownKeywords);
+        }
     }
 }
