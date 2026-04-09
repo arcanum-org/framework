@@ -102,6 +102,21 @@ final class HttpTestSurfaceTest extends TestCase
         $this->assertSame(['name' => 'Alice'], $handler->captured->getParsedBody());
     }
 
+    public function testTerminateDelegatesToWrappedKernel(): void
+    {
+        // After a successful dispatch, terminate() should not throw and
+        // should be safe to call (it dispatches ResponseSent if a listener
+        // is registered, which we cover end-to-end in LifecycleEventTest).
+        $kernel = new TestKernel();
+        $handler = new CapturingTestHandler();
+        $surface = $kernel->http()->setCoreHandler($handler);
+
+        $surface->get('/anything');
+        $surface->terminate();
+
+        $this->assertNotNull($handler->captured);
+    }
+
     public function testUnroutedRequestRendersThrough404Path(): void
     {
         // No core handler installed → kernel throws HttpException(NotFound)

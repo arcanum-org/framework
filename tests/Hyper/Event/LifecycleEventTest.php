@@ -4,23 +4,19 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Hyper\Event;
 
-use Arcanum\Cabinet\Application;
-use Arcanum\Cabinet\Container;
 use Arcanum\Echo\Dispatcher;
 use Arcanum\Echo\Provider;
-use Arcanum\Glitch\ExceptionHandler;
 use Arcanum\Glitch\ExceptionRenderer;
 use Arcanum\Glitch\HttpException;
 use Arcanum\Hyper\Event\RequestFailed;
 use Arcanum\Hyper\Event\RequestHandled;
 use Arcanum\Hyper\Event\RequestReceived;
 use Arcanum\Hyper\Event\ResponseSent;
-use Arcanum\Hyper\StatusCode;
-use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\HyperKernel;
-use Arcanum\Test\Fixture\CapturingKernel;
+use Arcanum\Test\Fixture\Testing\CapturingTestHandler;
+use Arcanum\Test\Fixture\Testing\RenderingExceptionRenderer;
+use Arcanum\Testing\TestKernel;
 use Psr\EventDispatcher\EventDispatcherInterface;
-use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -37,27 +33,19 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(\Arcanum\Echo\UnknownEvent::class)]
 #[UsesClass(\Arcanum\Flow\Pipeline\Pipeline::class)]
 #[UsesClass(\Arcanum\Flow\Pipeline\StandardProcessor::class)]
-#[UsesClass(CapturingKernel::class)]
 #[UsesClass(HttpException::class)]
 #[UsesClass(\Arcanum\Glitch\ArcanumException::class)]
 final class LifecycleEventTest extends TestCase
 {
-    private function buildContainer(Provider $provider): Application
+    private function buildKernel(Provider $provider): TestKernel
     {
-        $dispatcher = new Dispatcher($provider);
-
-        $container = $this->createStub(Application::class);
-        $container->method('has')->willReturnCallback(
-            fn(string $id) => $id === EventDispatcherInterface::class,
-        );
-        $container->method('get')->willReturnCallback(
-            fn(string $id) => match ($id) {
-                EventDispatcherInterface::class => $dispatcher,
-                default => $this->createStub(Bootstrapper::class),
-            },
+        $kernel = new TestKernel();
+        $kernel->container()->instance(
+            EventDispatcherInterface::class,
+            new Dispatcher($provider),
         );
 
-        return $container;
+        return $kernel;
     }
 
     // -----------------------------------------------------------
@@ -66,7 +54,6 @@ final class LifecycleEventTest extends TestCase
 
     public function testRequestReceivedFiresBeforeHandling(): void
     {
-        // Arrange
         $provider = new Provider();
         $fired = false;
         $provider->listen(RequestReceived::class, function (RequestReceived $event) use (&$fired) {
@@ -74,36 +61,35 @@ final class LifecycleEventTest extends TestCase
             return $event;
         });
 
-        $container = $this->buildContainer($provider);
-        $kernel = new CapturingKernel('/app');
-        $kernel->bootstrap($container);
+        $kernel = $this->buildKernel($provider);
+        $kernel->http()->setCoreHandler(new CapturingTestHandler());
 
-        // Act
-        $kernel->handle($this->createStub(ServerRequestInterface::class));
+        $kernel->http()->get('/anything');
 
-        // Assert
         $this->assertTrue($fired);
     }
 
     public function testRequestReceivedMutationPropagates(): void
     {
-        // Arrange — listener replaces the request entirely
+        // Listener replaces the request entirely — the capturing core
+        // handler should observe the replacement, not the original.
         $provider = new Provider();
         $replacementRequest = $this->createStub(ServerRequestInterface::class);
-        $provider->listen(RequestReceived::class, function (RequestReceived $event) use ($replacementRequest) {
-            $event->setRequest($replacementRequest);
-            return $event;
-        });
+        $provider->listen(
+            RequestReceived::class,
+            function (RequestReceived $event) use ($replacementRequest) {
+                $event->setRequest($replacementRequest);
+                return $event;
+            },
+        );
 
-        $container = $this->buildContainer($provider);
-        $kernel = new CapturingKernel('/app');
-        $kernel->bootstrap($container);
+        $kernel = $this->buildKernel($provider);
+        $handler = new CapturingTestHandler();
+        $kernel->http()->setCoreHandler($handler);
 
-        // Act
-        $kernel->handle($this->createStub(ServerRequestInterface::class));
+        $kernel->http()->get('/anything');
 
-        // Assert — the capturing kernel received the replacement request
-        $this->assertSame($replacementRequest, $kernel->capturedRequest);
+        $this->assertSame($replacementRequest, $handler->captured);
     }
 
     // -----------------------------------------------------------
@@ -112,22 +98,21 @@ final class LifecycleEventTest extends TestCase
 
     public function testRequestHandledFiresAfterResponse(): void
     {
-        // Arrange
         $provider = new Provider();
         $capturedStatus = null;
-        $provider->listen(RequestHandled::class, function (RequestHandled $event) use (&$capturedStatus) {
-            $capturedStatus = $event->getResponse()->getStatusCode();
-            return $event;
-        });
+        $provider->listen(
+            RequestHandled::class,
+            function (RequestHandled $event) use (&$capturedStatus) {
+                $capturedStatus = $event->getResponse()->getStatusCode();
+                return $event;
+            },
+        );
 
-        $container = $this->buildContainer($provider);
-        $kernel = new CapturingKernel('/app');
-        $kernel->bootstrap($container);
+        $kernel = $this->buildKernel($provider);
+        $kernel->http()->setCoreHandler(new CapturingTestHandler());
 
-        // Act
-        $kernel->handle($this->createStub(ServerRequestInterface::class));
+        $kernel->http()->get('/anything');
 
-        // Assert
         $this->assertSame(200, $capturedStatus);
     }
 
@@ -137,42 +122,24 @@ final class LifecycleEventTest extends TestCase
 
     public function testRequestFailedFiresOnException(): void
     {
-        // Arrange
+        // No core handler installed → kernel throws HttpException(NotFound),
+        // RequestFailed fires, then the registered ExceptionRenderer renders
+        // the response. Mirrors the production failure path.
         $provider = new Provider();
         $capturedException = null;
-        $provider->listen(RequestFailed::class, function (RequestFailed $event) use (&$capturedException) {
-            $capturedException = $event->getException();
-            return $event;
-        });
-
-        $renderer = $this->createStub(ExceptionRenderer::class);
-        $renderer->method('render')->willReturn(
-            $this->createStub(ResponseInterface::class),
-        );
-
-        $container = $this->createStub(Application::class);
-        $container->method('has')->willReturnCallback(
-            fn(string $id) => match ($id) {
-                EventDispatcherInterface::class, ExceptionRenderer::class => true,
-                default => false,
-            },
-        );
-        $container->method('get')->willReturnCallback(
-            fn(string $id) => match ($id) {
-                EventDispatcherInterface::class => new Dispatcher($provider),
-                ExceptionRenderer::class => $renderer,
-                default => $this->createStub(Bootstrapper::class),
+        $provider->listen(
+            RequestFailed::class,
+            function (RequestFailed $event) use (&$capturedException) {
+                $capturedException = $event->getException();
+                return $event;
             },
         );
 
-        // Use default HyperKernel — handleRequest() throws NotFound
-        $kernel = new HyperKernel('/app');
-        $kernel->bootstrap($container);
+        $kernel = $this->buildKernel($provider);
+        $kernel->container()->instance(ExceptionRenderer::class, new RenderingExceptionRenderer());
 
-        // Act
-        $kernel->handle($this->createStub(ServerRequestInterface::class));
+        $kernel->http()->get('/anything');
 
-        // Assert
         $this->assertInstanceOf(HttpException::class, $capturedException);
     }
 
@@ -182,7 +149,6 @@ final class LifecycleEventTest extends TestCase
 
     public function testResponseSentFiresOnTerminate(): void
     {
-        // Arrange
         $provider = new Provider();
         $fired = false;
         $provider->listen(ResponseSent::class, function (ResponseSent $event) use (&$fired) {
@@ -190,22 +156,17 @@ final class LifecycleEventTest extends TestCase
             return $event;
         });
 
-        $container = $this->buildContainer($provider);
-        $kernel = new CapturingKernel('/app');
-        $kernel->bootstrap($container);
+        $kernel = $this->buildKernel($provider);
+        $kernel->http()->setCoreHandler(new CapturingTestHandler());
 
-        $kernel->handle($this->createStub(ServerRequestInterface::class));
+        $kernel->http()->get('/anything');
+        $kernel->http()->terminate();
 
-        // Act
-        $kernel->terminate();
-
-        // Assert
         $this->assertTrue($fired);
     }
 
     public function testResponseSentCarriesRequestAndResponse(): void
     {
-        // Arrange
         $provider = new Provider();
         $capturedRequest = null;
         $capturedResponse = null;
@@ -218,17 +179,12 @@ final class LifecycleEventTest extends TestCase
             },
         );
 
-        $container = $this->buildContainer($provider);
-        $kernel = new CapturingKernel('/app');
-        $kernel->bootstrap($container);
+        $kernel = $this->buildKernel($provider);
+        $kernel->http()->setCoreHandler(new CapturingTestHandler());
 
-        $request = $this->createStub(ServerRequestInterface::class);
-        $kernel->handle($request);
+        $kernel->http()->get('/anything');
+        $kernel->http()->terminate();
 
-        // Act
-        $kernel->terminate();
-
-        // Assert
         $this->assertNotNull($capturedRequest);
         $this->assertNotNull($capturedResponse);
         $this->assertSame(200, $capturedResponse->getStatusCode());
@@ -240,20 +196,13 @@ final class LifecycleEventTest extends TestCase
 
     public function testHandleWorksWithoutEventDispatcher(): void
     {
-        // Arrange — container with no EventDispatcherInterface
-        $container = $this->createStub(Application::class);
-        $container->method('has')->willReturn(false);
-        $container->method('get')->willReturn(
-            $this->createStub(Bootstrapper::class),
-        );
+        // TestKernel doesn't bind EventDispatcherInterface by default,
+        // so this verifies the kernel's "no dispatcher → no errors" path.
+        $kernel = new TestKernel();
+        $kernel->http()->setCoreHandler(new CapturingTestHandler());
 
-        $kernel = new CapturingKernel('/app');
-        $kernel->bootstrap($container);
+        $response = $kernel->http()->get('/anything');
 
-        // Act — should not throw
-        $response = $kernel->handle($this->createStub(ServerRequestInterface::class));
-
-        // Assert
         $this->assertSame(200, $response->getStatusCode());
     }
 }

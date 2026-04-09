@@ -89,6 +89,17 @@ final class HttpTestSurface
         return $this->dispatch(RequestMethod::DELETE, $path, $body);
     }
 
+    /**
+     * Terminate the wrapped kernel — runs `fastcgi_finish_request()` (no-op
+     * in CLI), dispatches `ResponseSent` for the most recent request, and
+     * taps `arcanum.complete` on the Stopwatch. Use this after `get/post/...`
+     * when a test needs to assert on post-response listener behavior.
+     */
+    public function terminate(): void
+    {
+        $this->kernel->terminate();
+    }
+
     private function dispatch(
         RequestMethod $method,
         string $path,
