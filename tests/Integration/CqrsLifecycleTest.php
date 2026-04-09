@@ -8,344 +8,70 @@ use Arcanum\Atlas\ConventionResolver;
 use Arcanum\Atlas\HttpRouter;
 use Arcanum\Atlas\LocationResolver;
 use Arcanum\Atlas\MiddlewareRegistry;
+use Arcanum\Atlas\Router;
 use Arcanum\Atlas\RouteMiddleware;
 use Arcanum\Atlas\UrlResolver;
-use Arcanum\Cabinet\Container;
+use Arcanum\Cabinet\Application;
 use Arcanum\Codex\Hydrator;
-use Arcanum\Flow\Conveyor\AcceptedDTO;
-use Arcanum\Flow\Conveyor\EmptyDTO;
+use Arcanum\Flow\Continuum\Progression;
+use Arcanum\Flow\Conveyor\Bus;
 use Arcanum\Flow\Conveyor\MiddlewareBus;
 use Arcanum\Flow\Conveyor\QueryResult;
-use Arcanum\Flow\Continuum\Progression;
-use Arcanum\Ignition\RouteDispatcher;
 use Arcanum\Hyper\CsvResponseRenderer;
 use Arcanum\Hyper\FormatRegistry;
 use Arcanum\Hyper\HtmlResponseRenderer;
 use Arcanum\Hyper\JsonResponseRenderer;
+use Arcanum\Ignition\RouteDispatcher;
 use Arcanum\Shodo\Format;
 use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Shodo\TemplateResolver;
-use Arcanum\Test\Fixture\Integration\Command\Submit;
-use Arcanum\Test\Fixture\Integration\Query\Status;
-use PHPUnit\Framework\TestCase;
+use Arcanum\Test\Fixture\Integration\RoutingHandler;
+use Arcanum\Testing\TestKernel;
 use PHPUnit\Framework\Attributes\CoversNothing;
-use Psr\Http\Message\ResponseInterface;
+use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Message\UriInterface;
 
 /**
- * Integration tests for the full CQRS request lifecycle.
+ * Integration tests for the full CQRS request lifecycle, dispatched through
+ * `TestKernel->http()`. The wrapped HyperKernel runs through its real
+ * exception/middleware/lifecycle paths; the `RoutingHandler` fixture wires up
+ * Route → Hydrate → Dispatch → Render the way the production `Routing`
+ * bootstrapper would.
  *
- * These tests verify that the major framework components work together
- * correctly: Router → Hydrator → Conveyor → Renderer.
+ * RouteDispatcher-specific tests at the bottom still construct their pieces
+ * directly because they're testing per-route middleware composition, not the
+ * HTTP boundary.
  */
 #[CoversNothing]
 final class CqrsLifecycleTest extends TestCase
 {
     private const ROOT_NS = 'Arcanum\\Test\\Fixture';
 
-    /** @param array<string, string> $queryParams */
-    private function stubRequest(
-        string $method,
-        string $path,
-        array $queryParams = [],
-        string $jsonBody = '',
-    ): ServerRequestInterface {
-        $uri = $this->createStub(UriInterface::class);
-        $uri->method('getPath')->willReturn($path);
-
-        $request = $this->createStub(ServerRequestInterface::class);
-        $request->method('getMethod')->willReturn($method);
-        $request->method('getUri')->willReturn($uri);
-        $request->method('getQueryParams')->willReturn($queryParams);
-
-        if ($jsonBody !== '') {
-            /** @var array<string, mixed> $parsed */
-            $parsed = json_decode($jsonBody, true);
-            $request->method('getParsedBody')->willReturn($parsed);
-        }
-
-        return $request;
-    }
-
-    private function container(): Container
+    /**
+     * Build a TestKernel with the CQRS pipeline wired up against its
+     * shared container, ready to dispatch through `http()`.
+     */
+    private function buildKernel(): TestKernel
     {
-        $container = new Container();
-        $container->instance(\Arcanum\Cabinet\Application::class, $container);
-        $container->instance(\Psr\Container\ContainerInterface::class, $container);
-        return $container;
-    }
+        $kernel = new TestKernel();
+        $container = $kernel->container();
 
-    private function router(): HttpRouter
-    {
-        return new HttpRouter(new ConventionResolver(self::ROOT_NS));
-    }
+        $container->instance(Application::class, $container);
 
-    // -----------------------------------------------------------
-    // JSON body → Hydrator → Command DTO
-    // -----------------------------------------------------------
-
-    public function testJsonBodyHydratesCommandDto(): void
-    {
-        // Arrange
-        $request = $this->stubRequest(
-            'PUT',
-            '/integration/submit',
-            jsonBody: '{"name":"Alice","email":"alice@example.com","message":"Hello"}',
-        );
         $hydrator = new Hydrator();
-
-        // Act — resolve route, hydrate DTO from parsed body
-        $route = $this->router()->resolve($request);
-        $data = (array) ($request->getParsedBody() ?? []);
-        /** @var class-string $dtoClass */
-        $dtoClass = $route->dtoClass;
-        $dto = $hydrator->hydrate($dtoClass, $data);
-
-        // Assert
-        $this->assertSame(self::ROOT_NS . '\\Integration\\Command\\Submit', $route->dtoClass);
-        $this->assertInstanceOf(Submit::class, $dto);
-        $this->assertSame('Alice', $dto->name);
-        $this->assertSame('alice@example.com', $dto->email);
-        $this->assertSame('Hello', $dto->message);
-    }
-
-    public function testJsonBodyHydratesCommandDtoWithDefaults(): void
-    {
-        // Arrange — message has a default, so omit it
-        $request = $this->stubRequest(
-            'PUT',
-            '/integration/submit',
-            jsonBody: '{"name":"Bob","email":"bob@example.com"}',
-        );
-        $hydrator = new Hydrator();
-
-        // Act
-        $route = $this->router()->resolve($request);
-        $data = (array) ($request->getParsedBody() ?? []);
-        /** @var class-string $dtoClass */
-        $dtoClass = $route->dtoClass;
-        $dto = $hydrator->hydrate($dtoClass, $data);
-
-        // Assert
-        $this->assertInstanceOf(Submit::class, $dto);
-        $this->assertSame('Bob', $dto->name);
-        $this->assertSame('bob@example.com', $dto->email);
-        $this->assertSame('', $dto->message);
-    }
-
-    public function testCommandDispatchReturnsEmptyDto(): void
-    {
-        // Arrange
-        $container = $this->container();
         $bus = new MiddlewareBus($container);
-        $hydrator = new Hydrator();
-
-        $request = $this->stubRequest(
-            'PUT',
-            '/integration/submit',
-            jsonBody: '{"name":"Alice","email":"alice@example.com"}',
-        );
-
-        // Act — resolve, hydrate, dispatch
-        $route = $this->router()->resolve($request);
-        $data = (array) ($request->getParsedBody() ?? []);
-        /** @var class-string $dtoClass */
-        $dtoClass = $route->dtoClass;
-        $dto = $hydrator->hydrate($dtoClass, $data);
-        $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
-
-        // Assert — void handler returns EmptyDTO
-        $this->assertInstanceOf(EmptyDTO::class, $result);
-    }
-
-    // -----------------------------------------------------------
-    // Query params → Hydrator → Query DTO → Handler → Response
-    // -----------------------------------------------------------
-
-    public function testQueryParamsHydrateQueryDto(): void
-    {
-        // Arrange
-        $request = $this->stubRequest(
-            'GET',
-            '/integration/status',
-            queryParams: ['verbose' => 'true'],
-        );
-        $hydrator = new Hydrator();
-
-        // Act
-        $route = $this->router()->resolve($request);
-        /** @var class-string $dtoClass */
-        $dtoClass = $route->dtoClass;
-        $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
-
-        // Assert
-        $this->assertSame(self::ROOT_NS . '\\Integration\\Query\\Status', $route->dtoClass);
-        $this->assertInstanceOf(Status::class, $dto);
-        $this->assertTrue($dto->verbose);
-    }
-
-    public function testQueryDispatchReturnsWrappedResult(): void
-    {
-        // Arrange
-        $container = $this->container();
-        $bus = new MiddlewareBus($container);
-        $hydrator = new Hydrator();
-
-        $request = $this->stubRequest(
-            'GET',
-            '/integration/status',
-            queryParams: ['verbose' => 'true'],
-        );
-
-        // Act — resolve, hydrate, dispatch
-        $route = $this->router()->resolve($request);
-        /** @var class-string $dtoClass */
-        $dtoClass = $route->dtoClass;
-        $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
-        $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
-
-        // Assert — array handler result is wrapped in QueryResult
-        $this->assertInstanceOf(QueryResult::class, $result);
-        $this->assertSame(['status' => 'ok', 'version' => '1.0.0', 'uptime' => 42], $result->data);
-    }
-
-    // -----------------------------------------------------------
-    // Full query response: Route → Hydrate → Dispatch → Render
-    // -----------------------------------------------------------
-
-    public function testFullQueryLifecycleProducesJsonResponse(): void
-    {
-        // Arrange
-        $container = $this->container();
-        $bus = new MiddlewareBus($container);
-        $hydrator = new Hydrator();
-        $router = $this->router();
+        $router = new HttpRouter(new ConventionResolver(self::ROOT_NS));
 
         $formats = new FormatRegistry($container);
         $formats->register(new Format('json', 'application/json', JsonResponseRenderer::class));
-        $container->service(JsonResponseRenderer::class);
-
-        $request = $this->stubRequest(
-            'GET',
-            '/integration/status.json',
-            queryParams: ['verbose' => 'true'],
-        );
-
-        // Act — the full lifecycle
-        $route = $router->resolve($request);
-        /** @var class-string $dtoClass */
-        $dtoClass = $route->dtoClass;
-        $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
-        $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
-
-        // Unwrap QueryResult
-        $data = $result instanceof QueryResult ? $result->data : $result;
-
-        /** @var ResponseInterface $response */
-        $response = $formats->renderer($route->format)->render($data);
-
-        // Assert — complete JSON response
-        $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame('application/json', $response->getHeaderLine('Content-Type'));
-
-        /** @var array<string, mixed> $body */
-        $body = json_decode((string) $response->getBody(), true);
-        $this->assertSame('ok', $body['status']);
-        $this->assertSame('1.0.0', $body['version']);
-        $this->assertSame(42, $body['uptime']);
-    }
-
-    public function testFullQueryLifecycleWithDefaultParams(): void
-    {
-        // Arrange
-        $container = $this->container();
-        $bus = new MiddlewareBus($container);
-        $hydrator = new Hydrator();
-        $router = $this->router();
-
-        $formats = new FormatRegistry($container);
-        $formats->register(new Format('json', 'application/json', JsonResponseRenderer::class));
-        $container->service(JsonResponseRenderer::class);
-
-        $request = $this->stubRequest('GET', '/integration/status');
-
-        // Act
-        $route = $router->resolve($request);
-        /** @var class-string $dtoClass */
-        $dtoClass = $route->dtoClass;
-        $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
-        $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
-        $data = $result instanceof QueryResult ? $result->data : $result;
-
-        /** @var ResponseInterface $response */
-        $response = $formats->renderer($route->format)->render($data);
-
-        // Assert — verbose=false means minimal response
-        $body = json_decode((string) $response->getBody(), true);
-        $this->assertSame(['status' => 'ok'], $body);
-    }
-
-    // -----------------------------------------------------------
-    // Full command lifecycle: Route → Hydrate → Dispatch → Status
-    // -----------------------------------------------------------
-
-    public function testFullCommandLifecycleProduces204(): void
-    {
-        // Arrange
-        $container = $this->container();
-        $bus = new MiddlewareBus($container);
-        $hydrator = new Hydrator();
-        $router = $this->router();
-
-        $emptyRenderer = new \Arcanum\Hyper\EmptyResponseRenderer();
-
-        $request = $this->stubRequest(
-            'PUT',
-            '/integration/submit',
-            jsonBody: '{"name":"Alice","email":"alice@example.com","message":"Hi"}',
-        );
-
-        // Act — the full command lifecycle
-        $route = $router->resolve($request);
-        $data = (array) ($request->getParsedBody() ?? []);
-        /** @var class-string $dtoClass */
-        $dtoClass = $route->dtoClass;
-        $dto = $hydrator->hydrate($dtoClass, $data);
-        $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
-
-        // Determine status code from result type
-        $status = $result instanceof EmptyDTO
-            ? \Arcanum\Hyper\StatusCode::NoContent
-            : \Arcanum\Hyper\StatusCode::Created;
-
-        $response = $emptyRenderer->render($status);
-
-        // Assert — void handler → 204 No Content, empty body
-        $this->assertSame(204, $response->getStatusCode());
-        $this->assertSame('', (string) $response->getBody());
-    }
-
-    // -----------------------------------------------------------
-    // Full query lifecycle: HTML format
-    // -----------------------------------------------------------
-
-    public function testFullQueryLifecycleProducesHtmlResponse(): void
-    {
-        // Arrange
-        $container = $this->container();
-        $bus = new MiddlewareBus($container);
-        $hydrator = new Hydrator();
-        $router = $this->router();
-
-        $formats = new FormatRegistry($container);
+        $formats->register(new Format('csv', 'text/csv', CsvResponseRenderer::class));
         $formats->register(new Format('html', 'text/html', HtmlResponseRenderer::class));
 
-        // Wire up HtmlResponseRenderer — TemplateResolver points at a nonexistent dir
-        // so it falls back to HtmlFallbackFormatter for a generic HTML representation.
+        $container->service(JsonResponseRenderer::class);
+        $container->service(CsvResponseRenderer::class);
         $container->factory(HtmlResponseRenderer::class, function () {
             $formatter = new HtmlFormatter(
                 resolver: new TemplateResolver('/nonexistent', 'Arcanum\Test'),
@@ -356,25 +82,57 @@ final class CqrsLifecycleTest extends TestCase
             return new HtmlResponseRenderer($formatter);
         });
 
-        $request = $this->stubRequest(
-            'GET',
-            '/integration/status.html',
-            queryParams: ['verbose' => 'true'],
+        $locationResolver = new LocationResolver(
+            urlResolver: new UrlResolver(self::ROOT_NS),
+            baseUrl: 'https://api.example.com',
         );
 
-        // Act — full lifecycle: Route → Hydrate → Dispatch → Render
-        $route = $router->resolve($request);
-        /** @var class-string $dtoClass */
-        $dtoClass = $route->dtoClass;
-        $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
-        $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
-        $data = $result instanceof QueryResult ? $result->data : $result;
+        $kernel->http()->setCoreHandler(
+            new RoutingHandler($router, $hydrator, $bus, $formats, $locationResolver),
+        );
 
-        /** @var HtmlResponseRenderer $renderer */
-        $renderer = $formats->renderer($route->format);
-        $response = $renderer->render($data, $route->dtoClass);
+        return $kernel;
+    }
 
-        // Assert
+    // -----------------------------------------------------------
+    // Full query lifecycle
+    // -----------------------------------------------------------
+
+    public function testJsonResponseFromQueryHandler(): void
+    {
+        $kernel = $this->buildKernel();
+
+        $response = $kernel->http()->get('/integration/status.json?verbose=true');
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('application/json', $response->getHeaderLine('Content-Type'));
+
+        /** @var array<string, mixed> $body */
+        $body = json_decode((string) $response->getBody(), true);
+        $this->assertSame('ok', $body['status']);
+        $this->assertSame('1.0.0', $body['version']);
+        $this->assertSame(42, $body['uptime']);
+    }
+
+    public function testQueryWithDefaultParams(): void
+    {
+        $kernel = $this->buildKernel();
+
+        $response = $kernel->http()->get('/integration/status.json');
+
+        $this->assertSame(200, $response->getStatusCode());
+
+        /** @var array<string, mixed> $body */
+        $body = json_decode((string) $response->getBody(), true);
+        $this->assertSame(['status' => 'ok'], $body);
+    }
+
+    public function testHtmlResponseFromQueryHandler(): void
+    {
+        $kernel = $this->buildKernel();
+
+        $response = $kernel->http()->get('/integration/status.html?verbose=true');
+
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame('text/html; charset=UTF-8', $response->getHeaderLine('Content-Type'));
 
@@ -384,45 +142,16 @@ final class CqrsLifecycleTest extends TestCase
         $this->assertStringContainsString('1.0.0', $body);
     }
 
-    // -----------------------------------------------------------
-    // Full query lifecycle: CSV format
-    // -----------------------------------------------------------
-
-    public function testFullQueryLifecycleProducesCsvResponse(): void
+    public function testCsvResponseFromQueryHandler(): void
     {
-        // Arrange
-        $container = $this->container();
-        $bus = new MiddlewareBus($container);
-        $hydrator = new Hydrator();
-        $router = $this->router();
+        $kernel = $this->buildKernel();
 
-        $formats = new FormatRegistry($container);
-        $formats->register(new Format('csv', 'text/csv', CsvResponseRenderer::class));
-        $container->service(CsvResponseRenderer::class);
+        $response = $kernel->http()->get('/integration/status.csv?verbose=true');
 
-        $request = $this->stubRequest(
-            'GET',
-            '/integration/status.csv',
-            queryParams: ['verbose' => 'true'],
-        );
-
-        // Act — full lifecycle: Route → Hydrate → Dispatch → Render
-        $route = $router->resolve($request);
-        /** @var class-string $dtoClass */
-        $dtoClass = $route->dtoClass;
-        $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
-        $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
-        $data = $result instanceof QueryResult ? $result->data : $result;
-
-        /** @var ResponseInterface $response */
-        $response = $formats->renderer($route->format)->render($data);
-
-        // Assert
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame('text/csv; charset=UTF-8', $response->getHeaderLine('Content-Type'));
 
         $body = (string) $response->getBody();
-        // Associative array renders as key,value CSV
         $this->assertStringContainsString('key,value', $body);
         $this->assertStringContainsString('status,ok', $body);
         $this->assertStringContainsString('version,1.0.0', $body);
@@ -430,16 +159,82 @@ final class CqrsLifecycleTest extends TestCase
     }
 
     // -----------------------------------------------------------
-    // Per-route middleware via RouteDispatcher
+    // Full command lifecycle
     // -----------------------------------------------------------
+
+    public function testVoidCommandReturns204(): void
+    {
+        $kernel = $this->buildKernel();
+
+        $response = $kernel->http()
+            ->withHeader('Content-Type', 'application/json')
+            ->put('/integration/submit', '{"name":"Alice","email":"alice@example.com","message":"Hi"}');
+
+        $this->assertSame(204, $response->getStatusCode());
+        $this->assertSame('', (string) $response->getBody());
+        $this->assertSame('', $response->getHeaderLine('Location'));
+    }
+
+    public function testVoidCommandHydratesDefaultsForOmittedFields(): void
+    {
+        // The Submit command's $message has a default; the Hydrator should
+        // honor it when the field is missing from the JSON body.
+        $kernel = $this->buildKernel();
+
+        $response = $kernel->http()
+            ->withHeader('Content-Type', 'application/json')
+            ->put('/integration/submit', '{"name":"Bob","email":"bob@example.com"}');
+
+        $this->assertSame(204, $response->getStatusCode());
+    }
+
+    public function testCommandReturningQueryDtoProduces201WithLocation(): void
+    {
+        $kernel = $this->buildKernel();
+
+        $response = $kernel->http()
+            ->withHeader('Content-Type', 'application/json')
+            ->put('/integration/create-item', '{"name":"Widget"}');
+
+        $this->assertSame(201, $response->getStatusCode());
+        $this->assertSame(
+            'https://api.example.com/integration/status?verbose=1',
+            $response->getHeaderLine('Location'),
+        );
+        $this->assertSame('', (string) $response->getBody());
+    }
+
+    // -----------------------------------------------------------
+    // Per-route middleware via RouteDispatcher
+    //
+    // These tests intentionally bypass the HTTP boundary — they're
+    // testing how RouteDispatcher composes per-route before/after
+    // middleware around the bus, not how the HTTP request lifecycle
+    // works. The full-lifecycle tests above prove that path.
+    // -----------------------------------------------------------
+
+    private function stubGetRequest(string $path): ServerRequestInterface
+    {
+        $uri = $this->createStub(\Psr\Http\Message\UriInterface::class);
+        $uri->method('getPath')->willReturn($path);
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getMethod')->willReturn('GET');
+        $request->method('getUri')->willReturn($uri);
+        $request->method('getQueryParams')->willReturn([]);
+
+        return $request;
+    }
 
     public function testRouteDispatcherAppliesBeforeMiddleware(): void
     {
-        // Arrange — before middleware that adds a tag to the DTO
-        $container = $this->container();
+        $kernel = new TestKernel();
+        $container = $kernel->container();
+        $container->instance(Application::class, $container);
+
         $bus = new MiddlewareBus($container);
         $hydrator = new Hydrator();
-        $router = $this->router();
+        $router = new HttpRouter(new ConventionResolver(self::ROOT_NS));
 
         $registry = new MiddlewareRegistry();
         $registry->register(
@@ -447,7 +242,6 @@ final class CqrsLifecycleTest extends TestCase
             new RouteMiddleware(before: ['test.before']),
         );
 
-        // Register a before progression that marks execution
         $beforeRan = false;
         $container->instance('test.before', new class ($beforeRan) implements Progression {
             public function __construct(public bool &$ran)
@@ -463,17 +257,15 @@ final class CqrsLifecycleTest extends TestCase
 
         $dispatcher = new RouteDispatcher($container, $registry, $bus);
 
-        $request = $this->stubRequest('GET', '/integration/status');
+        $request = $this->stubGetRequest('/integration/status');
         $route = $router->resolve($request);
 
         /** @var class-string $dtoClass */
         $dtoClass = $route->dtoClass;
         $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
 
-        // Act
         $result = $dispatcher->dispatch($dto, $route);
 
-        // Assert — before middleware ran, query still produced a result
         $this->assertTrue($beforeRan);
         $this->assertInstanceOf(QueryResult::class, $result);
         $this->assertSame(['status' => 'ok'], $result->data);
@@ -481,129 +273,27 @@ final class CqrsLifecycleTest extends TestCase
 
     public function testRouteDispatcherSkipsMiddlewareWhenNoneRegistered(): void
     {
-        // Arrange — empty registry, should behave identically to direct bus dispatch
-        $container = $this->container();
+        $kernel = new TestKernel();
+        $container = $kernel->container();
+        $container->instance(Application::class, $container);
+
         $bus = new MiddlewareBus($container);
         $hydrator = new Hydrator();
-        $router = $this->router();
+        $router = new HttpRouter(new ConventionResolver(self::ROOT_NS));
 
         $registry = new MiddlewareRegistry();
         $dispatcher = new RouteDispatcher($container, $registry, $bus);
 
-        $request = $this->stubRequest('GET', '/integration/status', queryParams: ['verbose' => 'true']);
+        $request = $this->stubGetRequest('/integration/status');
         $route = $router->resolve($request);
 
         /** @var class-string $dtoClass */
         $dtoClass = $route->dtoClass;
-        $dto = $hydrator->hydrate($dtoClass, $request->getQueryParams());
+        $dto = $hydrator->hydrate($dtoClass, ['verbose' => 'true']);
 
-        // Act
         $result = $dispatcher->dispatch($dto, $route);
 
-        // Assert
         $this->assertInstanceOf(QueryResult::class, $result);
         $this->assertSame(['status' => 'ok', 'version' => '1.0.0', 'uptime' => 42], $result->data);
-    }
-
-    // -----------------------------------------------------------
-    // Command response: 201 Created + Location header
-    // -----------------------------------------------------------
-
-    public function testCommandReturningDtoProduces201WithLocationHeader(): void
-    {
-        // Arrange
-        $container = $this->container();
-        $bus = new MiddlewareBus($container);
-        $hydrator = new Hydrator();
-        $router = $this->router();
-
-        $emptyRenderer = new \Arcanum\Hyper\EmptyResponseRenderer();
-        $locationResolver = new LocationResolver(
-            new UrlResolver(self::ROOT_NS),
-            'https://api.example.com',
-        );
-
-        $request = $this->stubRequest(
-            'PUT',
-            '/integration/create-item',
-            jsonBody: '{"name":"Widget"}',
-        );
-
-        // Act — full command lifecycle with Location header
-        $route = $router->resolve($request);
-        $data = (array) ($request->getParsedBody() ?? []);
-        /** @var class-string $dtoClass */
-        $dtoClass = $route->dtoClass;
-        $dto = $hydrator->hydrate($dtoClass, $data);
-        $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
-
-        $status = match (true) {
-            $result instanceof EmptyDTO => \Arcanum\Hyper\StatusCode::NoContent,
-            $result instanceof AcceptedDTO => \Arcanum\Hyper\StatusCode::Accepted,
-            default => \Arcanum\Hyper\StatusCode::Created,
-        };
-        $response = $emptyRenderer->render($status);
-
-        if ($status === \Arcanum\Hyper\StatusCode::Created) {
-            $location = $locationResolver->resolve($result);
-            if ($location !== null) {
-                $response = $response->withHeader('Location', $location);
-            }
-        }
-
-        // Assert — 201 Created with Location header pointing to Query DTO
-        $this->assertSame(201, $response->getStatusCode());
-        $this->assertSame(
-            'https://api.example.com/integration/status?verbose=1',
-            $response->getHeaderLine('Location'),
-        );
-        $this->assertSame('', (string) $response->getBody());
-    }
-
-    public function testVoidCommandProduces204WithoutLocationHeader(): void
-    {
-        // Arrange
-        $container = $this->container();
-        $bus = new MiddlewareBus($container);
-        $hydrator = new Hydrator();
-        $router = $this->router();
-
-        $emptyRenderer = new \Arcanum\Hyper\EmptyResponseRenderer();
-        $locationResolver = new LocationResolver(
-            new UrlResolver(self::ROOT_NS),
-            'https://api.example.com',
-        );
-
-        $request = $this->stubRequest(
-            'PUT',
-            '/integration/submit',
-            jsonBody: '{"name":"Alice","email":"alice@example.com","message":"Hi"}',
-        );
-
-        // Act
-        $route = $router->resolve($request);
-        $data = (array) ($request->getParsedBody() ?? []);
-        /** @var class-string $dtoClass */
-        $dtoClass = $route->dtoClass;
-        $dto = $hydrator->hydrate($dtoClass, $data);
-        $result = $bus->dispatch($dto, prefix: $route->handlerPrefix);
-
-        $status = match (true) {
-            $result instanceof EmptyDTO => \Arcanum\Hyper\StatusCode::NoContent,
-            $result instanceof AcceptedDTO => \Arcanum\Hyper\StatusCode::Accepted,
-            default => \Arcanum\Hyper\StatusCode::Created,
-        };
-        $response = $emptyRenderer->render($status);
-
-        if ($status === \Arcanum\Hyper\StatusCode::Created) {
-            $location = $locationResolver->resolve($result);
-            if ($location !== null) {
-                $response = $response->withHeader('Location', $location);
-            }
-        }
-
-        // Assert — void handler → 204 No Content, no Location header
-        $this->assertSame(204, $response->getStatusCode());
-        $this->assertSame('', $response->getHeaderLine('Location'));
     }
 }
