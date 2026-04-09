@@ -18,8 +18,11 @@ use Psr\Http\Message\ResponseInterface;
  *
  *   1. Non-htmx request → full render with layout (delegates to formatter)
  *   2. htmx Full type   → content section only, no layout (fragment mode)
- *   3. htmx Partial type → auto-extracted element by id from HX-Target,
- *                          swap-mode-aware (outerHTML vs innerHTML)
+ *   3. htmx Partial type → auto-extracted element by id from HX-Target
+ *
+ * Mode 3 always returns the full element (outerHTML) and adds an
+ * HX-Reswap: outerHTML response header so htmx replaces the element
+ * correctly regardless of the client's hx-swap attribute.
  *
  * Falls back to content section when HX-Target is absent or the id
  * isn't found in the template.
@@ -27,15 +30,6 @@ use Psr\Http\Message\ResponseInterface;
 class HtmxAwareResponseRenderer extends ResponseRenderer
 {
     private ?HtmxRequest $htmxRequest = null;
-
-    /**
-     * The server always returns outerHTML (the full element including its
-     * tags). htmx doesn't send HX-Swap as a request header, so the server
-     * can't know the client's swap mode. outerHTML is the safe default
-     * because the framework recommends hx-swap="outerHTML" — the element
-     * id survives the swap and subsequent requests keep working.
-     */
-    private const SERVER_SWAP_MODE = 'outerHTML';
 
     public function __construct(
         private readonly HtmlFormatter $formatter,
@@ -59,18 +53,27 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
         Stopwatch::tap('render.start');
 
         try {
-            $html = $this->renderHtml($data, $dtoClass);
-            return $this->buildResponse($html, 'text/html; charset=UTF-8');
+            [$html, $reswap] = $this->renderHtml($data, $dtoClass);
+            $response = $this->buildResponse($html, 'text/html; charset=UTF-8');
+
+            if ($reswap) {
+                $response = $response->withHeader('HX-Reswap', 'outerHTML');
+            }
+
+            return $response;
         } finally {
             Stopwatch::tap('render.complete');
         }
     }
 
-    private function renderHtml(mixed $data, string $dtoClass): string
+    /**
+     * @return array{string, bool} [html, reswap]
+     */
+    private function renderHtml(mixed $data, string $dtoClass): array
     {
         // Mode 1: Non-htmx — full render with layout.
         if ($this->htmxRequest === null || !$this->htmxRequest->isHtmx()) {
-            return $this->formatter->format($data, $dtoClass);
+            return [$this->formatter->format($data, $dtoClass), false];
         }
 
         $type = $this->htmxRequest->type();
@@ -78,12 +81,10 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
 
         // Mode 3: Partial with a target id — auto-extract the element.
         if ($type === HtmxRequestType::Partial && $target !== null) {
-            return $this->formatter->renderElementById(
-                $target,
-                self::SERVER_SWAP_MODE,
-                $data,
-                $dtoClass,
-            );
+            return [
+                $this->formatter->renderElementById($target, $data, $dtoClass),
+                true,
+            ];
         }
 
         // Mode 2: Full htmx (boosted nav) or partial without target —
@@ -91,7 +92,7 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
         $this->formatter->setFragment(true);
 
         try {
-            return $this->formatter->format($data, $dtoClass);
+            return [$this->formatter->format($data, $dtoClass), false];
         } finally {
             $this->formatter->setFragment(false);
         }

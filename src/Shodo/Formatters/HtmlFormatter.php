@@ -64,8 +64,7 @@ class HtmlFormatter implements Formatter
      *
      * Extracts the content section (no layout), finds the element with the
      * given id in the raw template source, and compiles/renders only that
-     * slice. The swap mode determines the shape: 'outerHTML' includes the
-     * element's own tags, 'innerHTML' returns only the children.
+     * element (outerHTML — includes the element's own tags).
      *
      * Falls back to rendering the full content section with a log warning
      * when the id isn't found in the template.
@@ -75,7 +74,6 @@ class HtmlFormatter implements Formatter
      */
     public function renderElementById(
         string $id,
-        string $swapMode,
         mixed $data,
         string $dtoClass = '',
     ): string {
@@ -85,12 +83,8 @@ class HtmlFormatter implements Formatter
             return $this->fallback->format($data);
         }
 
-        // Cache key uses the element id for outerHTML. For innerHTML, append
-        // the mode so they cache separately.
-        $cacheKey = $swapMode === 'innerHTML' ? $id . ':inner' : $id;
-
-        if ($this->cache->isFresh($templatePath, $cacheKey)) {
-            $compiled = $this->cache->load($templatePath, $cacheKey);
+        if ($this->cache->isFresh($templatePath, $id)) {
+            $compiled = $this->cache->load($templatePath, $id);
         } else {
             $source = $this->reader->read($templatePath);
 
@@ -116,16 +110,12 @@ class HtmlFormatter implements Formatter
                 return $this->renderContentSection($templatePath, $source, $data, $dtoClass);
             }
 
-            $slice = $swapMode === 'innerHTML'
-                ? $extraction->innerHtml
-                : $extraction->outerHtml;
-
-            $compiled = $this->compiler->compile($slice);
+            $compiled = $this->compiler->compile($extraction->outerHtml);
             $this->cache->store(
                 $templatePath,
                 $compiled,
                 $this->compiler->lastDependencies(),
-                $cacheKey,
+                $id,
             );
         }
 

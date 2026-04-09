@@ -511,7 +511,7 @@ final class HtmlFormatterTest extends TestCase
     // renderElementById — auto-fragment extraction
     // -----------------------------------------------------------
 
-    public function testRenderElementByIdOuterHtml(): void
+    public function testRenderElementByIdExtractsElement(): void
     {
         // Arrange
         file_put_contents(
@@ -523,37 +523,14 @@ final class HtmlFormatterTest extends TestCase
         // Act
         $result = $formatter->renderElementById(
             'sidebar',
-            'outerHTML',
             ['greeting' => 'Hello'],
             'App\\Pages\\Index',
         );
 
-        // Assert — includes the element itself
+        // Assert — full element (outerHTML), no surrounding content
         $this->assertStringContainsString('<div id="sidebar">', $result);
         $this->assertStringContainsString('<p>Hello</p>', $result);
         $this->assertStringNotContainsString('<h1>Title</h1>', $result);
-    }
-
-    public function testRenderElementByIdInnerHtml(): void
-    {
-        // Arrange
-        file_put_contents(
-            $this->rootDir . '/app/Pages/Index.html',
-            '<div id="sidebar"><p>{{ $greeting }}</p></div>',
-        );
-        $formatter = $this->createFormatter();
-
-        // Act
-        $result = $formatter->renderElementById(
-            'sidebar',
-            'innerHTML',
-            ['greeting' => 'Hello'],
-            'App\\Pages\\Index',
-        );
-
-        // Assert — just the children, no wrapper element
-        $this->assertStringContainsString('<p>Hello</p>', $result);
-        $this->assertStringNotContainsString('<div id="sidebar">', $result);
     }
 
     public function testRenderElementByIdUsesCache(): void
@@ -567,45 +544,24 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act — first call compiles and caches
-        $formatter->renderElementById('box', 'outerHTML', ['name' => 'first'], 'App\\Pages\\Index');
+        $formatter->renderElementById('box', ['name' => 'first'], 'App\\Pages\\Index');
 
         // Verify cache entry exists
         $cache = new TemplateCache($this->cacheDir);
         $this->assertTrue($cache->isFresh($templatePath, 'box'));
 
         // Act — second call uses cache
-        $result = $formatter->renderElementById('box', 'outerHTML', ['name' => 'second'], 'App\\Pages\\Index');
+        $result = $formatter->renderElementById('box', ['name' => 'second'], 'App\\Pages\\Index');
 
         // Assert
         $this->assertStringContainsString('second', $result);
     }
 
-    public function testRenderElementByIdCachesSeparatelyPerSwapMode(): void
-    {
-        // Arrange
-        $templatePath = $this->rootDir . '/app/Pages/Index.html';
-        file_put_contents(
-            $templatePath,
-            '<div id="box"><p>Content</p></div>',
-        );
-        $formatter = $this->createFormatter();
-
-        // Act — cache both modes
-        $outer = $formatter->renderElementById('box', 'outerHTML', [], 'App\\Pages\\Index');
-        $inner = $formatter->renderElementById('box', 'innerHTML', [], 'App\\Pages\\Index');
-
-        // Assert — different output, separately cached
-        $this->assertStringContainsString('<div id="box">', $outer);
-        $this->assertStringNotContainsString('<div id="box">', $inner);
-        $this->assertStringContainsString('<p>Content</p>', $inner);
-    }
-
     public function testRenderElementByIdFallsBackOnMissingId(): void
     {
         // Arrange
-        mkdir($this->rootDir . '/app/Templates', 0755, true);
         file_put_contents(
-            $this->rootDir . '/app/Templates/layout.html',
+            $this->rootDir . '/app/Pages/layout.html',
             "<html>{{ yield 'content' }}</html>",
         );
         file_put_contents(
@@ -626,7 +582,6 @@ final class HtmlFormatterTest extends TestCase
         // Act
         $result = $formatter->renderElementById(
             'nonexistent',
-            'outerHTML',
             [],
             'App\\Pages\\Index',
         );
@@ -644,7 +599,6 @@ final class HtmlFormatterTest extends TestCase
         // Act
         $result = $formatter->renderElementById(
             'anything',
-            'outerHTML',
             ['key' => 'val'],
             'App\\Domain\\Query\\Missing',
         );
@@ -666,7 +620,6 @@ final class HtmlFormatterTest extends TestCase
         // Act
         $result = $formatter->renderElementById(
             'box',
-            'outerHTML',
             ['name' => '<script>xss</script>'],
             'App\\Pages\\Index',
         );
