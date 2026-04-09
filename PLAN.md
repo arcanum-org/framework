@@ -106,8 +106,8 @@ The problem: `{{ fragment }}` is an htmx concern, not a core Shodo concern. Baki
 
 #### Documentation
 
-- [ ] **Write `src/Htmx/README.md`.** End-to-end package reference: the three request modes, `HtmxRequest` accessors, auto-fragment extraction (how ids become fragments, outerHTML vs innerHTML handling, the fall-through behavior), `ClientBroadcast` events, CSRF integration, auth-redirect handling, dynamic ids and the CQRS decomposition pattern, the quirks list (especially `from:body` and `Vary` notes), pointers to `four.htmx.org` for the `hx-*` attribute reference itself. Aim 400-600 lines, comprehensive enough that an app developer never needs another htmx tutorial.
-- [ ] **Update COMPENDIUM.** Replace the existing "Front-end defaults" htmx paragraph with one that names the package, the request/response builders, the event projection bridge, and the v4 pin. Add a new package entry alongside Testing/etc. (count 22 → 23).
+- [x] **Write `src/Htmx/README.md`.** End-to-end package reference covering the three rendering modes, `HtmxRequest` accessors, auto-fragment extraction (outerHTML vs innerHTML via `{{ fragment }}`), lazy closures, `ClientBroadcast` event projection with timing control, CSRF integration, auth-redirect handling, `HtmxResponse` builder, `Vary` header, dynamic ids and the CQRS decomposition pattern, configuration reference, middleware registration, and a pointer to `four.htmx.org`.
+- [x] **Update COMPENDIUM.** Replaced the "Front-end defaults" htmx paragraph with the package description. Added Htmx as the 23rd package entry.
 - [ ] **Update starter README.** Walk through the welcome-page guestbook feature and the upscales. Document the htmx pin config and how to bump it. Replace the existing "Front-End: Tailwind CSS + htmx" section.
 
 #### Cross-cutting
