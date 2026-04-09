@@ -67,6 +67,42 @@ The four Vault drivers (`ApcuDriver`, `RedisDriver`, `ArrayDriver`, `FileDriver`
 - [x] **Migrate all four Vault drivers to call `Interval::secondsIn()`.** Single commit covering ApcuDriver, RedisDriver, ArrayDriver, FileDriver. Each driver gains `use Arcanum\Hourglass\Interval;` and replaces the epoch-anchor incantation with `Interval::secondsIn($ttl)`. ApcuDriver/RedisDriver `resolveTtl` docblocks trimmed — the verbose explanation is no longer needed because the call site speaks for itself.
 - [x] **Hourglass README + COMPENDIUM.** Hourglass README intro now lists three primitives (Clock / Stopwatch / Interval), with a new `## Interval` section covering the API table, the documented epoch-anchor behavior for months and years, and a "why no value object" subsection capturing the helper-vs-subclass-vs-wrap reasoning. COMPENDIUM Hourglass entry mentions Interval as a sibling primitive used by all four Vault drivers.
 
+### Testing utilities — `Arcanum\Testing` — active
+
+The single highest-leverage item left. App developers writing handler tests today have to hand-roll Cabinet containers, fake PSR-7 requests, manual DTO construction, and stubbed services. Even the framework's own tests show the strain — `RuneKernelTest` has private `containerWith()`/`bootstrapKernel()` helpers that absorb the boilerplate but aren't reusable, and there are two ad-hoc test kernels in the codebase already (`tests/Fixture/CapturingKernel` in the framework, `tests/Helpers/FixtureKernel` in the starter app) that solve narrow slices of the same problem in incompatible ways. The Hourglass Clock work that just landed was the prerequisite — Sessions, Auth, Throttle, and Vault are now fakeable via `FrozenClock`, which is what `TestKernel` needs to bind during construction.
+
+**Design decisions made during discovery:**
+
+- **Package location:** `src/Testing/`, namespace `Arcanum\Testing\`. Full README parallel to other framework packages. Loaded via `autoload` (not `autoload-dev`) so it ships as a public API surface.
+- **Kernel composition, not re-implementation.** `TestKernel` composes a real `HyperKernel` and a real `RuneKernel` internally rather than re-implementing the bootstrap loop. Wrapping means `TestKernel` automatically picks up future bootstrapper additions and lifecycle changes — no parallel maintenance burden.
+- **Lazy transport construction.** `TestKernel::http()` and `TestKernel::cli()` build their respective kernels on first call and memoize. Most tests touch one transport; a CLI-only test shouldn't pay for constructing a HyperKernel it never uses. Cross-transport tests still work because the shared state (container, FrozenClock, ArrayDriver, ActiveIdentity) lives on the parent `TestKernel`, and both lazy kernels bootstrap against the same container — so a `cli()->run('login')` followed by `http()->get('/api/me')` sees the same identity.
+- **`Factory` ships with the easy validation rules supported.** `NotEmpty`, `Email`, `Url`, `Uuid`, `MinLength`, `MaxLength`, `Min`, `Max`, `In`, `Pattern` (literal-string patterns), nullable types. Throws `FactoryException` with a "provide an override" message for `#[Pattern]` against arbitrary regexes and `#[Callback]` rules — those are user-payload-dependent and can't be auto-generated.
+- **`Fake\` namespace deferred.** No fakeable external boundaries exist in the framework yet — the mailer, HTTP client, and queue are all on the long-distance list and don't have interfaces to fake against. Defer the entire `Fake\` namespace until the first such interface lands (likely the mailer).
+- **Inception caveat:** `TestKernel`'s own tests can't use `TestKernel` — they have to construct it directly and verify its behavior. `tests/Testing/*Test.php` will look more like traditional unit tests than the kind of tests app developers will write *using* `TestKernel`. That's expected.
+
+#### Foundation
+
+- [ ] **Create `Arcanum\Testing` package skeleton.** New `src/Testing/` directory with empty (or near-empty) `TestKernel.php`, `Factory.php`, and a `README.md` stub. Add `src/Testing/` to composer `autoload` (not `autoload-dev`). Verify the namespace loads via a smoke test. This commit is purely structural — no behavior — but it sets up the namespace and lets later commits land cleanly.
+- [ ] **Build the minimal `TestKernel` core.** Constructor with optional overrides (clock, cache, root directory). Builds the shared container up front, binds `FrozenClock` (defaults to a fixed `2026-01-01` instant), binds `ArrayDriver` as the cache, registers `ActiveIdentity`. Provides `container()`, `clock()`, and a `withIdentity(Identity)` chained setter. No HTTP or CLI surfaces yet — just the kernel base. `tests/Testing/TestKernelTest.php` covers construction + accessors.
+- [ ] **Add the `http()` surface.** `Arcanum\Testing\HttpTestSurface` with minimal `get/put/post/patch/delete` methods returning `ResponseInterface`. `TestKernel::http()` constructs a real `HyperKernel` lazily, bootstrapped against the shared container, and memoizes it. The surface translates fluent test calls into PSR-7 requests and dispatches through the wrapped kernel. Includes a `withHeader()` chained setter for tests that need to set request headers. Tests verify dispatch to a fixture handler and the right status code.
+- [ ] **Add the `cli()` surface.** `Arcanum\Testing\CliTestSurface` with a `run(array $argv): CliResult` method, where `CliResult` is a small value object carrying `exitCode`, `stdout`, `stderr`. `TestKernel::cli()` constructs a real `RuneKernel` lazily, bootstrapped against the shared container, and memoizes. The surface installs in-memory streams for stdout/stderr capture. Tests verify it runs a fixture command and reports the right exit code.
+- [ ] **Build `Factory`.** Reflection-based DTO generator. `Factory::make(class-string<T>, array $overrides = []): T` with reflection over the constructor parameters: provided overrides take precedence, then attribute-based generation for the easy rules, then the parameter's default value, then `FactoryException`. Recurses into nested DTO parameters. Tests cover happy path, override path, recursive nested-DTO path, and the `FactoryException` path for `#[Pattern]` against a non-trivial regex.
+- [ ] **Write `src/Testing/README.md` and update `COMPENDIUM.md`.** End-to-end documentation: how to write a handler test, how to advance the clock, how to use `Factory`, how to use `http()` / `cli()`, how to handle the strict-coverage `#[CoversClass]` requirement (use `#[CoversClass(MyHandler::class)]` for handler-targeted tests; `#[CoversNothing]` for cross-component scenarios), how to opt into more bootstrappers via `withDatabase`/`withConfiguration`/etc. COMPENDIUM gets a new "Testing" entry alongside the other packages.
+
+#### Migration of existing ad-hoc patterns
+
+- [ ] **Migrate `tests/Integration/CqrsLifecycleTest.php` to `TestKernel`.** This is the longest existing integration test and the closest match for what app handler tests will look like. Replaces hand-rolled `stubRequest()` / `container()` / `router()` helpers and the per-test `MiddlewareBus` + `Hydrator` + `Router` construction with `$kernel = new TestKernel(rootDirectory: ...); $response = $kernel->http()->get('/integration/status.json');`. Proves the test kernel handles the most complex existing pattern.
+- [ ] **Migrate `tests/Integration/HelperResolutionTest.php` to `TestKernel`.** Same migration pattern.
+- [ ] **Evaluate `tests/Hyper/Event/LifecycleEventTest.php` for migration.** Currently uses `CapturingKernel`. The lifecycle events (`RequestReceived`, `RequestHandled`, `RequestFailed`, `ResponseSent`) are dispatched by `HyperKernel`, so a TestKernel wrapping a real HyperKernel should observe them naturally. Migrate if practical, document why not if the test specifically needs `CapturingKernel`'s captured-request behavior.
+- [ ] **Migrate starter app `tests/Helpers/WiredUpHelperTest.php` to `TestKernel`.** Replaces `FixtureKernel` instantiation with `new TestKernel(rootDirectory: $this->tmpRoot)`. The helper takes a real `Kernel` instance — `TestKernel` is one.
+- [ ] **Migrate starter app `tests/Helpers/EnvCheckHelperTest.php` to `TestKernel`.** Same migration.
+- [ ] **Delete starter app `tests/Helpers/FixtureKernel.php`.** Once both callers are migrated, the fake kernel has no remaining users. Removing it forces future helper tests to use `TestKernel` instead of inventing a new ad-hoc fake.
+
+#### Cross-cutting
+
+- [ ] **Run `composer check` after each commit.** Pre-commit hook enforces this; same practice as the Hourglass arc.
+- [ ] **Final sweep.** After all migrations, grep `tests/` for any remaining ad-hoc patterns: classes implementing `Kernel` directly, anonymous subclasses of `HyperKernel`/`RuneKernel`, manual `MiddlewareBus + Hydrator + Router` construction. Update this checklist with anything found.
+
 ### Welcome page — nice-to-haves (deferred)
 
 The Index redesign landed (nine-section structure, real diagnostics, CSS-only tabs, copy buttons, ASCII rune). The leftovers are explicitly optional:
@@ -80,9 +116,9 @@ The Index redesign landed (nine-section structure, real diagnostics, CSS-only ta
 
 ## Upcoming Work
 
-### Testing utilities + PSR-20 `Clock` adoption — next focus
+### Testing utilities — promoted to active checklist
 
-The single highest-leverage item left. See the long-distance entry below for the concrete shape; promote to a checklist above when ready to start.
+See "Testing utilities — `Arcanum\Testing`" under Active Checklists. The Clock half of the original "Testing utilities + PSR-20 Clock adoption" arc is fully done; the testing-utilities half is now in progress.
 
 ---
 
@@ -116,6 +152,8 @@ The single highest-leverage item left. See the long-distance entry below for the
 
   **Why before the Todo App dogfood?** The dogfood's whole point is to surface friction we *can't see* from inside. If we run it without testing utilities, the retrospective will be dominated by testability complaints we already know about, drowning out the genuinely new surprises. Doing this first means the dogfood retrospective surfaces gaps we couldn't predict.
 - **Queue/Job system** — async processing with drivers (Redis, database, SQS).
+- **Refactor `HyperKernel` and `RuneKernel` onto a shared `AbstractKernel` base** — Discovery for the testing-utilities arc surfaced that the two production kernels share ~80% of their structure: identical constructor signature, identical `isBootstrapped` flag, identical four directory accessors, identical bootstrap loop (only differing in which `Transport` enum gets bound at line 1), identical `Stopwatch::tap('boot.complete')`, identical `Stopwatch::tap('arcanum.complete')` in `terminate()`. The bootstrapper lists overlap entirely except for the HTTP-specific entries (`Sessions`, `Routing`, `Helpers`, `Formats`, `RouteMiddleware`, `Middleware`). Only `handle()` genuinely diverges (PSR-7 in / PSR-7 out vs argv in / int out). An `AbstractKernel` base class could collapse the duplication. **Wait until after the testing-utilities arc lands** — TestKernel will exercise both production kernels through composition, so the test surface will be in place to verify the refactor doesn't break behavior. Treat this as a pure refactor; no API changes.
+- **Build out integration test coverage** — `tests/Integration/` currently has only 2 files (`CqrsLifecycleTest`, `HelperResolutionTest`). The framework's testing culture is heavily biased toward fine-grained unit tests with mocked dependencies, which catches narrow regressions but misses interaction bugs (convention-based discovery, bootstrapper ordering, route → handler → renderer round trips, transport guard behavior, validation flow, error rendering paths, htmx fragment rendering, CSRF middleware integration, lifecycle event ordering). Once `Arcanum\Testing\TestKernel` exists, writing integration tests becomes cheap and we should aggressively expand coverage. This is a long-tail effort, not a single deliverable — every feature added going forward should land with at least one integration test alongside its unit tests, and existing features should get retrofit coverage as time permits. Promote to a checklist when there's a concrete batch ready to execute.
 - **Internationalization** — translation strings, locale detection, pluralization.
 - **Task scheduling** — `schedule:run` cron dispatcher.
 - **Mail/Notifications** — thin wrappers or Symfony Mailer integration.
