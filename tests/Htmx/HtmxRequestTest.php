@@ -163,9 +163,9 @@ final class HtmxRequestTest extends TestCase
     // target
     // ------------------------------------------------------------------
 
-    public function testTargetReturnsIdFromHeader(): void
+    public function testTargetReturnsBareId(): void
     {
-        // Arrange
+        // Arrange — htmx v2 sends just the id
         $req = $this->request([
             'HX-Request' => 'true',
             'HX-Target' => 'product-list',
@@ -173,6 +173,30 @@ final class HtmxRequestTest extends TestCase
 
         // Act & Assert
         $this->assertSame('product-list', $req->target());
+    }
+
+    public function testTargetParsesV4TagNameHashIdFormat(): void
+    {
+        // Arrange — htmx v4 sends "tagName#id"
+        $req = $this->request([
+            'HX-Request' => 'true',
+            'HX-Target' => 'div#incantation',
+        ]);
+
+        // Act & Assert
+        $this->assertSame('incantation', $req->target());
+    }
+
+    public function testTargetRawReturnsUnparsedHeader(): void
+    {
+        // Arrange
+        $req = $this->request([
+            'HX-Request' => 'true',
+            'HX-Target' => 'div#sidebar',
+        ]);
+
+        // Act & Assert
+        $this->assertSame('div#sidebar', $req->targetRaw());
     }
 
     public function testTargetReturnsNullWhenAbsent(): void

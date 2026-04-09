@@ -70,12 +70,39 @@ final readonly class HtmxRequest
     }
 
     /**
-     * The id of the target element, from HX-Target.
+     * The id of the target element, extracted from HX-Target.
      *
-     * htmx only sends this header when the resolved target element has
-     * an id attribute. Returns null when the header is absent or empty.
+     * htmx v4 sends HX-Target in `tagName#id` format (e.g. `div#incantation`).
+     * htmx v2 sends just the bare id (e.g. `incantation`).
+     * This method normalizes both to the bare id.
+     *
+     * Returns null when the header is absent or empty.
      */
     public function target(): ?string
+    {
+        $raw = $this->header('HX-Target');
+
+        if ($raw === null) {
+            return null;
+        }
+
+        // htmx v4 format: "tagName#id" — extract the id after the #.
+        $hashPos = strpos($raw, '#');
+
+        if ($hashPos !== false) {
+            return substr($raw, $hashPos + 1);
+        }
+
+        // htmx v2 format or bare id.
+        return $raw;
+    }
+
+    /**
+     * The raw HX-Target header value, unparsed.
+     *
+     * htmx v4 sends `tagName#id` format. Use target() for just the id.
+     */
+    public function targetRaw(): ?string
     {
         return $this->header('HX-Target');
     }
