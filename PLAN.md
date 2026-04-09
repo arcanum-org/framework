@@ -38,7 +38,7 @@ Integrate `Hourglass\Clock` throughout the framework and starter app so every wa
 
 - [x] **`TokenBucket` — inject Clock, migrate one `time()` site.** New constructor takes `Clock $clock = new SystemClock()`; the lone `time()` read is now `$this->clock->now()->getTimestamp()`. Throttler also computes `retryAfter` and passes it to `Quota`. Two new `FrozenClock`-based tests: deterministic refill across `advance()`, and an explicit retryAfter assertion under a frozen clock.
 - [x] **`SlidingWindow` — inject Clock, migrate one `time()` site.** Same pattern as `TokenBucket`: constructor takes `Clock $clock = new SystemClock()`, `time()` becomes `$this->clock->now()->getTimestamp()`, denied Quotas get an explicit `retryAfter`. Two new `FrozenClock`-based tests cover deterministic window rotation and the explicit retryAfter assertion.
-- [x] **`Quota` — accept retryAfter at construction (Option B from the plan).** Quota now takes an optional `int $retryAfter = 0` constructor param; `headers()` uses it directly when non-zero, falls back to wall-clock subtraction when zero. The fallback exists only so this commit can land before the Throttlers are updated; once both Throttlers pass the explicit value (next commits), the fallback can be removed in a final cleanup pass. Two new QuotaTest assertions cover both paths.
+- [x] **`Quota` — accept retryAfter at construction (Option B from the plan).** Quota now takes `int $retryAfter = 0` and `headers()` uses it directly. Both Throttlers pass the explicit value, and the temporary wall-clock fallback that bridged the staged commits has been removed (`a461fbd`). Quota is now Clock-free entirely; QuotaTest covers explicit-retryAfter and default-zero paths.
 - [x] **Throttle README — document the Clock dependency.** Quota table now lists `$retryAfter` and a sentence noting Quota stays Clock-free. New `### Deterministic tests with FrozenClock` subsection with a worked TokenBucket example.
 
 #### Auth
@@ -53,7 +53,7 @@ Integrate `Hourglass\Clock` throughout the framework and starter app so every wa
 
 #### Cross-cutting
 
-- [ ] **Run `composer check` after each commit.** PHPStan will catch any missed call sites or constructor mismatches; PHPUnit will catch any test that broke without an obvious symptom.
+- [x] **Run `composer check` after each commit.** Pre-commit hook enforces this — every commit on the branch has a green `composer check` line in its output. Suite is at 2503 tests / 5037 assertions and stayed green throughout the migration.
 - [x] **Update COMPENDIUM.md.** Hourglass entry now names the consumers (Vault `ArrayDriver`/`FileDriver`, Throttle `TokenBucket`/`SlidingWindow`, Auth `CliSession`), notes the bootstrap binding, and explicitly calls out that Stopwatch deliberately bypasses Clock — they model different things, and conflating them would freeze elapsed-time measurement when a test froze the wall-clock. Testing-section paragraph updated to reflect that the Clock half of the testing-utilities arc is in progress.
 - [ ] **Final sweep.** After all migrations, re-run the discovery grep (`time(`, `new DateTime`, `new DateTimeImmutable`) across `src/` to confirm only the explicitly-skipped sites remain. Update this checklist with any stragglers found.
 
