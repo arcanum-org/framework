@@ -32,19 +32,13 @@ final class HtmxCsrfController
      * and it avoids a Parchment dependency.
      */
     private const JS = <<<'JS'
-        (function() {
-            function getToken() {
+        document.addEventListener('htmx:configRequest', function(event) {
+            var method = (event.detail.verb || event.detail.method || '').toUpperCase();
+            if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
                 var meta = document.querySelector('meta[name="csrf-token"]');
-                return meta ? meta.getAttribute('content') : '';
+                event.detail.headers['X-CSRF-TOKEN'] = meta ? meta.getAttribute('content') : '';
             }
-
-            document.body.addEventListener('htmx:configRequest', function(event) {
-                var method = (event.detail.verb || event.detail.method || '').toUpperCase();
-                if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
-                    event.detail.headers['X-CSRF-TOKEN'] = getToken();
-                }
-            });
-        })();
+        });
         JS;
 
     public function handle(): ResponseInterface
