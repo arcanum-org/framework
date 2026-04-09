@@ -9,6 +9,7 @@ use Arcanum\Test\Fixture\Testing\NestedDto;
 use Arcanum\Test\Fixture\Testing\NullableDto;
 use Arcanum\Test\Fixture\Testing\PatternDto;
 use Arcanum\Test\Fixture\Testing\SimpleDto;
+use Arcanum\Glitch\ArcanumException;
 use Arcanum\Testing\Factory;
 use Arcanum\Testing\FactoryException;
 use Arcanum\Validation\Rule\Email;
@@ -125,6 +126,18 @@ final class FactoryTest extends TestCase
         $object = $factory->make(\stdClass::class);
 
         $this->assertInstanceOf(\stdClass::class, $object);
+    }
+
+    public function testFactoryExceptionImplementsArcanumException(): void
+    {
+        $exception = new FactoryException('synthesis failed');
+
+        $this->assertInstanceOf(ArcanumException::class, $exception);
+        $this->assertSame('Test Factory Synthesis Failed', $exception->getTitle());
+        $this->assertSame(
+            'Pass an explicit override for the parameter via the second argument to Factory::make().',
+            $exception->getSuggestion(),
+        );
     }
 
     public function testEmailAttributeProducesValidEmail(): void
