@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Arcanum\Test\Htmx;
 
 use Arcanum\Htmx\HtmxAwareResponseRenderer;
+use Arcanum\Htmx\HtmxCsrfController;
 use Arcanum\Htmx\HtmxRequest;
 use Arcanum\Htmx\HtmxRequestMiddleware;
 use PHPUnit\Framework\TestCase;
@@ -58,7 +59,7 @@ final class HtmxRequestMiddlewareTest extends TestCase
                 ->method('setHtmxRequest');
         }
 
-        $middleware = new HtmxRequestMiddleware($renderer, $addVaryHeader);
+        $middleware = new HtmxRequestMiddleware($renderer, new HtmxCsrfController(), $addVaryHeader);
 
         return $middleware->process($request, $handler);
     }
