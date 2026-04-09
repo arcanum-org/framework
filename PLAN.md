@@ -128,6 +128,16 @@ The Index redesign landed (nine-section structure, real diagnostics, CSS-only ta
 
 ---
 
+## Pre-1.0 Required
+
+- **Context-specific output encoding** — Shodo's `{{ }}` provides HTML entity encoding via `htmlspecialchars(ENT_QUOTES, UTF-8)`. This is correct for HTML body text and quoted HTML attributes. It is **not** correct for URL, JavaScript, or CSS contexts, each of which requires its own encoding per OWASP XSS Prevention guidelines. Today's starter app is safe because it never places user data in these contexts, but the framework provides no guard rails if an app developer does. Before 1.0, Arcanum needs:
+  - **URL sanitization helper** — `Html::url($href)` or similar that rejects `javascript:` and `data:` URI schemes. This is the most likely footgun — a handler passes a user-supplied URL to a template, the template puts it in `href="{{ $url }}"`, and HTML encoding prevents attribute breakout but not scheme injection. The helper should validate the scheme (allow `http`, `https`, `mailto`, `tel`, and relative paths; reject everything else) and HTML-encode the result. Use it in templates as `href="{{ Html::url($link) }}"`.
+  - **JavaScript encoding helper** — `Html::js($value)` for the rare case where a variable is placed in a JavaScript string context (`<script>var x = '...'</script>` or JSON embedded in a `<script>` tag). Should use `\uXXXX` Unicode encoding per OWASP.
+  - **Documentation** — clearly state that `{{ }}` is HTML encoding only, explain the five OWASP contexts, and point developers to the context-specific helpers. The Shodo README and the framework's security documentation should cover this.
+  - CSS encoding is lowest priority — inline `style` attributes with user data are rare and almost always a design mistake. Document the risk; add a helper later if demand surfaces.
+
+  Surfaced during a systematic OWASP XSS audit (April 2026). The three concrete escaping fixes from that audit (HtmlHelper::csrf token escaping, HtmxHelper::script attribute escaping, JsonFormatter full HEX flags) are already landed.
+
 ## Long-Distance Future
 
 - **Reserved-filename collision in `app/Pages/`** — Any convention-based discovery file inside `app/Pages/` collides with a potential Page URL route. Today `app/Pages/Middleware.php` is picked up by `MiddlewareDiscovery` as scoped middleware for `App\Pages\*`, which means a developer who wants to make `/middleware.html` a real page by creating `app/Pages/Middleware.php` will either silently get a middleware config file instead of a page or hit a confusing runtime error when `PageDiscovery` and `MiddlewareDiscovery` disagree about what the file is. Same problem will hit `Helpers.php` once the discovery alignment below lands. The fix has two parts:
