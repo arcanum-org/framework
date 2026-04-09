@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Htmx;
 
+use Arcanum\Htmx\FragmentDirective;
 use Arcanum\Htmx\HtmxAwareResponseRenderer;
 use Arcanum\Htmx\HtmxRequest;
 use Arcanum\Htmx\HtmxRequestType;
@@ -22,6 +23,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 use Psr\Http\Message\ServerRequestInterface;
 
 #[CoversClass(HtmxAwareResponseRenderer::class)]
+#[UsesClass(FragmentDirective::class)]
 #[UsesClass(HtmxRequest::class)]
 #[UsesClass(HtmxRequestType::class)]
 #[UsesClass(HtmlFormatter::class)]
@@ -246,6 +248,61 @@ final class HtmxAwareResponseRendererTest extends TestCase
         $body = (string) $response->getBody();
         $this->assertStringContainsString('<p>Content</p>', $body);
         $this->assertStringNotContainsString('<!DOCTYPE html>', $body);
+    }
+
+    // ------------------------------------------------------------------
+    // Fragment mode reset
+    // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // Mode 3 with {{ fragment }} markers — innerHTML extraction
+    // ------------------------------------------------------------------
+
+    public function testPartialWithFragmentMarkerReturnsInnerContent(): void
+    {
+        // Arrange — template has {{ fragment 'panel' }} inside a div.
+        // The renderer should return the inner content (no wrapper div).
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<div id="panel">{{ fragment \'panel\' }}<p>{{ $message }}</p>{{ endfragment }}</div>',
+        );
+        $renderer = $this->createRenderer();
+        $renderer->setHtmxRequest($this->htmxRequest([
+            'HX-Request' => 'true',
+            'HX-Request-Type' => 'partial',
+            'HX-Target' => 'panel',
+        ]));
+
+        // Act
+        $response = $renderer->render(['message' => 'Hello'], 'App\\Pages\\Index');
+
+        // Assert — innerHTML only: <p>Hello</p>, not the wrapper <div id="panel">
+        $body = (string) $response->getBody();
+        $this->assertStringContainsString('<p>Hello</p>', $body);
+        $this->assertStringNotContainsString('<div id="panel">', $body);
+    }
+
+    public function testPartialWithoutFragmentMarkerFallsBackToOuterHtml(): void
+    {
+        // Arrange — template has no fragment marker, just a div with id.
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Index.html',
+            '<div id="box"><p>{{ $name }}</p></div>',
+        );
+        $renderer = $this->createRenderer();
+        $renderer->setHtmxRequest($this->htmxRequest([
+            'HX-Request' => 'true',
+            'HX-Request-Type' => 'partial',
+            'HX-Target' => 'box',
+        ]));
+
+        // Act
+        $response = $renderer->render(['name' => 'World'], 'App\\Pages\\Index');
+
+        // Assert — outerHTML: includes the wrapper div
+        $body = (string) $response->getBody();
+        $this->assertStringContainsString('<div id="box">', $body);
+        $this->assertStringContainsString('<p>World</p>', $body);
     }
 
     // ------------------------------------------------------------------

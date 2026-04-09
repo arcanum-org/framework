@@ -6,6 +6,7 @@ namespace Arcanum\Htmx;
 
 use Arcanum\Hourglass\Stopwatch;
 use Arcanum\Hyper\ResponseRenderer;
+use Arcanum\Parchment\Reader;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Psr\Http\Message\ResponseInterface;
 
@@ -20,9 +21,10 @@ use Psr\Http\Message\ResponseInterface;
  *   2. htmx Full type   → content section only, no layout (fragment mode)
  *   3. htmx Partial type → auto-extracted element by id from HX-Target
  *
- * Mode 3 always returns the full element (outerHTML). The developer
- * controls the swap mode on their element with hx-swap — the framework
- * does not override it with HX-Reswap. Recommend outerHTML in docs.
+ * Mode 3 checks for explicit {{ fragment 'id' }} markers first. When
+ * present, renders the inner content only (no wrapper element) — the
+ * opt-in for innerHTML/afterbegin/beforeend swap modes. When absent,
+ * falls back to element-by-id extraction (outerHTML).
  *
  * Falls back to content section when HX-Target is absent or the id
  * isn't found in the template.
@@ -33,6 +35,7 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
 
     public function __construct(
         private readonly HtmlFormatter $formatter,
+        private readonly Reader $reader = new Reader(),
     ) {
     }
 
@@ -70,9 +73,10 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
         $type = $this->htmxRequest->type();
         $target = $this->htmxRequest->target();
 
-        // Mode 3: Partial with a target id — auto-extract the element.
+        // Mode 3: Partial with a target id — check for explicit fragment
+        // markers first, then fall back to element-by-id extraction.
         if ($type === HtmxRequestType::Partial && $target !== null) {
-            return $this->formatter->renderElementById($target, $data, $dtoClass);
+            return $this->renderPartial($target, $data, $dtoClass);
         }
 
         // Mode 2: Full htmx (boosted nav) or partial without target —
@@ -84,5 +88,33 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
         } finally {
             $this->formatter->setFragment(false);
         }
+    }
+
+    /**
+     * Render a partial response for an htmx request with HX-Target.
+     *
+     * Checks for explicit {{ fragment 'id' }} markers in the raw template
+     * source. When found, renders the inner content only (innerHTML).
+     * When not found, delegates to element-by-id extraction (outerHTML).
+     */
+    private function renderPartial(string $target, mixed $data, string $dtoClass): string
+    {
+        $templatePath = $this->formatter->resolveTemplate($dtoClass);
+
+        if ($templatePath !== null) {
+            $source = $this->reader->read($templatePath);
+            $fragment = FragmentDirective::extractFragment($source, $target);
+
+            if ($fragment !== null) {
+                return $this->formatter->renderSlice(
+                    $fragment,
+                    dirname($templatePath),
+                    $data,
+                    $dtoClass,
+                );
+            }
+        }
+
+        return $this->formatter->renderElementById($target, $data, $dtoClass);
     }
 }

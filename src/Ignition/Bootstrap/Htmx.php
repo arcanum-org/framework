@@ -16,7 +16,6 @@ use Arcanum\Htmx\FragmentDirective;
 use Arcanum\Htmx\HtmxRequestMiddleware;
 use Arcanum\Hyper\HtmlResponseRenderer;
 use Arcanum\Ignition\Bootstrapper;
-use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\HelperRegistry;
 use Arcanum\Shodo\TemplateCompiler;
 
@@ -99,13 +98,6 @@ class Htmx implements Bootstrapper
             /** @var TemplateCompiler $compiler */
             $compiler = $container->get(TemplateCompiler::class);
             $compiler->directives()->register(new FragmentDirective());
-        }
-
-        // Wire the fragment extractor into HtmlFormatter for innerHTML rendering.
-        if ($container->has(HtmlFormatter::class)) {
-            /** @var HtmlFormatter $formatter */
-            $formatter = $container->get(HtmlFormatter::class);
-            $formatter->setFragmentExtractor(FragmentDirective::extractFragment(...));
         }
 
         // Template helper: {{! Htmx::script() !}}, {{! Htmx::csrf() !}}

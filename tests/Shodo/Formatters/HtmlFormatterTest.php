@@ -608,57 +608,62 @@ final class HtmlFormatterTest extends TestCase
         $this->assertStringContainsString('val', $result);
     }
 
-    public function testRenderElementByIdUsesFragmentExtractorWhenSet(): void
+    public function testResolveTemplateReturnsPathForExistingTemplate(): void
     {
-        // Arrange — template with an explicit fragment marker inside a div.
-        // The fragment extractor should return the inner content (no wrapper),
-        // while element-by-id extraction would return the full div (outerHTML).
+        // Arrange
         file_put_contents(
             $this->rootDir . '/app/Pages/Index.html',
-            '<div id="panel">{{ fragment \'panel\' }}<p>{{ $message }}</p>{{ endfragment }}</div>',
+            '<p>Hello</p>',
         );
         $formatter = $this->createFormatter();
-        $formatter->setFragmentExtractor(function (string $source, string $id): ?string {
-            $escaped = preg_quote($id, '/');
-            $pattern = '/\{\{\s*fragment\s+\'' . $escaped . '\'\s*\}\}(.*?)\{\{\s*endfragment\s*\}\}/s';
-            if (preg_match($pattern, $source, $m)) {
-                return $m[1];
-            }
-            return null;
-        });
 
         // Act
-        $result = $formatter->renderElementById(
-            'panel',
-            ['message' => 'Hello'],
-            'App\\Pages\\Index',
-        );
+        $result = $formatter->resolveTemplate('App\\Pages\\Index');
 
-        // Assert — innerHTML only: <p>Hello</p>, not the wrapper <div id="panel">
-        $this->assertStringContainsString('<p>Hello</p>', $result);
-        $this->assertStringNotContainsString('<div id="panel">', $result);
+        // Assert
+        $this->assertSame($this->rootDir . '/app/Pages/Index.html', $result);
     }
 
-    public function testRenderElementByIdFallsBackToElementExtractionWhenFragmentNotFound(): void
+    public function testResolveTemplateReturnsNullForMissingTemplate(): void
     {
-        // Arrange — template with no fragment marker, but fragment extractor is set
-        file_put_contents(
-            $this->rootDir . '/app/Pages/Index.html',
-            '<div id="box"><p>{{ $name }}</p></div>',
-        );
+        // Arrange
         $formatter = $this->createFormatter();
-        $formatter->setFragmentExtractor(fn (string $source, string $id) => null);
+
+        // Act & Assert
+        $this->assertNull($formatter->resolveTemplate('App\\Pages\\Missing'));
+    }
+
+    public function testRenderSliceCompilesAndRendersSource(): void
+    {
+        // Arrange
+        $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->renderElementById(
-            'box',
-            ['name' => 'World'],
-            'App\\Pages\\Index',
+        $result = $formatter->renderSlice(
+            '<p>{{ $name }}</p>',
+            $this->rootDir,
+            ['name' => 'Alice'],
         );
 
-        // Assert — outerHTML: includes the wrapper div
-        $this->assertStringContainsString('<div id="box">', $result);
-        $this->assertStringContainsString('<p>World</p>', $result);
+        // Assert
+        $this->assertSame('<p>Alice</p>', $result);
+    }
+
+    public function testRenderSliceEscapesOutput(): void
+    {
+        // Arrange
+        $formatter = $this->createFormatter();
+
+        // Act
+        $result = $formatter->renderSlice(
+            '<p>{{ $name }}</p>',
+            $this->rootDir,
+            ['name' => '<script>xss</script>'],
+        );
+
+        // Assert
+        $this->assertStringContainsString('&lt;script&gt;', $result);
+        $this->assertStringNotContainsString('<script>xss', $result);
     }
 
     public function testRenderElementByIdEscapesOutput(): void
