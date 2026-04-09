@@ -28,8 +28,8 @@ Prerequisite for the htmx package below. Shodo currently has `{{ section 'name' 
 
 #### Documentation
 
-- [ ] **Shodo README — document the `{{ fragment }}` directive.** New section with worked examples (basic, multiple fragments per template, conditional fragments). Notes the soft-fall-through behavior. Cross-references the htmx package once it lands.
-- [ ] **COMPENDIUM Shodo entry update.** Mentions the new directive alongside the existing `{{ section }}` and `{{ extends }}` mechanisms.
+- [x] **Shodo README — document the `{{ fragment }}` directive.** New section with worked examples (basic, multiple fragments per template, conditional fragments). Notes the soft-fall-through behavior. Cross-references the htmx package once it lands.
+- [x] **COMPENDIUM Shodo entry update.** Mentions the new directive alongside the existing `{{ section }}` and `{{ extends }}` mechanisms.
 
 #### Fragment / swap-mode footgun
 
