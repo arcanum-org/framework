@@ -210,24 +210,9 @@ class Formats implements Bootstrapper
     {
         $container->service(JsonResponseRenderer::class);
         $container->service(CsvResponseRenderer::class);
-
-        $container->factory(HtmlResponseRenderer::class, function () use ($container) {
-            /** @var HtmlFormatter $formatter */
-            $formatter = $container->get(HtmlFormatter::class);
-            return new HtmlResponseRenderer($formatter);
-        });
-
-        $container->factory(PlainTextResponseRenderer::class, function () use ($container) {
-            /** @var PlainTextFormatter $formatter */
-            $formatter = $container->get(PlainTextFormatter::class);
-            return new PlainTextResponseRenderer($formatter);
-        });
-
-        $container->factory(MarkdownResponseRenderer::class, function () use ($container) {
-            /** @var MarkdownFormatter $formatter */
-            $formatter = $container->get(MarkdownFormatter::class);
-            return new MarkdownResponseRenderer($formatter);
-        });
+        $container->service(HtmlResponseRenderer::class);
+        $container->service(PlainTextResponseRenderer::class);
+        $container->service(MarkdownResponseRenderer::class);
     }
 
     private function registerValidationRenderer(Application $container): void

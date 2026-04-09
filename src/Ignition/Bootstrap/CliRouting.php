@@ -147,11 +147,8 @@ class CliRouting implements Bootstrapper
         $debug = $config->get('app.debug');
         $isDebug = $debug === true || $debug === 'true';
 
-        $container->factory(CliExceptionWriter::class, function () use ($container, $isDebug) {
-            /** @var Output $output */
-            $output = $container->get(Output::class);
-            return new CliExceptionWriter($output, $isDebug);
-        });
+        $container->specify(CliExceptionWriter::class, '$debug', $isDebug);
+        $container->service(CliExceptionWriter::class);
     }
 
     private function registerHydrator(Application $container): void

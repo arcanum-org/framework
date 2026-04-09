@@ -42,9 +42,13 @@ class Security implements Bootstrapper
 
         $key = $this->parseKey($appKey);
 
-        $container->factory(Encryptor::class, fn() => new SodiumEncryptor($key));
-        $container->factory(Signer::class, fn() => new SodiumSigner($key->bytes));
-        $container->factory(Hasher::class, fn() => new BcryptHasher());
+        $container->instance(EncryptionKey::class, $key);
+        $container->service(Encryptor::class, SodiumEncryptor::class);
+
+        $container->specify(SodiumSigner::class, '$key', $key->bytes);
+        $container->service(Signer::class, SodiumSigner::class);
+
+        $container->service(Hasher::class, BcryptHasher::class);
     }
 
     private function parseKey(string $appKey): EncryptionKey
