@@ -29,34 +29,12 @@ namespace Arcanum\Shodo;
  *
  * Mirrors PHP's own naming conventions, so no `@` prefix is needed.
  *
- * Pre-compilation passes (run before PHP compilation):
- * - include 'path' — inlines referenced file contents
- * - extends / section / yield directives — layout inheritance
- * - match / case / default — switch-style branching with implicit break
+ * Built-in directives ship with Shodo and are registered by default.
+ * Custom directives can be registered by framework packages or app
+ * developers through the DirectiveRegistry.
  */
 final class TemplateCompiler
 {
-    /**
-     * Standalone helper-call pattern, applied inside captured `{{ }}` /
-     * `{{! !}}` / control-structure expression bodies.
-     *
-     * The lookbehind keeps the rewriter from clobbering names that look
-     * like helpers but are not — specifically:
-     *   - `\App\Foo::bar()`        — fully-qualified call (preceded by `\`)
-     *   - `Namespace\Foo::bar()`   — partially-qualified call (preceded by `\`)
-     *   - `$Format::method()`      — variable static call (preceded by `$`)
-     *   - `MyFoo::bar()` inside an identifier — preceded by a word char
-     *
-     * The argument list allows up to three levels of nested parens, which
-     * covers every realistic case (`Format::number(count($items), 0)`,
-     * `Format::number(Math::min($a, $b), 2)`, etc.). Calls deeper than
-     * three levels still rewrite correctly because each helper-call inside
-     * the body will be matched by its own occurrence of the pattern — the
-     * rewrite is one pass over the body, not recursive.
-     */
-    private const HELPER_CALL_PATTERN = '(?<![\\\\\w$])([A-Z][a-zA-Z0-9]*)::(\w+)'
-        . '((?:\((?:[^()]*+|\((?:[^()]*+|\([^()]*+\))*\))*\)))';
-
     /**
      * Files touched by the most recent compile() call, in the order they
      * were resolved. Includes layouts and any nested @include partials —
@@ -70,6 +48,8 @@ final class TemplateCompiler
      */
     private array $lastDependencies = [];
 
+    private DirectiveRegistry $directives;
+
     /**
      * @param string $templatesDirectory Shared templates directory
      *     (e.g. app/Templates/). Used as a fallback when resolving
@@ -79,7 +59,35 @@ final class TemplateCompiler
     public function __construct(
         private readonly \Arcanum\Parchment\Reader $reader = new \Arcanum\Parchment\Reader(),
         private readonly string $templatesDirectory = '',
+        ?DirectiveRegistry $directives = null,
     ) {
+        $this->directives = $directives ?? self::defaultDirectives();
+    }
+
+    /**
+     * The directive registry.
+     *
+     * Exposed so framework packages and app developers can register
+     * custom directives after construction (e.g. during bootstrap).
+     */
+    public function directives(): DirectiveRegistry
+    {
+        return $this->directives;
+    }
+
+    /**
+     * Create the default registry with all built-in directives.
+     */
+    private static function defaultDirectives(): DirectiveRegistry
+    {
+        $registry = new DirectiveRegistry();
+        $registry->register(new Directives\IncludeDirective());
+        $registry->register(new Directives\LayoutDirective());
+        $registry->register(new Directives\MatchDirective());
+        $registry->register(new Directives\CsrfDirective());
+        $registry->register(new Directives\ControlFlowDirective());
+
+        return $registry;
     }
 
     /**
@@ -264,8 +272,8 @@ final class TemplateCompiler
     /**
      * Compile template source into PHP.
      *
-     * When $templateDirectory is provided, pre-compilation passes run first:
-     * include inlining and extends/section/yield layout inheritance.
+     * Runs registered directives in priority order, then compiles
+     * expression output (raw and escaped) as the catch-all final passes.
      *
      * When $fragment is true, layout inheritance is skipped — only the
      * 'content' section is rendered. This is used for htmx partial swaps
@@ -278,30 +286,18 @@ final class TemplateCompiler
     ): string {
         $this->lastDependencies = [];
 
-        if ($templateDirectory !== '') {
-            $source = $this->resolveIncludes($source, $templateDirectory);
-            $source = $fragment
-                ? $this->resolveFragment($source, $templateDirectory)
-                : $this->resolveLayout($source, $templateDirectory);
-        }
-
-        // Match / case / default → PHP switch alt syntax with implicit
-        // breaks. Done as a pre-pass because case fall-through needs to
-        // see the entire block at once. Runs before the regex passes for
-        // variables and helpers because the case bodies still contain
-        // template syntax that those passes will compile.
-        $source = $this->resolveMatch($source);
-
-        $compiled = $source;
-
-        // Directives: {{ csrf }} — raw output, no escape (intentional HTML).
-        // Runs before the body-capture passes so the bare keyword is not
-        // mistaken for a generic expression.
-        $compiled = $this->replace(
-            '/\{\{\s*csrf\s*\}\}/',
-            '<?= $__helpers[\'Html\']->csrf() ?>',
-            $compiled,
+        $context = new CompilerContext(
+            templateDirectory: $templateDirectory,
+            templatesDirectory: $this->templatesDirectory,
+            fragment: $fragment,
+            reader: $this->reader,
+            dependencies: $this->lastDependencies,
         );
+
+        // Run directives in priority order.
+        foreach ($this->directives->all() as $directive) {
+            $source = $directive->process($source, $context);
+        }
 
         /*
          * Raw output: {{! $expr !}}
@@ -312,48 +308,10 @@ final class TemplateCompiler
          * tag. Must run before the escaped output pass so the `!`
          * boundaries are consumed first.
          */
-        $compiled = $this->replaceCallback(
+        $source = $context->replaceCallback(
             '/\{\{!\s*(.+?)\s*!\}\}/s',
-            fn (array $m) => '<?= ' . $this->rewriteHelperCalls($m[1]) . ' ?>',
-            $compiled,
-        );
-
-        /*
-         * Control structures with conditions (foreach, if, elseif, for, while).
-         *
-         * Three accepted forms:
-         *   {{ if $foo > 0 }}        — preferred, paren-free
-         *   {{ if ($foo > 0) }}      — also accepted
-         *   {{ if ($foo > 0): }}     — also accepted (PHP alt syntax)
-         *
-         * Normalised to canonical PHP alt-syntax with explicit parens.
-         * Helper calls inside the condition are rewritten so that
-         * `{{ if Env::debugMode() }}` and `{{ foreach Wired::list() as $item }}`
-         * resolve through the helper registry rather than compiling to
-         * literal PHP static calls.
-         */
-        $compiled = $this->replaceCallback(
-            '/\{\{\s*(foreach|if|elseif|for|while)(?:\s+|(?=\())(.+?)\s*\}\}/s',
-            function (array $m): string {
-                $expr = $this->normaliseControlExpression($m[2]);
-                $expr = $this->rewriteHelperCalls($expr);
-                return '<?php ' . $m[1] . ' (' . $expr . '): ?>';
-            },
-            $compiled,
-        );
-
-        // else (no arguments, no colon)
-        $compiled = $this->replace(
-            '/\{\{\s*else\s*\}\}/',
-            '<?php else: ?>',
-            $compiled,
-        );
-
-        // End tags: endforeach, endif, endfor, endwhile
-        $compiled = $this->replace(
-            '/\{\{\s*(endforeach|endif|endfor|endwhile)\s*\}\}/',
-            '<?php $1; ?>',
-            $compiled,
+            fn (array $m) => '<?= ' . $context->rewriteHelperCalls($m[1]) . ' ?>',
+            $source,
         );
 
         // Escaped output: {{ $expr }} — calls $__escape provided by the renderer.
@@ -365,526 +323,12 @@ final class TemplateCompiler
         // Works because PHP itself parses the result. Multiple helper calls
         // in one expression compose: `{{ Format::number(Math::pi(), 2) }}`
         // rewrites both occurrences in a single pass.
-        $compiled = $this->replaceCallback(
+        $source = $context->replaceCallback(
             '/\{\{\s*(.+?)\s*\}\}/s',
-            fn (array $m) => '<?= $__escape((string)(' . $this->rewriteHelperCalls($m[1]) . ')) ?>',
-            $compiled,
-        );
-
-        return $compiled;
-    }
-
-    /**
-     * Rewrite every helper-call occurrence inside an expression body.
-     *
-     * Each `Name::method(args)` match becomes `$__helpers['Name']->method(args)`.
-     * Names that are part of a fully-qualified call (`\App\Foo::bar()`),
-     * a variable static call (`$Format::method()`), or an identifier suffix
-     * are left alone — see HELPER_CALL_PATTERN for the lookbehind details.
-     */
-    private function rewriteHelperCalls(string $body): string
-    {
-        return $this->replaceCallback(
-            '/' . self::HELPER_CALL_PATTERN . '/s',
-            function (array $m): string {
-                // Recurse into the captured argument list so nested helper
-                // calls compose: Format::number(Math::pi(), 2) rewrites both
-                // helpers in a single pass over the body.
-                $args = $this->rewriteHelperCalls($m[3]);
-                return '$__helpers[\'' . $m[1] . '\']->' . $m[2] . $args;
-            },
-            $body,
-        );
-    }
-
-    private function replace(string $pattern, string $replacement, string $subject): string
-    {
-        $result = preg_replace($pattern, $replacement, $subject);
-
-        if ($result === null) {
-            throw new \RuntimeException("Template compilation failed for pattern: $pattern");
-        }
-
-        return $result;
-    }
-
-    private function replaceCallback(string $pattern, callable $callback, string $subject): string
-    {
-        $result = preg_replace_callback($pattern, $callback, $subject);
-
-        if ($result === null) {
-            throw new \RuntimeException("Template compilation failed for pattern: $pattern");
-        }
-
-        return $result;
-    }
-
-    /**
-     * Normalise a control-structure expression to its bare form.
-     *
-     * Strips a trailing `:` (the developer wrote PHP alt-syntax style)
-     * and a single layer of outer parens (only when balanced as a true
-     * wrapping pair, not just two separately-grouped sub-expressions).
-     * The compiler then re-wraps the cleaned expression in canonical
-     * `(EXPR):` form.
-     */
-    private function normaliseControlExpression(string $raw): string
-    {
-        $expr = trim($raw);
-
-        // Strip a trailing PHP alt-syntax colon if present.
-        if (str_ends_with($expr, ':')) {
-            $expr = trim(substr($expr, 0, -1));
-        }
-
-        // Strip a single layer of outer parens if they wrap the whole
-        // expression. Walk char by char and verify the opening paren is
-        // paired with the closing one (not with something internal).
-        if (
-            strlen($expr) >= 2
-            && $expr[0] === '('
-            && $expr[strlen($expr) - 1] === ')'
-            && $this->outerParensWrapWholeExpression($expr)
-        ) {
-            $expr = trim(substr($expr, 1, -1));
-        }
-
-        return $expr;
-    }
-
-    /**
-     * True if the first `(` is paired with the last `)` — i.e. the parens
-     * wrap the whole expression rather than two separate sub-expressions.
-     *
-     * For "(a)" → true. For "(a) || (b)" → false (depth hits 0 mid-way).
-     */
-    private function outerParensWrapWholeExpression(string $expr): bool
-    {
-        $length = strlen($expr);
-        $depth = 0;
-
-        for ($i = 0; $i < $length; $i++) {
-            $char = $expr[$i];
-            if ($char === '(') {
-                $depth++;
-            } elseif ($char === ')') {
-                $depth--;
-                if ($depth === 0 && $i < $length - 1) {
-                    return false;
-                }
-            }
-        }
-
-        return $depth === 0;
-    }
-
-    // ------------------------------------------------------------------
-    // Pre-compilation: include
-    // ------------------------------------------------------------------
-
-    /**
-     * Resolve {{ include 'path' }} directives by inlining file contents.
-     *
-     * Paths are relative to the given base directory. Supports nesting
-     * (included files may themselves contain include directives).
-     * Guards against circular includes with a depth limit.
-     */
-    private function resolveIncludes(
-        string $source,
-        string $baseDirectory,
-        int $depth = 0,
-    ): string {
-        if ($depth > 10) {
-            throw new \RuntimeException(
-                'Include depth limit exceeded (max 10)'
-                    . ' — check for circular includes',
-            );
-        }
-
-        return $this->replaceCallback(
-            '/\{\{\s*include\s+\'([^\']+)\'\s*\}\}/',
-            function (array $matches) use ($baseDirectory, $depth): string {
-                $path = $this->resolveIncludePath(
-                    $matches[1],
-                    $baseDirectory,
-                );
-                $this->trackDependency($path);
-                $contents = $this->reader->read($path);
-
-                return $this->resolveIncludes(
-                    $contents,
-                    dirname($path),
-                    $depth + 1,
-                );
-            },
+            fn (array $m) => '<?= $__escape((string)(' . $context->rewriteHelperCalls($m[1]) . ')) ?>',
             $source,
         );
-    }
 
-    /**
-     * Append a dependency to the deps list, deduplicated.
-     */
-    private function trackDependency(string $path): void
-    {
-        if (!in_array($path, $this->lastDependencies, true)) {
-            $this->lastDependencies[] = $path;
-        }
-    }
-
-    /**
-     * Resolve an include path.
-     *
-     * Resolution order:
-     * 1. Relative to the current template's directory
-     * 2. Relative to the configured templates directory (if set)
-     *
-     * Tries each location with the exact path first, then with .html
-     * appended if no extension was given.
-     */
-    private function resolveIncludePath(
-        string $path,
-        string $baseDirectory,
-    ): string {
-        $resolved = $this->findFile($path, $baseDirectory);
-        if ($resolved !== null) {
-            return $resolved;
-        }
-
-        if ($this->templatesDirectory !== '') {
-            $resolved = $this->findFile($path, $this->templatesDirectory);
-            if ($resolved !== null) {
-                return $resolved;
-            }
-        }
-
-        $searched = $baseDirectory;
-        if ($this->templatesDirectory !== '') {
-            $searched .= ', ' . $this->templatesDirectory;
-        }
-
-        throw new \RuntimeException(sprintf(
-            'Include file not found: %s (searched: %s)',
-            $path,
-            $searched,
-        ));
-    }
-
-    /**
-     * Try to find a file in a directory, with optional .html extension.
-     */
-    private function findFile(string $path, string $directory): ?string
-    {
-        $absolute = $directory . DIRECTORY_SEPARATOR . $path;
-
-        if (is_file($absolute)) {
-            return $absolute;
-        }
-
-        if (pathinfo($path, PATHINFO_EXTENSION) === '') {
-            $withExt = $absolute . '.html';
-            if (is_file($withExt)) {
-                return $withExt;
-            }
-        }
-
-        return null;
-    }
-
-    // ------------------------------------------------------------------
-    // Pre-compilation: extends / section / yield
-    // ------------------------------------------------------------------
-
-    /**
-     * Resolve layout inheritance.
-     *
-     * If the source starts with the extends directive, extract all
-     * {{ section 'name' }}...{{ endsection }} blocks from the child,
-     * load the layout file, and replace {{ yield 'name' }} placeholders
-     * with the section contents.
-     */
-    private function resolveLayout(
-        string $source,
-        string $templateDirectory,
-    ): string {
-        // Check for extends directive (must appear at the start, ignoring whitespace).
-        if (!preg_match('/^\s*\{\{\s*extends\s+\'([^\']+)\'\s*\}\}/s', $source, $extendsMatch)) {
-            return $source;
-        }
-
-        $layoutName = $extendsMatch[1];
-
-        // Strip the extends directive from the child source.
-        $childSource = substr($source, strlen($extendsMatch[0]));
-
-        // Extract sections from the child.
-        $sections = $this->extractSections($childSource);
-
-        // Load and resolve includes in the layout.
-        $layoutPath = $this->resolveLayoutPath(
-            $layoutName,
-            $templateDirectory,
-        );
-        $this->trackDependency($layoutPath);
-        $layoutSource = $this->reader->read($layoutPath);
-        $layoutSource = $this->resolveIncludes(
-            $layoutSource,
-            dirname($layoutPath),
-        );
-
-        // Collect yield names from the layout.
-        preg_match_all(
-            '/\{\{\s*yield\s+\'([^\']+)\'\s*\}\}/s',
-            $layoutSource,
-            $yieldMatches,
-        );
-        $yieldNames = $yieldMatches[1];
-
-        // Warn about sections defined in the child that don't match
-        // any yield in the layout — almost always a typo.
-        $unusedSections = array_diff(
-            array_keys($sections),
-            $yieldNames,
-        );
-        if ($unusedSections !== []) {
-            $available = $yieldNames !== []
-                ? 'Available yields: ' . implode(', ', $yieldNames)
-                : 'The layout has no yield directives';
-
-            throw new \RuntimeException(sprintf(
-                'Template defines section(s) not found in layout: %s. %s',
-                implode(', ', $unusedSections),
-                $available,
-            ));
-        }
-
-        // Replace yield directives in the layout with section content.
-        return $this->replaceCallback(
-            '/\{\{\s*yield\s+\'([^\']+)\'\s*\}\}/s',
-            function (array $matches) use ($sections): string {
-                return $sections[$matches[1]] ?? '';
-            },
-            $layoutSource,
-        );
-    }
-
-    /**
-     * Resolve fragment mode: extract only the 'content' section, skip layout.
-     *
-     * When a template declares a layout via the extends directive, fragment
-     * mode returns the content section directly without wrapping in the
-     * layout. If there's no extends directive, the source passes through.
-     */
-    private function resolveFragment(
-        string $source,
-        string $templateDirectory,
-    ): string {
-        if (!preg_match('/^\s*\{\{\s*extends\s+\'([^\']+)\'\s*\}\}/s', $source, $extendsMatch)) {
-            return $source;
-        }
-
-        $childSource = substr($source, strlen($extendsMatch[0]));
-        $sections = $this->extractSections($childSource);
-
-        return $sections['content'] ?? '';
-    }
-
-    /**
-     * Extract {{ section 'name' }}...{{ endsection }} blocks.
-     *
-     * @return array<string, string> Section name → content.
-     */
-    private function extractSections(string $source): array
-    {
-        $sections = [];
-
-        preg_match_all(
-            '/\{\{\s*section\s+\'([^\']+)\'\s*\}\}(.*?)\{\{\s*endsection\s*\}\}/s',
-            $source,
-            $matches,
-            PREG_SET_ORDER,
-        );
-
-        foreach ($matches as $match) {
-            $sections[$match[1]] = trim($match[2]);
-        }
-
-        return $sections;
-    }
-
-    // ------------------------------------------------------------------
-    // Pre-compilation: match / case / default / endmatch
-    // ------------------------------------------------------------------
-
-    /**
-     * Resolve match / case / default blocks into PHP switch alt-syntax
-     * with implicit `break` after each case.
-     *
-     * Input:
-     *   {{ match $status }}
-     *       {{ case 'pending', 'active' }}<span>active</span>
-     *       {{ case 'closed' }}<span>closed</span>
-     *       {{ default }}<span>unknown</span>
-     *   {{ endmatch }}
-     *
-     * Output:
-     *   <?php switch ($status): ?>
-     *       <?php case 'pending': ?><?php case 'active': ?><span>active</span><?php break; ?>
-     *       <?php case 'closed': ?><span>closed</span><?php break; ?>
-     *       <?php default: ?><span>unknown</span><?php break; ?>
-     *   <?php endswitch; ?>
-     *
-     * Comma-separated values in `case` map to PHP fall-through case lists.
-     * The case body still contains template syntax that the main compile
-     * pass picks up afterwards.
-     */
-    private function resolveMatch(string $source): string
-    {
-        return $this->replaceCallback(
-            '/\{\{\s*match\s+(.+?)\s*\}\}(.*?)\{\{\s*endmatch\s*\}\}/s',
-            function (array $matches): string {
-                $subject = trim($matches[1]);
-                $body = $matches[2];
-
-                $output = '<?php switch (' . $subject . '): ?>';
-
-                // Split body on case/default markers, keeping them.
-                $parts = preg_split(
-                    '/(\{\{\s*(?:case\s+[^}]+?|default)\s*\}\})/s',
-                    $body,
-                    -1,
-                    PREG_SPLIT_DELIM_CAPTURE,
-                );
-
-                if ($parts === false || $parts === []) {
-                    return $output . '<?php endswitch; ?>';
-                }
-
-                // Anything before the first case marker is dropped (it's
-                // just whitespace inside the match block, before any arm).
-                $count = count($parts);
-                for ($i = 1; $i < $count; $i += 2) {
-                    $marker = $parts[$i];
-                    $caseBody = $parts[$i + 1] ?? '';
-
-                    if (preg_match('/\{\{\s*case\s+(.+?)\s*\}\}/s', $marker, $caseMatch)) {
-                        $values = $this->splitCaseValues($caseMatch[1]);
-                        foreach ($values as $value) {
-                            $output .= '<?php case ' . $value . ': ?>';
-                        }
-                    } elseif (preg_match('/\{\{\s*default\s*\}\}/', $marker)) {
-                        $output .= '<?php default: ?>';
-                    }
-
-                    $output .= $caseBody . '<?php break; ?>';
-                }
-
-                return $output . '<?php endswitch; ?>';
-            },
-            $source,
-        );
-    }
-
-    /**
-     * Split a case clause's value list on commas, respecting strings,
-     * parens, and brackets so we don't break up things like
-     *   `[1, 2], 'a, b'`
-     * into the wrong pieces.
-     *
-     * @return list<string>
-     */
-    private function splitCaseValues(string $list): array
-    {
-        $values = [];
-        $buffer = '';
-        $depth = 0;
-        $inString = null;
-        $length = strlen($list);
-
-        for ($i = 0; $i < $length; $i++) {
-            $char = $list[$i];
-
-            if ($inString !== null) {
-                $buffer .= $char;
-                if ($char === '\\' && $i + 1 < $length) {
-                    $buffer .= $list[++$i];
-                    continue;
-                }
-                if ($char === $inString) {
-                    $inString = null;
-                }
-                continue;
-            }
-
-            if ($char === "'" || $char === '"') {
-                $inString = $char;
-                $buffer .= $char;
-                continue;
-            }
-
-            if ($char === '(' || $char === '[') {
-                $depth++;
-                $buffer .= $char;
-                continue;
-            }
-
-            if ($char === ')' || $char === ']') {
-                $depth--;
-                $buffer .= $char;
-                continue;
-            }
-
-            if ($char === ',' && $depth === 0) {
-                $values[] = trim($buffer);
-                $buffer = '';
-                continue;
-            }
-
-            $buffer .= $char;
-        }
-
-        $buffer = trim($buffer);
-        if ($buffer !== '') {
-            $values[] = $buffer;
-        }
-
-        return $values;
-    }
-
-    /**
-     * Resolve a layout file path.
-     *
-     * Resolution order:
-     * 1. Relative to the child template's directory
-     * 2. Relative to the configured templates directory (if set)
-     *
-     * This means co-located layouts (next to the child) take precedence,
-     * with the shared templates directory as the standard fallback.
-     */
-    private function resolveLayoutPath(
-        string $name,
-        string $startDirectory,
-    ): string {
-        $resolved = $this->findFile($name, $startDirectory);
-        if ($resolved !== null) {
-            return $resolved;
-        }
-
-        if ($this->templatesDirectory !== '') {
-            $resolved = $this->findFile($name, $this->templatesDirectory);
-            if ($resolved !== null) {
-                return $resolved;
-            }
-        }
-
-        $searched = $startDirectory;
-        if ($this->templatesDirectory !== '') {
-            $searched .= ', ' . $this->templatesDirectory;
-        }
-
-        throw new \RuntimeException(sprintf(
-            'Layout file not found: %s (searched: %s)',
-            $name,
-            $searched,
-        ));
+        return $source;
     }
 }
