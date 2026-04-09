@@ -10,6 +10,7 @@ use Arcanum\Cabinet\Application;
 use Arcanum\Cabinet\Container;
 use Arcanum\Hourglass\Clock;
 use Arcanum\Hourglass\FrozenClock;
+use Arcanum\Testing\Internal\TestHyperKernel;
 use Arcanum\Vault\ArrayDriver;
 use DateTimeImmutable;
 use Psr\SimpleCache\CacheInterface;
@@ -29,6 +30,8 @@ final class TestKernel
     private readonly Clock $clock;
     private readonly CacheInterface $cache;
     private readonly ActiveIdentity $identity;
+
+    private HttpTestSurface|null $http = null;
 
     public function __construct(
         Clock|null $clock = null,
@@ -78,5 +81,25 @@ final class TestKernel
         $this->identity->set($identity);
 
         return $this;
+    }
+
+    /**
+     * Lazily build and memoize the HTTP test surface.
+     *
+     * Most tests touch one transport; constructing the HyperKernel only on
+     * first call means a CLI-only test never pays for HTTP wiring it doesn't
+     * use. Cross-transport tests still see consistent state because the
+     * surface bootstraps against the shared container.
+     */
+    public function http(): HttpTestSurface
+    {
+        if ($this->http === null) {
+            $this->http = new HttpTestSurface(
+                new TestHyperKernel($this->rootDirectory ?? '/app'),
+                $this->container,
+            );
+        }
+
+        return $this->http;
     }
 }
