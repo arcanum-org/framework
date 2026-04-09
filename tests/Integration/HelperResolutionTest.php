@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Integration;
 
-use Arcanum\Cabinet\Container;
+use Arcanum\Cabinet\Application;
 use Arcanum\Gather\Configuration;
 use Arcanum\Ignition\Bootstrap\Helpers;
 use Arcanum\Ignition\Bootstrap\Routing;
@@ -13,6 +13,7 @@ use Arcanum\Ignition\Kernel;
 use Arcanum\Hyper\JsonResponseRenderer;
 use Arcanum\Shodo\HelperResolver;
 use Arcanum\Shodo\Helpers\RouteHelper;
+use Arcanum\Testing\TestKernel;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversNothing;
 
@@ -60,10 +61,16 @@ final class HelperResolutionTest extends TestCase
         rmdir($dir);
     }
 
-    private function bootstrap(): Container
+    private function bootstrap(): Application
     {
-        $container = new Container();
-        $container->instance(\Arcanum\Cabinet\Application::class, $container);
+        // TestKernel gives us the same shared bindings any future app
+        // handler test will inherit (FrozenClock, ArrayDriver,
+        // ActiveIdentity) — this test doesn't need them, but using
+        // TestKernel proves it doesn't get in the way of bootstrapper-
+        // driven setup either.
+        $kernel = new TestKernel(rootDirectory: $this->rootDir);
+        $container = $kernel->container();
+        $container->instance(Application::class, $container);
         $container->instance(\Psr\Container\ContainerInterface::class, $container);
 
         $config = new Configuration([
