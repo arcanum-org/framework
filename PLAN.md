@@ -65,7 +65,7 @@ The four Vault drivers (`ApcuDriver`, `RedisDriver`, `ArrayDriver`, `FileDriver`
 
 - [x] **Add `Hourglass\Interval` with `secondsIn` and `ofSeconds`.** Final class, two static methods. `secondsIn` uses the epoch-anchor trick; `ofSeconds` clamps negatives to zero and constructs `new \DateInterval("PT{$n}S")`. 13 IntervalTest methods covering h/m/s/d intervals, mixed intervals, the documented `P1M`→31d / `P1Y`→365d epoch-anchor behavior, the negative-clamp, and a round-trip.
 - [x] **Migrate all four Vault drivers to call `Interval::secondsIn()`.** Single commit covering ApcuDriver, RedisDriver, ArrayDriver, FileDriver. Each driver gains `use Arcanum\Hourglass\Interval;` and replaces the epoch-anchor incantation with `Interval::secondsIn($ttl)`. ApcuDriver/RedisDriver `resolveTtl` docblocks trimmed — the verbose explanation is no longer needed because the call site speaks for itself.
-- [ ] **Hourglass README + COMPENDIUM.** Document the new type with a worked example in the Hourglass README and update the COMPENDIUM Hourglass entry to list it.
+- [x] **Hourglass README + COMPENDIUM.** Hourglass README intro now lists three primitives (Clock / Stopwatch / Interval), with a new `## Interval` section covering the API table, the documented epoch-anchor behavior for months and years, and a "why no value object" subsection capturing the helper-vs-subclass-vs-wrap reasoning. COMPENDIUM Hourglass entry mentions Interval as a sibling primitive used by all four Vault drivers.
 
 ### Welcome page — nice-to-haves (deferred)
 

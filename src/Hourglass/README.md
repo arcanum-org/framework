@@ -1,13 +1,14 @@
 # Arcanum Hourglass
 
-Hourglass is the time package. It owns everything Arcanum does with time — wall-clock readings, elapsed-time measurement, and the test doubles that make time-dependent code deterministic.
+Hourglass is the time package. It owns everything Arcanum does with time — wall-clock readings, elapsed-time measurement, interval conversions, and the test doubles that make time-dependent code deterministic.
 
-Two primitives live here:
+Three primitives live here:
 
 - **Clock** — wall-clock time. "What time is it right now?"
 - **Stopwatch** — process timeline. "How much time has passed between two points in this process?"
+- **Interval** — `DateInterval` ↔ seconds conversion. "How many seconds is this interval, and vice versa?"
 
-They're related but distinct. Clock is for timestamps, expiry, audit logs. Stopwatch is for profiling, lifecycle measurement, "rendered in X ms" footers.
+They're related but distinct. Clock is for timestamps, expiry, audit logs. Stopwatch is for profiling, lifecycle measurement, "rendered in X ms" footers. Interval is the small piece of glue between PHP's `\DateInterval` representation and the integer seconds that PSR-16 caches, schedulers, and rate limiters actually want to work with.
 
 ## Clock
 
@@ -140,6 +141,42 @@ The framework records these instants automatically once Stopwatch is wired throu
 
 The cost is single-digit nanoseconds per mark. Stopwatch is always on.
 
+## Interval
+
+`Arcanum\Hourglass\Interval` is a small stateless utility for converting between PHP's `\DateInterval` and integer seconds. PSR-16 caches and most TTL-shaped APIs accept `\DateInterval|int|null`, and the integer branch is straightforward — but the `DateInterval` branch needs a normalization step. Hourglass owns that normalization so individual cache drivers, throttlers, and schedulers don't each re-implement it.
+
+```php
+use Arcanum\Hourglass\Interval;
+
+Interval::secondsIn(new \DateInterval('PT1H'));   // 3600
+Interval::secondsIn(new \DateInterval('PT5M30S')); // 330
+
+$ttl = Interval::ofSeconds(3600);                  // \DateInterval representing 1 hour
+$cache->set('key', 'value', $ttl);
+```
+
+### API
+
+| Method | Returns | Notes |
+|---|---|---|
+| `secondsIn(\DateInterval $interval)` | `int` | Total seconds in the interval. |
+| `ofSeconds(int $seconds)` | `\DateInterval` | Construct an interval of `$seconds` seconds. Negative inputs clamp to zero. |
+
+### How `secondsIn` handles months and years
+
+The conversion anchors a `DateTime` at the unix epoch (timestamp `0`), adds the interval, and reads the resulting timestamp. For hour/minute/second/day intervals — the overwhelmingly common case — this is exact: `PT1H` is 3600, `P1D` is 86400, `P2DT3H` is 183600.
+
+For month and year components, "how many seconds in a month?" doesn't have a single right answer. The epoch anchor pins it: `P1M` (1 month) added to Jan 1, 1970 lands on Feb 1, 1970 — 31 days, so `Interval::secondsIn(new \DateInterval('P1M'))` is `2_678_400`. Similarly `P1Y` resolves to 365 days because 1970 is non-leap. If your code is doing calendar arithmetic that needs accurate month/year handling, use `\DateTimeImmutable::add()` directly against a known reference date instead — `Interval::secondsIn` is for fixed-length conversions like cache TTLs and rate-limit windows.
+
+### Why no `Interval` value object?
+
+Hourglass deliberately does **not** ship a class that extends `\DateInterval` or wraps it. Both options were considered and rejected:
+
+- **Subclass `\DateInterval`** — would inherit the parent's mutable public properties (`$y, $m, $d, $h, $i, $s`), violating the package's "immutable value objects only" preference. It also wouldn't reduce the cache-driver duplication on its own, because the drivers receive raw `\DateInterval` from PSR-16 and still need a function that operates on the parent type.
+- **Wrap `\DateInterval`** — over-engineered for a one-method conversion, and forces every caller to choose between the wrapper and the raw type.
+
+The static helper does the actual job (drivers stop duplicating the conversion) with the smallest surface. If a discoverable instance method like `$interval->toSeconds()` becomes worth its weight later, adding it is a one-line change.
+
 ## At a glance
 
 ```
@@ -148,5 +185,6 @@ Hourglass
 ├── SystemClock      — production
 ├── FrozenClock      — test double (set, advance)
 ├── Stopwatch        — process timeline recorder
-└── Instant          — readonly label + time
+├── Instant          — readonly label + time
+└── Interval         — \DateInterval ↔ seconds (static helper)
 ```
