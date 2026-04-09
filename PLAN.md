@@ -70,9 +70,9 @@ First-class htmx support baked into the framework, targeting **htmx 4** directly
 
 #### Middleware
 
-- [ ] **Add `HtmxRequestMiddleware`** (inbound). Populates `HtmxRequest` resolution in the container, auto-adds `Vary: HX-Request` via `withAddedHeader`. Replaces the starter app's `App\Http\Middleware\Htmx`. Tests cover the request decoration + the Vary appending (including the "Vary already has Accept" case).
-- [ ] **Add `EventCapture` and `HtmxEventTriggerMiddleware`** (outbound). `EventCapture` is a thin decorator around Echo's dispatcher that records `ClientBroadcast` events fired during the request. The middleware reads them after the handler runs and merges them into `HX-Trigger` / `HX-Trigger-After-Swap` / `HX-Trigger-After-Settle` based on which sub-interface they implement. Also handles the `Location → HX-Location` copy for command redirects. Tests cover single event, multiple events, mixed timings, the location copy, and the no-events no-op case.
-- [ ] **Add `HtmxAuthRedirectMiddleware`** (or extend the existing exception renderer). On 401/403 with an htmx request, returns an empty body with `HX-Location: /login` (default) or `HX-Refresh: true` (config). Tests cover both modes plus the non-htmx pass-through.
+- [x] **Add `HtmxRequestMiddleware`** (inbound). Populates `HtmxRequest` resolution in the container, auto-adds `Vary: HX-Request` via `withAddedHeader`. Replaces the starter app's `App\Http\Middleware\Htmx`. Tests cover the request decoration + the Vary appending (including the "Vary already has Accept" case).
+- [x] **Add `EventCapture` and `HtmxEventTriggerMiddleware`** (outbound). `EventCapture` is a thin decorator around Echo's dispatcher that records `ClientBroadcast` events fired during the request. The middleware reads them after the handler runs and merges them into `HX-Trigger` / `HX-Trigger-After-Swap` / `HX-Trigger-After-Settle` based on which sub-interface they implement. Also handles the `Location → HX-Location` copy for command redirects. Tests cover single event, multiple events, mixed timings, the location copy, and the no-events no-op case.
+- [x] **Add `HtmxAuthRedirectMiddleware`** (or extend the existing exception renderer). On 401/403 with an htmx request, returns an empty body with `HX-Location: /login` (default) or `HX-Refresh: true` (config). Tests cover both modes plus the non-htmx pass-through.
 
 #### CSRF and config
 
