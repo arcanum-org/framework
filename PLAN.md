@@ -8,83 +8,65 @@
 
 Concrete, walkable lists. Everything else in this file is informational — context, history, decisions, and future work that hasn't been broken into steps yet. When something becomes a checklist, it lives here.
 
-### Shodo `{{ fragment }}` directive — active
+### Shodo fragment support — superseded by auto-detection
 
-Prerequisite for the htmx package below. Shodo currently has `{{ section 'name' }}` for layout slots and a setFragment-mode that strips the layout and renders the whole content section. Adding named fragments — addressable regions inside a section — gives htmx handlers a way to render just part of a template by name, without forcing every fragment into its own template file.
+The `{{ fragment 'name' }}` directive was built, tested, and documented, then removed in favor of auto-fragment extraction from HTML `id` attributes (see the htmx package section below). The directive added ceremony that auto-detection eliminates — developers just write `<div id="sidebar">` and the framework extracts it on htmx requests.
 
-**Design decisions made during discovery:**
-
-- **Directive shape: `{{ fragment 'name' }} … {{ endfragment }}`.** Parallel to `{{ section }}` and uses the existing string-literal-name convention. Lives inside a section.
-- **Fragment storage: each named fragment compiles to its own callable**, keyed by name on the compiled template object. The renderer looks up by name; existing layout/section logic is untouched.
-- **Cache key extension: template path + fragment name.** A template with three fragments has four cache entries (the whole template plus one per fragment), each independently compiled and stored. Avoids re-compiling the parent on every fragment access.
-- **Fall-through: rendering an unknown fragment name logs a warning and falls back to rendering the section.** Soft failure is the right default — a typo in a fragment name shouldn't 404 a real user, and the framework log surfaces the bug for the developer.
-- **Locality: fragments live next to the markup they describe**, inside the same template file as the page they're part of. The whole point is that a page and its addressable sub-regions are one file.
-
-#### Compiler
-
-- [x] **Add `{{ fragment 'name' }} … {{ endfragment }}` recognition to `TemplateCompiler`.** Parses the directive into a captured callable per fragment, keyed by name. Errors clearly on mismatched/unclosed fragment blocks. Tests cover happy path, multiple fragments per section, fragments-with-conditionals, fragments-with-includes, and the error cases.
-- [x] **Extend `TemplateCache` to key by template path + fragment name.** Existing whole-template cache entries keep working; new fragment entries live alongside them. Cache invalidation already handles dependency tracking; the fragment entries inherit it.
-- [x] **Add `HtmlFormatter::renderFragment(string $template, string $name, mixed $data): string`.** Returns just the rendered fragment, no layout, no surrounding section. Follows the same dependency-resolution and template-resolver path as the full render.
-
-#### Documentation
-
-- [x] **Shodo README — document the `{{ fragment }}` directive.** New section with worked examples (basic, multiple fragments per template, conditional fragments). Notes the soft-fall-through behavior. Cross-references the htmx package once it lands.
-- [x] **COMPENDIUM Shodo entry update.** Mentions the new directive alongside the existing `{{ section }}` and `{{ extends }}` mechanisms.
-
-#### Fragment / swap-mode footgun
-
-htmx defaults to `innerHTML` swaps, but fragments pair more naturally with `outerHTML` (the fragment wraps the target element so the id survives the swap). We chose **not** to override htmx's default — someone reading htmx docs should see the same behavior in Arcanum. But this means a developer who writes `{{ fragment 'foo' }}` wrapping the inner content of `<div id="foo">` will silently get correct behavior on full-page loads and broken behavior on htmx swaps (the target element's id disappears after the first innerHTML swap, so subsequent swaps fail).
-
-Mitigation ideas (pick one or combine, not designed yet):
-- [ ] **Compile-time lint in `TemplateCompiler` or a `validate:templates` CLI command.** Scan each `{{ fragment 'name' }}` and check whether the immediately preceding non-whitespace HTML is `<TAG id="name">`. If so, warn that the fragment wraps the *inner* content — the developer probably wants the fragment to wrap the element itself for outerHTML swaps. If the fragment *starts with* `<TAG id="name">`, it's the outerHTML shape and no warning fires.
-- [ ] **Runtime warning in `HtmlFormatter::renderFragment()`.** When rendering a named fragment for an htmx request, inspect the rendered HTML: if it doesn't contain an element whose id matches the fragment name, log a warning ("fragment 'foo' does not contain an element with id='foo' — htmx outerHTML swaps will lose the target").
-- [ ] **Documentation prominence.** Shodo README and htmx README both lead with the outerHTML pattern and call out the innerHTML footgun explicitly, with a before/after example showing the id-disappears failure mode.
+**What survived from this arc:**
+- `TemplateCache` fragment-keyed entries (`isFresh`, `load`, `store`, `cachePath` all accept an optional `fragmentName` parameter). Auto-detection reuses this for caching by element id.
+- `HtmlFormatter` gained a `LoggerInterface` constructor parameter for warning on fall-through. Auto-detection will use this.
+- The content-section-only mode (`compile(fragment: true)` / `setFragment(true)`) is unchanged and still serves as the fall-through when auto-detection finds no matching id.
 
 #### Cross-cutting
 
-- [ ] **Run `composer check` after each commit.** Pre-commit hook enforces.
+- [x] **Run `composer check` after each commit.**
 
 ### htmx package — `Arcanum\Htmx` — active
 
 First-class htmx support baked into the framework, targeting **htmx 4** directly. Replaces the starter app's local `App\Http\Middleware\Htmx` (30-line minimal middleware) with a full `src/Htmx/` package that exposes:
 
 - `HtmxRequest` — read-side decorator over `ServerRequestInterface` for handlers that want to inspect htmx headers.
-- `Fragment` — escape-hatch return value for handlers whose scope diverges from the page-load query.
+- **Auto-fragment extraction** — the framework reads `HX-Target` from the request, finds the matching `id="..."` element in the raw template source, extracts just that region, and compiles/renders only the extracted slice. Developers write normal HTML with ids; the framework handles partial rendering automatically.
 - `ClientBroadcast` — marker interface on domain events that should project as `HX-Trigger` server-to-client signals.
-- A new htmx-aware HTML rendering mode that reads `HX-Request-Type` and `HX-Target` to pick the right rendering shape automatically — handlers stay transport-agnostic by default.
+- Automatic swap-mode awareness — the framework reads the swap mode (outerHTML vs innerHTML) and includes or strips the wrapper element accordingly.
 - An `HtmxEventTriggerMiddleware` that auto-projects domain events through Echo into `HX-Trigger` headers — the CQRS-native cross-component refresh story.
 - A CSRF JS shim served from a framework endpoint (`/_htmx/csrf.js`) that auto-injects tokens via `htmx:configRequest`.
 - An htmx-aware auth-redirect handler that returns `HX-Location: /login` on 401/403 instead of swapping login HTML into a random target.
 
-Depends on the Shodo `{{ fragment }}` directive arc above.
-
 **Design decisions made during discovery:**
 
 - **Target htmx 4 directly, no v2 fallback.** Pin to `4.0.0-beta1` exactly (configurable via `config/htmx.php`). v4 fixes the 422 validation gotcha by default (4xx/5xx swap), introduces `HX-Request-Type` for clean rendering-mode resolution, ships native morph swaps, and aligns mentally with Arcanum's CQRS conventions. The htmx team has perpetual v2 support, so existing v2 docs/tutorials will keep working in the wider ecosystem.
-- **App-facing API surface is intentionally tiny:** `HtmxRequest`, `Fragment`, `ClientBroadcast`. Three types. Everything else is middleware, internal builders, and config the developer never imports.
-- **Handlers stay transport-agnostic by default.** The framework's HTML renderer reads `HX-Request-Type` from the request. On `partial`, it parses `HX-Target`'s `tagName#id?name` format, extracts the id, and renders the matching named fragment from the resolved template. On `full`, it renders the whole template (with layout for non-htmx, content section for htmx-with-full-type). Handlers return plain data; the renderer figures out the shape.
-- **`Fragment::named('archive-ui', $data)` is the explicit escape hatch** for handlers whose scope diverges from the page-load query — different data, different permissions, or per-instance ids. Documented as the secondary pattern.
-- **Convention: fragment names match DOM element ids.** A `{{ fragment 'archive-ui' }}` block lives inside a `<div id="archive-ui">`. htmx sends `HX-Target: div#archive-ui?`, the framework extracts the id, looks up the named fragment, renders it. Self-consistent loop. Documented prominently in the package README.
+- **Auto-fragment extraction from HTML ids — the zero-ceremony default.** Instead of requiring developers to wrap regions in `{{ fragment 'name' }}…{{ endfragment }}` directives, the framework finds elements by `id` attribute directly in the raw template source. When `HX-Target: sidebar` arrives, the compiler searches the template's content section for `id="sidebar"`, determines the tag name, depth-counts open/close tags to find the matching close, extracts that slice, and compiles only the extracted region. The developer writes natural HTML with ids — no fragment directives, no htmx awareness in the template. The explicit `{{ fragment }}` directive (already landed in Shodo) remains as a fallback for unusual layouts, but the auto-detection path is the primary mechanism and what documentation leads with.
+- **Swap-mode-aware extraction.** The framework reads the swap mode from the request (htmx v4 sends swap info, or the framework infers from config). For `outerHTML` swaps, the extracted region includes the target element itself. For `innerHTML` swaps, the framework strips the wrapper and returns only the element's children. Same template, same handler — the framework adapts the response shape automatically. This eliminates the innerHTML/outerHTML footgun entirely: the developer doesn't need to think about swap modes when writing templates.
+- **`HX-Target` is only sent when the target element has an `id`.** Confirmed in htmx source (line 3605: `'HX-Target': getAttributeValue(target, 'id')`). `Element.getAttribute('id')` returns null for elements without an id, so the header is omitted. This means auto-detection is the only viable server-side fragment resolution — the server never receives CSS selectors, only ids (or nothing). The convention is self-enforcing: if the developer wants server-side partial rendering, they put an id on the target element. If they don't, htmx swaps the full response and the server renders normally.
+- **App-facing API surface is intentionally tiny:** `HtmxRequest`, `ClientBroadcast`. Two types. Everything else is middleware, internal builders, and config the developer never imports. No `Fragment` value object — strict CQRS means commands don't return data, and queries always return the full dataset; the framework decides what slice to render from `HX-Target`.
+- **Handlers stay transport-agnostic by default.** The framework's HTML renderer reads `HX-Request-Type` from the request. On `partial`, it reads `HX-Target` to get the element id, finds it in the template source, extracts and compiles just that region. On `full`, it renders the whole template (with layout for non-htmx, content section for htmx-with-full-type). Handlers return plain data; the renderer figures out the shape.
+- **Dynamic ids are a routing question, not a fragment question.** `<div id="item-{{ $id }}">` inside a `{{ foreach }}` can't be extracted at the template level — the id is only known after rendering, and the loop variable `$item` would be undefined outside its scope. The existing debug-mode undefined-variable detection catches this naturally. The CQRS answer: if something is independently addressable via htmx, it should be its own query with its own handler and template. Per-item updates route to a single-item query (`GET /items/42`), not a fragment of the list query.
 - **`ClientBroadcast` is a marker interface** with `eventName(): string` and `payload(): array`. Sub-interfaces `BroadcastAfterSwap` and `BroadcastAfterSettle` for the timing variants — most events default to immediate `HX-Trigger`.
 - **`HtmxResponse` is framework-internal**, possibly under `Internal\`. App code never constructs it. It's the typed builder middleware uses to compose response headers.
 - **`Vary: HX-Request` is auto-added** by `HtmxRequestMiddleware` via `withAddedHeader` (preserves existing `Vary` values). Config opt-out available; default on. Avoids the cache-key footgun.
 - **No `#[HtmxOnly]` attribute** — pattern doesn't match transport-guard semantics, can be added later if a real case demands it.
-- **Don't override htmx's default `hx-swap`.** Keep upstream docs accurate for Arcanum users. Recommend `outerHTML` in package README + starter examples.
+- **Don't override htmx's default `hx-swap`.** Keep upstream docs accurate for Arcanum users. Recommend `outerHTML` in package README + starter examples, since it pairs most naturally with the id-based extraction (the target element survives the swap).
 - **Top-level `src/Htmx/` package**, not nested under Hyper. Cross-cuts Echo, Session, Auth, Shodo, Validation, Hyper, Glitch, Ignition — the cross-cutting nature makes a sub-package wrong. Parallel to `Arcanum\Testing` in placement and dependency shape.
-- **Soft fall-through on missing fragments**: when `HX-Target` carries an id with no matching fragment in the template, the renderer falls back to the content section and logs a warning. Strict failure would 404 real users for typos.
+- **Soft fall-through on missing ids**: when `HX-Target` carries an id with no matching element in the template, the renderer falls back to the content section and logs a warning. Strict failure would 404 real users for typos.
+- **The `{{ fragment }}` directive remains as a fallback.** Already landed in Shodo, it handles edge cases where the extractable region doesn't correspond to a single HTML element (unusual layouts, multi-element groups). Auto-detection is the primary path; `{{ fragment }}` is the escape hatch. Review whether the directive is still needed after the package is complete.
 
 #### Foundation
 
-- [ ] **Create `Arcanum\Htmx` package skeleton.** New `src/Htmx/` directory with placeholder files (`HtmxRequest.php`, `Fragment.php`, `ClientBroadcast.php`, `README.md` stub). Smoke test verifies namespace loads. No composer.json change needed — `Arcanum\` already maps to `src/`.
-- [ ] **Add `HtmxRequestType` enum and `HtmxRequest` decorator.** Enum: `Full` | `Partial`. Decorator wraps `ServerRequestInterface` with `isHtmx()`, `isBoosted()`, `isHistoryRestore()`, `type(): HtmxRequestType`, `target(): ?string` (returns id portion of parsed `HX-Target`), `source(): ?string` (same for `HX-Source`), `triggerName()`, `currentUrl()`, `prompt()`. Private parser for the `tagName#id?name` format. Tests cover every accessor + the parser edge cases (empty id, empty name, body, missing pieces).
-- [ ] **Add `Fragment` value object.** `Fragment::named(string $name, array $data = []): self`. Public readonly `name` and `data` properties. Constructor docblock notes the optional override fields (`retarget`, `reswap`, `reselect`) for the rare cases where a handler needs to override the client's swap decision. Tests cover construction, the named-constructor sugar, and the override fields.
+- [ ] **Create `Arcanum\Htmx` package skeleton.** New `src/Htmx/` directory with placeholder files (`HtmxRequest.php`, `ClientBroadcast.php`, `README.md` stub). Smoke test verifies namespace loads. No composer.json change needed — `Arcanum\` already maps to `src/`.
+- [ ] **Add `HtmxRequestType` enum and `HtmxRequest` decorator.** Enum: `Full` | `Partial`. Decorator wraps `ServerRequestInterface` with `isHtmx()`, `isBoosted()`, `isHistoryRestore()`, `type(): HtmxRequestType`, `target(): ?string` (the `HX-Target` value — an element id or null), `swapMode(): ?string` (the `HX-Swap` value when available), `source(): ?string`, `triggerName()`, `currentUrl()`, `prompt()`. Tests cover every accessor + edge cases (missing headers, empty values).
 - [ ] **Add `ClientBroadcast` marker interface and timing sub-interfaces.** `ClientBroadcast::eventName(): string` and `payload(): array`. `BroadcastAfterSwap extends ClientBroadcast` and `BroadcastAfterSettle extends ClientBroadcast` are pure marker sub-interfaces — no method additions, just type-level signals. Tests cover that `instanceof` checks pick the right sub-interface.
+
+#### Auto-fragment extraction (Shodo integration)
+
+- [ ] **Add `TemplateCompiler::extractElementById(string $source, string $id): ?ElementExtraction`.** Searches raw template source for an element with the given `id` attribute. Uses tag-name depth counting to find the matching close tag. Returns an `ElementExtraction` value object with `outerHtml` (the full element including its tags) and `innerHtml` (children only), or null when the id isn't found. Handles self-closing/void elements. Tests cover: basic extraction, nested same-tag elements, void elements, id not found, id inside control structures (still extracts — the undefined-variable detection catches scope issues at render time), id with template expressions in attributes (skipped — literal ids only).
+- [ ] **Add `HtmlFormatter::renderElementById(string $id, string $swapMode, mixed $data, string $dtoClass): string`.** Resolves the template, extracts the content section (no layout), calls `extractElementById`, picks `outerHtml` or `innerHtml` based on swap mode, compiles and renders just that slice. Falls back to content section + log warning when the id isn't found. Uses fragment-keyed cache (`template#id`). Tests cover outerHTML mode, innerHTML mode, cache hit, fall-through, and escaping.
 
 #### Rendering pipeline
 
 - [ ] **Add `HtmxResponse` internal builder.** Immutable PSR-7-style decorator with `withLocation`, `withPushUrl`, `withReplaceUrl`, `withRedirect`, `withRefresh`, `withRetarget`, `withReswap`, `withReselect`, `withTrigger`, `withTriggerAfterSwap`, `withTriggerAfterSettle`, `withVary`, `toResponse()`. Trigger methods merge into a single header per timing slot. Tests cover all builder methods + trigger merging.
 - [ ] **Add `HtmxLocation` value object** for the JSON-envelope form of `HX-Location`. Fields per the htmx spec: `path`, `target`, `swap`, `source`, `event`, `handler`, `values`, `headers`, `select`. JSON-serializable. Tests cover the simple `path`-only case + the full envelope.
-- [ ] **Extend `HtmlResponseRenderer` (or add `HtmxAwareResponseRenderer`) to read `HX-Request-Type` and `HX-Target` from the request and pick the rendering shape.** Three modes: full + layout, full body without layout, named fragment via `HX-Target` id lookup. Falls back to content section + log warning when fragment lookup fails. Detects `Fragment` return values from handlers and renders them directly (bypassing the HX-Target lookup). Tests cover all modes + the fall-through.
+- [ ] **Extend `HtmlResponseRenderer` (or add `HtmxAwareResponseRenderer`) to read `HX-Request-Type` and `HX-Target` from the request and pick the rendering shape.** Three modes: (1) full + layout (non-htmx), (2) full content section without layout (htmx full-type), (3) auto-extracted element by id from `HX-Target` (htmx partial-type). Falls back to content section + log warning when element id lookup fails. Falls back to `{{ fragment }}` lookup when auto-detection finds nothing (bridge to the explicit directive). Tests cover all three modes + both fall-throughs.
 
 #### Middleware
 
@@ -102,14 +84,14 @@ Depends on the Shodo `{{ fragment }}` directive arc above.
 
 - [ ] **Replace starter `App\Http\Middleware\Htmx`** with the framework package's `HtmxRequestMiddleware` + `HtmxEventTriggerMiddleware` registered globally. Update `config/middleware.php` accordingly. Verify smoke test still passes.
 - [ ] **Update starter layout** to use `{{ Htmx::script() }}` instead of the hardcoded `<script src="...htmx.org@2.0.4...">` line. Add `<meta name="csrf-token">` and `<script src="/_htmx/csrf.js">`.
-- [ ] **Build the welcome-page guestbook fixture.** New `app/Domain/Guestbook/` module: `GetGuestbookEntries` query + handler + `.html` template (with `{{ fragment 'list' }}` for the list region), `AddEntry` command + handler with validation attributes, `EntryAdded` event implementing `ClientBroadcast`. SQLite storage via Forge with two `.sql` files. Wire into `Index.html` as a new card. Manually test the round-trip: form submit → 422 with errors → fix → success → list refreshes via `EntryAdded` broadcast.
-- [ ] **Welcome-page upscales: incantation card refresh.** Add a refresh button on the existing incantation card that hits `GET /` with `hx-target="#incantation"`. Add `<div id="incantation">{{ fragment 'incantation' }}…{{ endfragment }}</div>` to `Index.html`. Verify `GetIndexHandler` returns the same data and the framework picks the fragment from `HX-Target`.
-- [ ] **Welcome-page upscales: diagnostic row re-check.** Add per-row re-check buttons. Each row gets a unique fragment name (e.g., `diag-database`, `diag-cache`) wrapping `<div id="diag-database">`. Buttons target their own row's id. `GetIndexHandler` unchanged.
-- [ ] **Welcome-page upscales: CQRS demo lazy-load.** The existing CSS-only tabs become htmx-lazy-loaded. Each tab's content moves into a `{{ fragment 'cqrs-tab-x' }}` block. Tab buttons get `hx-get="/" hx-target="#cqrs-tab-x" hx-trigger="click once"` so each tab loads on first click and stays cached.
+- [ ] **Build the welcome-page guestbook fixture.** New `app/Domain/Guestbook/` module: `GetGuestbookEntries` query + handler + `.html` template with the entry list inside a `<div id="guestbook-list">`, `AddEntry` command + handler with validation attributes, `EntryAdded` event implementing `ClientBroadcast`. SQLite storage via Forge with two `.sql` files. Wire into `Index.html` as a new card. Manually test the round-trip: form submit → 422 with errors → fix → success → list refreshes via `EntryAdded` broadcast. Auto-fragment extraction serves the `<div id="guestbook-list">` region on htmx requests — no `{{ fragment }}` directives needed.
+- [ ] **Welcome-page upscales: incantation card refresh.** Add a refresh button on the existing incantation card that hits `GET /` with `hx-target="#incantation"`. Wrap the incantation content in `<div id="incantation">…</div>` in `Index.html`. Verify `GetIndexHandler` returns the same data and the framework auto-extracts the element from `HX-Target`.
+- [ ] **Welcome-page upscales: diagnostic row re-check.** Add per-row re-check buttons. Each row gets a unique id (e.g., `<div id="diag-database">`). Buttons target their own row's id. `GetIndexHandler` unchanged — auto-extraction serves the right element.
+- [ ] **Welcome-page upscales: CQRS demo lazy-load.** The existing CSS-only tabs become htmx-lazy-loaded. Each tab's content lives inside a `<div id="cqrs-tab-x">` block. Tab buttons get `hx-get="/" hx-target="#cqrs-tab-x" hx-trigger="click once"` so each tab loads on first click and stays cached. Auto-extraction serves each tab independently.
 
 #### Documentation
 
-- [ ] **Write `src/Htmx/README.md`.** End-to-end package reference: the three request modes, `HtmxRequest` accessors, `Fragment` value object, the HX-Target convention, `ClientBroadcast` events, CSRF integration, auth-redirect handling, the quirks list (especially `from:body` and `Vary` notes), pointers to `four.htmx.org` for the `hx-*` attribute reference itself. Aim 400-600 lines, comprehensive enough that an app developer never needs another htmx tutorial.
+- [ ] **Write `src/Htmx/README.md`.** End-to-end package reference: the three request modes, `HtmxRequest` accessors, auto-fragment extraction (how ids become fragments, outerHTML vs innerHTML handling, the fall-through behavior), `ClientBroadcast` events, CSRF integration, auth-redirect handling, dynamic ids and the CQRS decomposition pattern, the quirks list (especially `from:body` and `Vary` notes), pointers to `four.htmx.org` for the `hx-*` attribute reference itself. Aim 400-600 lines, comprehensive enough that an app developer never needs another htmx tutorial.
 - [ ] **Update COMPENDIUM.** Replace the existing "Front-end defaults" htmx paragraph with one that names the package, the request/response builders, the event projection bridge, and the v4 pin. Add a new package entry alongside Testing/etc. (count 22 → 23).
 - [ ] **Update starter README.** Walk through the welcome-page guestbook feature and the upscales. Document the htmx pin config and how to bump it. Replace the existing "Front-End: Tailwind CSS + htmx" section.
 

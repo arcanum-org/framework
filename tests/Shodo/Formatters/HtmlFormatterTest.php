@@ -15,7 +15,6 @@ use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Shodo\TemplateAnalyzer;
 use Arcanum\Shodo\TemplateResolver;
-use Psr\Log\LoggerInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -74,22 +73,13 @@ final class HtmlFormatterTest extends TestCase
         string $cacheDir = '',
         ?HelperResolver $helpers = null,
         bool $debug = false,
-        ?LoggerInterface $logger = null,
     ): HtmlFormatter {
         $resolver = new TemplateResolver($this->rootDir, 'App');
         $compiler = new TemplateCompiler();
         $cache = new TemplateCache($cacheDir ?: $this->cacheDir);
         $fallback = new HtmlFallbackFormatter();
 
-        return new HtmlFormatter(
-            $resolver,
-            $compiler,
-            $cache,
-            $fallback,
-            helpers: $helpers,
-            debug: $debug,
-            logger: $logger,
-        );
+        return new HtmlFormatter($resolver, $compiler, $cache, $fallback, helpers: $helpers, debug: $debug);
     }
 
     public function testFormatReturnsNonEmptyOutput(): void
@@ -503,111 +493,5 @@ final class HtmlFormatterTest extends TestCase
 
         // Assert — no notice triggered
         $this->assertSame('', $noticed);
-    }
-
-    // -----------------------------------------------------------
-    // renderFragment — named fragment rendering
-    // -----------------------------------------------------------
-
-    public function testRenderFragmentRendersNamedFragment(): void
-    {
-        // Arrange
-        file_put_contents(
-            $this->rootDir . '/app/Pages/Index.html',
-            "<h1>Title</h1>\n{{ fragment 'sidebar' }}<aside>{{ \$title }}</aside>{{ endfragment }}",
-        );
-        $formatter = $this->createFormatter();
-
-        // Act
-        $result = $formatter->renderFragment('sidebar', ['title' => 'Links'], 'App\\Pages\\Index');
-
-        // Assert — only the fragment content
-        $this->assertStringContainsString('<aside>Links</aside>', $result);
-        $this->assertStringNotContainsString('<h1>Title</h1>', $result);
-    }
-
-    public function testRenderFragmentUsesCache(): void
-    {
-        // Arrange
-        $templatePath = $this->rootDir . '/app/Pages/Index.html';
-        file_put_contents(
-            $templatePath,
-            "{{ fragment 'box' }}<div>{{ \$name }}</div>{{ endfragment }}",
-        );
-        $formatter = $this->createFormatter();
-
-        // Act — first call compiles and caches
-        $formatter->renderFragment('box', ['name' => 'first'], 'App\\Pages\\Index');
-
-        // Verify cache entry exists for the fragment
-        $cache = new TemplateCache($this->cacheDir);
-        $this->assertTrue($cache->isFresh($templatePath, 'box'));
-
-        // Act — second call uses cache
-        $result = $formatter->renderFragment('box', ['name' => 'second'], 'App\\Pages\\Index');
-
-        // Assert
-        $this->assertStringContainsString('<div>second</div>', $result);
-    }
-
-    public function testRenderFragmentFallsBackToContentSectionOnUnknownName(): void
-    {
-        // Arrange — template with a layout, but the requested fragment doesn't exist
-        mkdir($this->rootDir . '/app/Templates', 0755, true);
-        file_put_contents(
-            $this->rootDir . '/app/Templates/layout.html',
-            "<html>{{ yield 'content' }}</html>",
-        );
-        file_put_contents(
-            $this->rootDir . '/app/Pages/Index.html',
-            "{{ extends 'layout' }}\n{{ section 'title' }}T{{ endsection }}\n"
-                . "{{ section 'content' }}<p>Whole content</p>{{ endsection }}",
-        );
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects($this->once())
-            ->method('warning')
-            ->with(
-                $this->stringContains('not found'),
-                $this->callback(fn(array $ctx) => ($ctx['fragment'] ?? '') === 'nonexistent'),
-            );
-
-        $formatter = $this->createFormatter(logger: $logger);
-
-        // Act
-        $result = $formatter->renderFragment('nonexistent', [], 'App\\Pages\\Index');
-
-        // Assert — falls back to content section
-        $this->assertStringContainsString('<p>Whole content</p>', $result);
-        $this->assertStringNotContainsString('<html>', $result);
-    }
-
-    public function testRenderFragmentFallsBackToFallbackWhenNoTemplate(): void
-    {
-        // Arrange — no template file exists for this DTO
-        $formatter = $this->createFormatter();
-
-        // Act
-        $result = $formatter->renderFragment('anything', ['key' => 'val'], 'App\\Domain\\Query\\Missing');
-
-        // Assert — fallback formatter output
-        $this->assertStringContainsString('<!DOCTYPE html>', $result);
-        $this->assertStringContainsString('val', $result);
-    }
-
-    public function testRenderFragmentEscapesOutput(): void
-    {
-        // Arrange
-        file_put_contents(
-            $this->rootDir . '/app/Pages/Index.html',
-            "{{ fragment 'box' }}<p>{{ \$name }}</p>{{ endfragment }}",
-        );
-        $formatter = $this->createFormatter();
-
-        // Act
-        $result = $formatter->renderFragment('box', ['name' => '<script>xss</script>'], 'App\\Pages\\Index');
-
-        // Assert
-        $this->assertStringContainsString('&lt;script&gt;', $result);
-        $this->assertStringNotContainsString('<script>', $result);
     }
 }
