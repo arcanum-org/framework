@@ -8,8 +8,6 @@ use Arcanum\Cabinet\Application;
 use Arcanum\Gather\Configuration;
 use Arcanum\Ignition\Bootstrap\Helpers;
 use Arcanum\Ignition\Bootstrap\Routing;
-use Arcanum\Ignition\HyperKernel;
-use Arcanum\Ignition\Kernel;
 use Arcanum\Hyper\JsonResponseRenderer;
 use Arcanum\Shodo\HelperResolver;
 use Arcanum\Shodo\Helpers\RouteHelper;
@@ -93,9 +91,7 @@ final class HelperResolutionTest extends TestCase
         ]);
         $container->instance(Configuration::class, $config);
 
-        $kernel = new HyperKernel($this->rootDir);
-        $container->instance(Kernel::class, $kernel);
-
+        // Kernel::class is already bound — TestKernel auto-binds itself.
         (new Routing())->bootstrap($container);
         (new Helpers())->bootstrap($container);
 

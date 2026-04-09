@@ -102,7 +102,12 @@ The single highest-leverage item left. App developers writing handler tests toda
 #### Cross-cutting
 
 - [ ] **Run `composer check` after each commit.** Pre-commit hook enforces this; same practice as the Hourglass arc.
-- [ ] **Final sweep.** After all migrations, grep `tests/` for any remaining ad-hoc patterns: classes implementing `Kernel` directly, anonymous subclasses of `HyperKernel`/`RuneKernel`, manual `MiddlewareBus + Hydrator + Router` construction. Update this checklist with anything found.
+- [x] **Final sweep.** Grepped for `implements Kernel`, `extends HyperKernel`, `extends RuneKernel`, `new HyperKernel(`, `new RuneKernel(`, `new MiddlewareBus(`, `new Hydrator(`, `new HttpRouter(` across `tests/`. Findings, all classified:
+    - **All remaining `new HyperKernel(` / `new RuneKernel(` references are direct unit tests of the kernels themselves** — `tests/Ignition/HyperKernelTest.php`, `tests/Ignition/RuneKernelTest.php`, `tests/Ignition/EnvironmentValidationTest.php` (anonymous subclasses to override `requiredEnvironmentVariables`), `tests/Ignition/Bootstrap/RoutingTest.php` (testing the Routing bootstrapper itself). Not migration targets.
+    - **`tests/Fixture/CapturingKernel.php`** stays in place because `HyperKernelTest` still uses it. Already documented.
+    - **All remaining `new MiddlewareBus(` / `new Hydrator(` / `new HttpRouter(` references are direct unit tests of those components** — `MiddlewareBusTest`, `IntegrationTest` (Conveyor's own test), `HttpRouterTest`, `HydratorTest`, `OptionsTest`, `CliRoutingTest`, plus the two `RouteDispatcher` tests we deliberately kept in `CqrsLifecycleTest` because they test per-route middleware composition around the bus, not the HTTP boundary.
+    - **One cleanup found and applied:** `tests/Integration/HelperResolutionTest.php` had a leftover `instance(Kernel::class, new HyperKernel(...))` line that became redundant the moment TestKernel started auto-binding itself as `Kernel::class`. Dropped along with the `HyperKernel` and `Kernel` imports. No behavior change; the test just got two lines shorter.
+    - **Zero stragglers.** No app-handler-style tests are still hand-rolling kernels or pipelines.
 
 ### Welcome page — nice-to-haves (deferred)
 
