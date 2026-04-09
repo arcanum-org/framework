@@ -53,9 +53,9 @@ First-class htmx support baked into the framework, targeting **htmx 4** directly
 
 #### Foundation
 
-- [ ] **Create `Arcanum\Htmx` package skeleton.** New `src/Htmx/` directory with placeholder files (`HtmxRequest.php`, `ClientBroadcast.php`, `README.md` stub). Smoke test verifies namespace loads. No composer.json change needed — `Arcanum\` already maps to `src/`.
-- [ ] **Add `HtmxRequestType` enum and `HtmxRequest` decorator.** Enum: `Full` | `Partial`. Decorator wraps `ServerRequestInterface` with `isHtmx()`, `isBoosted()`, `isHistoryRestore()`, `type(): HtmxRequestType`, `target(): ?string` (the `HX-Target` value — an element id or null), `swapMode(): ?string` (the `HX-Swap` value when available), `source(): ?string`, `triggerName()`, `currentUrl()`, `prompt()`. Tests cover every accessor + edge cases (missing headers, empty values).
-- [ ] **Add `ClientBroadcast` marker interface and timing sub-interfaces.** `ClientBroadcast::eventName(): string` and `payload(): array`. `BroadcastAfterSwap extends ClientBroadcast` and `BroadcastAfterSettle extends ClientBroadcast` are pure marker sub-interfaces — no method additions, just type-level signals. Tests cover that `instanceof` checks pick the right sub-interface.
+- [x] **Create `Arcanum\Htmx` package skeleton.** New `src/Htmx/` directory with placeholder files (`HtmxRequest.php`, `ClientBroadcast.php`, `README.md` stub). Smoke test verifies namespace loads. No composer.json change needed — `Arcanum\` already maps to `src/`.
+- [x] **Add `HtmxRequestType` enum and `HtmxRequest` decorator.** Enum: `Full` | `Partial`. Decorator wraps `ServerRequestInterface` with `isHtmx()`, `isBoosted()`, `isHistoryRestore()`, `type(): HtmxRequestType`, `target(): ?string` (the `HX-Target` value — an element id or null), `swapMode(): ?string` (the `HX-Swap` value when available), `source(): ?string`, `triggerName()`, `currentUrl()`, `prompt()`. Tests cover every accessor + edge cases (missing headers, empty values).
+- [x] **Add `ClientBroadcast` marker interface and timing sub-interfaces.** `ClientBroadcast::eventName(): string` and `payload(): array`. `BroadcastAfterSwap extends ClientBroadcast` and `BroadcastAfterSettle extends ClientBroadcast` are pure marker sub-interfaces — no method additions, just type-level signals. Tests cover that `instanceof` checks pick the right sub-interface.
 
 #### Auto-fragment extraction (Shodo integration)
 
