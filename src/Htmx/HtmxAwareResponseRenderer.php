@@ -20,9 +20,9 @@ use Psr\Http\Message\ResponseInterface;
  *   2. htmx Full type   → content section only, no layout (fragment mode)
  *   3. htmx Partial type → auto-extracted element by id from HX-Target
  *
- * Mode 3 always returns the full element (outerHTML) and adds an
- * HX-Reswap: outerHTML response header so htmx replaces the element
- * correctly regardless of the client's hx-swap attribute.
+ * Mode 3 always returns the full element (outerHTML). The developer
+ * controls the swap mode on their element with hx-swap — the framework
+ * does not override it with HX-Reswap. Recommend outerHTML in docs.
  *
  * Falls back to content section when HX-Target is absent or the id
  * isn't found in the template.
@@ -53,27 +53,18 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
         Stopwatch::tap('render.start');
 
         try {
-            [$html, $reswap] = $this->renderHtml($data, $dtoClass);
-            $response = $this->buildResponse($html, 'text/html; charset=UTF-8');
-
-            if ($reswap) {
-                $response = $response->withHeader('HX-Reswap', 'outerHTML');
-            }
-
-            return $response;
+            $html = $this->renderHtml($data, $dtoClass);
+            return $this->buildResponse($html, 'text/html; charset=UTF-8');
         } finally {
             Stopwatch::tap('render.complete');
         }
     }
 
-    /**
-     * @return array{string, bool} [html, reswap]
-     */
-    private function renderHtml(mixed $data, string $dtoClass): array
+    private function renderHtml(mixed $data, string $dtoClass): string
     {
         // Mode 1: Non-htmx — full render with layout.
         if ($this->htmxRequest === null || !$this->htmxRequest->isHtmx()) {
-            return [$this->formatter->format($data, $dtoClass), false];
+            return $this->formatter->format($data, $dtoClass);
         }
 
         $type = $this->htmxRequest->type();
@@ -81,10 +72,7 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
 
         // Mode 3: Partial with a target id — auto-extract the element.
         if ($type === HtmxRequestType::Partial && $target !== null) {
-            return [
-                $this->formatter->renderElementById($target, $data, $dtoClass),
-                true,
-            ];
+            return $this->formatter->renderElementById($target, $data, $dtoClass);
         }
 
         // Mode 2: Full htmx (boosted nav) or partial without target —
@@ -92,7 +80,7 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
         $this->formatter->setFragment(true);
 
         try {
-            return [$this->formatter->format($data, $dtoClass), false];
+            return $this->formatter->format($data, $dtoClass);
         } finally {
             $this->formatter->setFragment(false);
         }
