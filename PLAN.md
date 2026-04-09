@@ -22,14 +22,23 @@ Prerequisite for the htmx package below. Shodo currently has `{{ section 'name' 
 
 #### Compiler
 
-- [ ] **Add `{{ fragment 'name' }} … {{ endfragment }}` recognition to `TemplateCompiler`.** Parses the directive into a captured callable per fragment, keyed by name. Errors clearly on mismatched/unclosed fragment blocks. Tests cover happy path, multiple fragments per section, fragments-with-conditionals, fragments-with-includes, and the error cases.
-- [ ] **Extend `TemplateCache` to key by template path + fragment name.** Existing whole-template cache entries keep working; new fragment entries live alongside them. Cache invalidation already handles dependency tracking; the fragment entries inherit it.
+- [x] **Add `{{ fragment 'name' }} … {{ endfragment }}` recognition to `TemplateCompiler`.** Parses the directive into a captured callable per fragment, keyed by name. Errors clearly on mismatched/unclosed fragment blocks. Tests cover happy path, multiple fragments per section, fragments-with-conditionals, fragments-with-includes, and the error cases.
+- [x] **Extend `TemplateCache` to key by template path + fragment name.** Existing whole-template cache entries keep working; new fragment entries live alongside them. Cache invalidation already handles dependency tracking; the fragment entries inherit it.
 - [ ] **Add `HtmlFormatter::renderFragment(string $template, string $name, mixed $data): string`.** Returns just the rendered fragment, no layout, no surrounding section. Follows the same dependency-resolution and template-resolver path as the full render.
 
 #### Documentation
 
 - [ ] **Shodo README — document the `{{ fragment }}` directive.** New section with worked examples (basic, multiple fragments per template, conditional fragments). Notes the soft-fall-through behavior. Cross-references the htmx package once it lands.
 - [ ] **COMPENDIUM Shodo entry update.** Mentions the new directive alongside the existing `{{ section }}` and `{{ extends }}` mechanisms.
+
+#### Fragment / swap-mode footgun
+
+htmx defaults to `innerHTML` swaps, but fragments pair more naturally with `outerHTML` (the fragment wraps the target element so the id survives the swap). We chose **not** to override htmx's default — someone reading htmx docs should see the same behavior in Arcanum. But this means a developer who writes `{{ fragment 'foo' }}` wrapping the inner content of `<div id="foo">` will silently get correct behavior on full-page loads and broken behavior on htmx swaps (the target element's id disappears after the first innerHTML swap, so subsequent swaps fail).
+
+Mitigation ideas (pick one or combine, not designed yet):
+- [ ] **Compile-time lint in `TemplateCompiler` or a `validate:templates` CLI command.** Scan each `{{ fragment 'name' }}` and check whether the immediately preceding non-whitespace HTML is `<TAG id="name">`. If so, warn that the fragment wraps the *inner* content — the developer probably wants the fragment to wrap the element itself for outerHTML swaps. If the fragment *starts with* `<TAG id="name">`, it's the outerHTML shape and no warning fires.
+- [ ] **Runtime warning in `HtmlFormatter::renderFragment()`.** When rendering a named fragment for an htmx request, inspect the rendered HTML: if it doesn't contain an element whose id matches the fragment name, log a warning ("fragment 'foo' does not contain an element with id='foo' — htmx outerHTML swaps will lose the target").
+- [ ] **Documentation prominence.** Shodo README and htmx README both lead with the outerHTML pattern and call out the innerHTML footgun explicitly, with a before/after example showing the id-disappears failure mode.
 
 #### Cross-cutting
 

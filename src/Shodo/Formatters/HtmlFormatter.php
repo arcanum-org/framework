@@ -11,6 +11,7 @@ use Arcanum\Shodo\TemplateAnalyzer;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Shodo\TemplateResolver;
+use Psr\Log\LoggerInterface;
 
 /**
  * Formats data as an HTML string using co-located templates.
@@ -31,6 +32,7 @@ class HtmlFormatter implements Formatter
         private readonly Reader $reader = new Reader(),
         private readonly ?HelperResolver $helpers = null,
         private readonly bool $debug = false,
+        private readonly ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -55,6 +57,77 @@ class HtmlFormatter implements Formatter
         }
 
         return $this->renderTemplate($templatePath, $data, $dtoClass);
+    }
+
+    /**
+     * Render a named fragment from a template.
+     *
+     * Returns just the rendered fragment — no layout, no surrounding section.
+     * When the fragment name doesn't exist in the template, logs a warning
+     * and falls back to rendering the content section (fragment mode).
+     *
+     * Uses the same template-resolver, dependency-resolution, and cache
+     * paths as the full render.
+     */
+    public function renderFragment(string $name, mixed $data, string $dtoClass = ''): string
+    {
+        $templatePath = $this->resolver->resolve($dtoClass);
+
+        if ($templatePath === null) {
+            return $this->fallback->format($data);
+        }
+
+        return $this->renderNamedFragment($templatePath, $name, $data, $dtoClass);
+    }
+
+    private function renderNamedFragment(
+        string $templatePath,
+        string $fragmentName,
+        mixed $data,
+        string $dtoClass,
+    ): string {
+        // Try the named fragment first, with caching.
+        if ($this->cache->isFresh($templatePath, $fragmentName)) {
+            $compiled = $this->cache->load($templatePath, $fragmentName);
+        } else {
+            $source = $this->reader->read($templatePath);
+            $compiled = $this->compiler->compile(
+                $source,
+                dirname($templatePath),
+                fragmentName: $fragmentName,
+            );
+
+            $this->cache->store(
+                $templatePath,
+                $compiled,
+                $this->compiler->lastDependencies(),
+                $fragmentName,
+            );
+        }
+
+        // Empty compiled output means the fragment name wasn't found.
+        // Fall back to rendering the content section and log a warning.
+        if ($compiled === '') {
+            $this->logger?->warning(
+                'Fragment "{fragment}" not found in template "{template}"'
+                    . ' — falling back to content section.',
+                ['fragment' => $fragmentName, 'template' => $templatePath],
+            );
+
+            $source = $source ?? $this->reader->read($templatePath);
+            $compiled = $this->compiler->compile(
+                $source,
+                dirname($templatePath),
+                fragment: true,
+            );
+        }
+
+        $variables = $this->extractVariables($data);
+        $variables['__escape'] = static fn(string $value): string =>
+            htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+        $variables['__helpers'] = $this->helpers !== null ? $this->helpers->for($dtoClass) : [];
+
+        return $this->execute($compiled, $variables);
     }
 
     private function renderTemplate(string $templatePath, mixed $data, string $dtoClass): string
