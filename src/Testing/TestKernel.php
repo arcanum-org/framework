@@ -11,6 +11,7 @@ use Arcanum\Cabinet\Container;
 use Arcanum\Hourglass\Clock;
 use Arcanum\Hourglass\FrozenClock;
 use Arcanum\Testing\Internal\TestHyperKernel;
+use Arcanum\Testing\Internal\TestRuneKernel;
 use Arcanum\Vault\ArrayDriver;
 use DateTimeImmutable;
 use Psr\SimpleCache\CacheInterface;
@@ -32,6 +33,7 @@ final class TestKernel
     private readonly ActiveIdentity $identity;
 
     private HttpTestSurface|null $http = null;
+    private CliTestSurface|null $cli = null;
 
     public function __construct(
         Clock|null $clock = null,
@@ -101,5 +103,23 @@ final class TestKernel
         }
 
         return $this->http;
+    }
+
+    /**
+     * Lazily build and memoize the CLI test surface.
+     *
+     * Mirror of `http()`. Cross-transport tests see consistent state
+     * because both surfaces bootstrap against the same container.
+     */
+    public function cli(): CliTestSurface
+    {
+        if ($this->cli === null) {
+            $this->cli = new CliTestSurface(
+                new TestRuneKernel($this->rootDirectory ?? '/app'),
+                $this->container,
+            );
+        }
+
+        return $this->cli;
     }
 }
