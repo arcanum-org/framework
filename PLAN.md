@@ -76,9 +76,9 @@ First-class htmx support baked into the framework, targeting **htmx 4** directly
 
 #### CSRF and config
 
-- [ ] **Add `/_htmx/csrf.js` endpoint and `HtmxCsrfController`.** Returns the JS shim that listens to `htmx:configRequest` and attaches the CSRF token from the `<meta name="csrf-token">` tag to every non-GET request. Includes the boosted-navigation token-rotation handling. Cacheable response with `Cache-Control: public, max-age=...`. Tests cover the endpoint response + content.
-- [ ] **Add `config/htmx.php` and the `Htmx::script()` template helper.** Config exposes the pinned version (`'version' => '4.0.0-beta1'`), integrity hash, CDN URL template, CSRF strategy, auth-redirect mode, Vary opt-out. Helper renders the full `<script src="..." integrity="..." crossorigin="anonymous">` tag for inclusion in the layout. Tests cover the helper output.
-- [ ] **Add `Bootstrap\Htmx` bootstrapper.** Registers the three middleware classes, the request decorator factory, the event capture, and the config-loaded values. Added to HyperKernel's `$bootstrappers` list. Tests cover bootstrap + binding resolution.
+- [x] **Add `/_htmx/csrf.js` endpoint and `HtmxCsrfController`.** Returns the JS shim that listens to `htmx:configRequest` and attaches the CSRF token from the `<meta name="csrf-token">` tag to every non-GET request. Includes the boosted-navigation token-rotation handling. Cacheable response with `Cache-Control: public, max-age=...`. Tests cover the endpoint response + content.
+- [x] **Add `config/htmx.php` and the `Htmx::script()` template helper.** Config exposes the pinned version (`'version' => '4.0.0-beta1'`), integrity hash, CDN URL template, CSRF strategy, auth-redirect mode, Vary opt-out. Helper renders the full `<script src="..." integrity="..." crossorigin="anonymous">` tag for inclusion in the layout. Tests cover the helper output.
+- [x] **Add `Bootstrap\Htmx` bootstrapper.** Registers the three middleware classes, the request decorator factory, the event capture, and the config-loaded values. Added to HyperKernel's `$bootstrappers` list. Tests cover bootstrap + binding resolution.
 
 #### Starter app
 
