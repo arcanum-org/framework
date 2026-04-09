@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Arcanum\Vault;
 
 use Arcanum\Hourglass\Clock;
+use Arcanum\Hourglass\Interval;
 use Arcanum\Hourglass\SystemClock;
 use Psr\SimpleCache\CacheInterface;
 
@@ -109,7 +110,7 @@ final class ArrayDriver implements CacheInterface
         $now = $this->clock->now()->getTimestamp();
 
         if ($ttl instanceof \DateInterval) {
-            return $now + (int) (new \DateTime())->setTimestamp(0)->add($ttl)->getTimestamp();
+            return $now + Interval::secondsIn($ttl);
         }
 
         if ($ttl <= 0) {

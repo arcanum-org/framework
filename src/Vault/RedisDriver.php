@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Vault;
 
+use Arcanum\Hourglass\Interval;
 use Psr\SimpleCache\CacheInterface;
 
 /**
@@ -103,10 +104,9 @@ final class RedisDriver implements CacheInterface
     /**
      * Normalize a PSR-16 TTL into a positive integer count of seconds.
      *
-     * The DateInterval branch converts the interval into total seconds via an
-     * epoch-anchored DateTime — it never reads wall-clock "now," so it does
-     * not cross a Hourglass\Clock testability boundary. Redis handles expiry
-     * natively from the int we hand it.
+     * No Hourglass\Clock dependency — Redis handles expiry natively from the
+     * int we hand it, and the DateInterval branch is pure conversion via
+     * Interval::secondsIn().
      */
     private function resolveTtl(\DateInterval|int|null $ttl): int|null
     {
@@ -115,7 +115,7 @@ final class RedisDriver implements CacheInterface
         }
 
         if ($ttl instanceof \DateInterval) {
-            return (int) (new \DateTime())->setTimestamp(0)->add($ttl)->getTimestamp();
+            return Interval::secondsIn($ttl);
         }
 
         return $ttl;
