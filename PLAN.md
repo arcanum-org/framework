@@ -66,7 +66,7 @@ First-class htmx support baked into the framework, targeting **htmx 4** directly
 
 - [x] **Add `HtmxResponse` internal builder.** Immutable PSR-7-style decorator with `withLocation`, `withPushUrl`, `withReplaceUrl`, `withRedirect`, `withRefresh`, `withRetarget`, `withReswap`, `withReselect`, `withTrigger`, `withTriggerAfterSwap`, `withTriggerAfterSettle`, `withVary`, `toResponse()`. Trigger methods merge into a single header per timing slot. Tests cover all builder methods + trigger merging.
 - [x] **Add `HtmxLocation` value object** for the JSON-envelope form of `HX-Location`. Fields per the htmx spec: `path`, `target`, `swap`, `source`, `event`, `handler`, `values`, `headers`, `select`. JSON-serializable. Tests cover the simple `path`-only case + the full envelope.
-- [ ] **Extend `HtmlResponseRenderer` (or add `HtmxAwareResponseRenderer`) to read `HX-Request-Type` and `HX-Target` from the request and pick the rendering shape.** Three modes: (1) full + layout (non-htmx), (2) full content section without layout (htmx full-type), (3) auto-extracted element by id from `HX-Target` (htmx partial-type). Falls back to content section + log warning when element id lookup fails. Tests cover all three modes + the fall-through.
+- [x] **Extend `HtmlResponseRenderer` (or add `HtmxAwareResponseRenderer`) to read `HX-Request-Type` and `HX-Target` from the request and pick the rendering shape.** Three modes: (1) full + layout (non-htmx), (2) full content section without layout (htmx full-type), (3) auto-extracted element by id from `HX-Target` (htmx partial-type). Falls back to content section + log warning when element id lookup fails. Tests cover all three modes + the fall-through.
 
 #### Middleware
 
