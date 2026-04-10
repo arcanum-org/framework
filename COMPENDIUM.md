@@ -101,7 +101,7 @@ Arcanum has opinions about the front end. They aren't required — you can swap 
 
 ### Persistence & state
 
-- **Forge** — SQL files as first-class methods. `Connection` interface, `PdoConnection` (MySQL, PostgreSQL, SQLite), `ConnectionManager` with read/write split and domain mapping. `Model::__call` maps to `.sql` files with PHP named/positional/mixed args. `@cast` (int, float, bool, json) and `@param` annotations. `SqlScanner` for comment/string-aware parsing. Streaming via `Sequencer`/`Cursor`; writes return immutable `WriteResult`. `ModelGenerator` produces type-safe sub-model classes.
+- **Forge** — SQL files as first-class methods. `Connection` interface, `PdoConnection` (MySQL, PostgreSQL, SQLite), `ConnectionManager` with read/write split and domain mapping. `Model::__call` maps to `.sql` files with PHP named/positional/mixed args. `@cast` (int, float, bool, json) and `@param` annotations. `SqlScanner` for comment/string-aware parsing. Streaming via `Sequencer`/`Cursor`; writes return immutable `WriteResult`. `ModelGenerator` produces type-safe sub-model classes. **Migrations:** `Migrator`, `MigrationParser`, `MigrationRepository` under `Forge\Migration`. Plain `.sql` files with `-- @migrate up` / `-- @migrate down` pragmas. Timestamp-based versioning, checksum integrity validation, transactional by default (`-- @transaction off` opt-out). CLI: `migrate`, `migrate:rollback`, `migrate:status`, `migrate:create`.
 - **Vault** — PSR-16 caching. Five drivers (`File`, `Array`, `Null`, `APCu`, `Redis`). `CacheManager` for named stores. `PrefixedCache` decorator. Framework caches (config, templates, pages, middleware, helpers) all live on Vault.
 - **Session** — HTTP session management. Configurable drivers (file, cookie, cache). `ActiveSession` request-scoped holder. `SessionMiddleware` handles start/save/cookie. CSRF protection via `CsrfMiddleware` + `{{ csrf }}` directive.
 
@@ -199,6 +199,10 @@ The starter app's CLI entry point. Built-in commands shipped by Rune:
 | `validate:models` | Verify generated Forge models are up to date |
 | `validate:handlers` | Verify every Command/Query DTO has a registered handler |
 | `db:status` | Show database connection status |
+| `migrate` | Run all pending database migrations |
+| `migrate:rollback` | Revert the most recent migration(s). `--step=N` for multiple. |
+| `migrate:status` | Show applied and pending migrations |
+| `migrate:create <name>` | Scaffold a new migration file with timestamp |
 
 App developers add their own commands by defining DTOs under `app/Cli/Command/` (or wherever `app.namespace` points) and the same Conveyor bus dispatches them.
 
