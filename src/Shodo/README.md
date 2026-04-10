@@ -4,19 +4,28 @@ Shodo (書道, "the way of writing") is the output formatting package. It conver
 
 ## Architecture
 
-Shodo owns **formatting**. Each formatter takes data in and returns a string. Transport layers wrap the result:
+Shodo has a three-layer architecture:
 
-- **HTTP** (Hyper) — wraps formatter output in a `ResponseInterface` with Content-Type, Content-Length, and status code via response renderers
+1. **TemplateResolver** — maps a DTO class name to a filesystem path via PSR-4 convention. `resolveForStatus()` resolves status-specific templates (`Dto.422.html` → `errors/422.html` → null).
+2. **TemplateEngine** — the mechanical render pipeline: compile, cache, execute. Four methods: `render()`, `renderFragment()` (content section only), `renderElement()` (element-by-id extraction), `renderSource()` (arbitrary source string).
+3. **Formatters** — own data → variable conversion, escape function setup, and helper scoping. Receive a pre-resolved template path and delegate to the engine.
+
+Transport layers wrap the result:
+
+- **HTTP** (Hyper) — response renderers compose a `TemplateResolver` to resolve the template path, then call the formatter, then wrap in a `ResponseInterface`
 - **CLI** (Rune) — writes formatter output to `Output` directly
 
 ```
-Shodo (pure formatting)
-  ↑              ↑
-Hyper            Rune
-(HTTP adapters)  (uses formatters directly)
+TemplateResolver (path resolution)
+        ↓
+ResponseRenderer (HTTP adapter — resolves path, calls formatter)
+        ↓
+Formatter (data → variables, escape function, helpers)
+        ↓
+TemplateEngine (compile → cache → execute)
 ```
 
-This separation means the same `JsonFormatter` serves both `GET /health.json` and `php arcanum query:health --format=json`. No duplicate formatting logic.
+This separation means the same rendering pipeline serves success responses, error responses, and fallbacks. The same `TemplateEngine` renders user templates, status-specific templates (`AddEntry.422.html`), and bundled fallback templates.
 
 ## Formatters
 
@@ -25,7 +34,7 @@ All formatters implement the `Formatter` interface:
 ```php
 interface Formatter
 {
-    public function format(mixed $data, string $dtoClass = ''): string;
+    public function format(mixed $data, string $templatePath = '', string $dtoClass = ''): string;
 }
 ```
 
@@ -41,7 +50,7 @@ $json = $formatter->format(['name' => 'Arcanum', 'version' => 1]);
 
 ### HtmlFormatter
 
-Template-based. Discovers a co-located `.html` template file by convention, compiles it, and renders with the handler's data as template variables:
+Template-based. Receives a pre-resolved template path, builds variables from the handler's data (with `htmlspecialchars` as the escape function), and delegates to the `TemplateEngine`:
 
 ```php
 // Handler returns:
@@ -54,11 +63,11 @@ Template-based. Discovers a co-located `.html` template file by convention, comp
 // → rendered HTML string
 ```
 
-When no template exists, falls back to a generic HTML dump of the data (definition lists for key-value pairs, unordered lists for arrays).
+When no template path is provided, renders the bundled fallback template (`src/Shodo/Templates/fallback.html`) — a generic definition-list representation of the data, through the same engine.
 
 ### PlainTextFormatter
 
-Template-based, like HTML. Discovers a co-located `.txt` template file. Uses an identity escape function — `{{ $var }}` passes through as-is since there's no HTML to escape.
+Template-based, like HTML. Receives a pre-resolved `.txt` template path. Uses an identity escape function — `{{ $var }}` passes through as-is since there's no HTML to escape.
 
 ```
 // Template at app/Domain/Query/Health.txt:
@@ -68,11 +77,11 @@ PHP: {{ $php_version }}
 // → plain text string
 ```
 
-Falls back to a YAML-like structured dump when no template exists.
+Falls back to the bundled `fallback.txt` template when no path is provided.
 
 ### MarkdownFormatter
 
-Template-based, like HTML and plain text. Discovers a co-located `.md` template file. Uses an identity escape function — `{{ $var }}` passes through as-is since Markdown doesn't require HTML escaping.
+Template-based, like HTML and plain text. Receives a pre-resolved `.md` template path. Uses an identity escape function — `{{ $var }}` passes through as-is since Markdown doesn't require HTML escaping.
 
 ```
 // Template at app/Domain/Query/Health.md:
@@ -87,7 +96,7 @@ Template-based, like HTML and plain text. Discovers a co-located `.md` template 
 // → Markdown string
 ```
 
-Falls back to a structured Markdown representation when no template exists — bold keys for associative arrays (`**key:** value`), bulleted lists for sequential arrays, and `##` headings for nested structures.
+Falls back to the bundled `fallback.md` template when no path is provided.
 
 ### CsvFormatter
 
@@ -272,17 +281,14 @@ Includes nest up to 10 levels deep. Included files can themselves use `{{ includ
 
 ## Fragment rendering (htmx)
 
-When a template uses `extends`, the same file can serve both full-page loads and htmx partial swaps. In **fragment mode**, only the `content` section is rendered — the layout wrapper (head, nav, footer) is skipped.
+When a template uses `extends`, the same file can serve both full-page loads and htmx partial swaps. The `TemplateEngine` provides two methods:
 
-The `HtmlFormatter` exposes `setFragment(bool)`. Call it from middleware when the `HX-Request` header is present:
+- `render($path, $variables)` — full render with layout
+- `renderFragment($path, $variables)` — content section only, layout skipped
 
-```php
-if ($request->hasHeader('HX-Request')) {
-    $formatter->setFragment(true);
-}
-```
+The `HtmxAwareResponseRenderer` calls `renderFragment()` for htmx boosted navigation requests and `renderElement()` for targeted partial swaps. Full page loads go through `render()`.
 
-Full page load returns the complete layout. htmx request returns just the content — ready for `hx-swap`.
+The `TemplateCompiler` mirrors this split with `compile()` and `compileFragment()` — no boolean flags.
 
 ## Template discovery
 
@@ -294,7 +300,23 @@ App\Pages\Index                  →  app/Pages/Index.html
 App\Pages\About                  →  app/Pages/About.txt
 ```
 
-Each formatter has its own resolver configured for its file extension.
+### Status-specific templates
+
+`resolveForStatus($dtoClass, $statusCode, $format)` resolves templates for a specific HTTP status code. Resolution order:
+
+1. **Co-located:** `{DtoClass}.{status}.{format}` — e.g., `AddEntry.422.html` next to the command
+2. **App-wide:** `{errorTemplatesDirectory}/{status}.{format}` — e.g., `app/Templates/errors/422.html`
+3. **null** — no status-specific template, fall through to default
+
+Works for any status code — error templates (422, 500), success templates (200, 201), or anything in between.
+
+### Resolution in the rendering pipeline
+
+Template-based response renderers (`Html`, `PlainText`, `Markdown`) compose a `TemplateResolver` and resolve the path before calling the formatter. Resolution order for each request:
+
+1. `resolveForStatus($dtoClass, $statusCode)` — status-specific (skipped for 200)
+2. `resolve($dtoClass)` — default co-located template
+3. Bundled fallback template — generic data representation
 
 ## Template compilation and caching
 
@@ -451,8 +473,11 @@ HelperResolver
     → overlays #[WithHelper] attributes from the DTO class
     → returns ['Format' => FormatHelper, 'Route' => RouteHelper, 'Cart' => CartHelper, ...]
 
-HtmlFormatter / PlainTextFormatter / MarkdownFormatter
-  injects $__helpers into template scope via extract()
+Formatter.buildVariables()
+  injects $__helpers into the variable array
+
+TemplateEngine.render()
+  extracts variables into scope, executes compiled template
 ```
 
 ## CLI format registry
@@ -512,25 +537,32 @@ Shodo (pure formatting — no transport dependency)
 │   ├── PlainTextFormatter (template-based, identity escape)
 │   ├── MarkdownFormatter (template-based, identity escape)
 │   ├── KeyValueFormatter (auto-detect: key-value pairs or table)
-│   ├── TableFormatter (ASCII tables)
-│   ├── HtmlFallbackFormatter / PlainTextFallbackFormatter / MarkdownFallbackFormatter
-├── TemplateCompiler → TemplateCache → TemplateResolver
+│   └── TableFormatter (ASCII tables)
+├── TemplateResolver (DTO class → filesystem path, status-specific resolution)
+├── TemplateEngine (compile → cache → execute, fragment/element/source modes)
+├── TemplateCompiler (compile / compileFragment → CompilerDirective pipeline)
+├── TemplateCache (compiled PHP cache with mtime + dependency freshness)
+├── Templates/
+│   ├── fallback.html (bundled generic HTML representation)
+│   ├── fallback.txt (bundled generic plain text representation)
+│   └── fallback.md (bundled generic Markdown representation)
 ├── HelperRegistry → HelperResolver → HelperDiscovery
 ├── Helpers/
 │   ├── FormatHelper, StrHelper, ArrHelper (always available)
-│   ├── RouteHelper, HtmlHelper (HTTP bootstrap)
+│   └── RouteHelper, HtmlHelper (HTTP bootstrap)
 ├── CliFormatRegistry (--format → Formatter)
 ├── Format (extension + content type value object)
 └── UnsupportedFormat (exception)
 
 Hyper (HTTP response adapters — compose Shodo formatters)
 ├── ResponseRenderer (abstract base)
+├── HtmlResponseRenderer → TemplateResolver + HtmlFormatter
+├── PlainTextResponseRenderer → TemplateResolver + PlainTextFormatter
+├── MarkdownResponseRenderer → TemplateResolver + MarkdownFormatter
 ├── JsonResponseRenderer → JsonFormatter
 ├── CsvResponseRenderer → CsvFormatter
-├── HtmlResponseRenderer → HtmlFormatter
-├── PlainTextResponseRenderer → PlainTextFormatter
-├── MarkdownResponseRenderer → MarkdownFormatter
 ├── EmptyResponseRenderer (status-code-only for commands)
+├── HtmlExceptionResponseRenderer → TemplateEngine (unified error pipeline)
 ├── JsonExceptionResponseRenderer (exceptions as JSON)
 └── FormatRegistry (URL extension → ResponseRenderer)
 ```
