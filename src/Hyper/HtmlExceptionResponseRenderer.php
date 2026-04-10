@@ -9,6 +9,7 @@ use Arcanum\Flow\River\Stream;
 use Arcanum\Glitch\ArcanumException;
 use Arcanum\Glitch\ExceptionRenderer;
 use Arcanum\Glitch\HttpException;
+use Arcanum\Shodo\HelperResolver;
 use Arcanum\Shodo\TemplateEngine;
 use Arcanum\Shodo\TemplateResolver;
 use Psr\Http\Message\ResponseInterface;
@@ -35,6 +36,7 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
         private readonly bool $verboseErrors = false,
         private readonly ?TemplateEngine $engine = null,
         private readonly ?TemplateResolver $templateResolver = null,
+        private readonly ?HelperResolver $helpers = null,
     ) {
     }
 
@@ -154,7 +156,8 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
                 ? $e->errorsByField() : [],
             '__escape' => static fn(string $v): string =>
                 htmlspecialchars($v, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8'),
-            '__helpers' => [],
+            '__helpers' => $this->helpers !== null
+                ? $this->helpers->for($this->dtoClass) : [],
         ];
 
         if ($this->debug) {
