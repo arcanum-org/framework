@@ -9,24 +9,21 @@ use Arcanum\Flow\River\Stream;
 use Arcanum\Glitch\ArcanumException;
 use Arcanum\Glitch\ExceptionRenderer;
 use Arcanum\Glitch\HttpException;
-use Arcanum\Parchment\Reader;
-use Arcanum\Shodo\TemplateCompiler;
+use Arcanum\Shodo\TemplateEngine;
 use Arcanum\Shodo\TemplateResolver;
 use Psr\Http\Message\ResponseInterface;
 
 /**
  * Renders exceptions as styled HTML error pages.
  *
- * Self-contained inline styles following DESIGN.md — no external CSS
- * dependency, so error pages work even when the app's assets are broken.
+ * Uses the same TemplateEngine as the success rendering path. When an
+ * app-provided error template exists (co-located or app-wide), it's
+ * rendered through the engine with error-specific variables. When no
+ * template exists, falls back to a self-contained built-in error page.
  *
  * Production mode: status code, title, message, navigation links.
  * Debug mode adds: exception class, file:line, stack trace.
  * Verbose errors adds: suggestion hint from ArcanumException.
- *
- * App override: when errorTemplatesDirectory is configured, checks for
- * a {code}.html template (e.g., errors/404.html) before rendering the
- * built-in page. Templates receive $code, $title, $message, $suggestion.
  */
 class HtmlExceptionResponseRenderer implements ExceptionRenderer
 {
@@ -35,10 +32,8 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
     public function __construct(
         private readonly bool $debug = false,
         private readonly bool $verboseErrors = false,
-        private readonly string $errorTemplatesDirectory = '',
-        private readonly ?TemplateCompiler $compiler = null,
+        private readonly ?TemplateEngine $engine = null,
         private readonly ?TemplateResolver $templateResolver = null,
-        private readonly Reader $reader = new Reader(),
     ) {
     }
 
@@ -89,15 +84,12 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
     }
 
     /**
-     * Try to render an app-provided error template.
+     * Try to render an app-provided error template via the TemplateEngine.
      *
      * Resolution order (via TemplateResolver::resolveForStatus):
      *   1. Co-located: {DtoClass}.{status}.html (when dtoClass is set)
      *   2. App-wide:   {errorTemplatesDirectory}/{status}.html
      *   3. null (falls through to built-in error page)
-     *
-     * Falls back to legacy direct path lookup when no TemplateResolver
-     * is configured.
      */
     private function renderAppTemplate(
         StatusCode $status,
@@ -105,22 +97,35 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
         \Throwable $e,
         ?string $suggestion,
     ): ?string {
-        if ($this->compiler === null) {
+        if ($this->engine === null || $this->templateResolver === null) {
             return null;
         }
 
-        $templatePath = $this->resolveErrorTemplate($status);
+        $templatePath = $this->templateResolver->resolveForStatus(
+            $this->dtoClass,
+            $status->value,
+            'html',
+        );
 
         if ($templatePath === null) {
             return null;
         }
 
-        $source = $this->reader->read($templatePath);
-        $compiled = $this->compiler->compile(
-            $source,
-            dirname($templatePath),
-        );
+        $variables = $this->buildErrorVariables($status, $title, $e, $suggestion);
+        return $this->engine->render($templatePath, $variables);
+    }
 
+    /**
+     * Build the template variable array for error templates.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildErrorVariables(
+        StatusCode $status,
+        string $title,
+        \Throwable $e,
+        ?string $suggestion,
+    ): array {
         $rawMessage = $e->getMessage();
         if ($rawMessage === $status->reason()->value) {
             $rawMessage = $this->defaultDescription($status);
@@ -145,42 +150,7 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
             $variables['trace'] = $e->getTraceAsString();
         }
 
-        $executor = static function (string $php, array $vars): string {
-            extract($vars);
-            ob_start();
-            eval('?>' . $php);
-            return (string) ob_get_clean();
-        };
-
-        return $executor($compiled, $variables);
-    }
-
-    /**
-     * Find an error template using the unified resolution chain.
-     *
-     * TemplateResolver path: co-located {Dto}.{status}.html → app-wide.
-     * Legacy path: {errorTemplatesDirectory}/{status}.html.
-     */
-    private function resolveErrorTemplate(StatusCode $status): ?string
-    {
-        // Unified path: TemplateResolver handles both co-located and app-wide
-        if ($this->templateResolver !== null) {
-            return $this->templateResolver->resolveForStatus(
-                $this->dtoClass,
-                $status->value,
-                'html',
-            );
-        }
-
-        // Legacy path: direct directory lookup (no TemplateResolver configured)
-        if ($this->errorTemplatesDirectory === '') {
-            return null;
-        }
-
-        $path = $this->errorTemplatesDirectory
-            . DIRECTORY_SEPARATOR . $status->value . '.html';
-
-        return is_file($path) ? $path : null;
+        return $variables;
     }
 
     private function buildHtml(

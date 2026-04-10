@@ -14,7 +14,10 @@ use Arcanum\Glitch\HttpException;
 use Arcanum\Hyper\Headers;
 use Arcanum\Hyper\HtmlExceptionResponseRenderer;
 use Arcanum\Parchment\Reader;
+use Arcanum\Parchment\Writer;
+use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
+use Arcanum\Shodo\TemplateEngine;
 use Arcanum\Shodo\TemplateResolver;
 use Arcanum\Validation\ValidationException;
 use Arcanum\Validation\ValidationError;
@@ -32,7 +35,10 @@ use Psr\Http\Message\ResponseInterface;
 #[UsesClass(ArcanumException::class)]
 #[UsesClass(HttpException::class)]
 #[UsesClass(TemplateCompiler::class)]
+#[UsesClass(TemplateEngine::class)]
+#[UsesClass(TemplateCache::class)]
 #[UsesClass(Reader::class)]
+#[UsesClass(Writer::class)]
 #[UsesClass(Response::class)]
 #[UsesClass(Message::class)]
 #[UsesClass(Headers::class)]
@@ -417,9 +423,18 @@ final class HtmlExceptionResponseRendererTest extends TestCase
     {
         // Arrange
         $fixtureDir = dirname(__DIR__) . '/Fixture/ErrorTemplates';
-        $renderer = new HtmlExceptionResponseRenderer(
-            errorTemplatesDirectory: $fixtureDir,
+        $engine = new TemplateEngine(
             compiler: new TemplateCompiler(),
+            cache: new TemplateCache(''),
+        );
+        $resolver = new TemplateResolver(
+            rootDirectory: '',
+            rootNamespace: 'App',
+            errorTemplatesDirectory: $fixtureDir,
+        );
+        $renderer = new HtmlExceptionResponseRenderer(
+            engine: $engine,
+            templateResolver: $resolver,
         );
 
         // Act — 404 has an app template
@@ -435,9 +450,18 @@ final class HtmlExceptionResponseRendererTest extends TestCase
     {
         // Arrange
         $fixtureDir = dirname(__DIR__) . '/Fixture/ErrorTemplates';
-        $renderer = new HtmlExceptionResponseRenderer(
-            errorTemplatesDirectory: $fixtureDir,
+        $engine = new TemplateEngine(
             compiler: new TemplateCompiler(),
+            cache: new TemplateCache(''),
+        );
+        $resolver = new TemplateResolver(
+            rootDirectory: '',
+            rootNamespace: 'App',
+            errorTemplatesDirectory: $fixtureDir,
+        );
+        $renderer = new HtmlExceptionResponseRenderer(
+            engine: $engine,
+            templateResolver: $resolver,
         );
 
         // Act — 500 has no app template
@@ -477,9 +501,13 @@ final class HtmlExceptionResponseRendererTest extends TestCase
             '<div class="co-located">{{ $code }} {{ $title }}</div>',
         );
 
+        $engine = new TemplateEngine(
+            compiler: new TemplateCompiler(),
+            cache: new TemplateCache(''),
+        );
         $resolver = new TemplateResolver($rootDir, 'App');
         $renderer = new HtmlExceptionResponseRenderer(
-            compiler: new TemplateCompiler(),
+            engine: $engine,
             templateResolver: $resolver,
         );
         $renderer->setDtoClass('App\\Domain\\Query\\Products');
@@ -506,9 +534,13 @@ final class HtmlExceptionResponseRendererTest extends TestCase
         $rootDir = sys_get_temp_dir() . '/arcanum_exc_resolver_test_' . uniqid();
         mkdir($rootDir . '/app', 0755, true);
 
+        $engine = new TemplateEngine(
+            compiler: new TemplateCompiler(),
+            cache: new TemplateCache(''),
+        );
         $resolver = new TemplateResolver($rootDir, 'App');
         $renderer = new HtmlExceptionResponseRenderer(
-            compiler: new TemplateCompiler(),
+            engine: $engine,
             templateResolver: $resolver,
         );
         $renderer->setDtoClass('App\\Domain\\Query\\Products');
@@ -537,9 +569,13 @@ final class HtmlExceptionResponseRendererTest extends TestCase
                 . '{{ endforeach }}',
         );
 
+        $engine = new TemplateEngine(
+            compiler: new TemplateCompiler(),
+            cache: new TemplateCache(''),
+        );
         $resolver = new TemplateResolver($rootDir, 'App');
         $renderer = new HtmlExceptionResponseRenderer(
-            compiler: new TemplateCompiler(),
+            engine: $engine,
             templateResolver: $resolver,
         );
         $renderer->setDtoClass('App\\Domain\\Command\\AddEntry');
