@@ -12,7 +12,6 @@ use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Writer;
 use Arcanum\Shodo\ElementExtraction;
-use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
@@ -28,7 +27,6 @@ use Psr\Http\Message\ServerRequestInterface;
 #[UsesClass(HtmxRequest::class)]
 #[UsesClass(HtmxRequestType::class)]
 #[UsesClass(HtmlFormatter::class)]
-#[UsesClass(HtmlFallbackFormatter::class)]
 #[UsesClass(TemplateResolver::class)]
 #[UsesClass(TemplateCompiler::class)]
 #[UsesClass(TemplateCache::class)]
@@ -89,8 +87,7 @@ final class HtmxAwareResponseRendererTest extends TestCase
             compiler: new TemplateCompiler(),
             cache: new TemplateCache($this->cacheDir),
         );
-        $fallback = new HtmlFallbackFormatter();
-        $formatter = new HtmlFormatter($engine, $fallback);
+        $formatter = new HtmlFormatter($engine);
 
         return new HtmxAwareResponseRenderer($formatter, $engine, $resolver);
     }

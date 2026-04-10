@@ -9,7 +9,6 @@ use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Writer;
 use Arcanum\Shodo\HelperRegistry;
 use Arcanum\Shodo\HelperResolver;
-use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
@@ -27,7 +26,6 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(TemplateResolver::class)]
 #[UsesClass(TemplateCompiler::class)]
 #[UsesClass(TemplateCache::class)]
-#[UsesClass(HtmlFallbackFormatter::class)]
 #[UsesClass(TemplateEngine::class)]
 #[UsesClass(TemplateAnalyzer::class)]
 #[UsesClass(Reader::class)]
@@ -86,11 +84,8 @@ final class HtmlFormatterTest extends TestCase
             debug: $debug,
             logger: $logger,
         );
-        $fallback = new HtmlFallbackFormatter();
-
         return new HtmlFormatter(
             $engine,
-            $fallback,
             helpers: $helpers,
         );
     }

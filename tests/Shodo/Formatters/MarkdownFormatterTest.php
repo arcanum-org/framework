@@ -9,7 +9,6 @@ use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Writer;
 use Arcanum\Shodo\HelperRegistry;
 use Arcanum\Shodo\HelperResolver;
-use Arcanum\Shodo\Formatters\MarkdownFallbackFormatter;
 use Arcanum\Shodo\Formatters\MarkdownFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
@@ -25,7 +24,6 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(TemplateResolver::class)]
 #[UsesClass(TemplateCompiler::class)]
 #[UsesClass(TemplateCache::class)]
-#[UsesClass(MarkdownFallbackFormatter::class)]
 #[UsesClass(TemplateEngine::class)]
 #[UsesClass(Reader::class)]
 #[UsesClass(Writer::class)]
@@ -77,9 +75,7 @@ final class MarkdownFormatterTest extends TestCase
             compiler: new TemplateCompiler(),
             cache: new TemplateCache($this->cacheDir),
         );
-        $fallback = new MarkdownFallbackFormatter();
-
-        return new MarkdownFormatter($engine, $fallback, helpers: $helpers);
+        return new MarkdownFormatter($engine, helpers: $helpers);
     }
 
     public function testFormatReturnsNonEmptyOutput(): void

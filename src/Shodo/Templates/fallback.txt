@@ -1,0 +1,14 @@
+{{ if count($__vars) === 1 && $__vars[0] === 'data' }}
+{{! (string) $data !}}
+{{ else }}
+{{ foreach $__vars as $__key }}
+{{ if is_array($$__key) }}
+{{! $__key !}}:
+{{ foreach $$__key as $__subKey => $__subValue }}
+  {{! $__subKey !}}: {{! (string) $__subValue !}}
+{{ endforeach }}
+{{ else }}
+{{! $__key !}}: {{! (string) $$__key !}}
+{{ endif }}
+{{ endforeach }}
+{{ endif }}

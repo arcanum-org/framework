@@ -23,7 +23,6 @@ use Arcanum\Hyper\HtmlResponseRenderer;
 use Arcanum\Hyper\JsonResponseRenderer;
 use Arcanum\Ignition\RouteDispatcher;
 use Arcanum\Shodo\Format;
-use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
@@ -80,7 +79,6 @@ final class CqrsLifecycleTest extends TestCase
                     compiler: new TemplateCompiler(),
                     cache: new TemplateCache(''),
                 ),
-                fallback: new HtmlFallbackFormatter(),
             );
             return new HtmlResponseRenderer($formatter, $resolver);
         });

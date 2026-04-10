@@ -12,26 +12,23 @@ use Arcanum\Shodo\TemplateEngine;
  * Formats data as a plain text string using templates.
  *
  * Uses an identity escape function — no escaping is needed for plain text.
- * When no template path is provided, falls back to a structured
- * plain text representation.
+ * When no template path is provided, renders the bundled fallback template.
  */
 class PlainTextFormatter implements Formatter
 {
+    private const FALLBACK_TEMPLATE = __DIR__ . '/../Templates/fallback.txt';
+
     public function __construct(
         private readonly TemplateEngine $engine,
-        private readonly PlainTextFallbackFormatter $fallback,
         private readonly ?HelperResolver $helpers = null,
     ) {
     }
 
     public function format(mixed $data, string $templatePath = '', string $dtoClass = ''): string
     {
-        if ($templatePath === '') {
-            return $this->fallback->format($data);
-        }
-
+        $path = $templatePath !== '' ? $templatePath : self::FALLBACK_TEMPLATE;
         $variables = $this->buildVariables($data, $dtoClass);
-        return $this->engine->render($templatePath, $variables);
+        return $this->engine->render($path, $variables);
     }
 
     /**
@@ -40,6 +37,7 @@ class PlainTextFormatter implements Formatter
     private function buildVariables(mixed $data, string $dtoClass): array
     {
         $variables = $this->extractVariables($data);
+        $variables['__vars'] = array_keys($variables);
         $variables['__escape'] = static fn(string $value): string => $value;
         $variables['__helpers'] = $this->helpers !== null
             ? $this->helpers->for($dtoClass) : [];

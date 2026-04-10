@@ -18,7 +18,6 @@ use Arcanum\Hyper\Version;
 use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Writer;
-use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
@@ -35,7 +34,6 @@ use Psr\Http\Message\ResponseInterface;
 #[UsesClass(TemplateCompiler::class)]
 #[UsesClass(TemplateCache::class)]
 #[UsesClass(TemplateEngine::class)]
-#[UsesClass(HtmlFallbackFormatter::class)]
 #[UsesClass(Response::class)]
 #[UsesClass(Message::class)]
 #[UsesClass(Headers::class)]
@@ -95,7 +93,6 @@ final class HtmlResponseRendererTest extends TestCase
                 compiler: new TemplateCompiler(),
                 cache: new TemplateCache($this->cacheDir),
             ),
-            fallback: new HtmlFallbackFormatter(),
         );
         return new HtmlResponseRenderer($formatter, $resolver);
     }
@@ -194,7 +191,6 @@ final class HtmlResponseRendererTest extends TestCase
                 compiler: new TemplateCompiler(),
                 cache: new TemplateCache($this->cacheDir),
             ),
-            fallback: new HtmlFallbackFormatter(),
         );
         $renderer = new HtmlResponseRenderer($formatter, $resolver);
         $data = ['status' => 'ok'];

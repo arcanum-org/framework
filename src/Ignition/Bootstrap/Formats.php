@@ -18,12 +18,9 @@ use Arcanum\Ignition\Kernel;
 use Arcanum\Gather\Configuration;
 use Arcanum\Shodo\Format;
 use Arcanum\Shodo\Formatters\CsvFormatter;
-use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\Formatters\JsonFormatter;
-use Arcanum\Shodo\Formatters\MarkdownFallbackFormatter;
 use Arcanum\Shodo\Formatters\MarkdownFormatter;
-use Arcanum\Shodo\Formatters\PlainTextFallbackFormatter;
 use Arcanum\Shodo\Formatters\PlainTextFormatter;
 use Arcanum\Shodo\HelperResolver;
 use Arcanum\Shodo\TemplateCache;
@@ -147,7 +144,6 @@ class Formats implements Bootstrapper
 
             return new HtmlFormatter(
                 engine: $engine,
-                fallback: new HtmlFallbackFormatter(),
                 helpers: $helpers instanceof HelperResolver ? $helpers : null,
             );
         });
@@ -162,7 +158,6 @@ class Formats implements Bootstrapper
 
             return new PlainTextFormatter(
                 engine: $engine,
-                fallback: new PlainTextFallbackFormatter(),
                 helpers: $helpers instanceof HelperResolver ? $helpers : null,
             );
         });
@@ -177,7 +172,6 @@ class Formats implements Bootstrapper
 
             return new MarkdownFormatter(
                 engine: $engine,
-                fallback: new MarkdownFallbackFormatter(),
                 helpers: $helpers instanceof HelperResolver ? $helpers : null,
             );
         });

@@ -15,7 +15,6 @@ use Arcanum\Hyper\Version;
 use Arcanum\Parchment\FileSystem;
 use Arcanum\Parchment\Reader;
 use Arcanum\Parchment\Writer;
-use Arcanum\Shodo\Formatters\MarkdownFallbackFormatter;
 use Arcanum\Shodo\Formatters\MarkdownFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
@@ -27,7 +26,6 @@ use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(MarkdownResponseRenderer::class)]
 #[UsesClass(MarkdownFormatter::class)]
-#[UsesClass(MarkdownFallbackFormatter::class)]
 #[UsesClass(TemplateResolver::class)]
 #[UsesClass(TemplateCompiler::class)]
 #[UsesClass(TemplateEngine::class)]
@@ -108,7 +106,6 @@ final class MarkdownResponseRendererTest extends TestCase
                 compiler: new TemplateCompiler(),
                 cache: new TemplateCache(''),
             ),
-            fallback: new MarkdownFallbackFormatter(),
         );
 
         return new MarkdownResponseRenderer($formatter, $resolver);
