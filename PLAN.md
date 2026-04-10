@@ -16,7 +16,7 @@ First-class htmx 4 support: `HtmxAwareResponseRenderer` (three rendering modes: 
 
 Surfaced during the htmx smoke test (April 2026) and confirmed independently. When a command DTO fails validation (e.g., empty guestbook fields), the response message correctly says "Validation failed with 4 error(s)" but the HTTP status code is 500 instead of the expected 422 Unprocessable Entity. The `ValidationGuard` Conveyor middleware throws a `ValidationException` which should map to 422 via the exception renderer, but something in the rendering chain is swallowing the status code.
 
-- [ ] **Investigate and fix validation status code.** Trace the path from `ValidationGuard` throwing `ValidationException` through `ExceptionHandler` / `ExceptionRenderer` to the final response. The `ValidationExceptionRenderer` (registered in `Bootstrap\Formats`) should catch `ValidationException` and return 422. Verify: is it registered? Is it wrapping the right renderer? Is the status code set on the response object? Fix and add a test that asserts 422 for validation failures.
+- [x] **Investigate and fix validation status code.** Root cause: `HyperKernel::handleException()` resolves `HtmlExceptionResponseRenderer` directly for HTML requests, bypassing the `ValidationExceptionRenderer` decorator chain. Both `HtmlExceptionResponseRenderer` and `JsonExceptionResponseRenderer` only checked `instanceof HttpException` for status codes, falling through to 500. Fix: both renderers now check for `ValidationException` explicitly via `match` expression and map it to 422.
 
 ### Welcome page — nice-to-haves (deferred)
 
