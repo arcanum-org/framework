@@ -155,4 +155,150 @@ final class TemplateResolverTest extends TestCase
         // Assert
         $this->assertSame($templatePath, $result);
     }
+
+    // -----------------------------------------------------------
+    // resolveForStatus — co-located
+    // -----------------------------------------------------------
+
+    public function testResolveForStatusFindsCoLocatedErrorTemplate(): void
+    {
+        // Arrange
+        $templatePath = $this->rootDir . '/app/Domain/Shop/Query/Products.404.html';
+        file_put_contents($templatePath, '<p>not found</p>');
+        $resolver = new TemplateResolver($this->rootDir, 'App');
+
+        // Act
+        $result = $resolver->resolveForStatus('App\\Domain\\Shop\\Query\\Products', 404, 'html');
+
+        // Assert
+        $this->assertSame($templatePath, $result);
+    }
+
+    public function testResolveForStatusFindsCoLocatedSuccessTemplate(): void
+    {
+        // Arrange — works for any status code, not just errors
+        $templatePath = $this->rootDir . '/app/Domain/Shop/Query/Products.201.html';
+        file_put_contents($templatePath, '<p>created</p>');
+        $resolver = new TemplateResolver($this->rootDir, 'App');
+
+        // Act
+        $result = $resolver->resolveForStatus('App\\Domain\\Shop\\Query\\Products', 201, 'html');
+
+        // Assert
+        $this->assertSame($templatePath, $result);
+    }
+
+    public function testResolveForStatusFindsCoLocatedJsonTemplate(): void
+    {
+        // Arrange
+        $templatePath = $this->rootDir . '/app/Domain/Shop/Query/Products.500.json';
+        file_put_contents($templatePath, '{"error":"internal"}');
+        $resolver = new TemplateResolver($this->rootDir, 'App');
+
+        // Act
+        $result = $resolver->resolveForStatus('App\\Domain\\Shop\\Query\\Products', 500, 'json');
+
+        // Assert
+        $this->assertSame($templatePath, $result);
+    }
+
+    // -----------------------------------------------------------
+    // resolveForStatus — app-wide fallback
+    // -----------------------------------------------------------
+
+    public function testResolveForStatusFallsBackToAppWideTemplate(): void
+    {
+        // Arrange — no co-located template, but app-wide exists
+        $statusDir = $this->rootDir . '/app/Templates/errors';
+        mkdir($statusDir, 0755, true);
+        $appWidePath = $statusDir . '/422.html';
+        file_put_contents($appWidePath, '<p>validation error</p>');
+
+        $resolver = new TemplateResolver(
+            $this->rootDir,
+            'App',
+            errorTemplatesDirectory: $statusDir,
+        );
+
+        // Act
+        $result = $resolver->resolveForStatus('App\\Domain\\Shop\\Query\\Products', 422, 'html');
+
+        // Assert
+        $this->assertSame($appWidePath, $result);
+    }
+
+    public function testResolveForStatusPrefersCoLocatedOverAppWide(): void
+    {
+        // Arrange — both co-located and app-wide exist
+        $coLocatedPath = $this->rootDir . '/app/Domain/Shop/Query/Products.422.html';
+        file_put_contents($coLocatedPath, '<p>co-located error</p>');
+
+        $statusDir = $this->rootDir . '/app/Templates/errors';
+        mkdir($statusDir, 0755, true);
+        file_put_contents($statusDir . '/422.html', '<p>app-wide error</p>');
+
+        $resolver = new TemplateResolver(
+            $this->rootDir,
+            'App',
+            errorTemplatesDirectory: $statusDir,
+        );
+
+        // Act
+        $result = $resolver->resolveForStatus('App\\Domain\\Shop\\Query\\Products', 422, 'html');
+
+        // Assert — co-located wins
+        $this->assertSame($coLocatedPath, $result);
+    }
+
+    // -----------------------------------------------------------
+    // resolveForStatus — null when neither exists
+    // -----------------------------------------------------------
+
+    public function testResolveForStatusReturnsNullWhenNeitherExists(): void
+    {
+        // Arrange
+        $resolver = new TemplateResolver($this->rootDir, 'App');
+
+        // Act
+        $result = $resolver->resolveForStatus('App\\Domain\\Shop\\Query\\Products', 404, 'html');
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+    public function testResolveForStatusReturnsNullForEmptyDtoClass(): void
+    {
+        // Arrange
+        $resolver = new TemplateResolver($this->rootDir, 'App');
+
+        // Act
+        $result = $resolver->resolveForStatus('', 500, 'html');
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+    public function testResolveForStatusReturnsNullForWrongNamespace(): void
+    {
+        // Arrange
+        $resolver = new TemplateResolver($this->rootDir, 'App');
+
+        // Act
+        $result = $resolver->resolveForStatus('Other\\Namespace\\Thing', 500, 'html');
+
+        // Assert
+        $this->assertNull($result);
+    }
+
+    public function testResolveForStatusReturnsNullWhenNoStatusTemplatesDirectory(): void
+    {
+        // Arrange — no co-located template, no errorTemplatesDirectory configured
+        $resolver = new TemplateResolver($this->rootDir, 'App');
+
+        // Act
+        $result = $resolver->resolveForStatus('App\\Domain\\Shop\\Query\\Missing', 404, 'html');
+
+        // Assert
+        $this->assertNull($result);
+    }
 }
