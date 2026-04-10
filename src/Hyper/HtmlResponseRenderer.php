@@ -21,12 +21,15 @@ class HtmlResponseRenderer extends ResponseRenderer
     ) {
     }
 
-    public function render(mixed $data, string $dtoClass = ''): ResponseInterface
-    {
+    public function render(
+        mixed $data,
+        string $dtoClass = '',
+        StatusCode $status = StatusCode::OK,
+    ): ResponseInterface {
         Stopwatch::tap('render.start');
         try {
-            $html = $this->formatter->format($data, $dtoClass);
-            return $this->buildResponse($html, 'text/html; charset=UTF-8');
+            $html = $this->formatter->format($data, $dtoClass, $status->value);
+            return $this->buildResponse($html, 'text/html; charset=UTF-8', $status);
         } finally {
             Stopwatch::tap('render.complete');
         }

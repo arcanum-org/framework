@@ -6,6 +6,7 @@ namespace Arcanum\Htmx;
 
 use Arcanum\Hourglass\Stopwatch;
 use Arcanum\Hyper\ResponseRenderer;
+use Arcanum\Hyper\StatusCode;
 use Arcanum\Parchment\Reader;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Psr\Http\Message\ResponseInterface;
@@ -51,23 +52,26 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
         $this->htmxRequest = $htmxRequest;
     }
 
-    public function render(mixed $data, string $dtoClass = ''): ResponseInterface
-    {
+    public function render(
+        mixed $data,
+        string $dtoClass = '',
+        StatusCode $status = StatusCode::OK,
+    ): ResponseInterface {
         Stopwatch::tap('render.start');
 
         try {
-            $html = $this->renderHtml($data, $dtoClass);
-            return $this->buildResponse($html, 'text/html; charset=UTF-8');
+            $html = $this->renderHtml($data, $dtoClass, $status->value);
+            return $this->buildResponse($html, 'text/html; charset=UTF-8', $status);
         } finally {
             Stopwatch::tap('render.complete');
         }
     }
 
-    private function renderHtml(mixed $data, string $dtoClass): string
+    private function renderHtml(mixed $data, string $dtoClass, int $statusCode): string
     {
         // Mode 1: Non-htmx — full render with layout.
         if ($this->htmxRequest === null || !$this->htmxRequest->isHtmx()) {
-            return $this->formatter->format($data, $dtoClass);
+            return $this->formatter->format($data, $dtoClass, $statusCode);
         }
 
         $type = $this->htmxRequest->type();
@@ -84,7 +88,7 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
         $this->formatter->setFragment(true);
 
         try {
-            return $this->formatter->format($data, $dtoClass);
+            return $this->formatter->format($data, $dtoClass, $statusCode);
         } finally {
             $this->formatter->setFragment(false);
         }

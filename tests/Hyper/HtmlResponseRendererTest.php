@@ -200,4 +200,46 @@ final class HtmlResponseRendererTest extends TestCase
         // Assert
         $this->assertSame($expected, $body);
     }
+
+    public function testRenderPassesStatusCodeToResponse(): void
+    {
+        // Arrange
+        $renderer = $this->createRenderer();
+
+        // Act
+        $response = $renderer->render(
+            ['key' => 'value'],
+            'App\\Domain\\Query\\Missing',
+            StatusCode::UnprocessableEntity,
+        );
+
+        // Assert
+        $this->assertSame(422, $response->getStatusCode());
+    }
+
+    public function testRenderUsesStatusSpecificTemplate(): void
+    {
+        // Arrange — create both default and 422-specific templates
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Form.html',
+            '<form>default</form>',
+        );
+        file_put_contents(
+            $this->rootDir . '/app/Pages/Form.422.html',
+            '<form class="error">{{ $message }}</form>',
+        );
+        $renderer = $this->createRenderer();
+
+        // Act
+        $response = $renderer->render(
+            ['message' => 'Invalid input'],
+            'App\\Pages\\Form',
+            StatusCode::UnprocessableEntity,
+        );
+
+        // Assert — 422 template rendered, correct status code
+        $body = $this->readBody($response);
+        $this->assertStringContainsString('<form class="error">Invalid input</form>', $body);
+        $this->assertSame(422, $response->getStatusCode());
+    }
 }

@@ -21,6 +21,9 @@ interface Formatter
      *
      * @param string $dtoClass The DTO class name, used by template-based
      *                         formatters to discover co-located templates.
+     * @param int $statusCode HTTP status code. When > 0, template-based
+     *                        formatters try status-specific templates first
+     *                        (e.g., Dto.422.html before Dto.html).
      */
-    public function format(mixed $data, string $dtoClass = ''): string;
+    public function format(mixed $data, string $dtoClass = '', int $statusCode = 0): string;
 }

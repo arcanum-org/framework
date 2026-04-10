@@ -15,6 +15,9 @@ use Arcanum\Hyper\Headers;
 use Arcanum\Hyper\HtmlExceptionResponseRenderer;
 use Arcanum\Parchment\Reader;
 use Arcanum\Shodo\TemplateCompiler;
+use Arcanum\Shodo\TemplateResolver;
+use Arcanum\Validation\ValidationException;
+use Arcanum\Validation\ValidationError;
 use Arcanum\Hyper\Message;
 use Arcanum\Hyper\Phrase;
 use Arcanum\Hyper\Response;
@@ -41,6 +44,10 @@ use Psr\Http\Message\ResponseInterface;
 #[UsesClass(StreamResource::class)]
 #[UsesClass(IgnoreCaseRegistry::class)]
 #[UsesClass(Registry::class)]
+#[UsesClass(TemplateResolver::class)]
+#[UsesClass(ValidationException::class)]
+#[UsesClass(ValidationError::class)]
+#[UsesClass(\Arcanum\Parchment\FileSystem::class)]
 final class HtmlExceptionResponseRendererTest extends TestCase
 {
     private function getBody(ResponseInterface $response): string
@@ -454,5 +461,104 @@ final class HtmlExceptionResponseRendererTest extends TestCase
         // Assert — uses the built-in renderer
         $this->assertStringContainsString('<!DOCTYPE html>', $body);
         $this->assertStringNotContainsString('custom-error', $body);
+    }
+
+    // -----------------------------------------------------------
+    // TemplateResolver integration (co-located error templates)
+    // -----------------------------------------------------------
+
+    public function testRenderUsesCoLocatedErrorTemplateViaResolver(): void
+    {
+        // Arrange — co-located Products.404.html exists
+        $rootDir = sys_get_temp_dir() . '/arcanum_exc_resolver_test_' . uniqid();
+        mkdir($rootDir . '/app/Domain/Query', 0755, true);
+        file_put_contents(
+            $rootDir . '/app/Domain/Query/Products.404.html',
+            '<div class="co-located">{{ $code }} {{ $title }}</div>',
+        );
+
+        $resolver = new TemplateResolver($rootDir, 'App');
+        $renderer = new HtmlExceptionResponseRenderer(
+            compiler: new TemplateCompiler(),
+            templateResolver: $resolver,
+        );
+        $renderer->setDtoClass('App\\Domain\\Query\\Products');
+
+        // Act
+        $body = $this->getBody($renderer->render(new HttpException(StatusCode::NotFound)));
+
+        // Assert — co-located template is used
+        $this->assertStringContainsString('class="co-located"', $body);
+        $this->assertStringContainsString('404', $body);
+        $this->assertStringContainsString('Not Found', $body);
+
+        // Cleanup
+        unlink($rootDir . '/app/Domain/Query/Products.404.html');
+        rmdir($rootDir . '/app/Domain/Query');
+        rmdir($rootDir . '/app/Domain');
+        rmdir($rootDir . '/app');
+        rmdir($rootDir);
+    }
+
+    public function testRenderFallsBackToBuiltInWhenResolverFindsNothing(): void
+    {
+        // Arrange — resolver configured but no co-located template
+        $rootDir = sys_get_temp_dir() . '/arcanum_exc_resolver_test_' . uniqid();
+        mkdir($rootDir . '/app', 0755, true);
+
+        $resolver = new TemplateResolver($rootDir, 'App');
+        $renderer = new HtmlExceptionResponseRenderer(
+            compiler: new TemplateCompiler(),
+            templateResolver: $resolver,
+        );
+        $renderer->setDtoClass('App\\Domain\\Query\\Products');
+
+        // Act
+        $body = $this->getBody($renderer->render(new HttpException(StatusCode::NotFound)));
+
+        // Assert — built-in error page
+        $this->assertStringContainsString('<!DOCTYPE html>', $body);
+        $this->assertStringNotContainsString('co-located', $body);
+
+        // Cleanup
+        rmdir($rootDir . '/app');
+        rmdir($rootDir);
+    }
+
+    public function testRenderPassesValidationErrorsToTemplate(): void
+    {
+        // Arrange — co-located 422 template that renders $errors
+        $rootDir = sys_get_temp_dir() . '/arcanum_exc_resolver_test_' . uniqid();
+        mkdir($rootDir . '/app/Domain/Command', 0755, true);
+        file_put_contents(
+            $rootDir . '/app/Domain/Command/AddEntry.422.html',
+            '{{ foreach $errors as $field => $messages }}'
+                . '<span>{{ $field }}</span>'
+                . '{{ endforeach }}',
+        );
+
+        $resolver = new TemplateResolver($rootDir, 'App');
+        $renderer = new HtmlExceptionResponseRenderer(
+            compiler: new TemplateCompiler(),
+            templateResolver: $resolver,
+        );
+        $renderer->setDtoClass('App\\Domain\\Command\\AddEntry');
+
+        $exception = new ValidationException([
+            new ValidationError('name', 'Name is required'),
+        ]);
+
+        // Act
+        $body = $this->getBody($renderer->render($exception));
+
+        // Assert — template rendered with $errors
+        $this->assertStringContainsString('<span>name</span>', $body);
+
+        // Cleanup
+        unlink($rootDir . '/app/Domain/Command/AddEntry.422.html');
+        rmdir($rootDir . '/app/Domain/Command');
+        rmdir($rootDir . '/app/Domain');
+        rmdir($rootDir . '/app');
+        rmdir($rootDir);
     }
 }

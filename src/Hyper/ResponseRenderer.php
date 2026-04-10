@@ -22,8 +22,15 @@ abstract class ResponseRenderer
      *
      * @param string $dtoClass The DTO class name, used by template-based
      *                         renderers to discover co-located templates.
+     * @param StatusCode $status HTTP status code for the response. Template-based
+     *                           renderers also use this to resolve status-specific
+     *                           templates (e.g., Dto.422.html before Dto.html).
      */
-    abstract public function render(mixed $data, string $dtoClass = ''): ResponseInterface;
+    abstract public function render(
+        mixed $data,
+        string $dtoClass = '',
+        StatusCode $status = StatusCode::OK,
+    ): ResponseInterface;
 
     protected function buildResponse(
         string $content,

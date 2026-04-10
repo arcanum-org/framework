@@ -21,12 +21,15 @@ class CsvResponseRenderer extends ResponseRenderer
     ) {
     }
 
-    public function render(mixed $data, string $dtoClass = ''): ResponseInterface
-    {
+    public function render(
+        mixed $data,
+        string $dtoClass = '',
+        StatusCode $status = StatusCode::OK,
+    ): ResponseInterface {
         Stopwatch::tap('render.start');
         try {
-            $csv = $this->formatter->format($data, $dtoClass);
-            return $this->buildResponse($csv, 'text/csv; charset=UTF-8');
+            $csv = $this->formatter->format($data, $dtoClass, $status->value);
+            return $this->buildResponse($csv, 'text/csv; charset=UTF-8', $status);
         } finally {
             Stopwatch::tap('render.complete');
         }

@@ -21,12 +21,15 @@ class MarkdownResponseRenderer extends ResponseRenderer
     ) {
     }
 
-    public function render(mixed $data, string $dtoClass = ''): ResponseInterface
-    {
+    public function render(
+        mixed $data,
+        string $dtoClass = '',
+        StatusCode $status = StatusCode::OK,
+    ): ResponseInterface {
         Stopwatch::tap('render.start');
         try {
-            $markdown = $this->formatter->format($data, $dtoClass);
-            return $this->buildResponse($markdown, 'text/markdown; charset=UTF-8');
+            $markdown = $this->formatter->format($data, $dtoClass, $status->value);
+            return $this->buildResponse($markdown, 'text/markdown; charset=UTF-8', $status);
         } finally {
             Stopwatch::tap('render.complete');
         }

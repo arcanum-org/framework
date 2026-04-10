@@ -15,7 +15,7 @@ use Arcanum\Shodo\Formatter;
  */
 class CsvFormatter implements Formatter
 {
-    public function format(mixed $data, string $dtoClass = ''): string
+    public function format(mixed $data, string $dtoClass = '', int $statusCode = 0): string
     {
         if (is_object($data)) {
             $data = get_object_vars($data);

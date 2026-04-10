@@ -16,7 +16,7 @@ use Arcanum\Shodo\Formatter;
  */
 final class HtmlFallbackFormatter implements Formatter
 {
-    public function format(mixed $data, string $dtoClass = ''): string
+    public function format(mixed $data, string $dtoClass = '', int $statusCode = 0): string
     {
         $body = $this->renderValue($data);
 

@@ -11,6 +11,7 @@ use Arcanum\Glitch\ExceptionRenderer;
 use Arcanum\Glitch\HttpException;
 use Arcanum\Parchment\Reader;
 use Arcanum\Shodo\TemplateCompiler;
+use Arcanum\Shodo\TemplateResolver;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -29,13 +30,27 @@ use Psr\Http\Message\ResponseInterface;
  */
 class HtmlExceptionResponseRenderer implements ExceptionRenderer
 {
+    private string $dtoClass = '';
+
     public function __construct(
         private readonly bool $debug = false,
         private readonly bool $verboseErrors = false,
         private readonly string $errorTemplatesDirectory = '',
         private readonly ?TemplateCompiler $compiler = null,
+        private readonly ?TemplateResolver $templateResolver = null,
         private readonly Reader $reader = new Reader(),
     ) {
+    }
+
+    /**
+     * Set the DTO class context for co-located error template resolution.
+     *
+     * Called by the kernel or middleware when the route is resolved.
+     * When not set, only app-wide error templates are checked.
+     */
+    public function setDtoClass(string $dtoClass): void
+    {
+        $this->dtoClass = $dtoClass;
     }
 
     public function render(\Throwable $e): ResponseInterface
@@ -76,8 +91,13 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
     /**
      * Try to render an app-provided error template.
      *
-     * Looks for {errorTemplatesDirectory}/{code}.html. Returns null if
-     * no template exists or the directory isn't configured.
+     * Resolution order (via TemplateResolver::resolveForStatus):
+     *   1. Co-located: {DtoClass}.{status}.html (when dtoClass is set)
+     *   2. App-wide:   {errorTemplatesDirectory}/{status}.html
+     *   3. null (falls through to built-in error page)
+     *
+     * Falls back to legacy direct path lookup when no TemplateResolver
+     * is configured.
      */
     private function renderAppTemplate(
         StatusCode $status,
@@ -85,21 +105,20 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
         \Throwable $e,
         ?string $suggestion,
     ): ?string {
-        if ($this->errorTemplatesDirectory === '' || $this->compiler === null) {
+        if ($this->compiler === null) {
             return null;
         }
 
-        $templatePath = $this->errorTemplatesDirectory
-            . DIRECTORY_SEPARATOR . $status->value . '.html';
+        $templatePath = $this->resolveErrorTemplate($status);
 
-        if (!is_file($templatePath)) {
+        if ($templatePath === null) {
             return null;
         }
 
         $source = $this->reader->read($templatePath);
         $compiled = $this->compiler->compile(
             $source,
-            $this->errorTemplatesDirectory,
+            dirname($templatePath),
         );
 
         $rawMessage = $e->getMessage();
@@ -112,6 +131,8 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
             'title' => $title,
             'message' => $rawMessage,
             'suggestion' => $this->verboseErrors ? $suggestion : null,
+            'errors' => $e instanceof \Arcanum\Validation\ValidationException
+                ? $e->errorsByField() : [],
             '__escape' => static fn(string $v): string =>
                 htmlspecialchars($v, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8'),
             '__helpers' => [],
@@ -132,6 +153,34 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
         };
 
         return $executor($compiled, $variables);
+    }
+
+    /**
+     * Find an error template using the unified resolution chain.
+     *
+     * TemplateResolver path: co-located {Dto}.{status}.html → app-wide.
+     * Legacy path: {errorTemplatesDirectory}/{status}.html.
+     */
+    private function resolveErrorTemplate(StatusCode $status): ?string
+    {
+        // Unified path: TemplateResolver handles both co-located and app-wide
+        if ($this->templateResolver !== null) {
+            return $this->templateResolver->resolveForStatus(
+                $this->dtoClass,
+                $status->value,
+                'html',
+            );
+        }
+
+        // Legacy path: direct directory lookup (no TemplateResolver configured)
+        if ($this->errorTemplatesDirectory === '') {
+            return null;
+        }
+
+        $path = $this->errorTemplatesDirectory
+            . DIRECTORY_SEPARATOR . $status->value . '.html';
+
+        return is_file($path) ? $path : null;
     }
 
     private function buildHtml(

@@ -21,12 +21,15 @@ class PlainTextResponseRenderer extends ResponseRenderer
     ) {
     }
 
-    public function render(mixed $data, string $dtoClass = ''): ResponseInterface
-    {
+    public function render(
+        mixed $data,
+        string $dtoClass = '',
+        StatusCode $status = StatusCode::OK,
+    ): ResponseInterface {
         Stopwatch::tap('render.start');
         try {
-            $text = $this->formatter->format($data, $dtoClass);
-            return $this->buildResponse($text, 'text/plain; charset=UTF-8');
+            $text = $this->formatter->format($data, $dtoClass, $status->value);
+            return $this->buildResponse($text, 'text/plain; charset=UTF-8', $status);
         } finally {
             Stopwatch::tap('render.complete');
         }

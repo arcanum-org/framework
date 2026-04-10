@@ -59,9 +59,9 @@ class HtmlFormatter implements Formatter
         return $this->resolver->resolve($dtoClass);
     }
 
-    public function format(mixed $data, string $dtoClass = ''): string
+    public function format(mixed $data, string $dtoClass = '', int $statusCode = 0): string
     {
-        $templatePath = $this->resolver->resolve($dtoClass);
+        $templatePath = $this->resolveTemplatePath($dtoClass, $statusCode);
 
         if ($templatePath === null) {
             return $this->fallback->format($data);
@@ -189,6 +189,23 @@ class HtmlFormatter implements Formatter
             ? $this->helpers->for($dtoClass) : [];
 
         return $this->execute($compiled, $variables);
+    }
+
+    /**
+     * Resolve template path with status-specific override.
+     *
+     * Tries {Dto}.{status}.html first, then {Dto}.html.
+     */
+    private function resolveTemplatePath(string $dtoClass, int $statusCode): ?string
+    {
+        if ($statusCode > 0) {
+            $statusPath = $this->resolver->resolveForStatus($dtoClass, $statusCode);
+            if ($statusPath !== null) {
+                return $statusPath;
+            }
+        }
+
+        return $this->resolver->resolve($dtoClass);
     }
 
     private function renderTemplate(string $templatePath, mixed $data, string $dtoClass): string

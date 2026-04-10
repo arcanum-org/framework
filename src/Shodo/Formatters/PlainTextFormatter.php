@@ -34,15 +34,32 @@ class PlainTextFormatter implements Formatter
     ) {
     }
 
-    public function format(mixed $data, string $dtoClass = ''): string
+    public function format(mixed $data, string $dtoClass = '', int $statusCode = 0): string
     {
-        $templatePath = $this->resolver->resolve($dtoClass);
+        $templatePath = $this->resolveTemplatePath($dtoClass, $statusCode);
 
         if ($templatePath === null) {
             return $this->fallback->format($data);
         }
 
         return $this->renderTemplate($templatePath, $data, $dtoClass);
+    }
+
+    /**
+     * Resolve template path with status-specific override.
+     *
+     * Tries {Dto}.{status}.txt first, then {Dto}.txt.
+     */
+    private function resolveTemplatePath(string $dtoClass, int $statusCode): ?string
+    {
+        if ($statusCode > 0) {
+            $statusPath = $this->resolver->resolveForStatus($dtoClass, $statusCode);
+            if ($statusPath !== null) {
+                return $statusPath;
+            }
+        }
+
+        return $this->resolver->resolve($dtoClass);
     }
 
     private function renderTemplate(string $templatePath, mixed $data, string $dtoClass): string

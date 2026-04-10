@@ -817,4 +817,72 @@ final class HtmlFormatterTest extends TestCase
         $this->assertStringContainsString('&lt;script&gt;', $result);
         $this->assertStringNotContainsString('<script>xss', $result);
     }
+
+    // -----------------------------------------------------------
+    // Status-specific template resolution
+    // -----------------------------------------------------------
+
+    public function testFormatUsesStatusSpecificTemplateWhenProvided(): void
+    {
+        // Arrange — co-located Products.422.html exists
+        file_put_contents(
+            $this->rootDir . '/app/Domain/Query/Products.html',
+            '<p>{{ $name }}</p>',
+        );
+        file_put_contents(
+            $this->rootDir . '/app/Domain/Query/Products.422.html',
+            '<p class="error">{{ $message }}</p>',
+        );
+        $formatter = $this->createFormatter();
+
+        // Act — pass statusCode 422
+        $result = $formatter->format(
+            ['message' => 'Validation failed'],
+            'App\\Domain\\Query\\Products',
+            422,
+        );
+
+        // Assert — renders the 422 template, not the default
+        $this->assertStringContainsString('<p class="error">Validation failed</p>', $result);
+    }
+
+    public function testFormatFallsBackToDefaultTemplateWhenNoStatusMatch(): void
+    {
+        // Arrange — only Products.html exists, no Products.500.html
+        file_put_contents(
+            $this->rootDir . '/app/Domain/Query/Products.html',
+            '<p>{{ $name }}</p>',
+        );
+        $formatter = $this->createFormatter();
+
+        // Act — pass statusCode 500, no matching template
+        $result = $formatter->format(
+            ['name' => 'Arcanum'],
+            'App\\Domain\\Query\\Products',
+            500,
+        );
+
+        // Assert — falls back to default template
+        $this->assertStringContainsString('<p>Arcanum</p>', $result);
+    }
+
+    public function testFormatWithStatusCodeZeroUsesDefaultTemplate(): void
+    {
+        // Arrange
+        file_put_contents(
+            $this->rootDir . '/app/Domain/Query/Products.html',
+            '<p>{{ $name }}</p>',
+        );
+        $formatter = $this->createFormatter();
+
+        // Act — statusCode 0 means "use default" (same as omitting it)
+        $result = $formatter->format(
+            ['name' => 'Arcanum'],
+            'App\\Domain\\Query\\Products',
+            0,
+        );
+
+        // Assert
+        $this->assertStringContainsString('<p>Arcanum</p>', $result);
+    }
 }

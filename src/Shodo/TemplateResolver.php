@@ -56,9 +56,10 @@ final class TemplateResolver
      * @param int $statusCode HTTP status code.
      * @param string $format Response format (e.g., 'html', 'json').
      */
-    public function resolveForStatus(string $dtoClass, int $statusCode, string $format): ?string
+    public function resolveForStatus(string $dtoClass, int $statusCode, string $format = ''): ?string
     {
-        $suffix = '.' . $statusCode . '.' . $format;
+        $effectiveFormat = $format !== '' ? $format : $this->extension;
+        $suffix = '.' . $statusCode . '.' . $effectiveFormat;
 
         // 1. Co-located: e.g., app/Domain/Guestbook/Command/AddEntry.422.html
         $coLocated = $this->classToPath($dtoClass, $suffix);
