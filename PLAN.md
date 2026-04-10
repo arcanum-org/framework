@@ -51,6 +51,42 @@ The `{DtoClass}.{status}.{format}` convention works for any status code and form
 - [x] **Integrate with rendering pipeline.** `Formatter` interface gains `int $statusCode` parameter. Template-based formatters try `resolveForStatus()` first, fall back to `resolve()`. `ResponseRenderer` gains `StatusCode` parameter, all subclasses pass through. `HtmlExceptionResponseRenderer` uses `TemplateResolver` for co-located error templates with `$errors` (validation), `$suggestion` (ArcanumException). Unified resolution: `resolveForStatus(dto, status, format)` → `resolve(dto)` → built-in fallback.
 - [ ] **Framework default fragment for htmx.** When no error template exists and the request is htmx, return a minimal error fragment (unstyled `<ul>` of error messages for 422, generic error message for other codes) instead of the full error page document.
 
+##### Rendering pipeline refactor — TemplateEngine extraction
+
+The status-specific template work exposed a design tangle: HtmlFormatter is a god object (resolution + caching + compilation + helper scoping + variable setup + execution + fragment rendering), HtmlExceptionResponseRenderer duplicates the compile+execute pipeline, and HtmxAwareResponseRenderer reaches into the formatter's internals. The `$statusCode` parameter was added to the Formatter interface to route resolution, but resolution is the caller's concern, not the formatter's. The fallback formatters (HtmlFallbackFormatter, etc.) are just hardcoded templates in PHP that bypass the standard rendering path.
+
+The fix: split the god object, move resolution upstream, and put every template — including fallbacks — through the same engine.
+
+**Phase 1: Extract TemplateEngine**
+- [ ] **Create `Arcanum\Shodo\TemplateEngine`.** Absorbs compile + cache + read + execute from HtmlFormatter. Methods: `render(string $templatePath, array $variables, bool $fragment = false): string` — the core render path; `renderElement(string $templatePath, string $elementId, array $variables): string` — element-by-id extraction (outerHTML); `renderSource(string $source, string $baseDirectory, array $variables): string` — compile arbitrary template source (for renderSlice). Constructor takes: `TemplateCompiler`, `TemplateCache`, `Reader`, `bool $debug`. Does NOT own: resolution, data extraction, escape functions, helpers, fallback formatting. Tests: unit tests for each render method, cache hit/miss, fragment mode, element extraction.
+- [ ] **HtmlFormatter, PlainTextFormatter, MarkdownFormatter compose TemplateEngine.** Replace their private `renderTemplate()`, `execute()`, cache interaction with engine calls. Formatters keep: `format()`, variable extraction, escape function setup, helper resolution, closure resolution, fallback delegation. All existing formatter tests pass unchanged.
+
+**Phase 2: Expose variable building, simplify HtmxAwareResponseRenderer**
+- [ ] **HtmlFormatter exposes `buildVariables(mixed $data, string $dtoClass = ''): array`.** Returns the full variable array (data extraction, closure resolution, `$__escape`, `$__helpers`) ready for the engine. This is already what `format()` does internally before calling `renderTemplate()` — extract it as a public method.
+- [ ] **HtmxAwareResponseRenderer composes TemplateEngine directly.** Uses `formatter->buildVariables()` for variable prep, then calls the engine for each rendering mode (full, fragment, element, slice). Removes its dependency on `formatter->resolveTemplate()`, `formatter->renderSlice()`, `formatter->renderElementById()`. Those methods can be removed from HtmlFormatter once the htmx renderer no longer calls them.
+
+**Phase 3: Move resolution out of formatters**
+- [ ] **ResponseRenderers compose TemplateResolver.** Each template-based renderer (Html, PlainText, Markdown) gets a TemplateResolver injected. Resolution order: `resolveForStatus($dtoClass, $status)` → `resolve($dtoClass)` → null (formatter handles fallback). Non-template renderers (Json, Csv) unchanged.
+- [ ] **Formatter interface drops `$statusCode`, gains `$templatePath`.** New signature: `format(mixed $data, string $templatePath = '', string $dtoClass = ''): string`. `$templatePath`: pre-resolved path or empty for fallback. `$dtoClass`: used only for helper scoping. `$statusCode` removed — resolution already happened. Non-template formatters ignore both optional params as before. Update all implementations and call sites.
+- [ ] **Update Bootstrap/Formats.** TemplateResolver registration moves from formatter factories to renderer factories (or a shared service). Formatters no longer receive a TemplateResolver — they receive a TemplateEngine and fallback path.
+
+**Phase 4: Unify exception rendering**
+- [ ] **HtmlExceptionResponseRenderer composes TemplateEngine.** Replace the duplicated read → compile → execute logic with `engine->render($templatePath, $errorVariables)`. Error variables: `$code`, `$title`, `$message`, `$errors` (validation), `$suggestion` (ArcanumException), `$__escape`. Falls back to built-in styled error page when no template exists. The `setDtoClass()` setter stays so the kernel can provide DTO context for co-located error template resolution.
+- [ ] **Thread DTO class context through exception handling.** The DTO class is known when the route resolves but lost by the time exceptions reach `HyperKernel::handleException()`. Store it as a request attribute (`arcanum.dto_class`) when the route resolves. `handleException()` reads it from the request and passes it to the exception renderer. This replaces the setter-based approach for the common case (setter remains as fallback for exceptions outside the routing path).
+
+**Phase 5: Replace fallback formatters with bundled templates**
+- [ ] **Create `DataHelper` with recursive rendering methods.** `DataHelper::html(mixed $data): string` — recursive dl/dt/dd for objects, ol/li for lists, escaped text for scalars (current HtmlFallbackFormatter logic). `DataHelper::text(mixed $data): string` — key-value pairs (current PlainTextFallbackFormatter logic). `DataHelper::markdown(mixed $data): string` — headings and lists (current MarkdownFallbackFormatter logic). Registered as a global helper available in all templates.
+- [ ] **Create bundled fallback templates.** `src/Shodo/Templates/fallback.html`, `fallback.txt`, `fallback.md`. Each calls its format-specific `DataHelper` method. These are framework-provided templates, not app templates — the engine renders them like any other template.
+- [ ] **Formatter fallback path uses the engine.** When no template path is provided (or the path is empty), the formatter renders the bundled fallback template through the engine instead of delegating to a separate FallbackFormatter class. One rendering path for everything.
+- [ ] **Remove HtmlFallbackFormatter, PlainTextFallbackFormatter, MarkdownFallbackFormatter.** Delete the classes, remove from Bootstrap/Formats, update tests. The bundled templates + DataHelper replace them entirely.
+
+#### Cross-cutting for the refactor
+- [ ] **Run `composer check` after each commit.**
+- [ ] **Update COMPENDIUM** after phases that change public API (especially phase 3 and phase 5).
+- [ ] **Update Shodo README** with the TemplateEngine documentation.
+
+---
+
 ##### Starter app guestbook validation demo
 - [ ] **Extract guestbook form to shared partial.** Move the form from `app/Pages/Index.html` to `app/Templates/forms/_guestbook-form.html`. Update `Index.html` to include it. Add conditional `$errors` rendering to the partial.
 - [ ] **Add `AddEntry.422.html`.** Co-located with the command, includes the shared form partial. One-liner: `{{ include 'forms/_guestbook-form' }}`.
