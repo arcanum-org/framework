@@ -12,32 +12,61 @@ Concrete, walkable lists. Everything else in this file is informational — cont
 
 First-class htmx 4 support: `HtmxAwareResponseRenderer` (three rendering modes: full page, content section, element-by-id extraction), `HtmxRequest` decorator, `ClientBroadcast` event projection to `HX-Trigger` headers, `FragmentDirective` for innerHTML opt-in via `{{ fragment 'id' }}`, CSRF JS shim, auth-redirect middleware, `Vary: HX-Request`, lazy template closures, Shodo custom directive system (`CompilerDirective` interface with 5 built-ins + `DirectiveRegistry`). Full README, COMPENDIUM updated, starter app integrated with guestbook demo. Smoke-tested end-to-end (surfaced the validation 500 bug below). See `src/Htmx/README.md` for the package reference. Design decisions archived in git history (commits on `claude-bang` branch, April 2026).
 
-### Status-specific error templates — `{DtoClass}.{status}.{format}`
+### Validation error handling and status-specific error templates — active
 
-Convention-based error template resolution across all rendering pipelines and status codes. When an exception occurs during dispatch of a DTO, the renderer looks for a co-located error template before falling back to the app-wide and framework defaults.
+**Completed:**
 
-**Resolution order (most specific first):**
+- [x] **Fix validation status code (500 → 422).** Root cause: `HyperKernel::handleException()` resolved `HtmlExceptionResponseRenderer` directly for HTML requests, bypassing the `ValidationExceptionRenderer` decorator chain. Both renderers now check for `ValidationException` explicitly via `match` and map to 422.
 
-1. **Co-located:** `app/Domain/Shop/Command/SendEmail.503.json` — this specific DTO, this status, this format
-2. **App-wide:** `app/Templates/errors/503.json` — the app's default for this status + format
-3. **Framework default:** the built-in exception renderer (current behavior)
+**The validation error UX for htmx:**
 
-**Naming convention:** `{DtoClass}.{statusCode}.{format}` — the DTO's filename with the HTTP status code and response format as extensions. Examples:
-- `AddEntry.422.html` — validation errors for the guestbook command, rendered as HTML
-- `PlaceOrder.503.html` — service unavailable error specific to order placement
-- `Health.500.json` — custom JSON error shape for the health endpoint
+The recommended pattern is form re-rendering with Idiomorph. The developer extracts the form into a shared partial in `app/Templates/` (reachable from both pages and command error templates). The form partial renders error messages conditionally when `$errors` is present. The command's co-located `.422.html` template includes the same partial. Idiomorph (`hx-swap="morph:outerHTML"`, built into htmx v4) preserves the user's typed values from the live DOM — no `$input` variable needed.
 
-**How it works:** The exception rendering chain already knows the DTO class (from the route), the status code (from the exception), and the response format (from the URL extension). `TemplateResolver` gains a `resolveError(string $dtoClass, int $statusCode, string $format)` method that checks co-located → app-wide → null. When non-null, the error renderer compiles and renders the template with error variables (`$code`, `$title`, `$message`, `$errors` for validation, `$suggestion` for ArcanumException). When null, falls back to the current built-in renderer.
+Example flow:
+1. Form partial lives at `app/Templates/forms/_guestbook-form.html` (shared templates directory, includable from anywhere)
+2. `app/Pages/Index.html` includes it: `{{ include 'forms/_guestbook-form' }}`
+3. `app/Domain/Guestbook/Command/AddEntry.422.html` includes the same partial: `{{ include 'forms/_guestbook-form' }}`
+4. The partial checks `$errors` and renders inline error messages when present
+5. The form uses `hx-swap="morph:outerHTML"` — Idiomorph preserves typed values, inserts error messages
+6. On validation failure: framework resolves `AddEntry.422.html` → renders with `$errors` → 422 → htmx morphs the form
 
-**Works across all formats:** HTML, JSON, CSV, plain text, Markdown. The co-located convention is format-aware — `AddEntry.422.html` and `AddEntry.422.json` can coexist for the same DTO.
+**Escape hatches:**
+- `hx-status:422="target:#errors swap:innerHTML"` on the form — errors go to a container, form untouched. `AddEntry.422.html` renders an error list instead of a form.
+- App-wide `app/Templates/errors/422.html` — generic error template for all commands without a co-located `.422.html`.
+- No template at all — framework returns a minimal error fragment for htmx requests, full error page for non-htmx.
+- Two-forms problem (same command, different form layouts on different pages): use `hx-status:422` on the page with the non-default layout.
 
-**htmx integration:** For htmx requests, the HTML error template is rendered as a fragment (no layout wrapper), making it safe to swap into the page. Combined with `hx-target-422` on the client, the developer has full control over where and how validation errors appear per form.
+**Status-specific error templates generalize beyond validation:**
 
-### Validation failure returns 500 instead of 422
+The `{DtoClass}.{status}.{format}` convention works for any status code and format — not just 422. `SendEmail.503.json`, `PlaceOrder.201.html`, `Health.500.json`. The resolution chain: co-located → app-wide (`app/Templates/errors/{status}.{format}`) → framework default. Error templates receive `$code`, `$message`, `$errors` (for validation), `$suggestion` (for ArcanumException). For htmx requests, HTML error templates render as fragments (no layout wrapper).
 
-Surfaced during the htmx smoke test (April 2026) and confirmed independently. When a command DTO fails validation (e.g., empty guestbook fields), the response message correctly says "Validation failed with 4 error(s)" but the HTTP status code is 500 instead of the expected 422 Unprocessable Entity. The `ValidationGuard` Conveyor middleware throws a `ValidationException` which should map to 422 via the exception renderer, but something in the rendering chain is swallowing the status code.
+#### Checklist
 
-- [x] **Investigate and fix validation status code.** Root cause: `HyperKernel::handleException()` resolves `HtmlExceptionResponseRenderer` directly for HTML requests, bypassing the `ValidationExceptionRenderer` decorator chain. Both `HtmlExceptionResponseRenderer` and `JsonExceptionResponseRenderer` only checked `instanceof HttpException` for status codes, falling through to 500. Fix: both renderers now check for `ValidationException` explicitly via `match` expression and map it to 422.
+##### Underscore partial convention
+- [ ] **Skip `_` prefixed files in `PageDiscovery::scan()`.** Files starting with `_` in `app/Pages/` are include-only partials, not routable pages. One-line change to the scan loop. Add test for the skip behavior.
+- [ ] **Document the underscore convention** in the Atlas README and starter app README.
+
+##### Status-specific template resolution
+- [ ] **Add `TemplateResolver::resolveError(string $dtoClass, int $statusCode, string $format): ?string`.** Resolution order: co-located `{DtoClass}.{status}.{format}` → app-wide `app/Templates/errors/{status}.{format}` → null. Tests cover: co-located found, app-wide fallback, null when neither exists.
+- [ ] **Integrate with exception renderers.** When `resolveError` returns a path, compile and render the template instead of the built-in error page. Pass template variables: `$code`, `$message`, `$errors` (for `ValidationException`), `$suggestion` (for `ArcanumException`). For htmx requests, render as fragment (no layout). For non-htmx, render with layout if the template uses `{{ extends }}`.
+- [ ] **Framework default fragment for htmx.** When no error template exists and the request is htmx, return a minimal error fragment (unstyled `<ul>` of error messages for 422, generic error message for other codes) instead of the full error page document.
+
+##### Starter app guestbook validation demo
+- [ ] **Extract guestbook form to shared partial.** Move the form from `app/Pages/Index.html` to `app/Templates/forms/_guestbook-form.html`. Update `Index.html` to include it. Add conditional `$errors` rendering to the partial.
+- [ ] **Add `AddEntry.422.html`.** Co-located with the command, includes the shared form partial. One-liner: `{{ include 'forms/_guestbook-form' }}`.
+- [ ] **Add `hx-swap="morph:outerHTML"` to the guestbook form.** Enables Idiomorph to preserve input values during error re-render.
+- [ ] **End-to-end test.** Submit with short values → 422 → form re-renders with inline errors and preserved input values → fix values → submit → 204 + broadcast → list refreshes.
+
+##### htmx v4 compatibility
+- [ ] **Address `HX-Trigger-After-Swap` and `HX-Trigger-After-Settle` removal.** htmx v4 removed these response headers. The `BroadcastAfterSwap` and `BroadcastAfterSettle` sub-interfaces in the Htmx package currently project to these headers. Investigate the v4 replacement (`HX-Trigger` timing, or JavaScript-based alternatives) and update `HtmxEventTriggerMiddleware`.
+- [ ] **Update `hx-target-422` references to `hx-status:422`.** The `response-targets` extension is superseded by the built-in `hx-status` attribute in v4. Update Htmx README, starter app templates, and any framework code that references the extension.
+
+##### Documentation
+- [ ] **Update Htmx README** with the validation error pattern, `morph:outerHTML`, `hx-status:422`, the form partial convention, and the fallback chain.
+- [ ] **Update COMPENDIUM** with the status-specific error template convention.
+
+#### Cross-cutting
+- [ ] **Run `composer check` after each commit.**
 
 ### Welcome page — nice-to-haves (deferred)
 
