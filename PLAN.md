@@ -49,7 +49,7 @@ The `{DtoClass}.{status}.{format}` convention works for any status code and form
 ##### Status-specific template resolution
 - [x] **Add `TemplateResolver::resolveForStatus(string $dtoClass, int $statusCode, string $format): ?string`.** Resolution order: co-located `{DtoClass}.{status}.{format}` → app-wide `app/Templates/errors/{status}.{format}` → null. Works for any HTTP status code, not just errors. Tests cover: co-located found (error and success), co-located JSON, app-wide fallback, co-located preferred over app-wide, null when neither exists, empty class, wrong namespace, no templates directory.
 - [x] **Integrate with rendering pipeline.** `Formatter` interface gains `int $statusCode` parameter. Template-based formatters try `resolveForStatus()` first, fall back to `resolve()`. `ResponseRenderer` gains `StatusCode` parameter, all subclasses pass through. `HtmlExceptionResponseRenderer` uses `TemplateResolver` for co-located error templates with `$errors` (validation), `$suggestion` (ArcanumException). Unified resolution: `resolveForStatus(dto, status, format)` → `resolve(dto)` → built-in fallback.
-- [ ] **Framework default fragment for htmx.** When no error template exists and the request is htmx, return a minimal error fragment (unstyled `<ul>` of error messages for 422, generic error message for other codes) instead of the full error page document.
+- [x] **Framework default fragment for htmx.** When no error template exists and the request is htmx, returns a minimal fragment: `<ul>` of field errors for 422, `<p>` with description for other codes. App-provided templates still take priority. `HyperKernel::handleException()` checks `HX-Request` header.
 
 ##### Rendering pipeline refactor — TemplateEngine extraction
 
