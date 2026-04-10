@@ -75,15 +75,13 @@ The fix: split the god object, move resolution upstream, and put every template 
 - [ ] **Thread DTO class context through exception handling.** Store as request attribute (`arcanum.dto_class`) when route resolves. `handleException()` reads it and passes to exception renderer. Deferred — setter works for now, request attribute is a polish item.
 
 **Phase 5: Replace fallback formatters with bundled templates**
-- [ ] **Create `DataHelper` with recursive rendering methods.** `DataHelper::html(mixed $data): string` — recursive dl/dt/dd for objects, ol/li for lists, escaped text for scalars (current HtmlFallbackFormatter logic). `DataHelper::text(mixed $data): string` — key-value pairs (current PlainTextFallbackFormatter logic). `DataHelper::markdown(mixed $data): string` — headings and lists (current MarkdownFallbackFormatter logic). Registered as a global helper available in all templates.
-- [ ] **Create bundled fallback templates.** `src/Shodo/Templates/fallback.html`, `fallback.txt`, `fallback.md`. Each calls its format-specific `DataHelper` method. These are framework-provided templates, not app templates — the engine renders them like any other template.
-- [ ] **Formatter fallback path uses the engine.** When no template path is provided (or the path is empty), the formatter renders the bundled fallback template through the engine instead of delegating to a separate FallbackFormatter class. One rendering path for everything.
-- [ ] **Remove HtmlFallbackFormatter, PlainTextFallbackFormatter, MarkdownFallbackFormatter.** Delete the classes, remove from Bootstrap/Formats, update tests. The bundled templates + DataHelper replace them entirely.
+- [x] **Bundled fallback templates replace FallbackFormatter classes.** `src/Shodo/Templates/fallback.{html,txt,md}` use `$__vars` (list of user data keys) with PHP variable variables (`$$key`) to iterate dynamic data. Two levels of nesting, pure Shodo syntax, no helper needed. `buildVariables()` adds `$__vars = array_keys($variables)` before framework entries.
+- [x] **HtmlFallbackFormatter, PlainTextFallbackFormatter, MarkdownFallbackFormatter deleted.** Classes and tests removed (-909 lines). One rendering path for everything — user templates, status-specific templates, and fallbacks all go through TemplateEngine.
 
 #### Cross-cutting for the refactor
-- [ ] **Run `composer check` after each commit.**
-- [ ] **Update COMPENDIUM** after phases that change public API (especially phase 3 and phase 5).
-- [ ] **Update Shodo README** with the TemplateEngine documentation.
+- [x] **`composer check` passed after each commit.**
+- [ ] **Update COMPENDIUM** with the refactored rendering pipeline (TemplateEngine, no fallback formatters, bundled templates).
+- [ ] **Update Shodo README** with TemplateEngine documentation.
 
 ---
 
