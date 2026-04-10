@@ -12,6 +12,27 @@ Concrete, walkable lists. Everything else in this file is informational — cont
 
 First-class htmx 4 support: `HtmxAwareResponseRenderer` (three rendering modes: full page, content section, element-by-id extraction), `HtmxRequest` decorator, `ClientBroadcast` event projection to `HX-Trigger` headers, `FragmentDirective` for innerHTML opt-in via `{{ fragment 'id' }}`, CSRF JS shim, auth-redirect middleware, `Vary: HX-Request`, lazy template closures, Shodo custom directive system (`CompilerDirective` interface with 5 built-ins + `DirectiveRegistry`). Full README, COMPENDIUM updated, starter app integrated with guestbook demo. Smoke-tested end-to-end (surfaced the validation 500 bug below). See `src/Htmx/README.md` for the package reference. Design decisions archived in git history (commits on `claude-bang` branch, April 2026).
 
+### Status-specific error templates — `{DtoClass}.{status}.{format}`
+
+Convention-based error template resolution across all rendering pipelines and status codes. When an exception occurs during dispatch of a DTO, the renderer looks for a co-located error template before falling back to the app-wide and framework defaults.
+
+**Resolution order (most specific first):**
+
+1. **Co-located:** `app/Domain/Shop/Command/SendEmail.503.json` — this specific DTO, this status, this format
+2. **App-wide:** `app/Templates/errors/503.json` — the app's default for this status + format
+3. **Framework default:** the built-in exception renderer (current behavior)
+
+**Naming convention:** `{DtoClass}.{statusCode}.{format}` — the DTO's filename with the HTTP status code and response format as extensions. Examples:
+- `AddEntry.422.html` — validation errors for the guestbook command, rendered as HTML
+- `PlaceOrder.503.html` — service unavailable error specific to order placement
+- `Health.500.json` — custom JSON error shape for the health endpoint
+
+**How it works:** The exception rendering chain already knows the DTO class (from the route), the status code (from the exception), and the response format (from the URL extension). `TemplateResolver` gains a `resolveError(string $dtoClass, int $statusCode, string $format)` method that checks co-located → app-wide → null. When non-null, the error renderer compiles and renders the template with error variables (`$code`, `$title`, `$message`, `$errors` for validation, `$suggestion` for ArcanumException). When null, falls back to the current built-in renderer.
+
+**Works across all formats:** HTML, JSON, CSV, plain text, Markdown. The co-located convention is format-aware — `AddEntry.422.html` and `AddEntry.422.json` can coexist for the same DTO.
+
+**htmx integration:** For htmx requests, the HTML error template is rendered as a fragment (no layout wrapper), making it safe to swap into the page. Combined with `hx-target-422` on the client, the developer has full control over where and how validation errors appear per form.
+
 ### Validation failure returns 500 instead of 422
 
 Surfaced during the htmx smoke test (April 2026) and confirmed independently. When a command DTO fails validation (e.g., empty guestbook fields), the response message correctly says "Validation failed with 4 error(s)" but the HTTP status code is 500 instead of the expected 422 Unprocessable Entity. The `ValidationGuard` Conveyor middleware throws a `ValidationException` which should map to 422 via the exception renderer, but something in the rendering chain is swallowing the status code.
