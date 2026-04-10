@@ -90,9 +90,9 @@ final class HtmxAwareResponseRendererTest extends TestCase
             cache: new TemplateCache($this->cacheDir),
         );
         $fallback = new HtmlFallbackFormatter();
-        $formatter = new HtmlFormatter($resolver, $engine, $fallback);
+        $formatter = new HtmlFormatter($engine, $fallback);
 
-        return new HtmxAwareResponseRenderer($formatter, $engine);
+        return new HtmxAwareResponseRenderer($formatter, $engine, $resolver);
     }
 
     /**

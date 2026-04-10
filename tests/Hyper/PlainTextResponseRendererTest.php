@@ -89,15 +89,15 @@ final class PlainTextResponseRendererTest extends TestCase
 
     private function createRenderer(): PlainTextResponseRenderer
     {
+        $resolver = new TemplateResolver($this->rootDir, 'App', extension: 'txt');
         $formatter = new PlainTextFormatter(
-            resolver: new TemplateResolver($this->rootDir, 'App', extension: 'txt'),
             engine: new TemplateEngine(
                 compiler: new TemplateCompiler(),
                 cache: new TemplateCache($this->cacheDir),
             ),
             fallback: new PlainTextFallbackFormatter(),
         );
-        return new PlainTextResponseRenderer($formatter);
+        return new PlainTextResponseRenderer($formatter, $resolver);
     }
 
     private function readBody(ResponseInterface $response): string
@@ -187,15 +187,15 @@ final class PlainTextResponseRendererTest extends TestCase
     public function testBodyMatchesFormatterOutput(): void
     {
         // Arrange
+        $resolver = new TemplateResolver($this->rootDir, 'App', extension: 'txt');
         $formatter = new PlainTextFormatter(
-            resolver: new TemplateResolver($this->rootDir, 'App', extension: 'txt'),
             engine: new TemplateEngine(
                 compiler: new TemplateCompiler(),
                 cache: new TemplateCache($this->cacheDir),
             ),
             fallback: new PlainTextFallbackFormatter(),
         );
-        $renderer = new PlainTextResponseRenderer($formatter);
+        $renderer = new PlainTextResponseRenderer($formatter, $resolver);
         $data = ['version' => '1.0'];
 
         // Act

@@ -37,6 +37,7 @@ final class HtmlFormatterTest extends TestCase
 {
     private string $rootDir;
     private string $cacheDir;
+    private TemplateResolver $resolver;
 
     protected function setUp(): void
     {
@@ -46,6 +47,7 @@ final class HtmlFormatterTest extends TestCase
         mkdir($this->rootDir . '/app/Domain/Query', 0755, true);
         mkdir($this->rootDir . '/app/Pages', 0755, true);
         mkdir($this->cacheDir, 0755, true);
+        $this->resolver = new TemplateResolver($this->rootDir, 'App');
     }
 
     protected function tearDown(): void
@@ -78,7 +80,6 @@ final class HtmlFormatterTest extends TestCase
         bool $debug = false,
         ?LoggerInterface $logger = null,
     ): HtmlFormatter {
-        $resolver = new TemplateResolver($this->rootDir, 'App');
         $engine = new TemplateEngine(
             compiler: new TemplateCompiler(),
             cache: new TemplateCache($cacheDir ?: $this->cacheDir),
@@ -88,7 +89,6 @@ final class HtmlFormatterTest extends TestCase
         $fallback = new HtmlFallbackFormatter();
 
         return new HtmlFormatter(
-            $resolver,
             $engine,
             $fallback,
             helpers: $helpers,
@@ -101,7 +101,8 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->format(['key' => 'value'], 'App\\Domain\\Query\\Health');
+        $templatePath = $this->resolver->resolve('App\\Domain\\Query\\Health') ?? '';
+        $result = $formatter->format(['key' => 'value'], $templatePath, 'App\\Domain\\Query\\Health');
 
         // Assert
         $this->assertNotSame('', $result);
@@ -113,7 +114,8 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->format(['name' => 'Arcanum'], 'App\\Domain\\Query\\Missing');
+        $templatePath = $this->resolver->resolve('App\\Domain\\Query\\Missing') ?? '';
+        $result = $formatter->format(['name' => 'Arcanum'], $templatePath, 'App\\Domain\\Query\\Missing');
 
         // Assert
         $this->assertStringContainsString('<!DOCTYPE html>', $result);
@@ -144,7 +146,8 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->format(['title' => 'Welcome'], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format(['title' => 'Welcome'], $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertStringContainsString('<h1>Welcome</h1>', $result);
@@ -163,7 +166,8 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->format($obj, 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format($obj, $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertStringContainsString('<p>Arcanum</p>', $result);
@@ -179,7 +183,8 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->format('hello', 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format('hello', $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertStringContainsString('<p>hello</p>', $result);
@@ -195,7 +200,8 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->format(['name' => '<script>xss</script>'], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format(['name' => '<script>xss</script>'], $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertStringContainsString('&lt;script&gt;xss&lt;/script&gt;', $result);
@@ -212,7 +218,8 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->format(['html' => '<b>bold</b>'], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format(['html' => '<b>bold</b>'], $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertStringContainsString('<div><b>bold</b></div>', $result);
@@ -228,7 +235,8 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->format(['items' => ['a', 'b', 'c']], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format(['items' => ['a', 'b', 'c']], $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertStringContainsString('<li>a</li>', $result);
@@ -246,8 +254,9 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
-        $shown = $formatter->format(['show' => true], 'App\\Pages\\Index');
-        $hidden = $formatter->format(['show' => false], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $shown = $formatter->format(['show' => true], $templatePath, 'App\\Pages\\Index');
+        $hidden = $formatter->format(['show' => false], $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertStringContainsString('<p>visible</p>', $shown);
@@ -262,14 +271,15 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act — first format compiles and caches
-        $formatter->format(['name' => 'first'], 'App\\Pages\\Index');
+        $resolvedPath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $formatter->format(['name' => 'first'], $resolvedPath, 'App\\Pages\\Index');
 
         // Verify cache file exists
         $cache = new TemplateCache($this->cacheDir);
         $this->assertTrue($cache->isFresh($templatePath));
 
         // Act — second format uses cache
-        $result = $formatter->format(['name' => 'second'], 'App\\Pages\\Index');
+        $result = $formatter->format(['name' => 'second'], $resolvedPath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertStringContainsString('<p>second</p>', $result);
@@ -285,7 +295,8 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter(cacheDir: '');
 
         // Act
-        $result = $formatter->format(['name' => 'Arcanum'], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format(['name' => 'Arcanum'], $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertStringContainsString('<p>Arcanum</p>', $result);
@@ -314,7 +325,8 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter(helpers: $resolver);
 
         // Act
-        $result = $formatter->format([], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format([], $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertStringContainsString('<a href="/api/health">Health</a>', $result);
@@ -339,7 +351,8 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter(helpers: $resolver);
 
         // Act
-        $result = $formatter->format([], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format([], $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertStringContainsString('&lt;script&gt;xss&lt;/script&gt;', $result);
@@ -356,7 +369,8 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->format(['name' => 'Arcanum'], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format(['name' => 'Arcanum'], $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertStringContainsString('<p>Arcanum</p>', $result);
@@ -381,7 +395,8 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter(helpers: $resolver);
 
         // Act
-        $result = $formatter->format([], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format([], $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertStringContainsString(
@@ -407,7 +422,8 @@ final class HtmlFormatterTest extends TestCase
             $this->expectException(\RuntimeException::class);
             $this->expectExceptionMessage('Undefined template variable "$usernme"');
 
-            $formatter->format(['username' => 'Alice'], 'App\\Pages\\Index');
+            $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+            $formatter->format(['username' => 'Alice'], $templatePath, 'App\\Pages\\Index');
         } finally {
             restore_error_handler();
         }
@@ -427,7 +443,8 @@ final class HtmlFormatterTest extends TestCase
 
         // Act & Assert
         try {
-            $formatter->format(['name' => 'Alice', 'email' => 'a@b.com'], 'App\\Pages\\Index');
+            $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+            $formatter->format(['name' => 'Alice', 'email' => 'a@b.com'], $templatePath, 'App\\Pages\\Index');
             $this->fail('Expected RuntimeException');
         } catch (\RuntimeException $e) {
             $this->assertStringContainsString('name', $e->getMessage());
@@ -447,7 +464,8 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act — should not throw
-        $result = @$formatter->format(['name' => 'Alice'], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = @$formatter->format(['name' => 'Alice'], $templatePath, 'App\\Pages\\Index');
 
         // Assert — renders without crashing (empty value)
         $this->assertStringContainsString('<p>', $result);
@@ -475,7 +493,8 @@ final class HtmlFormatterTest extends TestCase
             return true;
         });
 
-        $formatter->format(['name' => 'Alice', 'ssn' => '123-45-6789'], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $formatter->format(['name' => 'Alice', 'ssn' => '123-45-6789'], $templatePath, 'App\\Pages\\Index');
         restore_error_handler();
 
         // Assert
@@ -501,7 +520,8 @@ final class HtmlFormatterTest extends TestCase
             return true;
         });
 
-        $formatter->format(['name' => 'Alice', 'ssn' => '123-45-6789'], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $formatter->format(['name' => 'Alice', 'ssn' => '123-45-6789'], $templatePath, 'App\\Pages\\Index');
         restore_error_handler();
 
         // Assert — no notice triggered
@@ -515,10 +535,9 @@ final class HtmlFormatterTest extends TestCase
             $this->rootDir . '/app/Pages/Index.html',
             '<p>Hello</p>',
         );
-        $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->resolveTemplate('App\\Pages\\Index');
+        $result = $this->resolver->resolve('App\\Pages\\Index');
 
         // Assert
         $this->assertSame($this->rootDir . '/app/Pages/Index.html', $result);
@@ -526,11 +545,8 @@ final class HtmlFormatterTest extends TestCase
 
     public function testResolveTemplateReturnsNullForMissingTemplate(): void
     {
-        // Arrange
-        $formatter = $this->createFormatter();
-
         // Act & Assert
-        $this->assertNull($formatter->resolveTemplate('App\\Pages\\Missing'));
+        $this->assertNull($this->resolver->resolve('App\\Pages\\Missing'));
     }
 
     // -----------------------------------------------------------
@@ -548,6 +564,7 @@ final class HtmlFormatterTest extends TestCase
         $invoked = [];
 
         // Act
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
         $result = $formatter->format([
             'name' => function () use (&$invoked) {
                 $invoked[] = 'name';
@@ -557,7 +574,7 @@ final class HtmlFormatterTest extends TestCase
                 $invoked[] = 'count';
                 return '42';
             },
-        ], 'App\\Pages\\Index');
+        ], $templatePath, 'App\\Pages\\Index');
 
         // Assert — both closures invoked, values rendered
         $this->assertSame(['name', 'count'], $invoked);
@@ -575,10 +592,11 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
         $result = $formatter->format([
             'name' => fn() => 'Alice',
             'role' => 'admin',
-        ], 'App\\Pages\\Index');
+        ], $templatePath, 'App\\Pages\\Index');
 
         // Assert — both rendered correctly
         $this->assertStringContainsString('<p>Alice</p>', $result);
@@ -598,9 +616,10 @@ final class HtmlFormatterTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Database connection failed');
 
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
         $formatter->format([
             'data' => fn() => throw new \RuntimeException('Database connection failed'),
-        ], 'App\\Pages\\Index');
+        ], $templatePath, 'App\\Pages\\Index');
     }
 
     // -----------------------------------------------------------
@@ -620,11 +639,12 @@ final class HtmlFormatterTest extends TestCase
         );
         $formatter = $this->createFormatter();
 
-        // Act — pass statusCode 422
+        // Act — resolve status-specific template, then format
+        $templatePath = $this->resolver->resolveForStatus('App\\Domain\\Query\\Products', 422) ?? '';
         $result = $formatter->format(
             ['message' => 'Validation failed'],
+            $templatePath,
             'App\\Domain\\Query\\Products',
-            422,
         );
 
         // Assert — renders the 422 template, not the default
@@ -640,11 +660,14 @@ final class HtmlFormatterTest extends TestCase
         );
         $formatter = $this->createFormatter();
 
-        // Act — pass statusCode 500, no matching template
+        // Act — no 500 template exists, fall back to default
+        $templatePath = $this->resolver->resolveForStatus('App\\Domain\\Query\\Products', 500)
+            ?? $this->resolver->resolve('App\\Domain\\Query\\Products')
+            ?? '';
         $result = $formatter->format(
             ['name' => 'Arcanum'],
+            $templatePath,
             'App\\Domain\\Query\\Products',
-            500,
         );
 
         // Assert — falls back to default template
@@ -661,10 +684,11 @@ final class HtmlFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act — statusCode 0 means "use default" (same as omitting it)
+        $templatePath = $this->resolver->resolve('App\\Domain\\Query\\Products') ?? '';
         $result = $formatter->format(
             ['name' => 'Arcanum'],
+            $templatePath,
             'App\\Domain\\Query\\Products',
-            0,
         );
 
         // Assert

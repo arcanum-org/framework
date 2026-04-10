@@ -74,15 +74,15 @@ final class CqrsLifecycleTest extends TestCase
         $container->service(JsonResponseRenderer::class);
         $container->service(CsvResponseRenderer::class);
         $container->factory(HtmlResponseRenderer::class, function () {
+            $resolver = new TemplateResolver('/nonexistent', 'Arcanum\Test');
             $formatter = new HtmlFormatter(
-                resolver: new TemplateResolver('/nonexistent', 'Arcanum\Test'),
                 engine: new TemplateEngine(
                     compiler: new TemplateCompiler(),
                     cache: new TemplateCache(''),
                 ),
                 fallback: new HtmlFallbackFormatter(),
             );
-            return new HtmlResponseRenderer($formatter);
+            return new HtmlResponseRenderer($formatter, $resolver);
         });
 
         $locationResolver = new LocationResolver(

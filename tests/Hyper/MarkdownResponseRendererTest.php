@@ -47,8 +47,7 @@ final class MarkdownResponseRendererTest extends TestCase
     public function testRenderReturnsResponseWithMarkdownContentType(): void
     {
         // Arrange
-        $formatter = $this->createFormatter();
-        $renderer = new MarkdownResponseRenderer($formatter);
+        $renderer = $this->createRenderer();
 
         // Act
         $response = $renderer->render(['name' => 'Arcanum']);
@@ -60,8 +59,7 @@ final class MarkdownResponseRendererTest extends TestCase
     public function testRenderReturns200Status(): void
     {
         // Arrange
-        $formatter = $this->createFormatter();
-        $renderer = new MarkdownResponseRenderer($formatter);
+        $renderer = $this->createRenderer();
 
         // Act
         $response = $renderer->render(['name' => 'Arcanum']);
@@ -73,8 +71,7 @@ final class MarkdownResponseRendererTest extends TestCase
     public function testRenderBodyContainsFormattedMarkdown(): void
     {
         // Arrange
-        $formatter = $this->createFormatter();
-        $renderer = new MarkdownResponseRenderer($formatter);
+        $renderer = $this->createRenderer();
 
         // Act
         $response = $renderer->render(['name' => 'Arcanum', 'version' => '1.0']);
@@ -89,8 +86,7 @@ final class MarkdownResponseRendererTest extends TestCase
     public function testRenderSetsContentLength(): void
     {
         // Arrange
-        $formatter = $this->createFormatter();
-        $renderer = new MarkdownResponseRenderer($formatter);
+        $renderer = $this->createRenderer();
 
         // Act
         $response = $renderer->render('Hello');
@@ -101,17 +97,20 @@ final class MarkdownResponseRendererTest extends TestCase
         $this->assertSame((string) strlen($body), $response->getHeaderLine('Content-Length'));
     }
 
-    private function createFormatter(): MarkdownFormatter
+    private function createRenderer(): MarkdownResponseRenderer
     {
         $rootDir = sys_get_temp_dir() . '/arcanum_md_renderer_test_' . uniqid();
         mkdir($rootDir, 0755, true);
 
         $resolver = new TemplateResolver($rootDir, 'App', extension: 'md');
-        $compiler = new TemplateCompiler();
-        $cache = new TemplateCache('');
-        $fallback = new MarkdownFallbackFormatter();
+        $formatter = new MarkdownFormatter(
+            engine: new TemplateEngine(
+                compiler: new TemplateCompiler(),
+                cache: new TemplateCache(''),
+            ),
+            fallback: new MarkdownFallbackFormatter(),
+        );
 
-        $engine = new TemplateEngine(compiler: $compiler, cache: $cache);
-        return new MarkdownFormatter($resolver, $engine, $fallback);
+        return new MarkdownResponseRenderer($formatter, $resolver);
     }
 }

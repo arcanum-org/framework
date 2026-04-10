@@ -34,6 +34,7 @@ final class PlainTextFormatterTest extends TestCase
 {
     private string $rootDir;
     private string $cacheDir;
+    private TemplateResolver $resolver;
 
     protected function setUp(): void
     {
@@ -43,6 +44,7 @@ final class PlainTextFormatterTest extends TestCase
         mkdir($this->rootDir . '/app/Domain/Query', 0755, true);
         mkdir($this->rootDir . '/app/Pages', 0755, true);
         mkdir($this->cacheDir, 0755, true);
+        $this->resolver = new TemplateResolver($this->rootDir, 'App', extension: 'txt');
     }
 
     protected function tearDown(): void
@@ -71,14 +73,13 @@ final class PlainTextFormatterTest extends TestCase
 
     private function createFormatter(?HelperResolver $helpers = null): PlainTextFormatter
     {
-        $resolver = new TemplateResolver($this->rootDir, 'App', extension: 'txt');
         $engine = new TemplateEngine(
             compiler: new TemplateCompiler(),
             cache: new TemplateCache($this->cacheDir),
         );
         $fallback = new PlainTextFallbackFormatter();
 
-        return new PlainTextFormatter($resolver, $engine, $fallback, helpers: $helpers);
+        return new PlainTextFormatter($engine, $fallback, helpers: $helpers);
     }
 
     public function testFormatReturnsNonEmptyOutput(): void
@@ -99,7 +100,8 @@ final class PlainTextFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->format(['name' => 'Arcanum'], 'App\\Domain\\Query\\Missing');
+        $templatePath = $this->resolver->resolve('App\\Domain\\Query\\Missing') ?? '';
+        $result = $formatter->format(['name' => 'Arcanum'], $templatePath, 'App\\Domain\\Query\\Missing');
 
         // Assert
         $this->assertStringContainsString('name: Arcanum', $result);
@@ -127,7 +129,8 @@ final class PlainTextFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->format(['name' => 'Arcanum'], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format(['name' => 'Arcanum'], $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertSame('Welcome to Arcanum!', $result);
@@ -143,7 +146,8 @@ final class PlainTextFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->format(['value' => '<b>bold</b>'], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format(['value' => '<b>bold</b>'], $templatePath, 'App\\Pages\\Index');
 
         // Assert — no HTML escaping in plain text
         $this->assertSame('Value: <b>bold</b>', $result);
@@ -159,7 +163,8 @@ final class PlainTextFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->format(['items' => ['a', 'b']], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format(['items' => ['a', 'b']], $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertStringContainsString('- a', $result);
@@ -180,7 +185,8 @@ final class PlainTextFormatterTest extends TestCase
         $formatter = $this->createFormatter();
 
         // Act
-        $result = $formatter->format($obj, 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format($obj, $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertSame('Arcanum v1', $result);
@@ -209,7 +215,8 @@ final class PlainTextFormatterTest extends TestCase
         $formatter = $this->createFormatter(helpers: $resolver);
 
         // Act
-        $result = $formatter->format([], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format([], $templatePath, 'App\\Pages\\Index');
 
         // Assert
         $this->assertSame('URL: /api/health', $result);
@@ -234,7 +241,8 @@ final class PlainTextFormatterTest extends TestCase
         $formatter = $this->createFormatter(helpers: $resolver);
 
         // Act
-        $result = $formatter->format([], 'App\\Pages\\Index');
+        $templatePath = $this->resolver->resolve('App\\Pages\\Index') ?? '';
+        $result = $formatter->format([], $templatePath, 'App\\Pages\\Index');
 
         // Assert — no HTML encoding in plain text
         $this->assertSame('<b>bold</b>', $result);

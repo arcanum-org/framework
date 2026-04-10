@@ -89,15 +89,15 @@ final class HtmlResponseRendererTest extends TestCase
 
     private function createRenderer(): HtmlResponseRenderer
     {
+        $resolver = new TemplateResolver($this->rootDir, 'App');
         $formatter = new HtmlFormatter(
-            resolver: new TemplateResolver($this->rootDir, 'App'),
             engine: new TemplateEngine(
                 compiler: new TemplateCompiler(),
                 cache: new TemplateCache($this->cacheDir),
             ),
             fallback: new HtmlFallbackFormatter(),
         );
-        return new HtmlResponseRenderer($formatter);
+        return new HtmlResponseRenderer($formatter, $resolver);
     }
 
     private function readBody(ResponseInterface $response): string
@@ -188,15 +188,15 @@ final class HtmlResponseRendererTest extends TestCase
     public function testBodyMatchesFormatterOutput(): void
     {
         // Arrange
+        $resolver = new TemplateResolver($this->rootDir, 'App');
         $formatter = new HtmlFormatter(
-            resolver: new TemplateResolver($this->rootDir, 'App'),
             engine: new TemplateEngine(
                 compiler: new TemplateCompiler(),
                 cache: new TemplateCache($this->cacheDir),
             ),
             fallback: new HtmlFallbackFormatter(),
         );
-        $renderer = new HtmlResponseRenderer($formatter);
+        $renderer = new HtmlResponseRenderer($formatter, $resolver);
         $data = ['status' => 'ok'];
 
         // Act
