@@ -47,7 +47,7 @@ The `{DtoClass}.{status}.{format}` convention works for any status code and form
 - [x] **Document the underscore convention** in the Atlas README and COMPENDIUM.
 
 ##### Status-specific template resolution
-- [ ] **Add `TemplateResolver::resolveError(string $dtoClass, int $statusCode, string $format): ?string`.** Resolution order: co-located `{DtoClass}.{status}.{format}` → app-wide `app/Templates/errors/{status}.{format}` → null. Tests cover: co-located found, app-wide fallback, null when neither exists.
+- [x] **Add `TemplateResolver::resolveForStatus(string $dtoClass, int $statusCode, string $format): ?string`.** Resolution order: co-located `{DtoClass}.{status}.{format}` → app-wide `app/Templates/errors/{status}.{format}` → null. Works for any HTTP status code, not just errors. Tests cover: co-located found (error and success), co-located JSON, app-wide fallback, co-located preferred over app-wide, null when neither exists, empty class, wrong namespace, no templates directory.
 - [ ] **Integrate with exception renderers.** When `resolveError` returns a path, compile and render the template instead of the built-in error page. Pass template variables: `$code`, `$message`, `$errors` (for `ValidationException`), `$suggestion` (for `ArcanumException`). For htmx requests, render as fragment (no layout). For non-htmx, render with layout if the template uses `{{ extends }}`.
 - [ ] **Framework default fragment for htmx.** When no error template exists and the request is htmx, return a minimal error fragment (unstyled `<ul>` of error messages for 422, generic error message for other codes) instead of the full error page document.
 
