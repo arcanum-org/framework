@@ -40,9 +40,11 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
 
     public function render(\Throwable $e): ResponseInterface
     {
-        $status = $e instanceof HttpException
-            ? $e->getStatusCode()
-            : StatusCode::InternalServerError;
+        $status = match (true) {
+            $e instanceof HttpException => $e->getStatusCode(),
+            $e instanceof \Arcanum\Validation\ValidationException => StatusCode::UnprocessableEntity,
+            default => StatusCode::InternalServerError,
+        };
 
         $title = $e instanceof ArcanumException
             ? $e->getTitle()
