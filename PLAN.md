@@ -91,6 +91,9 @@ The fix: split the god object, move resolution upstream, and put every template 
 - [x] **Add `hx-swap="morph:outerHTML"` to the guestbook form.** Idiomorph preserves typed values during error re-render.
 - [x] **End-to-end smoke test.** Validated via curl: short values → 422 → form re-rendered with inline errors + CSRF token + morph swap. Valid values → 204 + `HX-Trigger: guestbook:entry:added`. App kernel sets DTO class on exception renderer for co-located template discovery. HelperResolver added to exception renderer for `{{ csrf }}` support in error templates.
 
+##### Idiomorph morph not preserving input values
+- [ ] **Investigate why `hx-swap="morph:outerHTML"` clears form field values on 422 re-render.** The validation error flow works (422 response, form re-rendered with error messages), but the user's typed values are lost when the morph swaps the form. Expected behavior: Idiomorph should preserve input values from the live DOM since the `name` attributes match. Possible causes: htmx v4 beta Idiomorph integration differences, `outerHTML` vs `innerHTML` morph behavior, the form `id` or structure changing in a way Idiomorph doesn't recognize, or `hx-swap="morph:outerHTML"` not being the correct v4 syntax. Investigate and fix — this is essential for the validation UX.
+
 ##### htmx v4 compatibility
 - [ ] **Address `HX-Trigger-After-Swap` and `HX-Trigger-After-Settle` removal.** htmx v4 removed these response headers. The `BroadcastAfterSwap` and `BroadcastAfterSettle` sub-interfaces in the Htmx package currently project to these headers. Investigate the v4 replacement (`HX-Trigger` timing, or JavaScript-based alternatives) and update `HtmxEventTriggerMiddleware`.
 - [ ] **Update `hx-target-422` references to `hx-status:422`.** The `response-targets` extension is superseded by the built-in `hx-status` attribute in v4. Update Htmx README, starter app templates, and any framework code that references the extension.
