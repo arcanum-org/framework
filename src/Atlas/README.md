@@ -183,6 +183,14 @@ app/Pages/Docs/GettingStarted.html    → GET /docs/getting-started
 
 PascalCase filenames are converted to kebab-case URL paths. `Index.html` at the root maps to `/`.
 
+Files starting with `_` are **partials** — include-only templates that are not registered as routes. Use them for shared fragments reachable via `{{ include }}`:
+
+```
+app/Pages/Index.html                  → GET /
+app/Pages/_Header.html                → skipped (partial)
+app/Templates/forms/_contact.html     → skipped (partial)
+```
+
 ### Pages with data
 
 Optionally add a PHP DTO class to provide default template data:

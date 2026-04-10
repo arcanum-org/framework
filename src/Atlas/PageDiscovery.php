@@ -103,6 +103,11 @@ final class PageDiscovery
         $pages = [];
 
         foreach (Searcher::findAll('*.html', $this->directory) as $file) {
+            // Skip underscore-prefixed partials (include-only, not routable)
+            if (str_starts_with($file->getFilename(), '_')) {
+                continue;
+            }
+
             $relativePath = $file->getRelativePathname();
             // Remove .html extension
             $relativePath = substr($relativePath, 0, -5);

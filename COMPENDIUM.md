@@ -50,7 +50,8 @@ app/
 │       ├── Helpers.php                 # domain-scoped template helpers
 │       └── Middleware.php              # domain-scoped middleware
 ├── Pages/
-│   └── Index.html                      # template-driven routes, no handler needed
+│   ├── Index.html                      # template-driven routes, no handler needed
+│   └── _Header.html                    # underscore prefix = partial (include-only, not routed)
 ├── Http/Kernel.php
 └── Cli/Kernel.php
 ```
@@ -132,6 +133,7 @@ Arcanum's small mental model comes from a handful of conventions that show up ev
 - `app/Domain/Shop/Query/Products.php` → URL `/shop/products`. Atlas walks the namespace; PSR-4 paths become URL paths via PascalCase → kebab-case.
 - `Products.php` (Query DTO) → `Products.html` (template) co-located in the same directory. Shodo finds the template by file extension next to the DTO.
 - `Products.html` → also `Products.json`, `Products.csv`, `Products.md`, `Products.txt`. Same handler, five formatters, picked by URL extension.
+- `_guestbook-form.html` — files starting with `_` are **partials**: include-only templates skipped by `PageDiscovery`, reachable via `{{ include }}`. Works in `app/Pages/`, `app/Templates/`, or any template directory.
 
 ### What's inside `{{ }}`
 

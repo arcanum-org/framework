@@ -95,6 +95,36 @@ final class PageDiscoveryTest extends TestCase
         }
     }
 
+    public function testUnderscorePrefixedFilesAreNotDiscovered(): void
+    {
+        // Arrange — _Partial.html exists in the fixture Pages directory
+        $discovery = new PageDiscovery(self::PAGES_NS, self::PAGES_DIR);
+
+        // Act
+        $pages = $discovery->discover();
+
+        // Assert — no path or class containing "Partial"
+        foreach ($pages as $path => $class) {
+            $this->assertStringNotContainsString('Partial', $path);
+            $this->assertStringNotContainsString('Partial', $class);
+        }
+    }
+
+    public function testUnderscorePrefixedFilesInSubdirectoriesAreNotDiscovered(): void
+    {
+        // Arrange — Docs/_Sidebar.html exists in the fixture Pages directory
+        $discovery = new PageDiscovery(self::PAGES_NS, self::PAGES_DIR);
+
+        // Act
+        $pages = $discovery->discover();
+
+        // Assert — no path or class containing "Sidebar"
+        foreach ($pages as $path => $class) {
+            $this->assertStringNotContainsString('Sidebar', $path);
+            $this->assertStringNotContainsString('Sidebar', $class);
+        }
+    }
+
     public function testReturnsEmptyForNonExistentDirectory(): void
     {
         // Arrange
