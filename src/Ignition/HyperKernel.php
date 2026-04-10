@@ -330,10 +330,11 @@ class HyperKernel implements Kernel, RequestHandlerInterface
                 $extension === 'html'
                 && $this->container->has(\Arcanum\Hyper\HtmlExceptionResponseRenderer::class)
             ) {
-                /** @var ExceptionRenderer $htmlRenderer */
+                /** @var \Arcanum\Hyper\HtmlExceptionResponseRenderer $htmlRenderer */
                 $htmlRenderer = $this->container->get(
                     \Arcanum\Hyper\HtmlExceptionResponseRenderer::class,
                 );
+                $htmlRenderer->setIsHtmxRequest($request->hasHeader('HX-Request'));
                 return $htmlRenderer->render($e);
             }
         }

@@ -28,6 +28,7 @@ use Psr\Http\Message\ResponseInterface;
 class HtmlExceptionResponseRenderer implements ExceptionRenderer
 {
     private string $dtoClass = '';
+    private bool $isHtmxRequest = false;
 
     public function __construct(
         private readonly bool $debug = false,
@@ -48,6 +49,17 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
         $this->dtoClass = $dtoClass;
     }
 
+    /**
+     * Mark the current request as htmx-initiated.
+     *
+     * When true and no app-provided error template exists, renders a
+     * minimal error fragment instead of the full styled error page.
+     */
+    public function setIsHtmxRequest(bool $isHtmx): void
+    {
+        $this->isHtmxRequest = $isHtmx;
+    }
+
     public function render(\Throwable $e): ResponseInterface
     {
         $status = match (true) {
@@ -65,7 +77,9 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
             : null;
 
         $html = $this->renderAppTemplate($status, $title, $e, $suggestion)
-            ?? $this->buildHtml($status, $title, $e, $suggestion);
+            ?? ($this->isHtmxRequest
+                ? $this->buildHtmxFragment($status, $e)
+                : $this->buildHtml($status, $title, $e, $suggestion));
 
         $body = new Stream(LazyResource::for('php://memory', 'w+'));
         $body->write($html);
@@ -151,6 +165,37 @@ class HtmlExceptionResponseRenderer implements ExceptionRenderer
         }
 
         return $variables;
+    }
+
+    /**
+     * Build a minimal error fragment for htmx requests.
+     *
+     * For 422 (validation): an unstyled <ul> of field error messages.
+     * For other errors: a single <p> with the error message.
+     * No layout, no styles — htmx will swap this into the existing page.
+     */
+    private function buildHtmxFragment(StatusCode $status, \Throwable $e): string
+    {
+        if (
+            $status === StatusCode::UnprocessableEntity
+            && $e instanceof \Arcanum\Validation\ValidationException
+        ) {
+            $items = '';
+            foreach ($e->errorsByField() as $field => $messages) {
+                foreach ($messages as $message) {
+                    $items .= '<li>' . $this->escape($field) . ': '
+                        . $this->escape($message) . '</li>';
+                }
+            }
+            return '<ul>' . $items . '</ul>';
+        }
+
+        $message = $e->getMessage();
+        if ($message === $status->reason()->value) {
+            $message = $this->defaultDescription($status);
+        }
+
+        return '<p>' . $this->escape($message) . '</p>';
     }
 
     private function buildHtml(

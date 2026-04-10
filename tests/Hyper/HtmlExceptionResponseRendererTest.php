@@ -597,4 +597,81 @@ final class HtmlExceptionResponseRendererTest extends TestCase
         rmdir($rootDir . '/app');
         rmdir($rootDir);
     }
+
+    // -----------------------------------------------------------
+    // htmx fragment fallback
+    // -----------------------------------------------------------
+
+    public function testRenderReturnsValidationFragmentForHtmxRequest(): void
+    {
+        // Arrange — no error template, htmx request
+        $renderer = new HtmlExceptionResponseRenderer();
+        $renderer->setIsHtmxRequest(true);
+
+        $exception = new ValidationException([
+            new ValidationError('name', 'Name is required'),
+            new ValidationError('email', 'Email is required'),
+        ]);
+
+        // Act
+        $body = $this->getBody($renderer->render($exception));
+
+        // Assert — minimal <ul> fragment, not full page
+        $this->assertStringContainsString('<ul>', $body);
+        $this->assertStringContainsString('<li>name: Name is required</li>', $body);
+        $this->assertStringContainsString('<li>email: Email is required</li>', $body);
+        $this->assertStringNotContainsString('<!DOCTYPE html>', $body);
+    }
+
+    public function testRenderReturnsGenericFragmentForHtmxNonValidationError(): void
+    {
+        // Arrange — no error template, htmx request, 404 error
+        $renderer = new HtmlExceptionResponseRenderer();
+        $renderer->setIsHtmxRequest(true);
+
+        // Act
+        $body = $this->getBody($renderer->render(new HttpException(StatusCode::NotFound)));
+
+        // Assert — minimal <p> fragment, not full page
+        $this->assertStringContainsString('<p>', $body);
+        $this->assertStringNotContainsString('<!DOCTYPE html>', $body);
+    }
+
+    public function testRenderReturnsFullPageForNonHtmxRequest(): void
+    {
+        // Arrange — no error template, NOT htmx
+        $renderer = new HtmlExceptionResponseRenderer();
+
+        // Act
+        $body = $this->getBody($renderer->render(new HttpException(StatusCode::NotFound)));
+
+        // Assert — full styled page
+        $this->assertStringContainsString('<!DOCTYPE html>', $body);
+    }
+
+    public function testRenderPrefersAppTemplateOverHtmxFragment(): void
+    {
+        // Arrange — app template exists AND htmx request
+        $fixtureDir = dirname(__DIR__) . '/Fixture/ErrorTemplates';
+        $engine = new TemplateEngine(
+            compiler: new TemplateCompiler(),
+            cache: new TemplateCache(''),
+        );
+        $resolver = new TemplateResolver(
+            rootDirectory: '',
+            rootNamespace: 'App',
+            errorTemplatesDirectory: $fixtureDir,
+        );
+        $renderer = new HtmlExceptionResponseRenderer(
+            engine: $engine,
+            templateResolver: $resolver,
+        );
+        $renderer->setIsHtmxRequest(true);
+
+        // Act — 404 has an app template
+        $body = $this->getBody($renderer->render(new HttpException(StatusCode::NotFound)));
+
+        // Assert — app template wins over htmx fragment
+        $this->assertStringContainsString('class="custom-error"', $body);
+    }
 }
