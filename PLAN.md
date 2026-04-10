@@ -62,8 +62,8 @@ The fix: split the god object, move resolution upstream, and put every template 
 - [x] **HtmlFormatter, PlainTextFormatter, MarkdownFormatter compose TemplateEngine.** Formatters keep: variable extraction, escape function, helper resolution, fallback delegation. Public `buildVariables()` on HtmlFormatter. Bootstrap/Formats registers shared TemplateEngine.
 
 **Phase 2: Expose variable building, simplify HtmxAwareResponseRenderer**
-- [ ] **HtmlFormatter exposes `buildVariables(mixed $data, string $dtoClass = ''): array`.** Returns the full variable array (data extraction, closure resolution, `$__escape`, `$__helpers`) ready for the engine. This is already what `format()` does internally before calling `renderTemplate()` — extract it as a public method.
-- [ ] **HtmxAwareResponseRenderer composes TemplateEngine directly.** Uses `formatter->buildVariables()` for variable prep, then calls the engine for each rendering mode (full, fragment, element, slice). Removes its dependency on `formatter->resolveTemplate()`, `formatter->renderSlice()`, `formatter->renderElementById()`. Those methods can be removed from HtmlFormatter once the htmx renderer no longer calls them.
+- [x] **HtmlFormatter exposes `buildVariables()`.** Closures left unresolved — engine handles selective resolution. `setFragment()`, `renderSlice()`, `renderElementById()` removed.
+- [x] **HtmxAwareResponseRenderer composes TemplateEngine directly.** Uses `buildVariables()` + engine for each mode. `TemplateCompiler` gains `compileFragment()`, boolean flag removed from `compile()`. Tests migrated to new TemplateEngineTest (11 tests).
 
 **Phase 3: Move resolution out of formatters**
 - [ ] **ResponseRenderers compose TemplateResolver.** Each template-based renderer (Html, PlainText, Markdown) gets a TemplateResolver injected. Resolution order: `resolveForStatus($dtoClass, $status)` → `resolve($dtoClass)` → null (formatter handles fallback). Non-template renderers (Json, Csv) unchanged.
