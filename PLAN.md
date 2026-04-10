@@ -138,6 +138,21 @@ The Index redesign landed (nine-section structure, real diagnostics, CSS-only ta
 
   Surfaced during a systematic OWASP XSS audit (April 2026). The three concrete escaping fixes from that audit (HtmlHelper::csrf token escaping, HtmxHelper::script attribute escaping, JsonFormatter full HEX flags) are already landed.
 
+- **Logging instrumentation** — The framework is too quiet. Almost nothing logs. A developer running an Arcanum app in production has no visibility into what the framework is doing unless something throws. Before 1.0, instrument the framework with PSR-3 logging via Quill at key decision points. Guiding principle: log *decisions*, not *data* — a log line should tell you *what the framework decided to do and why*, not dump request bodies or SQL results. Use appropriate levels (debug for routine decisions, info for lifecycle milestones, warning for fall-throughs and degraded states, error for caught failures). Candidate instrumentation sites:
+  - **Bootstrap chain** — which bootstrappers ran and in what order (debug). Slow bootstrappers (info with elapsed time).
+  - **Routing** — which DTO class a request resolved to, or that no route matched (debug). Wrong HTTP method → 405 (info).
+  - **Middleware** — which middleware ran for a request (debug). Middleware that short-circuited (info with reason).
+  - **Conveyor dispatch** — handler class resolved, validation/auth guard decisions (debug). Validation failure details (info).
+  - **Rendering** — which formatter and template were used, cache hit vs miss (debug). Fragment extraction fall-through (warning, already exists in HtmlFormatter).
+  - **Migrations** — each migration applied or rolled back (info). Checksum mismatch (warning).
+  - **Auth** — guard decisions: authenticated vs rejected, which guard, which identity (info). Session created/destroyed (debug).
+  - **Cache** — Vault store hits/misses at debug level. Framework cache rebuilds (config, templates, pages, middleware, helpers) at info.
+  - **Throttle** — rate limit decisions: allowed vs rejected, remaining quota (debug). Limit exceeded (info with client identifier).
+  - **Lifecycle events** — RequestReceived, RequestHandled, RequestFailed, ResponseSent already exist as Echo events. Log them at debug with timing from Stopwatch marks.
+  - **Exceptions** — Glitch already handles rendering, but the decision of *which* renderer was chosen and what status code was returned should log at info.
+
+  Implementation approach: inject `?LoggerInterface` as a nullable constructor parameter (same pattern HtmlFormatter already uses). Null means silent — no performance cost when logging is disabled. The starter app's `config/log.php` configures Quill channels; framework packages log to a `framework` channel by default. This is a long-tail effort like integration tests — instrument progressively, not all at once. Start with the HTTP lifecycle (routing → dispatch → render → response) since that's the most visible path.
+
 ## Long-Distance Future
 
 - **Reserved-filename collision in `app/Pages/`** — Any convention-based discovery file inside `app/Pages/` collides with a potential Page URL route. Today `app/Pages/Middleware.php` is picked up by `MiddlewareDiscovery` as scoped middleware for `App\Pages\*`, which means a developer who wants to make `/middleware.html` a real page by creating `app/Pages/Middleware.php` will either silently get a middleware config file instead of a page or hit a confusing runtime error when `PageDiscovery` and `MiddlewareDiscovery` disagree about what the file is. Same problem will hit `Helpers.php` once the discovery alignment below lands. The fix has two parts:
