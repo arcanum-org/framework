@@ -15,6 +15,7 @@ use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\ElementExtraction;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Shodo\TemplateAnalyzer;
+use Arcanum\Shodo\TemplateEngine;
 use Arcanum\Shodo\TemplateResolver;
 use Psr\Log\LoggerInterface;
 use PHPUnit\Framework\TestCase;
@@ -28,6 +29,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(TemplateCompiler::class)]
 #[UsesClass(TemplateCache::class)]
 #[UsesClass(HtmlFallbackFormatter::class)]
+#[UsesClass(TemplateEngine::class)]
 #[UsesClass(TemplateAnalyzer::class)]
 #[UsesClass(ElementExtraction::class)]
 #[UsesClass(Reader::class)]
@@ -79,18 +81,19 @@ final class HtmlFormatterTest extends TestCase
         ?LoggerInterface $logger = null,
     ): HtmlFormatter {
         $resolver = new TemplateResolver($this->rootDir, 'App');
-        $compiler = new TemplateCompiler();
-        $cache = new TemplateCache($cacheDir ?: $this->cacheDir);
+        $engine = new TemplateEngine(
+            compiler: new TemplateCompiler(),
+            cache: new TemplateCache($cacheDir ?: $this->cacheDir),
+            debug: $debug,
+            logger: $logger,
+        );
         $fallback = new HtmlFallbackFormatter();
 
         return new HtmlFormatter(
             $resolver,
-            $compiler,
-            $cache,
+            $engine,
             $fallback,
             helpers: $helpers,
-            debug: $debug,
-            logger: $logger,
         );
     }
 

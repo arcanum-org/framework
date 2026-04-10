@@ -27,6 +27,7 @@ use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
+use Arcanum\Shodo\TemplateEngine;
 use Arcanum\Shodo\TemplateResolver;
 use Arcanum\Test\Fixture\Integration\RoutingHandler;
 use Arcanum\Testing\TestKernel;
@@ -75,8 +76,10 @@ final class CqrsLifecycleTest extends TestCase
         $container->factory(HtmlResponseRenderer::class, function () {
             $formatter = new HtmlFormatter(
                 resolver: new TemplateResolver('/nonexistent', 'Arcanum\Test'),
-                compiler: new TemplateCompiler(),
-                cache: new TemplateCache(''),
+                engine: new TemplateEngine(
+                    compiler: new TemplateCompiler(),
+                    cache: new TemplateCache(''),
+                ),
                 fallback: new HtmlFallbackFormatter(),
             );
             return new HtmlResponseRenderer($formatter);

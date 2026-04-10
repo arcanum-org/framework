@@ -16,6 +16,7 @@ use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
+use Arcanum\Shodo\TemplateEngine;
 use Arcanum\Shodo\TemplateResolver;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -31,6 +32,7 @@ use Psr\Http\Message\ServerRequestInterface;
 #[UsesClass(TemplateResolver::class)]
 #[UsesClass(TemplateCompiler::class)]
 #[UsesClass(TemplateCache::class)]
+#[UsesClass(TemplateEngine::class)]
 #[UsesClass(ElementExtraction::class)]
 #[UsesClass(Reader::class)]
 #[UsesClass(Writer::class)]
@@ -83,10 +85,12 @@ final class HtmxAwareResponseRendererTest extends TestCase
     private function createRenderer(): HtmxAwareResponseRenderer
     {
         $resolver = new TemplateResolver($this->rootDir, 'App');
-        $compiler = new TemplateCompiler();
-        $cache = new TemplateCache($this->cacheDir);
+        $engine = new TemplateEngine(
+            compiler: new TemplateCompiler(),
+            cache: new TemplateCache($this->cacheDir),
+        );
         $fallback = new HtmlFallbackFormatter();
-        $formatter = new HtmlFormatter($resolver, $compiler, $cache, $fallback);
+        $formatter = new HtmlFormatter($resolver, $engine, $fallback);
 
         return new HtmxAwareResponseRenderer($formatter);
     }

@@ -28,6 +28,7 @@ use Arcanum\Shodo\Formatters\PlainTextFormatter;
 use Arcanum\Shodo\HelperResolver;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
+use Arcanum\Shodo\TemplateEngine;
 use Arcanum\Shodo\TemplateResolver;
 
 /**
@@ -117,73 +118,72 @@ class Formats implements Bootstrapper
             );
         });
 
+        // Shared template engine — compile, cache, execute.
+        $container->factory(TemplateEngine::class, function () use ($container, $config) {
+            /** @var TemplateCompiler $compiler */
+            $compiler = $container->get(TemplateCompiler::class);
+            /** @var TemplateCache $cache */
+            $cache = $container->get(TemplateCache::class);
+
+            /** @var mixed $debug */
+            $debug = $config->get('app.debug');
+
+            return new TemplateEngine(
+                compiler: $compiler,
+                cache: $cache,
+                debug: $debug === true || $debug === 'true',
+            );
+        });
+
         // Template-based formatters — each gets its own TemplateResolver
-        // configured for its file extension.
+        // configured for its file extension, but shares the TemplateEngine.
         $container->factory(HtmlFormatter::class, function () use ($container, $config) {
-            [$compiler, $cache, $helpers, $debug] = $this->templateDeps($container, $config);
+            /** @var TemplateEngine $engine */
+            $engine = $container->get(TemplateEngine::class);
+
+            $helpers = $container->has(HelperResolver::class)
+                ? $container->get(HelperResolver::class)
+                : null;
 
             return new HtmlFormatter(
                 resolver: $this->createTemplateResolver($container, $config, 'html'),
-                compiler: $compiler,
-                cache: $cache,
+                engine: $engine,
                 fallback: new HtmlFallbackFormatter(),
-                helpers: $helpers,
-                debug: $debug,
+                helpers: $helpers instanceof HelperResolver ? $helpers : null,
             );
         });
 
         $container->factory(PlainTextFormatter::class, function () use ($container, $config) {
-            [$compiler, $cache, $helpers, $debug] = $this->templateDeps($container, $config);
+            /** @var TemplateEngine $engine */
+            $engine = $container->get(TemplateEngine::class);
+
+            $helpers = $container->has(HelperResolver::class)
+                ? $container->get(HelperResolver::class)
+                : null;
 
             return new PlainTextFormatter(
                 resolver: $this->createTemplateResolver($container, $config, 'txt'),
-                compiler: $compiler,
-                cache: $cache,
+                engine: $engine,
                 fallback: new PlainTextFallbackFormatter(),
-                helpers: $helpers,
-                debug: $debug,
+                helpers: $helpers instanceof HelperResolver ? $helpers : null,
             );
         });
 
         $container->factory(MarkdownFormatter::class, function () use ($container, $config) {
-            [$compiler, $cache, $helpers, $debug] = $this->templateDeps($container, $config);
+            /** @var TemplateEngine $engine */
+            $engine = $container->get(TemplateEngine::class);
+
+            $helpers = $container->has(HelperResolver::class)
+                ? $container->get(HelperResolver::class)
+                : null;
 
             return new MarkdownFormatter(
                 resolver: $this->createTemplateResolver($container, $config, 'md'),
-                compiler: $compiler,
-                cache: $cache,
+                engine: $engine,
                 fallback: new MarkdownFallbackFormatter(),
-                helpers: $helpers,
-                debug: $debug,
+                helpers: $helpers instanceof HelperResolver ? $helpers : null,
             );
         });
-    }
-
-    /**
-     * Resolve shared dependencies for template-based formatters.
-     *
-     * @return array{TemplateCompiler, TemplateCache, ?HelperResolver, bool}
-     */
-    private function templateDeps(Application $container, Configuration $config): array
-    {
-        /** @var TemplateCompiler $compiler */
-        $compiler = $container->get(TemplateCompiler::class);
-        /** @var TemplateCache $cache */
-        $cache = $container->get(TemplateCache::class);
-
-        $helpers = $container->has(HelperResolver::class)
-            ? $container->get(HelperResolver::class)
-            : null;
-
-        /** @var mixed $debug */
-        $debug = $config->get('app.debug');
-
-        return [
-            $compiler,
-            $cache,
-            $helpers instanceof HelperResolver ? $helpers : null,
-            $debug === true || $debug === 'true',
-        ];
     }
 
     private function createTemplateResolver(

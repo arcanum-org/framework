@@ -22,6 +22,7 @@ use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
+use Arcanum\Shodo\TemplateEngine;
 use Arcanum\Shodo\TemplateResolver;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -33,6 +34,7 @@ use Psr\Http\Message\ResponseInterface;
 #[UsesClass(TemplateResolver::class)]
 #[UsesClass(TemplateCompiler::class)]
 #[UsesClass(TemplateCache::class)]
+#[UsesClass(TemplateEngine::class)]
 #[UsesClass(HtmlFallbackFormatter::class)]
 #[UsesClass(Response::class)]
 #[UsesClass(Message::class)]
@@ -89,8 +91,10 @@ final class HtmlResponseRendererTest extends TestCase
     {
         $formatter = new HtmlFormatter(
             resolver: new TemplateResolver($this->rootDir, 'App'),
-            compiler: new TemplateCompiler(),
-            cache: new TemplateCache($this->cacheDir),
+            engine: new TemplateEngine(
+                compiler: new TemplateCompiler(),
+                cache: new TemplateCache($this->cacheDir),
+            ),
             fallback: new HtmlFallbackFormatter(),
         );
         return new HtmlResponseRenderer($formatter);
@@ -186,8 +190,10 @@ final class HtmlResponseRendererTest extends TestCase
         // Arrange
         $formatter = new HtmlFormatter(
             resolver: new TemplateResolver($this->rootDir, 'App'),
-            compiler: new TemplateCompiler(),
-            cache: new TemplateCache($this->cacheDir),
+            engine: new TemplateEngine(
+                compiler: new TemplateCompiler(),
+                cache: new TemplateCache($this->cacheDir),
+            ),
             fallback: new HtmlFallbackFormatter(),
         );
         $renderer = new HtmlResponseRenderer($formatter);

@@ -19,6 +19,7 @@ use Arcanum\Shodo\Formatters\MarkdownFallbackFormatter;
 use Arcanum\Shodo\Formatters\MarkdownFormatter;
 use Arcanum\Shodo\TemplateCache;
 use Arcanum\Shodo\TemplateCompiler;
+use Arcanum\Shodo\TemplateEngine;
 use Arcanum\Shodo\TemplateResolver;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -29,6 +30,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(MarkdownFallbackFormatter::class)]
 #[UsesClass(TemplateResolver::class)]
 #[UsesClass(TemplateCompiler::class)]
+#[UsesClass(TemplateEngine::class)]
 #[UsesClass(TemplateCache::class)]
 #[UsesClass(Reader::class)]
 #[UsesClass(Writer::class)]
@@ -109,6 +111,7 @@ final class MarkdownResponseRendererTest extends TestCase
         $cache = new TemplateCache('');
         $fallback = new MarkdownFallbackFormatter();
 
-        return new MarkdownFormatter($resolver, $compiler, $cache, $fallback);
+        $engine = new TemplateEngine(compiler: $compiler, cache: $cache);
+        return new MarkdownFormatter($resolver, $engine, $fallback);
     }
 }
