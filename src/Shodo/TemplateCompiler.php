@@ -282,7 +282,29 @@ final class TemplateCompiler
     public function compile(
         string $source,
         string $templateDirectory = '',
-        bool $fragment = false,
+    ): string {
+        return $this->compileWith($source, $templateDirectory, fragment: false);
+    }
+
+    /**
+     * Compile in fragment mode — layout inheritance is skipped, only
+     * the 'content' section is rendered. Used for htmx partial swaps
+     * where the layout wrapper (head, nav, footer) is not needed.
+     */
+    public function compileFragment(
+        string $source,
+        string $templateDirectory = '',
+    ): string {
+        return $this->compileWith($source, $templateDirectory, fragment: true);
+    }
+
+    /**
+     * Internal compilation with explicit fragment flag.
+     */
+    private function compileWith(
+        string $source,
+        string $templateDirectory,
+        bool $fragment,
     ): string {
         $this->lastDependencies = [];
 

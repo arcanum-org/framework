@@ -12,7 +12,6 @@ use Arcanum\Shodo\HelperResolver;
 use Arcanum\Shodo\Formatters\HtmlFallbackFormatter;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\TemplateCache;
-use Arcanum\Shodo\ElementExtraction;
 use Arcanum\Shodo\TemplateCompiler;
 use Arcanum\Shodo\TemplateAnalyzer;
 use Arcanum\Shodo\TemplateEngine;
@@ -31,7 +30,6 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(HtmlFallbackFormatter::class)]
 #[UsesClass(TemplateEngine::class)]
 #[UsesClass(TemplateAnalyzer::class)]
-#[UsesClass(ElementExtraction::class)]
 #[UsesClass(Reader::class)]
 #[UsesClass(Writer::class)]
 #[UsesClass(FileSystem::class)]
@@ -510,107 +508,6 @@ final class HtmlFormatterTest extends TestCase
         $this->assertSame('', $noticed);
     }
 
-    // -----------------------------------------------------------
-    // renderElementById — auto-fragment extraction
-    // -----------------------------------------------------------
-
-    public function testRenderElementByIdExtractsElement(): void
-    {
-        // Arrange
-        file_put_contents(
-            $this->rootDir . '/app/Pages/Index.html',
-            '<h1>Title</h1><div id="sidebar"><p>{{ $greeting }}</p></div>',
-        );
-        $formatter = $this->createFormatter();
-
-        // Act
-        $result = $formatter->renderElementById(
-            'sidebar',
-            ['greeting' => 'Hello'],
-            'App\\Pages\\Index',
-        );
-
-        // Assert — full element (outerHTML), no surrounding content
-        $this->assertStringContainsString('<div id="sidebar">', $result);
-        $this->assertStringContainsString('<p>Hello</p>', $result);
-        $this->assertStringNotContainsString('<h1>Title</h1>', $result);
-    }
-
-    public function testRenderElementByIdUsesCache(): void
-    {
-        // Arrange
-        $templatePath = $this->rootDir . '/app/Pages/Index.html';
-        file_put_contents(
-            $templatePath,
-            '<div id="box"><span>{{ $name }}</span></div>',
-        );
-        $formatter = $this->createFormatter();
-
-        // Act — first call compiles and caches
-        $formatter->renderElementById('box', ['name' => 'first'], 'App\\Pages\\Index');
-
-        // Verify cache entry exists
-        $cache = new TemplateCache($this->cacheDir);
-        $this->assertTrue($cache->isFresh($templatePath, 'box'));
-
-        // Act — second call uses cache
-        $result = $formatter->renderElementById('box', ['name' => 'second'], 'App\\Pages\\Index');
-
-        // Assert
-        $this->assertStringContainsString('second', $result);
-    }
-
-    public function testRenderElementByIdFallsBackOnMissingId(): void
-    {
-        // Arrange
-        file_put_contents(
-            $this->rootDir . '/app/Pages/layout.html',
-            "<html>{{ yield 'content' }}</html>",
-        );
-        file_put_contents(
-            $this->rootDir . '/app/Pages/Index.html',
-            "{{ extends 'layout' }}\n{{ section 'title' }}T{{ endsection }}\n"
-                . "{{ section 'content' }}<p>Full content</p>{{ endsection }}",
-        );
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects($this->once())
-            ->method('warning')
-            ->with(
-                $this->stringContains('not found'),
-                $this->callback(fn(array $ctx) => ($ctx['id'] ?? '') === 'nonexistent'),
-            );
-
-        $formatter = $this->createFormatter(logger: $logger);
-
-        // Act
-        $result = $formatter->renderElementById(
-            'nonexistent',
-            [],
-            'App\\Pages\\Index',
-        );
-
-        // Assert — falls back to content section
-        $this->assertStringContainsString('<p>Full content</p>', $result);
-        $this->assertStringNotContainsString('<html>', $result);
-    }
-
-    public function testRenderElementByIdFallsBackToFallbackWhenNoTemplate(): void
-    {
-        // Arrange
-        $formatter = $this->createFormatter();
-
-        // Act
-        $result = $formatter->renderElementById(
-            'anything',
-            ['key' => 'val'],
-            'App\\Domain\\Query\\Missing',
-        );
-
-        // Assert — fallback formatter output
-        $this->assertStringContainsString('<!DOCTYPE html>', $result);
-        $this->assertStringContainsString('val', $result);
-    }
-
     public function testResolveTemplateReturnsPathForExistingTemplate(): void
     {
         // Arrange
@@ -634,39 +531,6 @@ final class HtmlFormatterTest extends TestCase
 
         // Act & Assert
         $this->assertNull($formatter->resolveTemplate('App\\Pages\\Missing'));
-    }
-
-    public function testRenderSliceCompilesAndRendersSource(): void
-    {
-        // Arrange
-        $formatter = $this->createFormatter();
-
-        // Act
-        $result = $formatter->renderSlice(
-            '<p>{{ $name }}</p>',
-            $this->rootDir,
-            ['name' => 'Alice'],
-        );
-
-        // Assert
-        $this->assertSame('<p>Alice</p>', $result);
-    }
-
-    public function testRenderSliceEscapesOutput(): void
-    {
-        // Arrange
-        $formatter = $this->createFormatter();
-
-        // Act
-        $result = $formatter->renderSlice(
-            '<p>{{ $name }}</p>',
-            $this->rootDir,
-            ['name' => '<script>xss</script>'],
-        );
-
-        // Assert
-        $this->assertStringContainsString('&lt;script&gt;', $result);
-        $this->assertStringNotContainsString('<script>xss', $result);
     }
 
     // -----------------------------------------------------------
@@ -699,67 +563,6 @@ final class HtmlFormatterTest extends TestCase
         $this->assertSame(['name', 'count'], $invoked);
         $this->assertStringContainsString('<p>Alice</p>', $result);
         $this->assertStringContainsString('<p>42</p>', $result);
-    }
-
-    public function testClosuresAreSelectivelyInvokedOnElementRender(): void
-    {
-        // Arrange — template has two sections, but we only extract "sidebar"
-        file_put_contents(
-            $this->rootDir . '/app/Pages/Index.html',
-            '<div id="main"><p>{{ $title }}</p></div>'
-                . '<div id="sidebar"><p>{{ $greeting }}</p></div>',
-        );
-        $formatter = $this->createFormatter();
-        $invoked = [];
-
-        // Act — render only the sidebar element
-        $result = $formatter->renderElementById(
-            'sidebar',
-            [
-                'title' => function () use (&$invoked) {
-                    $invoked[] = 'title';
-                    return 'Page Title';
-                },
-                'greeting' => function () use (&$invoked) {
-                    $invoked[] = 'greeting';
-                    return 'Hello';
-                },
-            ],
-            'App\\Pages\\Index',
-        );
-
-        // Assert — only 'greeting' invoked (referenced in the sidebar element),
-        // 'title' skipped (only referenced in #main, not rendered)
-        $this->assertSame(['greeting'], $invoked);
-        $this->assertStringContainsString('<p>Hello</p>', $result);
-        $this->assertStringNotContainsString('Page Title', $result);
-    }
-
-    public function testClosuresAreSelectivelyInvokedOnSliceRender(): void
-    {
-        // Arrange
-        $formatter = $this->createFormatter();
-        $invoked = [];
-
-        // Act — render a slice that only references $name
-        $result = $formatter->renderSlice(
-            '<p>{{ $name }}</p>',
-            $this->rootDir,
-            [
-                'name' => function () use (&$invoked) {
-                    $invoked[] = 'name';
-                    return 'Bob';
-                },
-                'unused' => function () use (&$invoked) {
-                    $invoked[] = 'unused';
-                    return 'should not run';
-                },
-            ],
-        );
-
-        // Assert — only 'name' invoked
-        $this->assertSame(['name'], $invoked);
-        $this->assertStringContainsString('<p>Bob</p>', $result);
     }
 
     public function testPlainValuesPassThroughUnchanged(): void
@@ -798,27 +601,6 @@ final class HtmlFormatterTest extends TestCase
         $formatter->format([
             'data' => fn() => throw new \RuntimeException('Database connection failed'),
         ], 'App\\Pages\\Index');
-    }
-
-    public function testRenderElementByIdEscapesOutput(): void
-    {
-        // Arrange
-        file_put_contents(
-            $this->rootDir . '/app/Pages/Index.html',
-            '<div id="box"><p>{{ $name }}</p></div>',
-        );
-        $formatter = $this->createFormatter();
-
-        // Act
-        $result = $formatter->renderElementById(
-            'box',
-            ['name' => '<script>xss</script>'],
-            'App\\Pages\\Index',
-        );
-
-        // Assert
-        $this->assertStringContainsString('&lt;script&gt;', $result);
-        $this->assertStringNotContainsString('<script>xss', $result);
     }
 
     // -----------------------------------------------------------

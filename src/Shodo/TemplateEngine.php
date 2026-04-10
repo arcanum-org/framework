@@ -75,10 +75,9 @@ final class TemplateEngine
     public function renderFragment(string $templatePath, array $variables): string
     {
         $source = $this->reader->read($templatePath);
-        $compiled = $this->compiler->compile(
+        $compiled = $this->compiler->compileFragment(
             $source,
             dirname($templatePath),
-            fragment: true,
         );
 
         // Fragment — all closures needed (content section may use any variable).
@@ -108,10 +107,9 @@ final class TemplateEngine
             $source = $this->reader->read($templatePath);
 
             // Extract the content section first (no layout wrapper).
-            $contentSource = $this->compiler->compile(
+            $contentSource = $this->compiler->compileFragment(
                 $source,
                 dirname($templatePath),
-                fragment: true,
             );
 
             $extraction = $this->compiler->extractElementById(

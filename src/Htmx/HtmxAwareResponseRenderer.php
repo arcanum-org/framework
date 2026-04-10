@@ -9,6 +9,7 @@ use Arcanum\Hyper\ResponseRenderer;
 use Arcanum\Hyper\StatusCode;
 use Arcanum\Parchment\Reader;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
+use Arcanum\Shodo\TemplateEngine;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -36,6 +37,7 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
 
     public function __construct(
         private readonly HtmlFormatter $formatter,
+        private readonly TemplateEngine $engine,
         private readonly Reader $reader = new Reader(),
     ) {
     }
@@ -85,13 +87,13 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
 
         // Mode 2: Full htmx (boosted nav) or partial without target —
         // content section only, no layout.
-        $this->formatter->setFragment(true);
-
-        try {
+        $templatePath = $this->formatter->resolveTemplate($dtoClass);
+        if ($templatePath === null) {
             return $this->formatter->format($data, $dtoClass, $statusCode);
-        } finally {
-            $this->formatter->setFragment(false);
         }
+
+        $variables = $this->formatter->buildVariables($data, $dtoClass);
+        return $this->engine->renderFragment($templatePath, $variables);
     }
 
     /**
@@ -105,20 +107,23 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
     {
         $templatePath = $this->formatter->resolveTemplate($dtoClass);
 
-        if ($templatePath !== null) {
-            $source = $this->reader->read($templatePath);
-            $fragment = FragmentDirective::extractFragment($source, $target);
-
-            if ($fragment !== null) {
-                return $this->formatter->renderSlice(
-                    $fragment,
-                    dirname($templatePath),
-                    $data,
-                    $dtoClass,
-                );
-            }
+        if ($templatePath === null) {
+            return $this->formatter->format($data, $dtoClass);
         }
 
-        return $this->formatter->renderElementById($target, $data, $dtoClass);
+        $variables = $this->formatter->buildVariables($data, $dtoClass);
+
+        $source = $this->reader->read($templatePath);
+        $fragment = FragmentDirective::extractFragment($source, $target);
+
+        if ($fragment !== null) {
+            return $this->engine->renderSource(
+                $fragment,
+                dirname($templatePath),
+                $variables,
+            );
+        }
+
+        return $this->engine->renderElement($templatePath, $target, $variables);
     }
 }

@@ -1053,7 +1053,7 @@ final class TemplateCompilerTest extends TestCase
         assert(is_string($source));
 
         // Act
-        $result = $compiler->compile($source, self::$fixtureDir, fragment: true);
+        $result = $compiler->compileFragment($source, self::$fixtureDir);
 
         // Assert — only the content section, no layout wrapper
         $this->assertStringNotContainsString('<!DOCTYPE html>', $result);
@@ -1069,7 +1069,7 @@ final class TemplateCompilerTest extends TestCase
         $source = '<p>{{ $name }}</p>';
 
         // Act
-        $result = $compiler->compile($source, self::$fixtureDir, fragment: true);
+        $result = $compiler->compileFragment($source, self::$fixtureDir);
 
         // Assert — compiled normally since there's no layout to strip
         $this->assertSame(
@@ -1085,7 +1085,7 @@ final class TemplateCompilerTest extends TestCase
         $source = "{{ extends 'layout' }}\n{{ section 'title' }}Title{{ endsection }}";
 
         // Act
-        $result = $compiler->compile($source, self::$fixtureDir, fragment: true);
+        $result = $compiler->compileFragment($source, self::$fixtureDir);
 
         // Assert — no content section defined, so empty
         $this->assertSame('', $result);

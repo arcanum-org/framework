@@ -22,26 +22,12 @@ use Arcanum\Shodo\TemplateResolver;
  */
 class HtmlFormatter implements Formatter
 {
-    private bool $fragment = false;
-
     public function __construct(
         private readonly TemplateResolver $resolver,
         private readonly TemplateEngine $engine,
         private readonly HtmlFallbackFormatter $fallback,
         private readonly ?HelperResolver $helpers = null,
     ) {
-    }
-
-    /**
-     * Enable fragment mode for the current request.
-     *
-     * When enabled, templates that use @extends will render only the
-     * 'content' section without the layout wrapper. Call this from
-     * middleware when the HX-Request header is present.
-     */
-    public function setFragment(bool $fragment): void
-    {
-        $this->fragment = $fragment;
     }
 
     /**
@@ -64,52 +50,7 @@ class HtmlFormatter implements Formatter
         }
 
         $variables = $this->buildVariables($data, $dtoClass);
-
-        return $this->fragment
-            ? $this->engine->renderFragment($templatePath, $variables)
-            : $this->engine->render($templatePath, $variables);
-    }
-
-    /**
-     * Compile arbitrary template source and render it.
-     *
-     * Takes raw template source (not a file path), compiles it through the
-     * standard pipeline (directives, helper rewriting, expression passes),
-     * and renders with the standard variable setup (escape function, helpers).
-     */
-    public function renderSlice(
-        string $source,
-        string $templateDirectory,
-        mixed $data,
-        string $dtoClass = '',
-    ): string {
-        $variables = $this->buildVariables($data, $dtoClass);
-        return $this->engine->renderSource($source, $templateDirectory, $variables);
-    }
-
-    /**
-     * Render a specific element by its id attribute from a template.
-     *
-     * Extracts the content section (no layout), finds the element with the
-     * given id in the raw template source, and compiles/renders only that
-     * element (outerHTML — includes the element's own tags).
-     *
-     * Falls back to rendering the full content section with a log warning
-     * when the id isn't found in the template.
-     */
-    public function renderElementById(
-        string $id,
-        mixed $data,
-        string $dtoClass = '',
-    ): string {
-        $templatePath = $this->resolver->resolve($dtoClass);
-
-        if ($templatePath === null) {
-            return $this->fallback->format($data);
-        }
-
-        $variables = $this->buildVariables($data, $dtoClass);
-        return $this->engine->renderElement($templatePath, $id, $variables);
+        return $this->engine->render($templatePath, $variables);
     }
 
     /**

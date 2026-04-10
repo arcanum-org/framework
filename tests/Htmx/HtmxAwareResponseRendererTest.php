@@ -92,7 +92,7 @@ final class HtmxAwareResponseRendererTest extends TestCase
         $fallback = new HtmlFallbackFormatter();
         $formatter = new HtmlFormatter($resolver, $engine, $fallback);
 
-        return new HtmxAwareResponseRenderer($formatter);
+        return new HtmxAwareResponseRenderer($formatter, $engine);
     }
 
     /**
