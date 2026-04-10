@@ -28,7 +28,7 @@ class CsvResponseRenderer extends ResponseRenderer
     ): ResponseInterface {
         Stopwatch::tap('render.start');
         try {
-            $csv = $this->formatter->format($data, $dtoClass, $status->value);
+            $csv = $this->formatter->format($data);
             return $this->buildResponse($csv, 'text/csv; charset=UTF-8', $status);
         } finally {
             Stopwatch::tap('render.complete');

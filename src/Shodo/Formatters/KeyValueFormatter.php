@@ -22,7 +22,7 @@ class KeyValueFormatter implements Formatter
     ) {
     }
 
-    public function format(mixed $data, string $dtoClass = '', int $statusCode = 0): string
+    public function format(mixed $data, string $templatePath = '', string $dtoClass = ''): string
     {
         if ($data === null) {
             return '';

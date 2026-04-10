@@ -10,6 +10,7 @@ use Arcanum\Hyper\StatusCode;
 use Arcanum\Parchment\Reader;
 use Arcanum\Shodo\Formatters\HtmlFormatter;
 use Arcanum\Shodo\TemplateEngine;
+use Arcanum\Shodo\TemplateResolver;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -38,6 +39,7 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
     public function __construct(
         private readonly HtmlFormatter $formatter,
         private readonly TemplateEngine $engine,
+        private readonly TemplateResolver $resolver,
         private readonly Reader $reader = new Reader(),
     ) {
     }
@@ -71,9 +73,16 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
 
     private function renderHtml(mixed $data, string $dtoClass, int $statusCode): string
     {
+        $templatePath = $this->resolveTemplatePath($dtoClass, $statusCode);
+
         // Mode 1: Non-htmx — full render with layout.
         if ($this->htmxRequest === null || !$this->htmxRequest->isHtmx()) {
-            return $this->formatter->format($data, $dtoClass, $statusCode);
+            return $this->formatter->format($data, $templatePath, $dtoClass);
+        }
+
+        // No template found — fall back to formatter (which will use fallback).
+        if ($templatePath === '') {
+            return $this->formatter->format($data, '', $dtoClass);
         }
 
         $type = $this->htmxRequest->type();
@@ -82,35 +91,24 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
         // Mode 3: Partial with a target id — check for explicit fragment
         // markers first, then fall back to element-by-id extraction.
         if ($type === HtmxRequestType::Partial && $target !== null) {
-            return $this->renderPartial($target, $data, $dtoClass);
+            return $this->renderPartial($templatePath, $target, $data, $dtoClass);
         }
 
         // Mode 2: Full htmx (boosted nav) or partial without target —
         // content section only, no layout.
-        $templatePath = $this->formatter->resolveTemplate($dtoClass);
-        if ($templatePath === null) {
-            return $this->formatter->format($data, $dtoClass, $statusCode);
-        }
-
         $variables = $this->formatter->buildVariables($data, $dtoClass);
         return $this->engine->renderFragment($templatePath, $variables);
     }
 
     /**
      * Render a partial response for an htmx request with HX-Target.
-     *
-     * Checks for explicit {{ fragment 'id' }} markers in the raw template
-     * source. When found, renders the inner content only (innerHTML).
-     * When not found, delegates to element-by-id extraction (outerHTML).
      */
-    private function renderPartial(string $target, mixed $data, string $dtoClass): string
-    {
-        $templatePath = $this->formatter->resolveTemplate($dtoClass);
-
-        if ($templatePath === null) {
-            return $this->formatter->format($data, $dtoClass);
-        }
-
+    private function renderPartial(
+        string $templatePath,
+        string $target,
+        mixed $data,
+        string $dtoClass,
+    ): string {
         $variables = $this->formatter->buildVariables($data, $dtoClass);
 
         $source = $this->reader->read($templatePath);
@@ -125,5 +123,17 @@ class HtmxAwareResponseRenderer extends ResponseRenderer
         }
 
         return $this->engine->renderElement($templatePath, $target, $variables);
+    }
+
+    private function resolveTemplatePath(string $dtoClass, int $statusCode): string
+    {
+        if ($statusCode > 0 && $statusCode !== 200) {
+            $path = $this->resolver->resolveForStatus($dtoClass, $statusCode);
+            if ($path !== null) {
+                return $path;
+            }
+        }
+
+        return $this->resolver->resolve($dtoClass) ?? '';
     }
 }

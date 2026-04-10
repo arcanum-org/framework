@@ -45,7 +45,7 @@ class Formats implements Bootstrapper
 
         $this->registerFormatRegistry($container, $config);
         $this->registerFormatters($container, $config);
-        $this->registerResponseRenderers($container);
+        $this->registerResponseRenderers($container, $config);
         $this->registerValidationRenderer($container);
     }
 
@@ -135,9 +135,9 @@ class Formats implements Bootstrapper
             );
         });
 
-        // Template-based formatters — each gets its own TemplateResolver
-        // configured for its file extension, but shares the TemplateEngine.
-        $container->factory(HtmlFormatter::class, function () use ($container, $config) {
+        // Template-based formatters — share the TemplateEngine, no longer
+        // own TemplateResolver (resolution is the renderer's responsibility).
+        $container->factory(HtmlFormatter::class, function () use ($container) {
             /** @var TemplateEngine $engine */
             $engine = $container->get(TemplateEngine::class);
 
@@ -146,14 +146,13 @@ class Formats implements Bootstrapper
                 : null;
 
             return new HtmlFormatter(
-                resolver: $this->createTemplateResolver($container, $config, 'html'),
                 engine: $engine,
                 fallback: new HtmlFallbackFormatter(),
                 helpers: $helpers instanceof HelperResolver ? $helpers : null,
             );
         });
 
-        $container->factory(PlainTextFormatter::class, function () use ($container, $config) {
+        $container->factory(PlainTextFormatter::class, function () use ($container) {
             /** @var TemplateEngine $engine */
             $engine = $container->get(TemplateEngine::class);
 
@@ -162,14 +161,13 @@ class Formats implements Bootstrapper
                 : null;
 
             return new PlainTextFormatter(
-                resolver: $this->createTemplateResolver($container, $config, 'txt'),
                 engine: $engine,
                 fallback: new PlainTextFallbackFormatter(),
                 helpers: $helpers instanceof HelperResolver ? $helpers : null,
             );
         });
 
-        $container->factory(MarkdownFormatter::class, function () use ($container, $config) {
+        $container->factory(MarkdownFormatter::class, function () use ($container) {
             /** @var TemplateEngine $engine */
             $engine = $container->get(TemplateEngine::class);
 
@@ -178,7 +176,6 @@ class Formats implements Bootstrapper
                 : null;
 
             return new MarkdownFormatter(
-                resolver: $this->createTemplateResolver($container, $config, 'md'),
                 engine: $engine,
                 fallback: new MarkdownFallbackFormatter(),
                 helpers: $helpers instanceof HelperResolver ? $helpers : null,
@@ -206,12 +203,34 @@ class Formats implements Bootstrapper
         );
     }
 
-    private function registerResponseRenderers(Application $container): void
+    private function registerResponseRenderers(Application $container, Configuration $config): void
     {
+        // Non-template renderers — no resolver needed.
         $container->service(JsonResponseRenderer::class);
         $container->service(CsvResponseRenderer::class);
+
+        // Template-based renderers — each gets a TemplateResolver for its format.
+        // The default TemplateResolver binding uses 'html' — PlainText and Markdown
+        // get format-specific resolvers via specify().
+        $container->factory(
+            TemplateResolver::class,
+            fn() => $this->createTemplateResolver($container, $config, 'html'),
+        );
+
         $container->service(HtmlResponseRenderer::class);
+
+        $container->specify(
+            PlainTextResponseRenderer::class,
+            TemplateResolver::class,
+            $this->createTemplateResolver($container, $config, 'txt'),
+        );
         $container->service(PlainTextResponseRenderer::class);
+
+        $container->specify(
+            MarkdownResponseRenderer::class,
+            TemplateResolver::class,
+            $this->createTemplateResolver($container, $config, 'md'),
+        );
         $container->service(MarkdownResponseRenderer::class);
     }
 

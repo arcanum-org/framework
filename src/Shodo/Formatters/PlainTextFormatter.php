@@ -7,32 +7,26 @@ namespace Arcanum\Shodo\Formatters;
 use Arcanum\Shodo\Formatter;
 use Arcanum\Shodo\HelperResolver;
 use Arcanum\Shodo\TemplateEngine;
-use Arcanum\Shodo\TemplateResolver;
 
 /**
- * Formats data as a plain text string using co-located templates.
- *
- * Template discovery follows PSR-4 convention: the DTO class name maps
- * to a .txt file in the same directory as the class. When no template
- * exists, falls back to a structured plain text representation.
+ * Formats data as a plain text string using templates.
  *
  * Uses an identity escape function — no escaping is needed for plain text.
+ * When no template path is provided, falls back to a structured
+ * plain text representation.
  */
 class PlainTextFormatter implements Formatter
 {
     public function __construct(
-        private readonly TemplateResolver $resolver,
         private readonly TemplateEngine $engine,
         private readonly PlainTextFallbackFormatter $fallback,
         private readonly ?HelperResolver $helpers = null,
     ) {
     }
 
-    public function format(mixed $data, string $dtoClass = '', int $statusCode = 0): string
+    public function format(mixed $data, string $templatePath = '', string $dtoClass = ''): string
     {
-        $templatePath = $this->resolveTemplatePath($dtoClass, $statusCode);
-
-        if ($templatePath === null) {
+        if ($templatePath === '') {
             return $this->fallback->format($data);
         }
 
@@ -51,18 +45,6 @@ class PlainTextFormatter implements Formatter
             ? $this->helpers->for($dtoClass) : [];
 
         return $variables;
-    }
-
-    private function resolveTemplatePath(string $dtoClass, int $statusCode): ?string
-    {
-        if ($statusCode > 0) {
-            $statusPath = $this->resolver->resolveForStatus($dtoClass, $statusCode);
-            if ($statusPath !== null) {
-                return $statusPath;
-            }
-        }
-
-        return $this->resolver->resolve($dtoClass);
     }
 
     /**

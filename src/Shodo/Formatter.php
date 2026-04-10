@@ -19,11 +19,12 @@ interface Formatter
     /**
      * Format the given data into a string.
      *
+     * @param string $templatePath Pre-resolved template path. Template-based
+     *                             formatters render this template; non-template
+     *                             formatters ignore it. Empty string means
+     *                             no template (use fallback).
      * @param string $dtoClass The DTO class name, used by template-based
-     *                         formatters to discover co-located templates.
-     * @param int $statusCode HTTP status code. When > 0, template-based
-     *                        formatters try status-specific templates first
-     *                        (e.g., Dto.422.html before Dto.html).
+     *                         formatters for helper scoping.
      */
-    public function format(mixed $data, string $dtoClass = '', int $statusCode = 0): string;
+    public function format(mixed $data, string $templatePath = '', string $dtoClass = ''): string;
 }

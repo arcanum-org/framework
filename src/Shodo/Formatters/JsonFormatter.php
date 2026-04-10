@@ -15,7 +15,7 @@ use Arcanum\Shodo\Formatter;
  */
 class JsonFormatter implements Formatter
 {
-    public function format(mixed $data, string $dtoClass = '', int $statusCode = 0): string
+    public function format(mixed $data, string $templatePath = '', string $dtoClass = ''): string
     {
         return json_encode(
             $data,

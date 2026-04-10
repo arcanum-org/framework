@@ -28,7 +28,7 @@ class JsonResponseRenderer extends ResponseRenderer
     ): ResponseInterface {
         Stopwatch::tap('render.start');
         try {
-            $json = $this->formatter->format($data, $dtoClass, $status->value);
+            $json = $this->formatter->format($data);
             return $this->buildResponse($json, 'application/json', $status);
         } finally {
             Stopwatch::tap('render.complete');
