@@ -43,8 +43,8 @@ The `{DtoClass}.{status}.{format}` convention works for any status code and form
 #### Checklist
 
 ##### Underscore partial convention
-- [ ] **Skip `_` prefixed files in `PageDiscovery::scan()`.** Files starting with `_` in `app/Pages/` are include-only partials, not routable pages. One-line change to the scan loop. Add test for the skip behavior.
-- [ ] **Document the underscore convention** in the Atlas README and starter app README.
+- [x] **Skip `_` prefixed files in `PageDiscovery::scan()`.** Files starting with `_` in `app/Pages/` are include-only partials, not routable pages. One-line change to the scan loop. Add test for the skip behavior.
+- [x] **Document the underscore convention** in the Atlas README and COMPENDIUM.
 
 ##### Status-specific template resolution
 - [ ] **Add `TemplateResolver::resolveError(string $dtoClass, int $statusCode, string $format): ?string`.** Resolution order: co-located `{DtoClass}.{status}.{format}` → app-wide `app/Templates/errors/{status}.{format}` → null. Tests cover: co-located found, app-wide fallback, null when neither exists.
