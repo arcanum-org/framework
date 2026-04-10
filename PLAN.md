@@ -66,9 +66,9 @@ The fix: split the god object, move resolution upstream, and put every template 
 - [x] **HtmxAwareResponseRenderer composes TemplateEngine directly.** Uses `buildVariables()` + engine for each mode. `TemplateCompiler` gains `compileFragment()`, boolean flag removed from `compile()`. Tests migrated to new TemplateEngineTest (11 tests).
 
 **Phase 3: Move resolution out of formatters**
-- [ ] **ResponseRenderers compose TemplateResolver.** Each template-based renderer (Html, PlainText, Markdown) gets a TemplateResolver injected. Resolution order: `resolveForStatus($dtoClass, $status)` → `resolve($dtoClass)` → null (formatter handles fallback). Non-template renderers (Json, Csv) unchanged.
-- [ ] **Formatter interface drops `$statusCode`, gains `$templatePath`.** New signature: `format(mixed $data, string $templatePath = '', string $dtoClass = ''): string`. `$templatePath`: pre-resolved path or empty for fallback. `$dtoClass`: used only for helper scoping. `$statusCode` removed — resolution already happened. Non-template formatters ignore both optional params as before. Update all implementations and call sites.
-- [ ] **Update Bootstrap/Formats.** TemplateResolver registration moves from formatter factories to renderer factories (or a shared service). Formatters no longer receive a TemplateResolver — they receive a TemplateEngine and fallback path.
+- [x] **ResponseRenderers compose TemplateResolver.** Html, PlainText, Markdown, HtmxAware renderers resolve paths before calling format(). TemplateResolver registered as shared service (html default) with format-specific overrides via specify().
+- [x] **Formatter interface drops `$statusCode`, gains `$templatePath`.** `format(mixed $data, string $templatePath = '', string $dtoClass = '')`. Formatters no longer compose TemplateResolver. Non-template formatters ignore both optional params.
+- [x] **Bootstrap/Formats updated.** Resolver registration moved from formatter factories to renderer registration.
 
 **Phase 4: Unify exception rendering**
 - [ ] **HtmlExceptionResponseRenderer composes TemplateEngine.** Replace the duplicated read → compile → execute logic with `engine->render($templatePath, $errorVariables)`. Error variables: `$code`, `$title`, `$message`, `$errors` (validation), `$suggestion` (ArcanumException), `$__escape`. Falls back to built-in styled error page when no template exists. The `setDtoClass()` setter stays so the kernel can provide DTO context for co-located error template resolution.
