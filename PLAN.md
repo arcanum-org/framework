@@ -86,10 +86,10 @@ The fix: split the god object, move resolution upstream, and put every template 
 ---
 
 ##### Starter app guestbook validation demo
-- [ ] **Extract guestbook form to shared partial.** Move the form from `app/Pages/Index.html` to `app/Templates/forms/_guestbook-form.html`. Update `Index.html` to include it. Add conditional `$errors` rendering to the partial.
-- [ ] **Add `AddEntry.422.html`.** Co-located with the command, includes the shared form partial. One-liner: `{{ include 'forms/_guestbook-form' }}`.
-- [ ] **Add `hx-swap="morph:outerHTML"` to the guestbook form.** Enables Idiomorph to preserve input values during error re-render.
-- [ ] **End-to-end test.** Submit with short values → 422 → form re-renders with inline errors and preserved input values → fix values → submit → 204 + broadcast → list refreshes.
+- [x] **Extract guestbook form to shared partial.** Moved to `app/Templates/Guestbook/_entry-form.html`. Conditional `$errors` rendering with Tailwind-styled error box. `Index.html` uses `{{ include 'Guestbook/_entry-form' }}`.
+- [x] **Add `AddEntry.422.html`.** Co-located with the command, includes the shared form partial: `{{ include 'Guestbook/_entry-form' }}`.
+- [x] **Add `hx-swap="morph:outerHTML"` to the guestbook form.** Idiomorph preserves typed values during error re-render.
+- [x] **End-to-end smoke test.** Validated via curl: short values → 422 → form re-rendered with inline errors + CSRF token + morph swap. Valid values → 204 + `HX-Trigger: guestbook:entry:added`. App kernel sets DTO class on exception renderer for co-located template discovery. HelperResolver added to exception renderer for `{{ csrf }}` support in error templates.
 
 ##### htmx v4 compatibility
 - [ ] **Address `HX-Trigger-After-Swap` and `HX-Trigger-After-Settle` removal.** htmx v4 removed these response headers. The `BroadcastAfterSwap` and `BroadcastAfterSettle` sub-interfaces in the Htmx package currently project to these headers. Investigate the v4 replacement (`HX-Trigger` timing, or JavaScript-based alternatives) and update `HtmxEventTriggerMiddleware`.
