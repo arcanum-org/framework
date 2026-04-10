@@ -30,6 +30,10 @@ use Arcanum\Rune\Command\MakeCommandCommand;
 use Arcanum\Rune\Command\ValidateModelsCommand;
 use Arcanum\Rune\Command\MakeKeyCommand;
 use Arcanum\Rune\Command\MakeMiddlewareCommand;
+use Arcanum\Rune\Command\MigrateCommand;
+use Arcanum\Rune\Command\MigrateCreateCommand;
+use Arcanum\Rune\Command\MigrateRollbackCommand;
+use Arcanum\Rune\Command\MigrateStatusCommand;
 use Arcanum\Rune\Command\MakePageCommand;
 use Arcanum\Rune\Command\MakeQueryCommand;
 use Arcanum\Rune\Command\ValidateHandlersCommand;
@@ -199,6 +203,10 @@ class CliRouting implements Bootstrapper
             $registry->register('forge:models', ForgeModelsCommand::class);
             $registry->register('validate:models', ValidateModelsCommand::class);
             $registry->register('db:status', DbStatusCommand::class);
+            $registry->register('migrate', MigrateCommand::class);
+            $registry->register('migrate:rollback', MigrateRollbackCommand::class);
+            $registry->register('migrate:status', MigrateStatusCommand::class);
+            $registry->register('migrate:create', MigrateCreateCommand::class);
             $registry->register('login', LoginCommand::class);
             $registry->register('logout', LogoutCommand::class);
             return $registry;
@@ -420,6 +428,54 @@ class CliRouting implements Bootstrapper
             return new DbStatusCommand(
                 connections: $connections,
                 domainRoot: $domainRoot,
+            );
+        });
+
+        // Migration commands — all share connections + rootDirectory.
+        $container->factory(MigrateCommand::class, function () use ($container) {
+            /** @var ConnectionManager|null $connections */
+            $connections = $container->has(ConnectionManager::class)
+                ? $container->get(ConnectionManager::class)
+                : null;
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+            return new MigrateCommand(
+                connections: $connections,
+                rootDirectory: $kernel->rootDirectory(),
+            );
+        });
+
+        $container->factory(MigrateRollbackCommand::class, function () use ($container) {
+            /** @var ConnectionManager|null $connections */
+            $connections = $container->has(ConnectionManager::class)
+                ? $container->get(ConnectionManager::class)
+                : null;
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+            return new MigrateRollbackCommand(
+                connections: $connections,
+                rootDirectory: $kernel->rootDirectory(),
+            );
+        });
+
+        $container->factory(MigrateStatusCommand::class, function () use ($container) {
+            /** @var ConnectionManager|null $connections */
+            $connections = $container->has(ConnectionManager::class)
+                ? $container->get(ConnectionManager::class)
+                : null;
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+            return new MigrateStatusCommand(
+                connections: $connections,
+                rootDirectory: $kernel->rootDirectory(),
+            );
+        });
+
+        $container->factory(MigrateCreateCommand::class, function () use ($container) {
+            /** @var Kernel $kernel */
+            $kernel = $container->get(Kernel::class);
+            return new MigrateCreateCommand(
+                rootDirectory: $kernel->rootDirectory(),
             );
         });
     }
