@@ -80,8 +80,8 @@ The fix: split the god object, move resolution upstream, and put every template 
 
 #### Cross-cutting for the refactor
 - [x] **`composer check` passed after each commit.**
-- [ ] **Update COMPENDIUM** with the refactored rendering pipeline (TemplateEngine, no fallback formatters, bundled templates).
-- [ ] **Update Shodo README** with TemplateEngine documentation.
+- [x] **Update COMPENDIUM** with the refactored rendering pipeline (TemplateEngine, no fallback formatters, bundled templates).
+- [x] **Update Shodo README** with TemplateEngine documentation, three-layer architecture, status-specific resolution, renderFragment/compileFragment.
 
 ---
 
