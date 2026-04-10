@@ -185,6 +185,8 @@ The Index redesign landed (nine-section structure, real diagnostics, CSS-only ta
 
   Becomes urgent when the Todo App dogfood surfaces the first "call an external API" need, or when Auth needs to verify tokens against an external provider.
 
+  **PSR-17 HTTP Factories** ship as part of this work. Trivial one-method wrappers over Hyper's existing PSR-7 constructors — `RequestFactory`, `ResponseFactory`, `StreamFactory`, `UriFactory`. They exist so third-party libraries (including the PSR-18 client itself) can create HTTP messages without importing Hyper's concrete classes. A dependency firewall: pull in any PSR-17-aware library and it builds messages using Arcanum's own types automatically.
+
 - **PSR-13 Hypermedia Links** — Implement `LinkInterface` and `LinkProviderInterface` so handlers can express relationships and available actions alongside their data. Handlers return links; middleware serializes them into HTTP `Link` headers on every response regardless of format. Two motivating use cases:
 
   1. **Command responses are empty but not meaningless.** A 204 No Content or 201 Created has no body, but `Link` headers can tell the client what happened and what's available next: `rel="self"` for the created resource, `rel="collection"` for the parent list, `rel="cancel"` if the action is reversible. The `Location` header already does this for 201 — `Link` headers generalize the pattern to every command outcome.
