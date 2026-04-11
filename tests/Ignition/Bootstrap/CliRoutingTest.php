@@ -13,6 +13,8 @@ use Arcanum\Cabinet\Container;
 use Arcanum\Codex\Hydrator;
 use Arcanum\Gather\Configuration;
 use Arcanum\Ignition\Bootstrap\CliRouting;
+use Arcanum\Ignition\Kernel;
+use Arcanum\Ignition\RuneKernel;
 use Arcanum\Rune\CliExceptionWriter;
 use Arcanum\Rune\ConsoleOutput;
 use Arcanum\Rune\Input;
@@ -38,6 +40,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(Hydrator::class)]
 #[UsesClass(Input::class)]
 #[UsesClass(Route::class)]
+#[UsesClass(RuneKernel::class)]
 #[UsesClass(Strings::class)]
 final class CliRoutingTest extends TestCase
 {
@@ -56,6 +59,7 @@ final class CliRoutingTest extends TestCase
             'routes' => $routesConfig,
         ]);
         $container->instance(Configuration::class, $config);
+        $container->instance(Kernel::class, new RuneKernel('/app'));
 
         return $container;
     }
