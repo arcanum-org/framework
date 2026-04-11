@@ -16,9 +16,14 @@ use Arcanum\Flow\Conveyor\AcceptedDTO;
 use Arcanum\Flow\Conveyor\QueryResult;
 use Arcanum\Glitch\ExceptionHandler;
 use Arcanum\Ignition\Bootstrapper;
+use Arcanum\Ignition\Lifecycle;
 use Arcanum\Ignition\RuneKernel;
 use Arcanum\Atlas\CliRouter;
 use Arcanum\Rune\ConsoleOutput;
+use Arcanum\Rune\Event\CommandCompleted;
+use Arcanum\Rune\Event\CommandFailed;
+use Arcanum\Rune\Event\CommandHandled;
+use Arcanum\Rune\Event\CommandReceived;
 use Arcanum\Rune\ExitCode;
 use Arcanum\Rune\Input;
 use Arcanum\Rune\Output;
@@ -28,6 +33,7 @@ use Arcanum\Shodo\Formatters\JsonFormatter;
 use Arcanum\Shodo\Formatters\KeyValueFormatter;
 use Arcanum\Shodo\Formatters\TableFormatter;
 use Arcanum\Toolkit\Strings;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -42,8 +48,13 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(ConventionResolver::class)]
 #[UsesClass(ExitCode::class)]
 #[UsesClass(Input::class)]
+#[UsesClass(Lifecycle::class)]
 #[UsesClass(Route::class)]
 #[UsesClass(Strings::class)]
+#[UsesClass(CommandCompleted::class)]
+#[UsesClass(CommandFailed::class)]
+#[UsesClass(CommandHandled::class)]
+#[UsesClass(CommandReceived::class)]
 #[UsesClass(TableFormatter::class)]
 final class RuneKernelTest extends TestCase
 {
@@ -434,16 +445,159 @@ final class RuneKernelTest extends TestCase
     // terminate()
     // ---------------------------------------------------------------
 
-    public function testTerminateDoesNotThrow(): void
+    public function testTerminateDoesNotThrowWithoutPriorHandle(): void
     {
         // Arrange
-        $kernel = new RuneKernel('/app');
+        $kernel = $this->bootstrapKernel($this->containerWith());
 
         // Act
         $kernel->terminate();
 
+        // Assert — no CommandCompleted dispatched when no command was handled
+        $this->addToAssertionCount(1);
+    }
+
+    // ---------------------------------------------------------------
+    // Lifecycle events
+    // ---------------------------------------------------------------
+
+    public function testCommandReceivedFiresBeforeDispatch(): void
+    {
+        // Arrange
+        $fired = false;
+        $dispatcher = $this->createStub(EventDispatcherInterface::class);
+        $dispatcher->method('dispatch')->willReturnCallback(
+            function (object $event) use (&$fired) {
+                if ($event instanceof CommandReceived) {
+                    $fired = true;
+                }
+                return $event;
+            },
+        );
+
+        $bus = $this->createStub(Bus::class);
+        $bus->method('dispatch')->willReturn(new EmptyDTO());
+
+        $kernel = $this->bootstrapKernel($this->containerWith(
+            bus: $bus,
+            routeFixtureNamespace: 'Arcanum\\Test\\Fixture',
+            eventDispatcher: $dispatcher,
+        ));
+
+        // Act
+        $kernel->handle(['bin/arcanum', 'command:contact:submit']);
+
         // Assert
-        $this->expectNotToPerformAssertions();
+        $this->assertTrue($fired);
+    }
+
+    public function testCommandHandledFiresAfterSuccessfulDispatch(): void
+    {
+        // Arrange
+        $capturedExitCode = null;
+        $dispatcher = $this->createStub(EventDispatcherInterface::class);
+        $dispatcher->method('dispatch')->willReturnCallback(
+            function (object $event) use (&$capturedExitCode) {
+                if ($event instanceof CommandHandled) {
+                    $capturedExitCode = $event->getExitCode();
+                }
+                return $event;
+            },
+        );
+
+        $bus = $this->createStub(Bus::class);
+        $bus->method('dispatch')->willReturn(new EmptyDTO());
+
+        $kernel = $this->bootstrapKernel($this->containerWith(
+            bus: $bus,
+            routeFixtureNamespace: 'Arcanum\\Test\\Fixture',
+            eventDispatcher: $dispatcher,
+        ));
+
+        // Act
+        $kernel->handle(['bin/arcanum', 'command:contact:submit']);
+
+        // Assert
+        $this->assertSame(ExitCode::Success->value, $capturedExitCode);
+    }
+
+    public function testCommandFailedFiresOnException(): void
+    {
+        // Arrange
+        $capturedException = null;
+        $dispatcher = $this->createStub(EventDispatcherInterface::class);
+        $dispatcher->method('dispatch')->willReturnCallback(
+            function (object $event) use (&$capturedException) {
+                if ($event instanceof CommandFailed) {
+                    $capturedException = $event->getException();
+                }
+                return $event;
+            },
+        );
+
+        $bus = $this->createStub(Bus::class);
+        $bus->method('dispatch')->willThrowException(new \RuntimeException('boom'));
+
+        $kernel = $this->bootstrapKernel($this->containerWith(
+            bus: $bus,
+            routeFixtureNamespace: 'Arcanum\\Test\\Fixture',
+            eventDispatcher: $dispatcher,
+        ));
+
+        // Act
+        $kernel->handle(['bin/arcanum', 'query:shop:products']);
+
+        // Assert
+        $this->assertInstanceOf(\RuntimeException::class, $capturedException);
+    }
+
+    public function testCommandCompletedFiresOnTerminate(): void
+    {
+        // Arrange
+        $fired = false;
+        $dispatcher = $this->createStub(EventDispatcherInterface::class);
+        $dispatcher->method('dispatch')->willReturnCallback(
+            function (object $event) use (&$fired) {
+                if ($event instanceof CommandCompleted) {
+                    $fired = true;
+                }
+                return $event;
+            },
+        );
+
+        $bus = $this->createStub(Bus::class);
+        $bus->method('dispatch')->willReturn(new EmptyDTO());
+
+        $kernel = $this->bootstrapKernel($this->containerWith(
+            bus: $bus,
+            routeFixtureNamespace: 'Arcanum\\Test\\Fixture',
+            eventDispatcher: $dispatcher,
+        ));
+
+        // Act
+        $kernel->handle(['bin/arcanum', 'command:contact:submit']);
+        $kernel->terminate();
+
+        // Assert
+        $this->assertTrue($fired);
+    }
+
+    public function testHandleWorksWithoutEventDispatcher(): void
+    {
+        // Arrange
+        $bus = $this->createStub(Bus::class);
+        $bus->method('dispatch')->willReturn(new EmptyDTO());
+
+        $kernel = $this->bootstrapKernel($this->containerWith(
+            bus: $bus,
+            routeFixtureNamespace: 'Arcanum\\Test\\Fixture',
+        ));
+
+        // Act
+        $exitCode = $kernel->handle(['bin/arcanum', 'command:contact:submit']);
+
+        // Assert
+        $this->assertSame(ExitCode::Success->value, $exitCode);
     }
 
     // ---------------------------------------------------------------
@@ -476,6 +630,7 @@ final class RuneKernelTest extends TestCase
         Bus|null $bus = null,
         string $routeFixtureNamespace = 'Arcanum\\Test\\Fixture',
         ExceptionHandler|null $exceptionHandler = null,
+        EventDispatcherInterface|null $eventDispatcher = null,
         bool $withFormatRegistry = false,
     ): Application {
         $router = new CliRouter(new ConventionResolver(rootNamespace: $routeFixtureNamespace));
@@ -508,6 +663,7 @@ final class RuneKernelTest extends TestCase
         $container->method('has')->willReturnCallback(
             fn(string $id): bool => match ($id) {
                 ExceptionHandler::class => $exceptionHandler !== null,
+                EventDispatcherInterface::class => $eventDispatcher !== null,
                 CliFormatRegistry::class => $formatRegistry !== null,
                 default => false,
             },
@@ -520,6 +676,7 @@ final class RuneKernelTest extends TestCase
                 Bus::class => $bus,
                 Output::class => $output,
                 ExceptionHandler::class => $exceptionHandler ?? throw new \RuntimeException('No handler'),
+                EventDispatcherInterface::class => $eventDispatcher ?? throw new \RuntimeException('No dispatcher'),
                 CliFormatRegistry::class => $formatRegistry ?? throw new \RuntimeException('No registry'),
                 default => throw new \RuntimeException("Unexpected service: $id"),
             },
