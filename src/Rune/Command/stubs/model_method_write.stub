@@ -1,0 +1,4 @@
+    public function {{! $methodName !}}({{! $params !}}): WriteResult
+    {
+        return $this->write(__DIR__ . '/{{! $sqlFile !}}', {{! $paramsArray !}});
+    }

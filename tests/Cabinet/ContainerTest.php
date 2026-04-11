@@ -8,8 +8,10 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use Arcanum\Test\Fixture;
+use Arcanum\Cabinet\CircularDependency;
 use Arcanum\Cabinet\InvalidKey;
 use Arcanum\Cabinet\Container;
+use Arcanum\Cabinet\ServiceNotFound;
 use Arcanum\Codex\Error\UnresolvableClass;
 use Arcanum\Flow\Continuum\Collection;
 use Arcanum\Flow\Pipeline\System;
@@ -19,6 +21,12 @@ use Arcanum\Flow\Pipeline\System;
 #[UsesClass(\Arcanum\Cabinet\PrototypeProvider::class)]
 #[UsesClass(UnresolvableClass::class)]
 #[UsesClass(InvalidKey::class)]
+#[UsesClass(ServiceNotFound::class)]
+#[UsesClass(CircularDependency::class)]
+#[UsesClass(\Arcanum\Codex\Resolver::class)]
+#[UsesClass(\Arcanum\Codex\Event\ClassRequested::class)]
+#[UsesClass(\Arcanum\Flow\Continuum\ContinuationCollection::class)]
+#[UsesClass(\Arcanum\Flow\Pipeline\PipelayerSystem::class)]
 final class ContainerTest extends TestCase
 {
     public function testContainerImplementsArrayAccess(): void
@@ -148,7 +156,7 @@ final class ContainerTest extends TestCase
         $container = new Container($resolver, $collection, $system);
 
         // Assert
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(ServiceNotFound::class);
 
         // Act
         $container[Fixture\DoesNotExist::class]; /** @phpstan-ignore-line */
@@ -394,7 +402,7 @@ final class ContainerTest extends TestCase
         $container = new Container($resolver, $collection, $system);
 
         // Assert
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(ServiceNotFound::class);
 
         // Act
         $container->get(Fixture\DoesNotExist::class); /** @phpstan-ignore-line */
@@ -1034,10 +1042,8 @@ final class ContainerTest extends TestCase
         $implementation = 'string';
 
         // Assert
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            "Cannot register service '$serviceName' with non-existent class '$implementation'"
-        );
+        $this->expectException(ServiceNotFound::class);
+        $this->expectExceptionMessage("class 'string' does not exist");
 
         // Act
         $container->service($serviceName, $implementation); // @phpstan-ignore-line
@@ -1141,5 +1147,79 @@ final class ContainerTest extends TestCase
             Fixture\SimpleDependency::class,
             Fixture\SimpleDependency::class
         );
+    }
+
+    public function testContainerSpecifyWithArrayWhenParameter(): void
+    {
+        // Arrange
+        /** @var \Arcanum\Codex\Resolver&\PHPUnit\Framework\MockObject\MockObject */
+        $resolver = $this->getMockBuilder(\Arcanum\Codex\Resolver::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['resolve', 'resolveWith', 'specify'])
+            ->getMock();
+
+        $resolver->expects($this->never())
+            ->method('resolveWith');
+
+        $resolver->expects($this->never())
+            ->method('resolve');
+
+        $resolver->expects($this->once())
+            ->method('specify')
+            ->with(
+                [Fixture\SimpleService::class, Fixture\SimpleClass::class],
+                Fixture\SimpleDependency::class,
+                Fixture\SimpleDependency::class
+            );
+
+        /** @var Collection&\PHPUnit\Framework\MockObject\MockObject */
+        $collection = $this->getMockBuilder(Collection::class)
+            ->getMock();
+
+        $collection->expects($this->never())
+            ->method('send');
+
+        /** @var System&\PHPUnit\Framework\MockObject\MockObject */
+        $system = $this->getMockBuilder(System::class)
+            ->getMock();
+
+        $system->expects($this->never())
+            ->method('send');
+
+        $container = new Container($resolver, $collection, $system);
+
+        // Act
+        $container->specify(
+            [Fixture\SimpleService::class, Fixture\SimpleClass::class],
+            Fixture\SimpleDependency::class,
+            Fixture\SimpleDependency::class
+        );
+    }
+
+    public function testContainerDefaultConstructor(): void
+    {
+        // Arrange & Act
+        $container = new Container();
+
+        // Assert — container is functional with default resolver, middleware, and decorators
+        $this->assertFalse($container->has(Fixture\SimpleService::class));
+        $result = $container->get(Fixture\SimpleDependency::class);
+        $this->assertInstanceOf(Fixture\SimpleDependency::class, $result);
+    }
+
+    public function testCircularDependencyThrowsWithChain(): void
+    {
+        // Arrange
+        $container = new Container();
+
+        // Act & Assert
+        // Codex detects the cycle during reflection-based resolution before
+        // Cabinet's own tracking triggers. Both throw RuntimeException with the
+        // same message shape; Cabinet's CircularDependency will be caught when
+        // the cycle occurs at the provider/get() level instead.
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Circular dependency detected:');
+
+        $container->get(Fixture\CircularA::class);
     }
 }

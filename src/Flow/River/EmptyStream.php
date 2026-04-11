@@ -124,21 +124,24 @@ class EmptyStream implements Copyable, \Stringable
      */
     public function getMetadata(string|null $key = null): mixed
     {
+        $meta = [
+            'timed_out' => false,
+            'blocked' => false,
+            'eof' => true,
+            'unread_bytes' => 0,
+            'stream_type' => 'EMPTY',
+            'wrapper_type' => 'EMPTY',
+            'wrapper_data' =>  null,
+            'mode' => 'rb',
+            'seekable' => false,
+            'uri' => ''
+        ];
+
         if ($key === null) {
-            return [
-                'timed_out' => false,
-                'blocked' => false,
-                'eof' => true,
-                'unread_bytes' => 0,
-                'stream_type' => 'EMPTY',
-                'wrapper_type' => 'EMPTY',
-                'wrapper_data' =>  null,
-                'mode' => 'rb',
-                'seekable' => false,
-                'uri' => ''
-            ];
+            return $meta;
         }
-        return null;
+
+        return $meta[$key] ?? null;
     }
 
     /**

@@ -156,4 +156,70 @@ final class ChannelTest extends TestCase
         // Act
         $channel->log('info', 'test');
     }
+
+    // -----------------------------------------------------------
+    // Name property
+    // -----------------------------------------------------------
+
+    public function testNameIsSetFromMonologLogger(): void
+    {
+        // Arrange
+        $monolog = $this->createStub(\Monolog\Logger::class);
+        $monolog->method('getName')->willReturn('audit');
+
+        // Act
+        $channel = new Channel($monolog);
+
+        // Assert
+        $this->assertSame('audit', $channel->name);
+    }
+
+    // -----------------------------------------------------------
+    // Context forwarding
+    // -----------------------------------------------------------
+
+    public function testContextIsForwardedToMonolog(): void
+    {
+        // Arrange
+        /** @var \Monolog\Logger&\PHPUnit\Framework\MockObject\MockObject */
+        $monolog = $this->createMock(\Monolog\Logger::class);
+
+        $context = ['user_id' => 42, 'exception' => new \RuntimeException('test')];
+
+        $monolog->expects($this->once())
+            ->method('error')
+            ->with('Something failed', $context);
+
+        $channel = new Channel($monolog);
+
+        // Act
+        $channel->error('Something failed', $context);
+    }
+
+    // -----------------------------------------------------------
+    // Stringable message support (PSR-3)
+    // -----------------------------------------------------------
+
+    public function testStringableMessageIsForwardedToMonolog(): void
+    {
+        // Arrange
+        /** @var \Monolog\Logger&\PHPUnit\Framework\MockObject\MockObject */
+        $monolog = $this->createMock(\Monolog\Logger::class);
+
+        $stringable = new class () implements \Stringable {
+            public function __toString(): string
+            {
+                return 'stringable message';
+            }
+        };
+
+        $monolog->expects($this->once())
+            ->method('info')
+            ->with($stringable);
+
+        $channel = new Channel($monolog);
+
+        // Act
+        $channel->info($stringable);
+    }
 }

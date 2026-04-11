@@ -10,4 +10,9 @@ final class UnknownClass extends Unresolvable
     {
         parent::__construct("Unknown Class: $message", $code, $previous);
     }
+
+    public function getTitle(): string
+    {
+        return 'Unknown Class';
+    }
 }

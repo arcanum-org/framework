@@ -221,10 +221,26 @@ class CachingStream implements Copyable, \Stringable
     }
 
     /**
-     * Get the stream contents as a string.
+     * Get the remaining stream contents as a string.
+     *
+     * Reads any uncached data from the remote stream into the local
+     * cache before returning the contents from the current position.
      */
     public function getContents(): string
     {
+        $position = $this->tell();
+
+        // Read all remaining remote data into the local cache.
+        while (!$this->remote->eof()) {
+            $chunk = $this->read(8192);
+            if ($chunk === '') {
+                break;
+            }
+        }
+
+        // Seek back so we return from the original position.
+        $this->local->seek($position);
+
         return $this->local->getContents();
     }
 
@@ -241,6 +257,7 @@ class CachingStream implements Copyable, \Stringable
 
     public function __toString(): string
     {
+        $this->rewind();
         return $this->getContents();
     }
 

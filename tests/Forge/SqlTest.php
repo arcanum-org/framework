@@ -1,0 +1,501 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Arcanum\Test\Forge;
+
+use Arcanum\Forge\Sql;
+use Arcanum\Toolkit\Strings;
+use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
+
+#[CoversClass(Sql::class)]
+#[UsesClass(Strings::class)]
+final class SqlTest extends TestCase
+{
+    // ── Basic reads ──────────────────────────────────────────────
+
+    public function testSelectIsRead(): void
+    {
+        $this->assertTrue(Sql::isRead('SELECT id, name FROM users'));
+    }
+
+    public function testSelectLowercaseIsRead(): void
+    {
+        $this->assertTrue(Sql::isRead('select id from users'));
+    }
+
+    public function testSelectMixedCaseIsRead(): void
+    {
+        $this->assertTrue(Sql::isRead('SeLeCt id from users'));
+    }
+
+    public function testSelectWithLeadingWhitespace(): void
+    {
+        $this->assertTrue(Sql::isRead("  \t\n  SELECT id FROM users"));
+    }
+
+    // ── Basic writes ─────────────────────────────────────────────
+
+    public function testInsertIsWrite(): void
+    {
+        $this->assertFalse(Sql::isRead('INSERT INTO users (name) VALUES (:name)'));
+    }
+
+    public function testUpdateIsWrite(): void
+    {
+        $this->assertFalse(Sql::isRead('UPDATE users SET name = :name WHERE id = :id'));
+    }
+
+    public function testDeleteIsWrite(): void
+    {
+        $this->assertFalse(Sql::isRead('DELETE FROM users WHERE id = :id'));
+    }
+
+    public function testCreateTableIsWrite(): void
+    {
+        $this->assertFalse(Sql::isRead('CREATE TABLE users (id INTEGER PRIMARY KEY)'));
+    }
+
+    public function testDropTableIsWrite(): void
+    {
+        $this->assertFalse(Sql::isRead('DROP TABLE users'));
+    }
+
+    public function testAlterTableIsWrite(): void
+    {
+        $this->assertFalse(Sql::isRead('ALTER TABLE users ADD COLUMN email TEXT'));
+    }
+
+    public function testTruncateIsWrite(): void
+    {
+        $this->assertFalse(Sql::isRead('TRUNCATE TABLE users'));
+    }
+
+    // ── Line comments (--) ───────────────────────────────────────
+
+    public function testSelectAfterSingleLineComment(): void
+    {
+        $this->assertTrue(Sql::isRead("-- fetch users\nSELECT * FROM users"));
+    }
+
+    public function testSelectAfterMultipleLineComments(): void
+    {
+        $this->assertTrue(Sql::isRead("-- first comment\n-- second comment\nSELECT * FROM users"));
+    }
+
+    public function testInsertAfterLineComment(): void
+    {
+        $this->assertFalse(Sql::isRead("-- insert a user\nINSERT INTO users (name) VALUES (:name)"));
+    }
+
+    public function testLineCommentOnlyNoNewline(): void
+    {
+        $this->assertFalse(Sql::isRead('-- just a comment'));
+    }
+
+    public function testLineCommentOnlyWithNewline(): void
+    {
+        $this->assertFalse(Sql::isRead("-- just a comment\n"));
+    }
+
+    // ── Block comments (/* */) ───────────────────────────────────
+
+    public function testSelectAfterBlockComment(): void
+    {
+        $this->assertTrue(Sql::isRead('/* fetch users */ SELECT * FROM users'));
+    }
+
+    public function testSelectAfterMultiLineBlockComment(): void
+    {
+        $sql = <<<'SQL'
+        /*
+         * Fetch all active users
+         * for the dashboard.
+         */
+        SELECT * FROM users WHERE active = 1
+        SQL;
+
+        $this->assertTrue(Sql::isRead($sql));
+    }
+
+    public function testInsertAfterBlockComment(): void
+    {
+        $this->assertFalse(Sql::isRead('/* create user */ INSERT INTO users (name) VALUES (:name)'));
+    }
+
+    public function testBlockCommentOnly(): void
+    {
+        $this->assertFalse(Sql::isRead('/* just a comment */'));
+    }
+
+    public function testUnclosedBlockComment(): void
+    {
+        $this->assertFalse(Sql::isRead('/* unclosed comment SELECT * FROM users'));
+    }
+
+    // ── Mixed comment styles ─────────────────────────────────────
+
+    public function testMixedLineAndBlockComments(): void
+    {
+        $sql = <<<'SQL'
+        -- @cast price float
+        -- @cast active bool
+        /* Products query */
+        SELECT id, name, price, active FROM products
+        SQL;
+
+        $this->assertTrue(Sql::isRead($sql));
+    }
+
+    public function testBlockThenLineCommentBeforeSelect(): void
+    {
+        $sql = "/* block */\n-- line\nSELECT 1";
+
+        $this->assertTrue(Sql::isRead($sql));
+    }
+
+    // ── CTEs (WITH) ──────────────────────────────────────────────
+
+    public function testCteWithSelectIsRead(): void
+    {
+        $sql = <<<'SQL'
+        WITH active_users AS (
+            SELECT id, name FROM users WHERE active = 1
+        )
+        SELECT * FROM active_users
+        SQL;
+
+        $this->assertTrue(Sql::isRead($sql));
+    }
+
+    public function testCteWithCommentIsRead(): void
+    {
+        $sql = <<<'SQL'
+        -- top customers by revenue
+        WITH revenue AS (
+            SELECT customer_id, SUM(total) as total
+            FROM orders
+            GROUP BY customer_id
+        )
+        SELECT c.name, r.total
+        FROM customers c
+        JOIN revenue r ON r.customer_id = c.id
+        SQL;
+
+        $this->assertTrue(Sql::isRead($sql));
+    }
+
+    // ── EXPLAIN ──────────────────────────────────────────────────
+
+    public function testExplainIsRead(): void
+    {
+        $this->assertTrue(Sql::isRead('EXPLAIN SELECT * FROM users'));
+    }
+
+    public function testExplainAnalyzeIsRead(): void
+    {
+        $this->assertTrue(Sql::isRead('EXPLAIN ANALYZE SELECT * FROM users'));
+    }
+
+    // ── SHOW / DESCRIBE / PRAGMA ─────────────────────────────────
+
+    public function testShowIsRead(): void
+    {
+        $this->assertTrue(Sql::isRead('SHOW TABLES'));
+    }
+
+    public function testDescribeIsRead(): void
+    {
+        $this->assertTrue(Sql::isRead('DESCRIBE users'));
+    }
+
+    public function testDescAbbreviationIsRead(): void
+    {
+        $this->assertTrue(Sql::isRead('DESC users'));
+    }
+
+    public function testPragmaIsRead(): void
+    {
+        $this->assertTrue(Sql::isRead('PRAGMA table_info(users)'));
+    }
+
+    // ── Parenthesized subqueries ─────────────────────────────────
+
+    public function testParenthesizedSelectIsRead(): void
+    {
+        $this->assertTrue(Sql::isRead('(SELECT id FROM users)'));
+    }
+
+    public function testNestedParenthesesBeforeSelect(): void
+    {
+        $this->assertTrue(Sql::isRead('((SELECT id FROM users))'));
+    }
+
+    // ── Empty / degenerate input ─────────────────────────────────
+
+    public function testEmptyStringIsWrite(): void
+    {
+        $this->assertFalse(Sql::isRead(''));
+    }
+
+    public function testWhitespaceOnlyIsWrite(): void
+    {
+        $this->assertFalse(Sql::isRead("   \t\n  "));
+    }
+
+    // ── firstKeyword ─────────────────────────────────────────────
+
+    public function testFirstKeywordReturnsSelect(): void
+    {
+        $this->assertSame('SELECT', Sql::firstKeyword('SELECT * FROM users'));
+    }
+
+    public function testFirstKeywordSkipsComments(): void
+    {
+        $this->assertSame('INSERT', Sql::firstKeyword("-- comment\nINSERT INTO users"));
+    }
+
+    public function testFirstKeywordSkipsBlockComment(): void
+    {
+        $this->assertSame('UPDATE', Sql::firstKeyword('/* block */ UPDATE users SET x = 1'));
+    }
+
+    public function testFirstKeywordReturnsEmptyForEmptyInput(): void
+    {
+        $this->assertSame('', Sql::firstKeyword(''));
+    }
+
+    public function testFirstKeywordReturnsEmptyForCommentOnly(): void
+    {
+        $this->assertSame('', Sql::firstKeyword('-- just a comment'));
+    }
+
+    public function testFirstKeywordPreservesOriginalCase(): void
+    {
+        $this->assertSame('select', Sql::firstKeyword('select * from users'));
+    }
+
+    public function testFirstKeywordSkipsParenthesis(): void
+    {
+        $this->assertSame('SELECT', Sql::firstKeyword('(SELECT 1)'));
+    }
+
+    public function testFirstKeywordSkipsCommentsInterleavedWithParentheses(): void
+    {
+        $this->assertSame('INSERT', Sql::firstKeyword("-- comment\n ( \n --comment\n INSERT INTO users"));
+    }
+
+    // ── parseCasts ───────────────────────────────────────────────
+
+    public function testParseCastsExtractsAnnotations(): void
+    {
+        $sql = "-- @cast price float\n-- @cast active bool\nSELECT price, active FROM products";
+
+        $this->assertSame(['price' => 'float', 'active' => 'bool'], Sql::parseCasts($sql));
+    }
+
+    public function testParseCastsReturnsEmptyWhenNone(): void
+    {
+        $this->assertSame([], Sql::parseCasts('SELECT * FROM users'));
+    }
+
+    public function testParseCastsIgnoresRegularComments(): void
+    {
+        $sql = "-- This is a regular comment\n-- @cast id int\nSELECT id FROM users";
+
+        $this->assertSame(['id' => 'int'], Sql::parseCasts($sql));
+    }
+
+    public function testParseCastsAllTypes(): void
+    {
+        $sql = "-- @cast a int\n-- @cast b float\n-- @cast c bool\n-- @cast d json\nSELECT a, b, c, d FROM t";
+
+        $this->assertSame(
+            ['a' => 'int', 'b' => 'float', 'c' => 'bool', 'd' => 'json'],
+            Sql::parseCasts($sql),
+        );
+    }
+
+    // ── extractBindings ──────────────────────────────────────────
+
+    public function testExtractBindingsFindsNamedPlaceholders(): void
+    {
+        $sql = 'SELECT * FROM users WHERE name = :name AND age > :age';
+
+        $this->assertSame(['name', 'age'], Sql::extractBindings($sql));
+    }
+
+    public function testExtractBindingsReturnsInOrderOfAppearance(): void
+    {
+        $sql = 'INSERT INTO t (c, b, a) VALUES (:c, :b, :a)';
+
+        $this->assertSame(['c', 'b', 'a'], Sql::extractBindings($sql));
+    }
+
+    public function testExtractBindingsDeduplicates(): void
+    {
+        $sql = 'SELECT * FROM t WHERE a = :id OR b = :id';
+
+        $this->assertSame(['id'], Sql::extractBindings($sql));
+    }
+
+    public function testExtractBindingsReturnsEmptyForNoBindings(): void
+    {
+        $this->assertSame([], Sql::extractBindings('SELECT 1'));
+    }
+
+    public function testExtractBindingsIgnoresLineComments(): void
+    {
+        $sql = "-- :not_a_binding\nSELECT * FROM t WHERE id = :id";
+
+        $this->assertSame(['id'], Sql::extractBindings($sql));
+    }
+
+    public function testExtractBindingsIgnoresBlockComments(): void
+    {
+        $sql = '/* :not_a_binding */ SELECT * FROM t WHERE id = :id';
+
+        $this->assertSame(['id'], Sql::extractBindings($sql));
+    }
+
+    public function testExtractBindingsIgnoresStringLiterals(): void
+    {
+        $sql = "SELECT * FROM t WHERE name = ':not_a_binding' AND id = :id";
+
+        $this->assertSame(['id'], Sql::extractBindings($sql));
+    }
+
+    public function testExtractBindingsIgnoresEscapedQuotes(): void
+    {
+        $sql = "SELECT * FROM t WHERE name = 'it''s :not' AND id = :id";
+
+        $this->assertSame(['id'], Sql::extractBindings($sql));
+    }
+
+    public function testExtractBindingsHandlesUnderscoreNames(): void
+    {
+        $sql = 'SELECT * FROM t WHERE min_price = :min_price';
+
+        $this->assertSame(['min_price'], Sql::extractBindings($sql));
+    }
+
+    // ── parseParams ──────────────────────────────────────────────
+
+    public function testParseParamsExtractsAnnotations(): void
+    {
+        $sql = "-- @param name string\n-- @param age int\nSELECT 1";
+
+        $this->assertSame(
+            ['name' => 'string', 'age' => 'int'],
+            Sql::parseParams($sql),
+        );
+    }
+
+    public function testParseParamsReturnsEmptyWhenNone(): void
+    {
+        $this->assertSame([], Sql::parseParams('SELECT 1'));
+    }
+
+    public function testParseParamsIgnoresRegularComments(): void
+    {
+        $sql = "-- just a comment\n-- @param id int\nSELECT 1";
+
+        $this->assertSame(['id' => 'int'], Sql::parseParams($sql));
+    }
+
+    public function testParseParamsAllTypes(): void
+    {
+        $sql = "-- @param a string\n-- @param b int\n"
+            . "-- @param c float\n-- @param d bool\nSELECT 1";
+
+        $this->assertSame(
+            ['a' => 'string', 'b' => 'int', 'c' => 'float', 'd' => 'bool'],
+            Sql::parseParams($sql),
+        );
+    }
+
+    // ── resolveArgs ──────────────────────────────────────────────
+
+    public function testResolveArgsAllNamed(): void
+    {
+        $args = ['name' => 'Alice', 'age' => 30];
+        $bindings = ['name', 'age'];
+
+        $this->assertSame(
+            ['name' => 'Alice', 'age' => 30],
+            Sql::resolveArgs($args, $bindings),
+        );
+    }
+
+    public function testResolveArgsAllPositional(): void
+    {
+        $args = ['Alice', 30];
+        $bindings = ['name', 'age'];
+
+        $this->assertSame(
+            ['name' => 'Alice', 'age' => 30],
+            Sql::resolveArgs($args, $bindings),
+        );
+    }
+
+    public function testResolveArgsMixedPositionalAndNamed(): void
+    {
+        // 'shoes' positional → fills first unmatched (:category)
+        // active: true named → claims :active
+        $args = [0 => 'shoes', 'active' => true];
+        $bindings = ['category', 'min_price', 'active'];
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(':min_price');
+        Sql::resolveArgs($args, $bindings);
+    }
+
+    public function testResolveArgsMixedAllBindingsCovered(): void
+    {
+        $args = [0 => 'shoes', 1 => 10, 'active' => true];
+        $bindings = ['category', 'min_price', 'active'];
+
+        $this->assertSame(
+            ['category' => 'shoes', 'min_price' => 10, 'active' => true],
+            Sql::resolveArgs($args, $bindings),
+        );
+    }
+
+    public function testResolveArgsCamelToSnakeConversion(): void
+    {
+        $args = ['minPrice' => 10, 'maxPrice' => 100];
+        $bindings = ['min_price', 'max_price'];
+
+        $this->assertSame(
+            ['min_price' => 10, 'max_price' => 100],
+            Sql::resolveArgs($args, $bindings),
+        );
+    }
+
+    public function testResolveArgsThrowsOnMissingBinding(): void
+    {
+        $args = ['name' => 'Alice'];
+        $bindings = ['name', 'age'];
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(':age');
+        Sql::resolveArgs($args, $bindings);
+    }
+
+    public function testResolveArgsThrowsOnTooManyPositional(): void
+    {
+        $args = ['Alice', 30, 'extra'];
+        $bindings = ['name', 'age'];
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Too many positional arguments');
+        Sql::resolveArgs($args, $bindings);
+    }
+
+    public function testResolveArgsEmptyBindingsEmptyArgs(): void
+    {
+        $this->assertSame([], Sql::resolveArgs([], []));
+    }
+}

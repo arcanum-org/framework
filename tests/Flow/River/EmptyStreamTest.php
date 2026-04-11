@@ -118,13 +118,27 @@ final class EmptyStreamTest extends TestCase
         ], $result);
     }
 
-    public function testGetMetaDataByKeyAlwaysReturnsNull(): void
+    public function testGetMetaDataByKeyReturnsValue(): void
     {
         // Arrange
         $stream = new EmptyStream();
 
-        // Act
-        $result = $stream->getMetadata('timed_out');
+        // Act & Assert
+        $this->assertFalse($stream->getMetadata('timed_out'));
+        $this->assertTrue($stream->getMetadata('eof'));
+        $this->assertSame(0, $stream->getMetadata('unread_bytes'));
+        $this->assertSame('EMPTY', $stream->getMetadata('stream_type'));
+        $this->assertSame('rb', $stream->getMetadata('mode'));
+        $this->assertSame('', $stream->getMetadata('uri'));
+    }
+
+    public function testGetMetaDataByOptionalKeyReturnsNull(): void
+    {
+        // Arrange
+        $stream = new EmptyStream();
+
+        // Act — 'crypto' is an optional metadata key not set on EmptyStream
+        $result = $stream->getMetadata('crypto');
 
         // Assert
         $this->assertNull($result);

@@ -7,6 +7,7 @@ namespace Arcanum\Cabinet;
 use Arcanum\Codex\ClassResolver;
 use Arcanum\Codex\Resolver;
 use Arcanum\Codex\Specifier;
+use Arcanum\Toolkit\Strings;
 use Arcanum\Flow\Pipeline\System;
 use Arcanum\Flow\Pipeline\PipelayerSystem;
 use Arcanum\Flow\Continuum\Collection;
@@ -35,6 +36,13 @@ class Container implements Application, Specifier
      * @var array<string, Provider>
      */
     protected array $providers = [];
+
+    /**
+     * Tracks classes currently being resolved to detect circular dependencies.
+     *
+     * @var array<string, true>
+     */
+    private array $resolving = [];
 
     /**
      * @var \Arcanum\Flow\Pipeline\System
@@ -71,10 +79,22 @@ class Container implements Application, Specifier
             $implementation = $serviceName;
         }
         if (!class_exists($implementation)) {
-            throw new \InvalidArgumentException(
-                "Cannot register service '$serviceName' with non-existent class '$implementation'"
+            throw new ServiceNotFound(
+                $serviceName,
+                "Cannot register service '{$serviceName}'"
+                    . " — class '{$implementation}' does not exist",
             );
         }
+
+        // When mapping an interface to an implementation that already has a
+        // registered provider (e.g., a factory), forward to the container
+        // instead of re-resolving via Codex. This ensures custom factories
+        // are respected for interface aliases.
+        if ($implementation !== $serviceName && isset($this->providers[$implementation])) {
+            $this->factory($serviceName, fn(Container $c) => $c->get($implementation));
+            return;
+        }
+
         $this->factory($serviceName, $this->simpleFactory($implementation));
     }
 
@@ -261,25 +281,51 @@ class Container implements Application, Specifier
             throw new InvalidKey("Invalid key type: " . gettype($offset));
         }
 
-        // Provide the instance.
-        $provider = $this->providers[$offset] ?? null;
-
-        if ($provider === null) {
-            if (!class_exists($offset)) {
-                throw new \InvalidArgumentException(
-                    "Cannot resolve service '$offset' with non-existent class '$offset'"
-                );
-            }
-            $provider = PrototypeProvider::fromFactory($this->simpleFactory($offset));
+        // Circular dependency detection.
+        if (isset($this->resolving[$offset])) {
+            $chain = array_keys($this->resolving);
+            $chain[] = $offset;
+            $this->resolving = [];
+            throw new CircularDependency($chain);
         }
 
-        $instance = $provider($this);
+        $this->resolving[$offset] = true;
 
-        // Apply decorators.
-        $instance = $this->applyDecorators($offset, $instance, $provider);
+        try {
+            // Provide the instance.
+            $provider = $this->providers[$offset] ?? null;
 
-        // Apply middleware.
-        return $this->middleware->send($offset, $instance);
+            if ($provider === null) {
+                if (!class_exists($offset)) {
+                    $exception = new ServiceNotFound(
+                        $offset,
+                        "Service '{$offset}' is not registered and"
+                            . " does not match an existing class",
+                    );
+
+                    $registered = array_keys($this->providers);
+                    $closest = Strings::closestMatch($offset, $registered);
+
+                    throw $exception->withSuggestion(
+                        $closest !== null
+                            ? "Did you mean '{$closest}'?"
+                            : "Register it with \$container->service('{$offset}')"
+                                . ' or check the class name for typos',
+                    );
+                }
+                $provider = PrototypeProvider::fromFactory($this->simpleFactory($offset));
+            }
+
+            $instance = $provider($this);
+
+            // Apply decorators.
+            $instance = $this->applyDecorators($offset, $instance, $provider);
+
+            // Apply middleware.
+            return $this->middleware->send($offset, $instance);
+        } finally {
+            unset($this->resolving[$offset]);
+        }
     }
 
     /**

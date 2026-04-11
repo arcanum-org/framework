@@ -11,7 +11,7 @@ interface Stage
 
 That's it. A Stage is any callable that receives an object and returns an object (or null if it has nothing to return). Think of it like a function at a conveyor belt — something comes in, something goes out.
 
-Everything in Flow builds on this concept, split into four subpackages:
+Everything in Flow builds on this concept, split into five subpackages:
 
 ## [Pipeline](Pipeline/) — stages in a line
 
@@ -62,6 +62,24 @@ $result = $bus->dispatch(new PlaceOrder(item: 'burger', qty: 2));
 
 Ships with DTO validation middleware: `FinalFilter`, `PublicPropertyFilter`, `ReadOnlyPropertyFilter`, `NonStaticPropertyFilter`, `NonPublicMethodFilter`.
 
+## [Sequence](Sequence/) — lazy and eager ordered iterables
+
+Sequence is a separate concern from the data-flow subpackages. It ships a `Sequencer<T>` interface with two implementations — `Cursor` (lazy, single-pass, self-closing) and `Series` (eager, multi-pass) — so consumers can stream unbounded result sets row-by-row, or materialize into a multi-pass list when they actually need one. Forge's read path is the first consumer: `Connection::query()` returns a `Sequencer`.
+
+```php
+use Arcanum\Flow\Sequence\Cursor;
+
+$cursor = Cursor::open(
+    source: fn() => readRowsFromSomewhere(),
+    onClose: fn() => releaseTheHandle(),
+);
+
+foreach ($cursor->filter(...)->map(...) as $row) {
+    process($row);
+}
+// close callback fires exactly once, on completion, break, throw, or destruct
+```
+
 ## [River](River/) — stream wrappers
 
 River is a separate concern from the data-flow subpackages. It wraps PHP's low-level stream resources into PSR-7 `StreamInterface` objects with type safety, auto-cleanup, and proper error handling.
@@ -81,6 +99,7 @@ Stage (basic: in → out)
 ├── Pipeline    (chain stages linearly: A → B → C)
 ├── Continuum   (nest stages as middleware: A( B( C() ) ))
 ├── Conveyor    (Pipeline + Continuum = command bus with middleware)
+├── Sequence    (separate concern — lazy/eager ordered iterables)
 └── River       (separate concern — PSR-7 stream I/O wrappers)
 ```
 

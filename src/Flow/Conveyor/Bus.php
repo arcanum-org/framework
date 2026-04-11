@@ -11,6 +11,11 @@ interface Bus
      *
      * The object to be dispatched should be a simple DTO, and the
      * return value should be a simple DTO.
+     *
+     * @param string $prefix Handler name prefix. When non-empty, the bus
+     *                       tries the prefixed handler first (e.g., prefix
+     *                       'Delete' + DoSomething → DeleteDoSomethingHandler)
+     *                       and falls back to the unprefixed handler.
      */
-    public function dispatch(object $object): object;
+    public function dispatch(object $object, string $prefix = ''): object;
 }

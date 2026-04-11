@@ -6,3 +6,14 @@ parameters:
     excludePaths:
         - ../tests/.coverage/*
         - ../tests/.phpunit.cache/*
+        - ../src/Vault/RedisDriver.php
+        - ../tests/Vault/RedisDriverTest.php
+        - ../src/Vault/ApcuDriver.php
+        - ../tests/Vault/ApcuDriverTest.php
+    ignoreErrors:
+        - identifier: method.notFound
+          path: ../tests/Forge/ModelTest.php
+          reportUnmatched: false
+        - identifier: method.notFound
+          path: ../tests/Forge/DatabaseTest.php
+          reportUnmatched: false

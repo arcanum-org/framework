@@ -21,11 +21,13 @@ use Psr\Container\ContainerInterface;
 #[CoversClass(Resolver::class)]
 #[CoversClass(ClassNameResolver::class)]
 #[CoversClass(PrimitiveResolver::class)]
+#[UsesClass(Error\Unresolvable::class)]
 #[UsesClass(Error\UnresolvableClass::class)]
 #[UsesClass(Error\UnresolvablePrimitive::class)]
 #[UsesClass(Error\UnresolvableUnionType::class)]
 #[UsesClass(ClassResolved::class)]
 #[UsesClass(ClassRequested::class)]
+#[UsesClass(Fixture\ServiceWithNullableDependency::class)]
 final class ResolverTest extends TestCase
 {
     public function testClosure(): void
@@ -808,5 +810,65 @@ final class ResolverTest extends TestCase
 
         // Assert
         $this->assertInstanceOf(Fixture\ServiceImplementsInterface::class, $resolved->dependency);
+    }
+
+    public function testResolveWithCallableThatReturnsNonObjectThrowsTypeError(): void
+    {
+        // Arrange
+        $container = $this->createStub(ContainerInterface::class);
+
+        $container->method('has')
+            ->willReturn(false);
+
+        $resolver = Resolver::forContainer($container);
+
+        // Assert
+        $this->expectException(\TypeError::class);
+
+        // Act
+        $resolver->resolve(fn() => 'not an object'); // @phpstan-ignore argument.type, argument.templateType
+    }
+
+    public function testResolveWithVariadicConstructorParameters(): void
+    {
+        // Arrange
+        $container = $this->createStub(ContainerInterface::class);
+
+        $container->method('has')
+            ->willReturn(false);
+
+        $resolver = Resolver::forContainer($container);
+
+        // Act
+        $resolved = $resolver->resolveWith(Fixture\VariadicClassService::class, [
+            Fixture\SimpleDependency::class,
+            Fixture\SimpleDependency::class,
+            Fixture\SimpleDependency::class,
+        ]);
+
+        // Assert
+        $this->assertInstanceOf(Fixture\VariadicClassService::class, $resolved);
+        $this->assertCount(3, $resolved->dependencies);
+        $this->assertInstanceOf(Fixture\SimpleDependency::class, $resolved->dependencies[0]);
+    }
+
+    public function testNullableParameterFallsBackToNullWhenUnresolvable(): void
+    {
+        // Arrange
+        $container = $this->createStub(ContainerInterface::class);
+
+        $container->method('has')
+            ->willReturn(false);
+
+        $resolver = Resolver::forContainer($container);
+        $resolver->specify(Fixture\ServiceWithNullableDependency::class, '$name', 'test');
+
+        // Act
+        $resolved = $resolver->resolve(Fixture\ServiceWithNullableDependency::class);
+
+        // Assert
+        $this->assertInstanceOf(Fixture\ServiceWithNullableDependency::class, $resolved);
+        $this->assertSame('test', $resolved->name);
+        $this->assertNull($resolved->logger);
     }
 }

@@ -44,10 +44,16 @@ class Exceptions implements Bootstrapper, ErrorHandler, ExceptionHandler, Shutdo
         // Set the shutdown handler.
         \register_shutdown_function([$this, 'handleShutdown']);
 
-        // Disable PHP's display_errors setting if we are not in a testing environment.
-
         /** @var \Arcanum\Gather\Configuration $config */
         $config = $container->get(\Arcanum\Gather\Configuration::class);
+
+        // Resolve verbose_errors: defaults to app.debug when not explicitly set.
+        if (!$config->has('app.verbose_errors')) {
+            $debug = $config->get('app.debug');
+            $config->set('app.verbose_errors', $debug === true || $debug === 'true');
+        }
+
+        // Disable PHP's display_errors setting if we are not in a testing environment.
         if ($config->asString('app.environment') !== 'testing') {
             \ini_set('display_errors', 'Off');
         }

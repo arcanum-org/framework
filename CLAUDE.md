@@ -31,7 +31,9 @@ Arcanum is a CQRS PHP framework (not MVC). It's a monorepo with packages under `
 - **Hyper** — PSR-7 HTTP messages and PSR-15 server handler.
 - **Glitch** — Error/exception/shutdown handling with reporter system.
 - **Quill** — Multi-channel PSR-3 logger over Monolog.
-- **Parchment** — File utilities (WIP).
+- **Atlas** — Convention-based CQRS router. Maps inputs (HTTP, CLI in future) to Query/Command namespaces. Core mapping is transport-agnostic; HTTP adapter extracts response format from file extensions.
+- **Shodo** — Output rendering. `JsonRenderer`, `JsonExceptionRenderer`, format registry (WIP).
+- **Parchment** — File utilities.
 - **Toolkit** — String utilities.
 
 ### Testing patterns
@@ -41,6 +43,15 @@ Arcanum is a CQRS PHP framework (not MVC). It's a monorepo with packages under `
 - Tests mirror src structure: `src/Hyper/Headers.php` → `tests/Hyper/HeadersTest.php`
 - Arrange-Act-Assert pattern throughout
 - Fixtures live in `tests/Fixture/` or in subpackage test directories
+
+### HTTP status codes
+
+Arcanum embraces the full HTTP status code spectrum. When implementing any HTTP-facing feature, always use the most precise status code — never collapse to 200/404/500. Examples:
+
+- Command returns void → **204 No Content**, returns a DTO → **201 Created**, returns null → **202 Accepted**
+- Valid path, wrong HTTP method → **405 Method Not Allowed** (not 404)
+- Unsupported response format → **406 Not Acceptable** (not 400)
+- Use `HttpException` with the specific `StatusCode` enum value, never raw integers
 
 ### Starter project
 

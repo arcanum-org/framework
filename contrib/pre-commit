@@ -1,4 +1,10 @@
 #!/bin/bash
 
-# Let the composer check scripts check everything
+# Only run full checks if PHP files are staged.
+STAGED_PHP=$(git diff --cached --name-only --diff-filter=ACMR | grep '\.php$')
+
+if [ -z "$STAGED_PHP" ]; then
+    exit 0
+fi
+
 composer check

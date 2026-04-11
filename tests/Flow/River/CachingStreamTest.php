@@ -434,64 +434,65 @@ final class CachingStreamTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testGetContents(): void
+    public function testGetContentsReadsRemoteIntoCache(): void
     {
-        // Arrange
-        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
-        $stream = $this->getMockBuilder(Stream::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['getContents'])
-            ->getMock();
+        // Arrange — create a remote stream with content and an empty cache
+        $resource = fopen('php://memory', 'r+');
+        $this->assertIsResource($resource);
 
-        $stream->expects($this->never())
-            ->method('getContents');
+        $remote = new Stream(StreamResource::wrap($resource));
+        $remote->write('some content');
+        $remote->rewind();
 
-        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
-        $cache = $this->getMockBuilder(Stream::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['getContents'])
-            ->getMock();
+        $cache = TemporaryStream::getNew();
 
-        $cache->expects($this->once())
-            ->method('getContents')
-            ->willReturn('some content');
+        $streamInterface = CachingStream::fromStreamWithCache($remote, $cache);
 
-        // Act
-        $streamInterface = CachingStream::fromStreamWithCache($stream, $cache);
-
-        // Act
+        // Act — getContents should read from remote into cache
         $result = $streamInterface->getContents();
 
         // Assert
         $this->assertSame('some content', $result);
     }
 
-    public function testToString(): void
+    public function testGetContentsFromCurrentPosition(): void
     {
         // Arrange
-        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
-        $stream = $this->getMockBuilder(Stream::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['getContents'])
-            ->getMock();
+        $resource = fopen('php://memory', 'r+');
+        $this->assertIsResource($resource);
 
-        $stream->expects($this->never())
-            ->method('getContents');
+        $remote = new Stream(StreamResource::wrap($resource));
+        $remote->write('Hello World');
+        $remote->rewind();
 
-        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
-        $cache = $this->getMockBuilder(Stream::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['getContents'])
-            ->getMock();
+        $streamInterface = CachingStream::fromStream($remote);
 
-        $cache->expects($this->once())
-            ->method('getContents')
-            ->willReturn('some content');
+        // Read first 5 bytes to advance position
+        $streamInterface->read(5);
 
-        // Act
-        $streamInterface = CachingStream::fromStreamWithCache($stream, $cache);
+        // Act — getContents should return remaining from position 5
+        $result = $streamInterface->getContents();
 
-        // Act
+        // Assert
+        $this->assertSame(' World', $result);
+    }
+
+    public function testToStringReturnsFullContentFromBeginning(): void
+    {
+        // Arrange
+        $resource = fopen('php://memory', 'r+');
+        $this->assertIsResource($resource);
+
+        $remote = new Stream(StreamResource::wrap($resource));
+        $remote->write('some content');
+        $remote->rewind();
+
+        $streamInterface = CachingStream::fromStream($remote);
+
+        // Read some bytes to advance position
+        $streamInterface->read(4);
+
+        // Act — __toString should return everything from the beginning
         $result = (string)$streamInterface;
 
         // Assert
@@ -838,6 +839,44 @@ final class CachingStreamTest extends TestCase
 
         // Act — seek 10 bytes back from end (size 100)
         $streamInterface->seek(-10, SEEK_END);
+    }
+
+    public function testSeekWithSeekEndConsumesEverythingWhenRemoteSizeIsNull(): void
+    {
+        // Arrange — remote stream with unknown size, 20 bytes of content
+        $remoteData = 'abcdefghij0123456789';
+
+        /** @var Stream&\PHPUnit\Framework\MockObject\MockObject */
+        $stream = $this->getMockBuilder(Stream::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getSize', 'eof', 'read'])
+            ->getMock();
+
+        $stream->expects($this->once())
+            ->method('getSize')
+            ->willReturn(null);
+
+        $readOffset = 0;
+        $stream->method('read')
+            ->willReturnCallback(function (int $length) use ($remoteData, &$readOffset): string {
+                $chunk = substr($remoteData, $readOffset, $length);
+                $readOffset += strlen($chunk);
+                return $chunk;
+            });
+
+        $stream->method('eof')
+            ->willReturnCallback(function () use ($remoteData, &$readOffset): bool {
+                return $readOffset >= strlen($remoteData);
+            });
+
+        $streamInterface = CachingStream::fromStream($stream);
+
+        // Act — seek 5 bytes back from end; since size is null, consumeEverything() is called
+        $streamInterface->seek(-5, SEEK_END);
+
+        // Assert — position should be at byte 15 (20 - 5)
+        $this->assertSame(15, $streamInterface->tell());
+        $this->assertSame('56789', $streamInterface->read(5));
     }
 
     public function testSeekWithInvalidWhenceThrows(): void

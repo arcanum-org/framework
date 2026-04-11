@@ -18,7 +18,7 @@ class StandardProcessor implements Processor
         // $stages = array_reverse($stages);
         foreach ($stages as $stage) {
             $payload = $stage($payload);
-            if (!$payload) {
+            if ($payload === null) {
                 throw new Interrupted("Stage did not return a payload.");
             }
         }

@@ -1,0 +1,57 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Arcanum\Auth;
+
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\MiddlewareInterface;
+use Psr\Http\Server\RequestHandlerInterface;
+
+/**
+ * PSR-15 middleware that resolves the authenticated Identity.
+ *
+ * Calls the configured Guard to resolve an Identity from the request.
+ * If an Identity is returned, it's stored in the ActiveIdentity holder.
+ * If not, ActiveIdentity remains empty — the middleware never rejects.
+ *
+ * Authorization (deciding whether the route requires auth) is handled
+ * downstream by AuthorizationGuard in the Conveyor pipeline.
+ */
+final class AuthMiddleware implements MiddlewareInterface
+{
+    public function __construct(
+        private readonly Guard $guard,
+        private readonly ActiveIdentity $activeIdentity,
+    ) {
+    }
+
+    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+    {
+        $identity = $this->guard->resolve($request);
+
+        if ($identity !== null) {
+            $this->activeIdentity->set($identity);
+
+            if ($this->isTokenAuthenticated()) {
+                $request = $request->withAttribute('auth.token_authenticated', true);
+            }
+        }
+
+        return $handler->handle($request);
+    }
+
+    private function isTokenAuthenticated(): bool
+    {
+        if ($this->guard instanceof TokenGuard) {
+            return true;
+        }
+
+        if ($this->guard instanceof CompositeGuard) {
+            return $this->guard->lastResolvedGuard() instanceof TokenGuard;
+        }
+
+        return false;
+    }
+}

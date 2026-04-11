@@ -1,0 +1,69 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Arcanum\Atlas;
+
+final class Route
+{
+    /**
+     * @param string $dtoClass The fully-qualified Command or Query class name.
+     * @param string $handlerPrefix Method-specific prefix for handler resolution
+     *                              (e.g., 'Post', 'Delete', 'Patch'). Empty string for
+     *                              GET (Query) and PUT (default Command).
+     * @param string $format The response format parsed from the URL extension
+     *                       (e.g., 'json', 'html', 'csv').
+     * @param bool $isHelp Whether this route is a help request (CLI --help flag).
+     */
+    public function __construct(
+        public readonly string $dtoClass,
+        public readonly string $handlerPrefix = '',
+        public readonly string $format = 'json',
+        public readonly bool $isPage = false,
+        public readonly bool $isHelp = false,
+    ) {
+    }
+
+    public function isQuery(): bool
+    {
+        return $this->handlerPrefix === '' && !str_contains($this->dtoClass, '\\Command\\');
+    }
+
+    public function isCommand(): bool
+    {
+        return str_contains($this->dtoClass, '\\Command\\');
+    }
+
+    public function isPage(): bool
+    {
+        return $this->isPage;
+    }
+
+    /**
+     * Return a new Route with a different format.
+     */
+    public function withFormat(string $format): self
+    {
+        return new self(
+            dtoClass: $this->dtoClass,
+            handlerPrefix: $this->handlerPrefix,
+            format: $format,
+            isPage: $this->isPage,
+            isHelp: $this->isHelp,
+        );
+    }
+
+    /**
+     * Return a new Route marked as a help request.
+     */
+    public function withHelp(): self
+    {
+        return new self(
+            dtoClass: $this->dtoClass,
+            handlerPrefix: $this->handlerPrefix,
+            format: $this->format,
+            isPage: $this->isPage,
+            isHelp: true,
+        );
+    }
+}

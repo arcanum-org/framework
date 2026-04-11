@@ -18,5 +18,5 @@ interface ProviderRegistry
      *
      * @param string $serviceName
      */
-    public function provider(string $serviceName, Provider $provider): void;
+    public function provider(string $serviceName, string|Provider $provider): void;
 }

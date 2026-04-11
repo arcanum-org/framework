@@ -94,6 +94,7 @@ class Logger implements Bootstrapper
         $filesDirectory = $kernel->filesDirectory();
 
         $container->factory(QuillLogger::class, fn() => $this->makeQuillLogger((array)$logConfig, $filesDirectory));
+        $container->service(\Arcanum\Quill\ChannelLogger::class, QuillLogger::class);
     }
 
     /**

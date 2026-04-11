@@ -94,6 +94,20 @@ $serviceA = $container->get(\App\YourService::class);
 $serviceB = $container->get(\App\YourService::class);
 ```
 
+### Cached vs fresh instances
+
+All registration methods except `prototype()` and `prototypeFactory()` **cache after the first call**. This includes `factory()` — the closure runs once, and the result is reused for every subsequent `get()`. This is intentional: most services are singletons.
+
+| Method | Creates via | New instance each call? |
+|---|---|---|
+| `service()` | Auto-wired by Codex | No — cached after first creation |
+| `factory()` | Your closure | No — closure runs once, result cached |
+| `prototype()` | Auto-wired by Codex | **Yes** — new instance every `get()` |
+| `prototypeFactory()` | Your closure | **Yes** — closure runs every `get()` |
+| `instance()` | You provide it | N/A — already created |
+
+If you expect `factory()` to run the closure on every call, use `prototypeFactory()` instead.
+
 ## Directly Registering Service Instances
 Sometimes you already have an instance of your service and you just want to register it with the container. You can do that with `Container::instance()`.
 

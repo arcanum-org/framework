@@ -1,0 +1,7 @@
+    /**
+     * @return Sequencer<array<string, mixed>>
+     */
+    public function {{! $methodName !}}({{! $params !}}): Sequencer
+    {
+        return $this->read(__DIR__ . '/{{! $sqlFile !}}', {{! $paramsArray !}});
+    }

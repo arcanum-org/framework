@@ -25,6 +25,13 @@ class Resolver implements ClassResolver, Specifier
     private $specifications = [];
 
     /**
+     * Tracks classes currently being resolved to detect circular dependencies.
+     *
+     * @var array<string, true>
+     */
+    private array $resolving = [];
+
+    /**
      * Resolver uses a container to resolve dependencies.
      */
     private function __construct(
@@ -67,33 +74,59 @@ class Resolver implements ClassResolver, Specifier
             return $this->finalize($instance);
         }
 
-        $image = new \ReflectionClass($className);
-
-        // If it is not instantiable, we cannot resolve it.
-        if (!$image->isInstantiable()) {
-            throw new Error\UnresolvableClass(message: $className);
+        // Circular dependency detection — only for reflection-based resolution.
+        if (isset($this->resolving[$className])) {
+            $chain = array_keys($this->resolving);
+            $chain[] = $className;
+            $this->resolving = [];
+            throw new \RuntimeException(sprintf(
+                'Circular dependency detected: %s',
+                implode(' → ', $chain),
+            ));
         }
 
-        $constructor = $image->getConstructor();
+        $this->resolving[$className] = true;
 
-        // If it has no constructor, we can just instantiate it.
-        if ($constructor === null) {
-            return $this->finalize(new $className());
+        try {
+            $image = new \ReflectionClass($className);
+
+            // If it is not instantiable, we cannot resolve it.
+            if (!$image->isInstantiable()) {
+                throw (new Error\UnresolvableClass(message: $className))
+                    ->withSuggestion(
+                        $image->isInterface()
+                            ? "Register a concrete implementation with"
+                                . " \$container->service('{$className}',"
+                                . " ConcreteClass::class)"
+                            : "Abstract classes and traits can't be"
+                                . " instantiated — register a concrete"
+                                . " subclass instead",
+                    );
+            }
+
+            $constructor = $image->getConstructor();
+
+            // If it has no constructor, we can just instantiate it.
+            if ($constructor === null) {
+                return $this->finalize(new $className());
+            }
+
+            $parameters = $constructor->getParameters();
+
+            // If it has a constructor, but no parameters, we can just instantiate it.
+            if (count($parameters) === 0) {
+                return $this->finalize(new $className());
+            }
+
+            // Otherwise, we need to resolve the parameters as dependencies.
+            $dependencies = $this->resolveParameters($parameters, $className);
+
+            /** @var T */
+            $instance = $image->newInstanceArgs($dependencies);
+            return $this->finalize($instance);
+        } finally {
+            unset($this->resolving[$className]);
         }
-
-        $parameters = $constructor->getParameters();
-
-        // If it has a constructor, but no parameters, we can just instantiate it.
-        if (count($parameters) === 0) {
-            return $this->finalize(new $className());
-        }
-
-        // Otherwise, we need to resolve the parameters as dependencies.
-        $dependencies = $this->resolveParameters($parameters, $className);
-
-        /** @var T */
-        $instance = $image->newInstanceArgs($dependencies);
-        return $this->finalize($instance);
     }
 
     /**
@@ -214,7 +247,16 @@ class Resolver implements ClassResolver, Specifier
 
         // If it is not instantiable, we cannot resolve it.
         if (!$image->isInstantiable()) {
-            throw new Error\UnresolvableClass(message: $className);
+            throw (new Error\UnresolvableClass(message: $className))
+                ->withSuggestion(
+                    $image->isInterface()
+                        ? "Register a concrete implementation with"
+                            . " \$container->service('{$className}',"
+                            . " ConcreteClass::class)"
+                        : "Abstract classes and traits can't be"
+                            . " instantiated — register a concrete"
+                            . " subclass instead",
+                );
         }
 
         $constructor = $image->getConstructor();
@@ -238,6 +280,12 @@ class Resolver implements ClassResolver, Specifier
         // Now we can resolve the dependencies.
         $dependencies = [];
         foreach ($parameters as $index => $parameter) {
+            if ($parameter->isVariadic()) {
+                foreach (array_slice($arguments, $index) as $variadicArgument) {
+                    $dependencies[] = $this->resolve($variadicArgument, isDependency: true);
+                }
+                break;
+            }
             $argument = $arguments[$index] ?? null;
             $dependencies[] = match (true) {
                 $argument !== null => $this->resolve($argument, isDependency: true),
@@ -255,9 +303,9 @@ class Resolver implements ClassResolver, Specifier
 
     /**
      * @param class-string $name
-     * @return object|array<object>
+     * @return object|array<object>|null
      */
-    protected function resolveClass(\ReflectionParameter $parameter, string $name): object|array
+    protected function resolveClass(\ReflectionParameter $parameter, string $name): object|array|null
     {
         if ($parameter->isVariadic()) {
             // If we have gotten this far, then there were no specifications provided for the
@@ -273,7 +321,7 @@ class Resolver implements ClassResolver, Specifier
         } catch (Error\Unresolvable $e) {
             // handle the optional values on the parameter if it is not resolvable.
             if ($parameter->isDefaultValueAvailable()) {
-                /** @var object */
+                /** @var object|array<object>|null */
                 return $parameter->getDefaultValue();
             }
             throw $e;
