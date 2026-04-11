@@ -20,14 +20,14 @@ First-class htmx 4 support: `HtmxAwareResponseRenderer` (three rendering modes: 
 
 **The validation error UX for htmx:**
 
-The recommended pattern is form re-rendering with Idiomorph. The developer extracts the form into a shared partial in `app/Templates/` (reachable from both pages and command error templates). The form partial renders error messages conditionally when `$errors` is present. The command's co-located `.422.html` template includes the same partial. Idiomorph (`hx-swap="morph:outerHTML"`, built into htmx v4) preserves the user's typed values from the live DOM — no `$input` variable needed.
+The recommended pattern is form re-rendering with Idiomorph. The developer extracts the form into a shared partial in `app/Templates/` (reachable from both pages and command error templates). The form partial renders error messages conditionally when `$errors` is present. The command's co-located `.422.html` template includes the same partial. Idiomorph (`hx-swap="outerMorph"`, built into htmx v4) preserves the user's typed values from the live DOM — no `$input` variable needed.
 
 Example flow:
 1. Form partial lives at `app/Templates/forms/_guestbook-form.html` (shared templates directory, includable from anywhere)
 2. `app/Pages/Index.html` includes it: `{{ include 'forms/_guestbook-form' }}`
 3. `app/Domain/Guestbook/Command/AddEntry.422.html` includes the same partial: `{{ include 'forms/_guestbook-form' }}`
 4. The partial checks `$errors` and renders inline error messages when present
-5. The form uses `hx-swap="morph:outerHTML"` — Idiomorph preserves typed values, inserts error messages
+5. The form uses `hx-swap="outerMorph"` — Idiomorph preserves typed values, inserts error messages
 6. On validation failure: framework resolves `AddEntry.422.html` → renders with `$errors` → 422 → htmx morphs the form
 
 **Escape hatches:**
@@ -88,11 +88,12 @@ The fix: split the god object, move resolution upstream, and put every template 
 ##### Starter app guestbook validation demo
 - [x] **Extract guestbook form to shared partial.** Moved to `app/Templates/Guestbook/_entry-form.html`. Conditional `$errors` rendering with Tailwind-styled error box. `Index.html` uses `{{ include 'Guestbook/_entry-form' }}`.
 - [x] **Add `AddEntry.422.html`.** Co-located with the command, includes the shared form partial: `{{ include 'Guestbook/_entry-form' }}`.
-- [x] **Add `hx-swap="morph:outerHTML"` to the guestbook form.** Idiomorph preserves typed values during error re-render.
+- [x] **Add `hx-swap="outerMorph"` to the guestbook form.** Idiomorph preserves typed values during error re-render.
 - [x] **End-to-end smoke test.** Validated via curl: short values → 422 → form re-rendered with inline errors + CSRF token + morph swap. Valid values → 204 + `HX-Trigger: guestbook:entry:added`. App kernel sets DTO class on exception renderer for co-located template discovery. HelperResolver added to exception renderer for `{{ csrf }}` support in error templates.
+- [ ] **Remove manual `setDtoClass()` wiring from starter app kernel.** The framework now threads DTO class context automatically via `RouteDispatcher`. The starter app's `Kernel::handleRequest()` no longer needs to catch exceptions and call `setDtoClass()` on the renderer — remove that ceremony.
 
-##### Idiomorph morph not preserving input values
-- [ ] **Investigate why `hx-swap="morph:outerHTML"` clears form field values on 422 re-render.** The validation error flow works (422 response, form re-rendered with error messages), but the user's typed values are lost when the morph swaps the form. Expected behavior: Idiomorph should preserve input values from the live DOM since the `name` attributes match. Possible causes: htmx v4 beta Idiomorph integration differences, `outerHTML` vs `innerHTML` morph behavior, the form `id` or structure changing in a way Idiomorph doesn't recognize, or `hx-swap="morph:outerHTML"` not being the correct v4 syntax. Investigate and fix — this is essential for the validation UX.
+##### Idiomorph morph not preserving input values — fixed
+- [x] **Root cause: `morph:outerHTML` is htmx v2 extension syntax, not recognized by v4.** htmx v4 builds Idiomorph into core with new swap modes: `outerMorph` and `innerMorph`. The old `morph:outerHTML` hit the extension hook path and didn't invoke Idiomorph at all. Fix: change `hx-swap="outerMorph"` to `hx-swap="outerMorph"` in the guestbook form partial. Idiomorph correctly preserves typed input values — it only overwrites `.value` when the server response has an explicit `value` attribute, leaving the DOM property untouched otherwise. Confirmed working in the starter app.
 
 ##### htmx v4 compatibility
 - [x] **Address `HX-Trigger-After-Swap` and `HX-Trigger-After-Settle` removal.** htmx v4 removed these response headers. Dropped `BroadcastAfterSwap` and `BroadcastAfterSettle` interfaces, simplified `HtmxEventTriggerMiddleware` and `HtmxResponse` to route all events through `HX-Trigger`. No v4 replacement for timing variants — all events fire immediately.

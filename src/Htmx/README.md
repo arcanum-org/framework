@@ -253,7 +253,7 @@ When a command fails validation, Arcanum returns a 422 response with the form re
 <!-- app/Templates/forms/_my-form.html -->
 <form id="my-form"
       hx-post="/my-command"
-      hx-swap="morph:outerHTML"
+      hx-swap="outerMorph"
       hx-on:my:success="this.reset()"
       class="...">
     {{ csrf }}
@@ -283,7 +283,7 @@ When a command fails validation, Arcanum returns a 422 response with the form re
 {{ include 'forms/_my-form' }}
 ```
 
-3. **Idiomorph preserves input values.** The `hx-swap="morph:outerHTML"` attribute tells htmx to use Idiomorph for the swap. Idiomorph compares the live DOM (with the user's typed values) against the server response and morphs the differences — inserting error messages while keeping input values intact.
+3. **Idiomorph preserves input values.** The `hx-swap="outerMorph"` attribute tells htmx v4 to use its built-in Idiomorph for the swap. Idiomorph compares the live DOM (with the user's typed values) against the server response and morphs the differences — inserting error messages while keeping input values intact. Note: the v2 extension syntax `morph:outerHTML` does not work in v4; use `outerMorph` (or `innerMorph` for children-only morphing).
 
 ### How it works end to end
 
