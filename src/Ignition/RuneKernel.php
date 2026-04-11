@@ -15,10 +15,13 @@ use Arcanum\Flow\Conveyor\EmptyDTO;
 use Arcanum\Flow\Conveyor\AcceptedDTO;
 use Arcanum\Flow\Conveyor\Query;
 use Arcanum\Flow\Conveyor\QueryResult;
-use Arcanum\Glitch\ExceptionHandler;
 use Arcanum\Hourglass\Stopwatch;
 use Arcanum\Rune\CliExceptionWriter;
 use Arcanum\Rune\BuiltInRegistry;
+use Arcanum\Rune\Event\CommandCompleted;
+use Arcanum\Rune\Event\CommandFailed;
+use Arcanum\Rune\Event\CommandHandled;
+use Arcanum\Rune\Event\CommandReceived;
 use Arcanum\Rune\ExitCode;
 use Arcanum\Rune\HelpWriter;
 use Arcanum\Rune\Input;
@@ -38,6 +41,14 @@ use Arcanum\Shodo\CliFormatRegistry;
 class RuneKernel implements Kernel
 {
     private bool $isBootstrapped = false;
+
+    /**
+     * Stored for terminate() to dispatch CommandCompleted.
+     */
+    private ?Input $lastInput = null;
+    private ?int $lastExitCode = null;
+
+    protected Lifecycle $lifecycle;
 
     protected Application $container;
 
@@ -133,6 +144,7 @@ class RuneKernel implements Kernel
 
         Stopwatch::tap('boot.complete');
 
+        $this->lifecycle = new Lifecycle($container);
         $this->isBootstrapped = true;
     }
 
@@ -157,11 +169,23 @@ class RuneKernel implements Kernel
             return ExitCode::Success->value;
         }
 
+        Stopwatch::tap('command.received');
+        $this->lifecycle->dispatch(new CommandReceived($input));
+
         try {
-            return $this->handleInput($input, $output);
+            $exitCode = $this->handleInput($input, $output);
+
+            Stopwatch::tap('command.handled');
+            $this->lifecycle->dispatch(new CommandHandled($input, $exitCode));
         } catch (\Throwable $e) {
-            return $this->handleException($e, $output);
+            $this->lifecycle->dispatch(new CommandFailed($input, $e));
+            $exitCode = $this->handleException($e, $output);
         }
+
+        $this->lastInput = $input;
+        $this->lastExitCode = $exitCode;
+
+        return $exitCode;
     }
 
     /**
@@ -259,11 +283,7 @@ class RuneKernel implements Kernel
      */
     protected function handleException(\Throwable $e, Output $output): int
     {
-        if ($this->container->has(ExceptionHandler::class)) {
-            /** @var ExceptionHandler $handler */
-            $handler = $this->container->get(ExceptionHandler::class);
-            $handler->handleException($e);
-        }
+        $this->lifecycle->report($e);
 
         if ($this->container->has(CliExceptionWriter::class)) {
             /** @var CliExceptionWriter $renderer */
@@ -282,6 +302,13 @@ class RuneKernel implements Kernel
 
     public function terminate(): void
     {
+        if ($this->lastInput !== null && $this->lastExitCode !== null) {
+            Stopwatch::tap('command.completed');
+            $this->lifecycle->dispatch(
+                new CommandCompleted($this->lastInput, $this->lastExitCode),
+            );
+        }
+
         Stopwatch::tap('arcanum.complete');
     }
 

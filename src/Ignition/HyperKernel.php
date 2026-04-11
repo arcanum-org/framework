@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Arcanum\Ignition;
 
 use Arcanum\Cabinet\Application;
-use Arcanum\Glitch\ExceptionHandler;
 use Arcanum\Glitch\ExceptionRenderer;
 use Arcanum\Glitch\HttpException;
 use Arcanum\Hyper\CallableHandler;
@@ -16,7 +15,6 @@ use Arcanum\Hyper\Event\ResponseSent;
 use Arcanum\Hourglass\Stopwatch;
 use Arcanum\Hyper\HttpMiddleware;
 use Arcanum\Hyper\StatusCode;
-use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -49,6 +47,8 @@ class HyperKernel implements Kernel, RequestHandlerInterface
      * The DTO class name resolved by routing.
      */
     private string $resolvedDtoClass = '';
+
+    protected Lifecycle $lifecycle;
 
     /**
      * The application container, set during bootstrap.
@@ -166,6 +166,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
 
         Stopwatch::tap('boot.complete');
 
+        $this->lifecycle = new Lifecycle($container);
         $this->isBootstrapped = true;
     }
 
@@ -202,8 +203,12 @@ class HyperKernel implements Kernel, RequestHandlerInterface
     {
         try {
             $request = $this->prepareRequest($request);
+
             // Dispatch RequestReceived — listeners can mutate the request.
-            $request = $this->dispatchRequestReceived($request);
+            Stopwatch::tap('request.received');
+            /** @var RequestReceived $receivedEvent */
+            $receivedEvent = $this->lifecycle->dispatch(new RequestReceived($request));
+            $request = $receivedEvent->getRequest();
         } catch (\Throwable $e) {
             $this->lastRequest = $request;
             $response = $this->sendThroughMiddleware(
@@ -220,7 +225,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
             try {
                 return $this->handleRequest($r);
             } catch (\Throwable $e) {
-                $this->dispatchRequestFailed($r, $e);
+                $this->lifecycle->dispatch(new RequestFailed($r, $e));
                 return $this->handleException($e, $r);
             }
         });
@@ -231,16 +236,17 @@ class HyperKernel implements Kernel, RequestHandlerInterface
             // A middleware threw before reaching the core handler. The
             // partially-executed stack can't be replayed, so render the
             // exception directly into a response.
-            $this->dispatchRequestFailed($request, $e);
+            $this->lifecycle->dispatch(new RequestFailed($request, $e));
             $response = $this->handleException($e, $request);
         }
 
         // Dispatch RequestHandled — read-only observation.
         // Listener failures must not destroy a successful response.
         try {
-            $this->dispatchRequestHandled($request, $response);
+            Stopwatch::tap('request.handled');
+            $this->lifecycle->dispatch(new RequestHandled($request, $response));
         } catch (\Throwable $e) {
-            $this->reportException($e);
+            $this->lifecycle->report($e);
         }
 
         $this->lastResponse = $response;
@@ -352,11 +358,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
         \Throwable $e,
         ?ServerRequestInterface $request = null,
     ): ResponseInterface {
-        if ($this->container->has(ExceptionHandler::class)) {
-            /** @var ExceptionHandler $handler */
-            $handler = $this->container->get(ExceptionHandler::class);
-            $handler->handleException($e);
-        }
+        $this->lifecycle->report($e);
 
         // Use format-specific renderer when the request indicates HTML.
         if ($request !== null) {
@@ -420,71 +422,6 @@ class HyperKernel implements Kernel, RequestHandlerInterface
     }
 
     /**
-     * Report an exception without rendering a response.
-     *
-     * Used for non-fatal errors (e.g., listener failures) where the
-     * request should still complete successfully.
-     */
-    private function reportException(\Throwable $e): void
-    {
-        if ($this->container->has(ExceptionHandler::class)) {
-            /** @var ExceptionHandler $handler */
-            $handler = $this->container->get(ExceptionHandler::class);
-            $handler->handleException($e);
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Lifecycle event dispatching
-    // ------------------------------------------------------------------
-
-    /**
-     * Dispatch RequestReceived and return the (possibly mutated) request.
-     */
-    private function dispatchRequestReceived(
-        ServerRequestInterface $request,
-    ): ServerRequestInterface {
-        Stopwatch::tap('request.received');
-        $event = new RequestReceived($request);
-        $this->dispatchEvent($event);
-
-        return $event->getRequest();
-    }
-
-    /**
-     * Dispatch RequestHandled for read-only observation.
-     */
-    private function dispatchRequestHandled(
-        ServerRequestInterface $request,
-        ResponseInterface $response,
-    ): void {
-        Stopwatch::tap('request.handled');
-        $this->dispatchEvent(new RequestHandled($request, $response));
-    }
-
-    /**
-     * Dispatch RequestFailed for observational reporting.
-     */
-    private function dispatchRequestFailed(
-        ServerRequestInterface $request,
-        \Throwable $exception,
-    ): void {
-        $this->dispatchEvent(new RequestFailed($request, $exception));
-    }
-
-    /**
-     * Dispatch an event if an EventDispatcher is available.
-     */
-    private function dispatchEvent(object $event): void
-    {
-        if ($this->container->has(EventDispatcherInterface::class)) {
-            /** @var EventDispatcherInterface $dispatcher */
-            $dispatcher = $this->container->get(EventDispatcherInterface::class);
-            $dispatcher->dispatch($event);
-        }
-    }
-
-    /**
      * Terminate the application after the response has been sent.
      *
      * Calls fastcgi_finish_request() if available to release the client
@@ -501,7 +438,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
 
         if ($this->lastRequest !== null && $this->lastResponse !== null) {
             Stopwatch::tap('response.sent');
-            $this->dispatchEvent(
+            $this->lifecycle->dispatch(
                 new ResponseSent($this->lastRequest, $this->lastResponse),
             );
         }

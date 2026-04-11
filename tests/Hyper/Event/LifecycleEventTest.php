@@ -35,6 +35,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(\Arcanum\Flow\Pipeline\StandardProcessor::class)]
 #[UsesClass(HttpException::class)]
 #[UsesClass(\Arcanum\Glitch\ArcanumException::class)]
+#[UsesClass(\Arcanum\Ignition\Lifecycle::class)]
 final class LifecycleEventTest extends TestCase
 {
     private function buildKernel(Provider $provider): TestKernel
