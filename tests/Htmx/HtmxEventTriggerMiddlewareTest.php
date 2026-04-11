@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Htmx;
 
-use Arcanum\Htmx\BroadcastAfterSettle;
-use Arcanum\Htmx\BroadcastAfterSwap;
 use Arcanum\Htmx\ClientBroadcast;
 use Arcanum\Htmx\EventCapture;
 use Arcanum\Htmx\HtmxEventTriggerMiddleware;
@@ -117,96 +115,6 @@ final class HtmxEventTriggerMiddlewareTest extends TestCase
         $header = $response->getHeaderLine('HX-Trigger');
         $this->assertStringContainsString('cart-updated', $header);
         $this->assertStringContainsString('inventory-changed', $header);
-    }
-
-    public function testAfterSwapTrigger(): void
-    {
-        // Arrange
-        $event = new class implements BroadcastAfterSwap {
-            public function eventName(): string
-            {
-                return 'list-refreshed';
-            }
-
-            public function payload(): array
-            {
-                return [];
-            }
-        };
-
-        // Act
-        $response = $this->process(['HX-Request' => 'true'], [], [$event]);
-
-        // Assert
-        $this->assertSame(
-            'list-refreshed',
-            $response->getHeaderLine('HX-Trigger-After-Swap'),
-        );
-    }
-
-    public function testAfterSettleTrigger(): void
-    {
-        // Arrange
-        $event = new class implements BroadcastAfterSettle {
-            public function eventName(): string
-            {
-                return 'animation-ready';
-            }
-
-            public function payload(): array
-            {
-                return [];
-            }
-        };
-
-        // Act
-        $response = $this->process(['HX-Request' => 'true'], [], [$event]);
-
-        // Assert
-        $this->assertSame(
-            'animation-ready',
-            $response->getHeaderLine('HX-Trigger-After-Settle'),
-        );
-    }
-
-    public function testMixedTimingSlots(): void
-    {
-        // Arrange
-        $immediate = $this->simpleBroadcast('now');
-        $afterSwap = new class implements BroadcastAfterSwap {
-            public function eventName(): string
-            {
-                return 'swapped';
-            }
-
-            public function payload(): array
-            {
-                return [];
-            }
-        };
-        $afterSettle = new class implements BroadcastAfterSettle {
-            public function eventName(): string
-            {
-                return 'settled';
-            }
-
-            public function payload(): array
-            {
-                return [];
-            }
-        };
-
-        // Act
-        $response = $this->process(
-            ['HX-Request' => 'true'],
-            [],
-            [$immediate, $afterSwap, $afterSettle],
-        );
-
-        // Assert
-        $this->assertSame('now', $response->getHeaderLine('HX-Trigger'));
-        $this->assertSame('swapped', $response->getHeaderLine('HX-Trigger-After-Swap'));
-        $this->assertSame('settled', $response->getHeaderLine('HX-Trigger-After-Settle'));
     }
 
     public function testCopiesLocationToHxLocation(): void

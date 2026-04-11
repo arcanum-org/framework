@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Htmx;
 
-use Arcanum\Htmx\BroadcastAfterSettle;
-use Arcanum\Htmx\BroadcastAfterSwap;
 use Arcanum\Htmx\ClientBroadcast;
 use Arcanum\Htmx\EventCapture;
 use PHPUnit\Framework\TestCase;
@@ -127,7 +125,7 @@ final class EventCaptureTest extends TestCase
             }
         };
 
-        $eventB = new class implements BroadcastAfterSwap {
+        $eventB = new class implements ClientBroadcast {
             public function eventName(): string
             {
                 return 'second';
@@ -150,6 +148,6 @@ final class EventCaptureTest extends TestCase
         $this->assertCount(2, $events);
         $this->assertSame('first', $events[0]->eventName());
         $this->assertSame('second', $events[1]->eventName());
-        $this->assertInstanceOf(BroadcastAfterSwap::class, $events[1]);
+        $this->assertInstanceOf(ClientBroadcast::class, $events[1]);
     }
 }

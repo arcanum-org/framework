@@ -17,20 +17,13 @@ use Psr\Http\Message\ResponseInterface;
  * at the end to apply all accumulated headers to the underlying PSR-7
  * response.
  *
- * Trigger methods (withTrigger, withTriggerAfterSwap, withTriggerAfterSettle)
- * merge into a single JSON header per timing slot — multiple triggers
+ * Trigger methods merge into a single JSON header — multiple triggers
  * accumulate rather than overwrite.
  */
 final class HtmxResponse
 {
     /** @var array<string, mixed> */
     private array $triggers = [];
-
-    /** @var array<string, mixed> */
-    private array $triggersAfterSwap = [];
-
-    /** @var array<string, mixed> */
-    private array $triggersAfterSettle = [];
 
     /** @var array<string, string> */
     private array $headers = [];
@@ -133,30 +126,6 @@ final class HtmxResponse
     }
 
     /**
-     * Add a trigger event that fires after the swap completes.
-     *
-     * @param array<string, mixed> $payload
-     */
-    public function withTriggerAfterSwap(string $eventName, array $payload = []): self
-    {
-        $clone = clone $this;
-        $clone->triggersAfterSwap[$eventName] = $payload !== [] ? $payload : $eventName;
-        return $clone;
-    }
-
-    /**
-     * Add a trigger event that fires after the settle step completes.
-     *
-     * @param array<string, mixed> $payload
-     */
-    public function withTriggerAfterSettle(string $eventName, array $payload = []): self
-    {
-        $clone = clone $this;
-        $clone->triggersAfterSettle[$eventName] = $payload !== [] ? $payload : $eventName;
-        return $clone;
-    }
-
-    /**
      * Apply all accumulated htmx headers to the underlying response.
      */
     public function toResponse(): ResponseInterface
@@ -173,20 +142,6 @@ final class HtmxResponse
             $response = $response->withHeader(
                 'HX-Trigger',
                 $this->encodeTriggers($this->triggers),
-            );
-        }
-
-        if ($this->triggersAfterSwap !== []) {
-            $response = $response->withHeader(
-                'HX-Trigger-After-Swap',
-                $this->encodeTriggers($this->triggersAfterSwap),
-            );
-        }
-
-        if ($this->triggersAfterSettle !== []) {
-            $response = $response->withHeader(
-                'HX-Trigger-After-Settle',
-                $this->encodeTriggers($this->triggersAfterSettle),
             );
         }
 

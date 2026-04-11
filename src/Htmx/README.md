@@ -235,18 +235,6 @@ The `hx-trigger="guestbook:entry:added from:body"` attribute tells htmx to watch
 
 The `from:body` part is important — `HX-Trigger` events are fired on the body element, so your listening element needs to listen there.
 
-### Controlling when the event fires
-
-By default, `HX-Trigger` events fire immediately — before htmx swaps the response content into the page. If you need the event to fire at a different point in the lifecycle, implement one of the timing sub-interfaces instead:
-
-| Interface | When the event fires | Use case |
-|---|---|---|
-| `ClientBroadcast` | Before the swap | Most cases — trigger a refresh of another element |
-| `BroadcastAfterSwap` | After the swap completes | When the listening element needs to see the new content first |
-| `BroadcastAfterSettle` | After the settle step | When you need CSS transitions or attribute changes to finish |
-
-The sub-interfaces extend `ClientBroadcast`, so they have the same `eventName()` and `payload()` methods. They're just type-level markers that tell the middleware which response header to use (`HX-Trigger`, `HX-Trigger-After-Swap`, or `HX-Trigger-After-Settle`).
-
 ### Command redirects work automatically
 
 When a command handler returns a 201 Created response with a `Location` header (which is the standard Arcanum pattern for commands that create resources), the `HtmxEventTriggerMiddleware` automatically copies it to an `HX-Location` header for htmx requests. This means htmx navigates to the new URL after the command completes, without any special handling in the handler.
@@ -411,8 +399,6 @@ Here's everything in the package, for reference:
 | `HtmxResponse` | Immutable builder for composing htmx response headers |
 | `HtmxLocation` | Value object for the JSON form of `HX-Location` |
 | `ClientBroadcast` | Interface for domain events that should notify the browser |
-| `BroadcastAfterSwap` | Timing variant: event fires after the swap completes |
-| `BroadcastAfterSettle` | Timing variant: event fires after the settle step |
 | `EventCapture` | Decorator around Echo's dispatcher that records broadcast events |
 | `FragmentDirective` | Custom compiler directive for `{{ fragment }}` / `{{ endfragment }}` markers |
 | `HtmxAwareResponseRenderer` | Picks the rendering mode based on htmx request headers |

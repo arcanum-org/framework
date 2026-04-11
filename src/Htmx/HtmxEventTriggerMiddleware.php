@@ -13,11 +13,7 @@ use Psr\Http\Server\RequestHandlerInterface;
  * Outbound middleware that projects domain events into HX-Trigger headers.
  *
  * Reads ClientBroadcast events captured by EventCapture during the
- * handler pass and merges them into the response:
- *
- *   - ClientBroadcast       → HX-Trigger (fires before the swap)
- *   - BroadcastAfterSwap    → HX-Trigger-After-Swap
- *   - BroadcastAfterSettle  → HX-Trigger-After-Settle
+ * handler pass and merges them into the HX-Trigger response header.
  *
  * Also copies Location headers to HX-Location for htmx requests,
  * so command redirects (201 Created + Location) work without
@@ -60,22 +56,10 @@ final class HtmxEventTriggerMiddleware implements MiddlewareInterface
         $builder = new HtmxResponse($response);
 
         foreach ($events as $event) {
-            if ($event instanceof BroadcastAfterSettle) {
-                $builder = $builder->withTriggerAfterSettle(
-                    $event->eventName(),
-                    $event->payload(),
-                );
-            } elseif ($event instanceof BroadcastAfterSwap) {
-                $builder = $builder->withTriggerAfterSwap(
-                    $event->eventName(),
-                    $event->payload(),
-                );
-            } else {
-                $builder = $builder->withTrigger(
-                    $event->eventName(),
-                    $event->payload(),
-                );
-            }
+            $builder = $builder->withTrigger(
+                $event->eventName(),
+                $event->payload(),
+            );
         }
 
         return $builder->toResponse();

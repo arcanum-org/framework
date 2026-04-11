@@ -246,24 +246,6 @@ final class HtmxResponseTest extends TestCase
         $this->assertSame(['count' => 3], $decoded['cart-updated']);
     }
 
-    public function testTriggerTimingSlots(): void
-    {
-        // Arrange
-        $builder = new HtmxResponse($this->emptyResponse());
-
-        // Act
-        $response = $builder
-            ->withTrigger('immediate')
-            ->withTriggerAfterSwap('after-swap')
-            ->withTriggerAfterSettle('after-settle')
-            ->toResponse();
-
-        // Assert — each timing gets its own header
-        $this->assertSame('immediate', $response->getHeaderLine('HX-Trigger'));
-        $this->assertSame('after-swap', $response->getHeaderLine('HX-Trigger-After-Swap'));
-        $this->assertSame('after-settle', $response->getHeaderLine('HX-Trigger-After-Settle'));
-    }
-
     // ------------------------------------------------------------------
     // Immutability
     // ------------------------------------------------------------------

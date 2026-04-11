@@ -11,11 +11,7 @@ namespace Arcanum\Htmx;
  * Implement this on any Echo event class that should notify the
  * browser after a command completes. The HtmxEventTriggerMiddleware
  * collects all ClientBroadcast events fired during the request and
- * merges them into the appropriate HX-Trigger response header.
- *
- * For timing control, implement BroadcastAfterSwap or
- * BroadcastAfterSettle instead — they route to HX-Trigger-After-Swap
- * and HX-Trigger-After-Settle respectively.
+ * merges them into the HX-Trigger response header.
  */
 interface ClientBroadcast
 {
