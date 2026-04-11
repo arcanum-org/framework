@@ -241,6 +241,76 @@ When a command handler returns a 201 Created response with a `Location` header (
 
 ---
 
+## Validation errors and form re-rendering
+
+When a command fails validation, Arcanum returns a 422 response with the form re-rendered including error messages. The recommended pattern uses **Idiomorph** (built into htmx v4) to preserve the user's typed values while inserting the error messages.
+
+### The pattern
+
+1. **Extract the form into a shared partial** in `app/Templates/` so it can be included from both the page template and the error template:
+
+```html
+<!-- app/Templates/forms/_my-form.html -->
+<form id="my-form"
+      hx-post="/my-command"
+      hx-swap="morph:outerHTML"
+      hx-on:my:success="this.reset()"
+      class="...">
+    {{ csrf }}
+    {{ if isset($errors) && $errors }}
+    <div class="...error styles...">
+        <ul>
+            {{ foreach $errors as $field => $messages }}
+                {{ foreach $messages as $msg }}
+                <li>{{ $msg }}</li>
+                {{ endforeach }}
+            {{ endforeach }}
+        </ul>
+    </div>
+    {{ endif }}
+    <input type="text" name="title" placeholder="Title" required>
+    <button type="submit">Submit</button>
+</form>
+```
+
+2. **Include the partial from both templates.** The page template includes it for the initial render. The command's co-located `.422.html` error template includes the same partial, so the re-rendered form has identical structure:
+
+```html
+<!-- app/Pages/MyPage.html (or wherever the form lives) -->
+{{ include 'forms/_my-form' }}
+
+<!-- app/Domain/Shop/Command/MyCommand.422.html -->
+{{ include 'forms/_my-form' }}
+```
+
+3. **Idiomorph preserves input values.** The `hx-swap="morph:outerHTML"` attribute tells htmx to use Idiomorph for the swap. Idiomorph compares the live DOM (with the user's typed values) against the server response and morphs the differences — inserting error messages while keeping input values intact.
+
+### How it works end to end
+
+1. User submits the form → htmx sends POST with form data
+2. `ValidationGuard` rejects invalid input → framework resolves `MyCommand.422.html`
+3. Error template includes the same form partial, now with `$errors` populated
+4. htmx receives the 422 response → Idiomorph morphs the form in place
+5. Error messages appear, typed values stay, CSRF token refreshes
+
+### The status-specific template resolution chain
+
+The `{DtoClass}.{status}.{format}` convention works for any status code and format, not just 422:
+
+1. **Co-located**: `AddEntry.422.html` next to `AddEntry.php`
+2. **App-wide fallback**: `app/Templates/errors/422.html`
+3. **Framework default**: minimal error fragment for htmx requests, full error page otherwise
+
+Error templates receive these variables: `$code`, `$title`, `$message`, `$errors` (validation field errors), `$suggestion` (from `ArcanumException`).
+
+### Escape hatches
+
+- **`hx-status:422`** on the form — route error responses to a different target. `hx-status:422="target:#errors swap:innerHTML"` sends the 422 response to an error container instead of morphing the form.
+- **App-wide error template** — `app/Templates/errors/422.html` handles all commands that don't have a co-located `.422.html`.
+- **No template at all** — the framework returns a minimal error fragment for htmx requests (a `<ul>` of field errors for 422) or a full error page for non-htmx requests.
+
+---
+
 ## CSRF protection
 
 htmx sends requests using `XMLHttpRequest` under the hood. Unlike regular form submissions, XHR requests don't automatically include CSRF tokens. The Htmx package solves this with a small JavaScript helper that runs automatically.
@@ -350,11 +420,11 @@ The package includes `HtmxResponse`, an immutable builder for composing htmx res
 $response = (new HtmxResponse($originalResponse))
     ->withLocation('/dashboard')
     ->withTrigger('toast', ['message' => 'Saved!'])
-    ->withTriggerAfterSwap('highlight', ['id' => 42])
+    ->withTrigger('highlight', ['id' => 42])
     ->toResponse();
 ```
 
-Every method returns a new instance (the builder is immutable). Trigger methods merge — calling `withTrigger()` multiple times accumulates events into a single JSON header rather than overwriting.
+Every method returns a new instance (the builder is immutable). Trigger methods merge — calling `withTrigger()` multiple times accumulates events into a single `HX-Trigger` JSON header rather than overwriting.
 
 For the `HX-Location` header's JSON envelope form (when you need to specify a target, swap mode, or other navigation options), there's an `HtmxLocation` value object:
 

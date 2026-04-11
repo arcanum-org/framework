@@ -134,6 +134,7 @@ Arcanum's small mental model comes from a handful of conventions that show up ev
 - `Products.php` (Query DTO) → `Products.html` (template) co-located in the same directory. Shodo finds the template by file extension next to the DTO.
 - `Products.html` → also `Products.json`, `Products.csv`, `Products.md`, `Products.txt`. Same handler, five formatters, picked by URL extension.
 - `_guestbook-form.html` — files starting with `_` are **partials**: include-only templates skipped by `PageDiscovery`, reachable via `{{ include }}`. Works in `app/Pages/`, `app/Templates/`, or any template directory.
+- `AddEntry.422.html` — **status-specific template** co-located with the DTO. Resolution chain: co-located `{Dto}.{status}.{format}` → app-wide `app/Templates/errors/{status}.{format}` → framework default. Works for any status code and format (`PlaceOrder.201.html`, `Health.500.json`). Error templates receive `$code`, `$title`, `$message`, `$errors` (validation), `$suggestion` (ArcanumException). For htmx requests, error templates render as fragments (no layout).
 
 ### What's inside `{{ }}`
 
