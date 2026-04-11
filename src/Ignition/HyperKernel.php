@@ -46,6 +46,11 @@ class HyperKernel implements Kernel, RequestHandlerInterface
     private ?ResponseInterface $lastResponse = null;
 
     /**
+     * The DTO class name resolved by routing.
+     */
+    private string $resolvedDtoClass = '';
+
+    /**
      * The application container, set during bootstrap.
      */
     protected Application $container;
@@ -290,6 +295,37 @@ class HyperKernel implements Kernel, RequestHandlerInterface
     }
 
     /**
+     * Record the DTO class name after route resolution.
+     *
+     * Not needed when using RouteDispatcher (it tracks this
+     * automatically). Provided for apps with custom routing.
+     */
+    protected function setResolvedDtoClass(string $dtoClass): void
+    {
+        $this->resolvedDtoClass = $dtoClass;
+    }
+
+    /**
+     * Get the resolved DTO class name.
+     *
+     * Reads from RouteDispatcher if available, falls back to the
+     * value set via setResolvedDtoClass().
+     */
+    private function resolvedDtoClass(): string
+    {
+        if ($this->container->has(RouteDispatcher::class)) {
+            /** @var RouteDispatcher $dispatcher */
+            $dispatcher = $this->container->get(RouteDispatcher::class);
+            $dtoClass = $dispatcher->resolvedDtoClass();
+            if ($dtoClass !== '') {
+                return $dtoClass;
+            }
+        }
+
+        return $this->resolvedDtoClass;
+    }
+
+    /**
      * Handle the request through the application.
      *
      * Override this method in your application kernel to dispatch
@@ -334,6 +370,7 @@ class HyperKernel implements Kernel, RequestHandlerInterface
                 $htmlRenderer = $this->container->get(
                     \Arcanum\Hyper\HtmlExceptionResponseRenderer::class,
                 );
+                $htmlRenderer->setDtoClass($this->resolvedDtoClass());
                 $htmlRenderer->setIsHtmxRequest($request->hasHeader('HX-Request'));
                 return $htmlRenderer->render($e);
             }
