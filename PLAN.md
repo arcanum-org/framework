@@ -72,7 +72,7 @@ The fix: split the god object, move resolution upstream, and put every template 
 
 **Phase 4: Unify exception rendering**
 - [x] **HtmlExceptionResponseRenderer composes TemplateEngine.** Replaced duplicated read → compile → execute with `engine->render()`. Constructor takes `?TemplateEngine` and `?TemplateResolver` instead of `?TemplateCompiler` and `Reader`. Error templates go through the unified pipeline. `setDtoClass()` setter remains for DTO context.
-- [ ] **Thread DTO class context through exception handling.** Store as request attribute (`arcanum.dto_class`) when route resolves. `handleException()` reads it and passes to exception renderer. Deferred — setter works for now, request attribute is a polish item.
+- [x] **Thread DTO class context through exception handling.** `RouteDispatcher` stores the resolved DTO class on dispatch. `HyperKernel::handleException()` reads it from `RouteDispatcher` via the container and passes it to `HtmlExceptionResponseRenderer::setDtoClass()` automatically — no app-developer action needed. `setResolvedDtoClass()` protected method on HyperKernel is available as an escape hatch for apps with custom routing that don't use `RouteDispatcher`.
 
 **Phase 5: Replace fallback formatters with bundled templates**
 - [x] **Bundled fallback templates replace FallbackFormatter classes.** `src/Shodo/Templates/fallback.{html,txt,md}` use `$__vars` (list of user data keys) with PHP variable variables (`$$key`) to iterate dynamic data. Two levels of nesting, pure Shodo syntax, no helper needed. `buildVariables()` adds `$__vars = array_keys($variables)` before framework entries.

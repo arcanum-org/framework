@@ -25,11 +25,21 @@ use Psr\Http\Server\RequestHandlerInterface;
  */
 final class RouteDispatcher
 {
+    private string $resolvedDtoClass = '';
+
     public function __construct(
         private readonly ContainerInterface $container,
         private readonly MiddlewareRegistry $middlewareRegistry,
         private readonly Bus $bus,
     ) {
+    }
+
+    /**
+     * The DTO class name from the most recent dispatch.
+     */
+    public function resolvedDtoClass(): string
+    {
+        return $this->resolvedDtoClass;
     }
 
     /**
@@ -40,6 +50,7 @@ final class RouteDispatcher
      */
     public function dispatch(object $dto, Route $route): object
     {
+        $this->resolvedDtoClass = $route->dtoClass;
         $mw = $this->middlewareRegistry->for($route->dtoClass);
 
         if ($mw->before === [] && $mw->after === []) {

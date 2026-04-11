@@ -33,6 +33,40 @@ use Psr\Http\Server\RequestHandlerInterface;
 #[UsesClass(\Arcanum\Flow\Continuum\StandardAdvancer::class)]
 final class RouteDispatcherTest extends TestCase
 {
+    public function testResolvedDtoClassIsEmptyBeforeDispatch(): void
+    {
+        // Arrange
+        $registry = new MiddlewareRegistry();
+        $container = $this->createStub(ContainerInterface::class);
+        $bus = $this->createStub(Bus::class);
+
+        $dispatcher = new RouteDispatcher($container, $registry, $bus);
+
+        // Act & Assert
+        $this->assertSame('', $dispatcher->resolvedDtoClass());
+    }
+
+    public function testDispatchStoresResolvedDtoClass(): void
+    {
+        // Arrange
+        $dto = new \stdClass();
+        $route = new Route(dtoClass: 'App\\Query\\Status', handlerPrefix: '');
+
+        $bus = $this->createStub(Bus::class);
+        $bus->method('dispatch')->willReturn(new \stdClass());
+
+        $registry = new MiddlewareRegistry();
+        $container = $this->createStub(ContainerInterface::class);
+
+        $dispatcher = new RouteDispatcher($container, $registry, $bus);
+
+        // Act
+        $dispatcher->dispatch($dto, $route);
+
+        // Assert
+        $this->assertSame('App\\Query\\Status', $dispatcher->resolvedDtoClass());
+    }
+
     public function testDispatchWithNoMiddlewareDelegatesToBus(): void
     {
         // Arrange

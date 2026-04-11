@@ -12,8 +12,12 @@ use Arcanum\Hyper\CallableHandler;
 use Arcanum\Hyper\HttpMiddleware;
 use Arcanum\Hyper\MiddlewareStage;
 use Arcanum\Hyper\StatusCode;
+use Arcanum\Atlas\MiddlewareRegistry;
+use Arcanum\Atlas\Route;
+use Arcanum\Flow\Conveyor\Bus;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\HyperKernel;
+use Arcanum\Ignition\RouteDispatcher;
 use Arcanum\Test\Fixture\CapturingKernel;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use PHPUnit\Framework\TestCase;
@@ -34,6 +38,9 @@ use Psr\Http\Server\RequestHandlerInterface;
 #[UsesClass(HttpException::class)]
 #[UsesClass(StatusCode::class)]
 #[UsesClass(\Arcanum\Hyper\Phrase::class)]
+#[UsesClass(RouteDispatcher::class)]
+#[UsesClass(MiddlewareRegistry::class)]
+#[UsesClass(Route::class)]
 final class HyperKernelTest extends TestCase
 {
     // -----------------------------------------------------------
@@ -743,6 +750,7 @@ final class HyperKernelTest extends TestCase
             [\Arcanum\Hyper\HtmlExceptionResponseRenderer::class, true],
             [\Arcanum\Gather\Configuration::class, true],
             [EventDispatcherInterface::class, false],
+            [RouteDispatcher::class, false],
         ]);
         $container->method('get')->willReturnCallback(
             fn(string $id) => match ($id) {
@@ -771,12 +779,153 @@ final class HyperKernelTest extends TestCase
 
         $request = $this->createStub(ServerRequestInterface::class);
         $request->method('getUri')->willReturn($uri);
+        $request->method('hasHeader')->willReturn(false);
 
         // Act
         $response = $kernel->handle($request);
 
         // Assert — HTML renderer was used because formats.default = 'html'
         $this->assertSame($htmlResponse, $response);
+    }
+
+    public function testHandleExceptionSetsDtoClassFromRouteDispatcher(): void
+    {
+        // Arrange — a kernel whose handleRequest throws after routing.
+        // RouteDispatcher has a resolved DTO class; the HTML exception
+        // renderer should receive it automatically.
+        $thrown = new \RuntimeException('Handler failed');
+
+        $htmlRenderer = $this->createMock(\Arcanum\Hyper\HtmlExceptionResponseRenderer::class);
+        $htmlRenderer->expects($this->once())
+            ->method('setDtoClass')
+            ->with('App\\Domain\\Shop\\Command\\PlaceOrder');
+        $htmlRenderer->expects($this->once())
+            ->method('render')
+            ->willReturn($this->createStub(ResponseInterface::class));
+
+        $bus = $this->createStub(Bus::class);
+        $bus->method('dispatch')->willReturn(new \stdClass());
+
+        $routeDispatcher = new RouteDispatcher(
+            $this->createStub(\Psr\Container\ContainerInterface::class),
+            new MiddlewareRegistry(),
+            $bus,
+        );
+        $routeDispatcher->dispatch(
+            new \stdClass(),
+            new Route(dtoClass: 'App\\Domain\\Shop\\Command\\PlaceOrder'),
+        );
+
+        $config = $this->createStub(\Arcanum\Gather\Configuration::class);
+        $config->method('get')->willReturnCallback(
+            fn(string $key) => $key === 'formats.default' ? 'html' : null,
+        );
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturnMap([
+            [ExceptionHandler::class, false],
+            [ExceptionRenderer::class, false],
+            [\Arcanum\Hyper\HtmlExceptionResponseRenderer::class, true],
+            [\Arcanum\Gather\Configuration::class, true],
+            [EventDispatcherInterface::class, false],
+            [RouteDispatcher::class, true],
+        ]);
+        $container->method('get')->willReturnCallback(
+            fn(string $id) => match ($id) {
+                \Arcanum\Hyper\HtmlExceptionResponseRenderer::class => $htmlRenderer,
+                \Arcanum\Gather\Configuration::class => $config,
+                RouteDispatcher::class => $routeDispatcher,
+                default => $bootstrapper,
+            }
+        );
+
+        $kernel = new class ('/app', $thrown) extends HyperKernel {
+            public function __construct(string $rootDirectory, private \Throwable $error)
+            {
+                parent::__construct($rootDirectory);
+            }
+
+            protected function handleRequest(ServerRequestInterface $request): ResponseInterface
+            {
+                throw $this->error;
+            }
+        };
+        $kernel->bootstrap($container);
+
+        $uri = $this->createStub(\Psr\Http\Message\UriInterface::class);
+        $uri->method('getPath')->willReturn('/shop/place-order');
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getUri')->willReturn($uri);
+        $request->method('hasHeader')->willReturn(false);
+
+        // Act
+        $kernel->handle($request);
+    }
+
+    public function testHandleExceptionFallsBackToSetResolvedDtoClass(): void
+    {
+        // Arrange — no RouteDispatcher in the container, but the kernel
+        // subclass called setResolvedDtoClass() before throwing.
+        $thrown = new \RuntimeException('Handler failed');
+
+        $htmlRenderer = $this->createMock(\Arcanum\Hyper\HtmlExceptionResponseRenderer::class);
+        $htmlRenderer->expects($this->once())
+            ->method('setDtoClass')
+            ->with('App\\Custom\\MyDto');
+        $htmlRenderer->expects($this->once())
+            ->method('render')
+            ->willReturn($this->createStub(ResponseInterface::class));
+
+        $config = $this->createStub(\Arcanum\Gather\Configuration::class);
+        $config->method('get')->willReturnCallback(
+            fn(string $key) => $key === 'formats.default' ? 'html' : null,
+        );
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturnMap([
+            [ExceptionHandler::class, false],
+            [ExceptionRenderer::class, false],
+            [\Arcanum\Hyper\HtmlExceptionResponseRenderer::class, true],
+            [\Arcanum\Gather\Configuration::class, true],
+            [EventDispatcherInterface::class, false],
+            [RouteDispatcher::class, false],
+        ]);
+        $container->method('get')->willReturnCallback(
+            fn(string $id) => match ($id) {
+                \Arcanum\Hyper\HtmlExceptionResponseRenderer::class => $htmlRenderer,
+                \Arcanum\Gather\Configuration::class => $config,
+                default => $bootstrapper,
+            }
+        );
+
+        $kernel = new class ('/app', $thrown) extends HyperKernel {
+            public function __construct(string $rootDirectory, private \Throwable $error)
+            {
+                parent::__construct($rootDirectory);
+            }
+
+            protected function handleRequest(ServerRequestInterface $request): ResponseInterface
+            {
+                $this->setResolvedDtoClass('App\\Custom\\MyDto');
+                throw $this->error;
+            }
+        };
+        $kernel->bootstrap($container);
+
+        $uri = $this->createStub(\Psr\Http\Message\UriInterface::class);
+        $uri->method('getPath')->willReturn('/custom/my-dto');
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getUri')->willReturn($uri);
+        $request->method('hasHeader')->willReturn(false);
+
+        // Act
+        $kernel->handle($request);
     }
 
     public function testExceptionThrownInMiddlewareIsCaughtAndRendered(): void
