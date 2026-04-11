@@ -109,8 +109,8 @@ The fix: split the god object, move resolution upstream, and put every template 
 
 The guestbook demo relies on a database and a migrated table. A fresh clone has neither. The welcome page should degrade gracefully instead of crashing.
 
-- [ ] **No database configured.** When `config/database.php` is missing or has no connections, the guestbook card should show a message like "Database required — configure `config/database.php` to enable the guestbook demo" instead of throwing. The `GetEntriesHandler` (or the rendering path) needs to catch the missing-database case.
-- [ ] **Database configured but table missing.** When the connection exists but `guestbook_entries` doesn't (migrations haven't run), show a message like "Run `php bin/arcanum migrate` to set up the database." A query against a missing table throws a PDO exception — catch it and render the guidance message.
+- [x] **No database configured.** When `config/database.php` is missing or has no connections, the guestbook card shows "Database required" with setup instructions instead of rendering the form and firing htmx requests that fail at the DI level. Template conditional on `Env::databaseConnection()`.
+- [x] **Database configured but table missing.** When the connection exists but `guestbook_entries` doesn't (migrations haven't run), shows "Database table missing" with `php bin/arcanum migrate` instructions. `GetEntriesHandler` catches `PDOException` and returns an `error` key; `GetEntries.html` renders the guidance message.
 - [ ] **Quick start docs.** Update the starter app README's quick start section to include `php bin/arcanum migrate` as a setup step after `composer install`.
 
 ### Welcome page — nice-to-haves (deferred)
