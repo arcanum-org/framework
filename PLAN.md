@@ -12,7 +12,7 @@ Concrete, walkable lists. Everything else in this file is informational — cont
 
 First-class htmx 4 support: `HtmxAwareResponseRenderer` (three rendering modes: full page, content section, element-by-id extraction), `HtmxRequest` decorator, `ClientBroadcast` event projection to `HX-Trigger` headers, `FragmentDirective` for innerHTML opt-in via `{{ fragment 'id' }}`, CSRF JS shim, auth-redirect middleware, `Vary: HX-Request`, lazy template closures, Shodo custom directive system (`CompilerDirective` interface with 5 built-ins + `DirectiveRegistry`). Full README, COMPENDIUM updated, starter app integrated with guestbook demo. Smoke-tested end-to-end (surfaced the validation 500 bug below). See `src/Htmx/README.md` for the package reference. Design decisions archived in git history (commits on `claude-bang` branch, April 2026).
 
-### Validation error handling and status-specific error templates — active
+### Validation error handling and status-specific error templates — complete
 
 **Completed:**
 
@@ -104,7 +104,7 @@ The fix: split the god object, move resolution upstream, and put every template 
 - [x] **Update COMPENDIUM** with the status-specific error template convention. Added to the "Naming derives behavior" section.
 
 #### Cross-cutting
-- [ ] **Run `composer check` after each commit.**
+- [x] **Run `composer check` after each commit.**
 
 ### Guestbook first-run experience
 
