@@ -111,7 +111,7 @@ The guestbook demo relies on a database and a migrated table. A fresh clone has 
 
 - [x] **No database configured.** When `config/database.php` is missing or has no connections, the guestbook card shows "Database required" with setup instructions instead of rendering the form and firing htmx requests that fail at the DI level. Template conditional on `Env::databaseConnection()`.
 - [x] **Database configured but table missing.** When the connection exists but `guestbook_entries` doesn't (migrations haven't run), shows "Database table missing" with `php bin/arcanum migrate` instructions. `GetEntriesHandler` catches `PDOException` and returns an `error` key; `GetEntries.html` renders the guidance message.
-- [ ] **Quick start docs.** Update the starter app README's quick start section to include `php bin/arcanum migrate` as a setup step after `composer install`.
+- [x] **Quick start docs.** Updated the starter app README's quick start section to include `php bin/arcanum migrate` as a setup step after `composer install`.
 
 ### Welcome page — nice-to-haves (deferred)
 
