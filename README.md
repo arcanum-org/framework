@@ -1,114 +1,224 @@
-Arcanum is under heavy development. v0.0.01
+# Arcanum
 
-# Arcanum: A Cutting-Edge PHP Framework
+**A CQRS PHP framework that stays readable at scale.**
 
-Arcanum is a transformative PHP Framework with a fresh take on web application development, crafted meticulously with the modern software engineer in mind.
+---
 
-## Packages
+## Why Arcanum
 
-Arcanum is a collection of packages that work together to create a robust, scalable, and maintainable web application framework. Each package is designed to be used independently, and combined they form the core of Arcanum applications.
+### MVC Doesn't Scale
 
-### Arcanum Ignition
+MVC groups by what things _are_: all models in one folder, all views in another, all controllers in a third. At 20 endpoints that's manageable. At 200, your `Models/` directory is a junk drawer and your controllers are 400-line god classes doing six different things.
 
-[Ignition](https://github.com/arcanum-org/framework/tree/main/src/Ignition) is the bootstrap package for Arcanum applications. Every Arcanum app uses an Ignition Kernel to get things started, keep them running, and terminate gracefully.
+CQRS groups by what things _do_. The DTO, handler, template, SQL, validation, and middleware for "place an order" all live together in `app/Domain/Shop/Command/PlaceOrder/`. The directory _is_ the architecture diagram. Things that change together live together.
 
-### Arcanum Cabinet
+### SQL Is Code
 
-[Cabinet](https://github.com/arcanum-org/framework/tree/main/src/Cabinet) is a flexible, PSR-11 compliant dependency injection container, along with an Application interface which you can use to register your application's services, factories, providers, and other dependencies.
+No ORM. No query builder. SQL files live in your codebase and the framework calls them directly.
 
-### Arcanum Codex
+```
+app/Domain/Shop/Model/
+├── AllProducts.sql       ← $db->model->allProducts()
+├── FindProduct.sql       ← $db->model->findProduct(id: 42)
+├── InsertProduct.sql     ← $db->model->insertProduct(name: 'Widget', price: 9.99)
+└── Model.php             ← generated, type-safe
+```
 
-[Codex](https://github.com/arcanum-org/framework/tree/main/src/Codex) is an automatic class resolver. Give it a class name, and it uses PHP's Reflection API to inspect the constructor, resolve all dependencies recursively, and hand you a fully built instance. It supports manual overrides via specifications — you can tell it "when building X, use Y for this parameter" — and integrates with Echo's event system to fire events before and after resolution. It's used by Cabinet under the hood, but works independently too.
+The database is the source of truth, not a PHP abstraction layer. You write real SQL — you can read it, you can `EXPLAIN` it, and you never fight a query builder when the abstraction leaks. Because it never leaks. It's just SQL.
 
-### Arcanum Echo
+### Stop Building Two Applications at the Same Time
 
-[Echo](https://github.com/arcanum-org/framework/tree/main/src/Echo) is a PSR-14 compliant event dispatcher. Register listeners for event classes, dispatch events, and Echo calls the right listeners in order. It walks the class hierarchy, so a listener for a base event class fires for all subclasses too. You can dispatch any object — non-Event objects get wrapped automatically. Under the hood, it uses Flow's Pipeline to chain listeners with propagation control.
+Most modern web apps are really two apps: a backend API and a JavaScript frontend, maintained in parallel, deployed separately, constantly drifting apart.
 
-### Arcanum Flow
+Arcanum takes a different path. The server renders the HTML. [htmx](https://htmx.org) makes it feel like a single-page app — partial updates, no page reloads, cross-component refresh — without client-side state management or a JavaScript build pipeline.
 
-[Flow](https://github.com/arcanum-org/framework/tree/main/src/Flow) is all about moving data through your application from point A to point B. Everything in Flow builds on the `Stage` interface — a callable that takes an object in and sends an object out. It's composed of four subpackages:
+The framework's [Htmx package](src/Htmx/README.md) handles the backend ceremony so you don't have to:
 
-1. [Pipeline](https://github.com/arcanum-org/framework/tree/main/src/Flow/Pipeline) chains stages in a straight line — the output of one becomes the input of the next. If you have a series of steps, Pipeline wraps them up in a nice, neat system.
-2. [Continuum](https://github.com/arcanum-org/framework/tree/main/src/Flow/Continuum) is middleware. Each stage gets a `$next` callback it must call to continue the chain, just like middleware in Express. This lets stages run logic both before and after the inner stages.
-3. [Conveyor](https://github.com/arcanum-org/framework/tree/main/src/Flow/Conveyor) is Arcanum's Command Bus. It combines Pipeline and Continuum to dispatch objects to handlers with before/after middleware. Handlers are resolved by convention — `PlaceOrder` dispatches to `PlaceOrderHandler`.
-4. [River](https://github.com/arcanum-org/framework/tree/main/src/Flow/River) is a PSR-7 Stream implementation. It wraps PHP's low-level stream resources into type-safe objects that auto-close, support caching for non-seekable streams, and generally make working with streams a breeze.
+- **You write normal handlers.** The framework inspects htmx headers, decides how much of the page to render, and returns the right fragment. Your handler code doesn't change.
+- **Domain events propagate to the DOM.** A command handler dispatches an event. The framework projects it as an `HX-Trigger` response header. Listening elements refresh themselves. Zero JavaScript coordination.
+- **CSRF, auth redirects, cache safety** — all wired up by three middleware. You register them once and move on.
 
-### Arcanum Gather
+One codebase. One language. One rendering pipeline. One source of truth.
 
-[Gather](https://github.com/arcanum-org/framework/tree/main/src/Gather) is a typed key-value collection system. The core `Registry` class wraps arrays with PSR-11 container compliance, type coercion (`asString`, `asInt`, `asBool`, etc.), and serialization support. Three specialized variants extend it: `Configuration` adds dot-notation access for nested settings, `Environment` locks down serialization and cloning to prevent leaking secrets, and `IgnoreCaseRegistry` provides case-insensitive key lookups (used by Hyper for HTTP headers).
+### Humans Don't Read Documentation, but AI Agents Do
 
-### Arcanum Glitch
+The AI genie is out of the bottle. Most developers use coding assistants, and AI agents are quickly becoming both the authors _and_ the consumers of your code. Arcanum is designed for this reality.
 
-[Glitch](https://github.com/arcanum-org/framework/tree/main/src/Glitch) is Arcanum's error handling package. It converts PHP errors to exceptions, manages shutdown handling, and dispatches to reporters for logging and alerting. `HttpException` lets you throw exceptions that carry a precise HTTP status code — a 409 Conflict, a 422 Unprocessable Entity, a 503 Service Unavailable — and the framework renders the correct response automatically.
+**AI writes better Arcanum code** because there's one idiomatic way to do things. When an AI agent scaffolds a new feature, the conventions guide it toward the right structure, the right naming, the right location — automatically. Tailwind is the default for styling because the visual intent lives right in the markup, not in a separate stylesheet an agent might miss.
 
-### Arcanum Hyper
+**AI consumes Arcanum apps natively.** The same handler serves `.html`, `.json`, `.md`, `.csv`, and `.txt` — just change the URL extension. An agent doesn't need to parse HTML or reverse-engineer an API; it asks for `/products.md` and gets Markdown. HTTP status codes carry precise, machine-readable semantics: 422 means "bad input, here are the field errors," 405 means "this endpoint exists but you used the wrong method," 429 means "back off and retry." Your app speaks a language that agents already understand — structured errors, content negotiation, and semantic links — without building a separate "bot API."
 
-[Hyper](https://github.com/arcanum-org/framework/tree/main/src/Hyper) is Arcanum's HTTP layer — PSR-7 messages, PSR-15 server handling, a type-safe `StatusCode` enum covering the full HTTP status code spectrum, and a PSR-15 middleware stack for global request/response processing. Where most frameworks treat status codes as an afterthought (200 for success, 404 for missing, 500 for everything else), Hyper gives every code in the spec a first-class representation and encourages precise, semantic use throughout the framework.
+### Your Handler Is Five Lines
 
-### Arcanum Parchment
+The framework absorbs the ceremony. Validation, authorization, CSRF, content negotiation, error rendering, response formatting — all handled by attributes, middleware, and conventions. What's left is the thing that matters:
 
-[Parchment](https://github.com/arcanum-org/framework/tree/main/src/Parchment) is a library of utilities designed to make working with files a breeze.
+```php
+final class PlaceOrderHandler
+{
+    public function __construct(private readonly Database $db) {}
 
-### Arcanum Quill
+    public function __invoke(PlaceOrder $command): void
+    {
+        $this->db->model->insertOrder(product: $command->product, quantity: $command->quantity);
+    }
+}
+```
 
-[Quill](https://github.com/arcanum-org/framework/tree/main/src/Quill) is a package for logging messages to different logging channels. It uses the excellent [Monolog](https://github.com/Seldaek/monolog) package under the hood.
+Validation? `#[NotEmpty]` and `#[Min(1)]` on the DTO constructor params — `ValidationGuard` rejects bad input with a 422 before the handler runs. Auth? `#[RequiresAuth]` on the DTO class. CSRF? Automatic. Response format? Automatic. Error rendering? Automatic.
 
-### Arcanum Atlas
+---
 
-[Atlas](https://github.com/arcanum-org/framework/tree/main/src/Atlas) is Arcanum's convention-based CQRS router. It maps both HTTP requests and CLI commands to Query and Command handlers by converting path segments to PascalCase namespaces — no route files, no annotations, no configuration for the common case. On HTTP, the request method determines intent: GET reads (Queries), PUT/POST/PATCH/DELETE writes (Commands). On CLI, an explicit prefix does the same: `query:` and `command:`. A shared `ConventionResolver` drives both transports, so the same DTO is reachable as `GET /shop/products` and `query:shop:products`. Atlas enforces precise error responses — a GET to a Command-only path is a **405 Method Not Allowed**, not a silent misroute. Request a path that doesn't exist? **404 Not Found**. Every error gets the right status code.
+## First Principles
 
-### Arcanum Shodo
+These are the foundations that everything in Arcanum is built upon.
 
-[Shodo](https://github.com/arcanum-org/framework/tree/main/src/Shodo) (書道, "the way of writing") is the output formatting package. It converts handler results into strings — JSON, CSV, HTML, plain text, key-value pairs, tables — without any knowledge of HTTP or CLI. Formatters produce content; transport layers deliver it. On HTTP, Hyper's response renderers wrap formatter output in a `ResponseInterface` with the correct Content-Type and status code. On CLI, Rune writes formatter output directly to the terminal. The same `JsonFormatter` serves both `GET /health.json` and `php arcanum query:health --format=json`. Template helpers provide reusable functions in templates — `{{ Format::number($price, 2) }}`, `{{ Route::url(...) }}`, `{{ @csrf }}` — with domain-scoped registration via co-located `Helpers.php` files.
+- **Don't abstract away the thing you're actually doing.** SQL, HTTP status codes, URL structure — let the real thing be the thing. Abstractions that hide the underlying reality eventually leak, and then you have two mental models instead of one.
 
-### Arcanum Rune
+- **Colocation by concern, not by layer.** The DTO, handler, template, SQL, validation, and middleware for an operation all live in the same directory. When you need to change how something works, you open one folder, not five.
 
-[Rune](https://github.com/arcanum-org/framework/tree/main/src/Rune) is Arcanum's CLI transport layer. It lets you run the same Commands and Queries from the terminal that you run over HTTP — same DTOs, same handlers, same Conveyor bus. Where Atlas maps HTTP requests to routes, Rune maps CLI arguments. Where Hyper renders responses for browsers, Rune renders tables and key-value output for terminals. Built-in commands (`list`, `help`, `validate:handlers`) ship with every app, and you can add your own. Mark DTOs with `#[CliOnly]` or `#[HttpOnly]` to restrict them to a single transport.
+- **Strong defaults, not walls.** Conventions make the common case effortless — one class per operation, handler discovered by name, template co-located with the DTO. But when you need to break the pattern, the framework gets out of your way. Opinionated doesn't mean inflexible.
 
-### Arcanum Forge
+- **Build for two audiences.** Every design decision should work for developers writing code _and_ agents consuming the deployed app. Opinionated conventions make AI write better code. Multi-format responses, structured errors, and semantic HTTP make your app machine-readable without a separate integration layer.
 
-[Forge](https://github.com/arcanum-org/framework/tree/main/src/Forge) is Arcanum's persistence layer. There's no ORM, no query builder, and no SQL strings in PHP. You write `.sql` files in domain `Model/` directories and call them as methods — `$db->model->products(category: 'shoes')`. Forge handles connections, parameter binding, read/write routing, and result shaping. Type-cast results with `@cast` annotations, declare parameter types with `@param`, and generate typed model classes with `forge:models` for full PHPStan coverage. The `Connection` interface lets you bring your own database abstraction layer if the built-in PDO wrapper isn't enough.
+---
 
-### Arcanum Toolkit
+## What It Looks Like
 
-[Toolkit](https://github.com/arcanum-org/framework/tree/main/src/Toolkit) is a collection of utilities, like string manipulation, etc.
+A query that serves `GET /shop/products.html` (and `.json`, `.csv`, `.md`, `.txt`):
 
-## Arcanum is Different
+```php
+// app/Domain/Shop/Query/Products.php — the DTO
+final class Products
+{
+    public function __construct(
+        public readonly string $category = '',
+    ) {}
+}
 
-Unlike most PHP Frameworks, Arcanum applications don't follow the classic Model-View-Controller (MVC) paradigm.
+// app/Domain/Shop/Query/ProductsHandler.php — the handler
+final class ProductsHandler
+{
+    public function __construct(private readonly Database $db) {}
 
-MVC is a cornerstone of web development. It's simple. It encapsulates and separates the relationship between the data (Model) and the user interface (View), earning a reputation as the de facto architecture for small to mid-sized applications.
+    public function __invoke(Products $query): array
+    {
+        return ['products' => $this->db->model->productsByCategory(category: $query->category)];
+    }
+}
+```
 
-### MVC Fails Complex Apps
+```sql
+-- app/Domain/Shop/Model/ProductsByCategory.sql
+-- @param category string
+-- @cast price float
+SELECT id, name, price FROM products
+WHERE (:category = '' OR category = :category)
+ORDER BY name
+```
 
-A tenet of "doing MVC right" is following the principle of "Skinny Controllers, Fat Models." This advice saves us from bloated controllers, but it inadvertently nudges us toward "God Models"—monolithic entities handling an array of responsibilities that span thousands of lines of code. As the complexity of an MVC application grows, so do these models, becoming increasingly difficult to maintain, test, and extend.
+No route registration. No controller. No model class. No ORM. The namespace _is_ the URL. The SQL _is_ the method.
 
-MVC offers little guidance on managing these "Fat Models," leading to sprawling codebases where one model serves too many masters, a tightly coupled system that hampers an application's ability to scale and evolve.
+---
 
-Highly complex apps demand a different approach.
+## Quick Start
 
-### Command Query Responsibility Segregation
+```bash
+git clone https://github.com/arcanum-org/arcanum.git myapp
+cd myapp
+composer install
+php bin/arcanum migrate
+php -S localhost:8000 -t public
+```
 
-Arcanum applications follow the Command Query Responsibility Segregation (CQRS) pattern for a distinctive, robust, and scalable solution to building complex web applications. Operations that mutate state (Commands) are separated from those that read state (Queries), leading to a leaner, highly maintainable architecture. We're not trying to reinvent the wheel, but we're offering a different, perhaps more suitable tool for specific applications.
+Visit [localhost:8000](http://localhost:8000) — you'll see the welcome page with a live guestbook demo, diagnostics, and a CQRS walkthrough.
 
-### Domain-Driven CQRS is a Game-Changer
+See the [starter app README](https://github.com/arcanum-org/arcanum) for the full setup guide.
 
-Successful apps get bigger. Arcanum applications tackle this truth by utilizing clear bounded contexts. A bounded context represents a specific area of responsibility with its own ubiquitous language and model design. This separation simplifies the codebase, providing more evident areas of responsibility and making debugging and adding features a breeze.
+---
 
-## The Arcanum Philosophy
+## What's in the Box
 
-### CQRS and Domain-Driven Design
+23 packages, each with its own README.
 
-In Arcanum, we embrace CQRS and domain-driven design to tackle the complexity of modern web applications head-on. We're not trying to replace all the lovely MVC frameworks out there. We respect and appreciate their immense contributions. Instead, we're offering a novel perspective, a unique tool in your toolbox that can handle the intricacies of highly complex web applications differently.
+### Foundation
 
-### HTTP Status Codes Mean Something
+| Package | What it does |
+|---|---|
+| [Cabinet](src/Cabinet/README.md) | PSR-11 dependency injection container |
+| [Codex](src/Codex/README.md) | Reflection-based auto-wiring and class resolution |
+| [Toolkit](src/Toolkit/README.md) | String utilities, cryptography primitives, random generation |
+| [Parchment](src/Parchment/README.md) | Filesystem reader utilities |
+| [Gather](src/Gather/README.md) | Typed registries: Configuration, Environment, IgnoreCaseRegistry |
 
-Most frameworks collapse the richness of HTTP into a handful of status codes: 200 for success, 404 for missing, 500 for errors, and 403 if you're feeling fancy. The HTTP specification defines dozens of status codes, each with precise semantics — and Arcanum uses them.
+### Data Flow
 
-A Command that creates a resource returns **201 Created**. A Command that completes with nothing to report returns **204 No Content**. A Command that's accepted for deferred processing returns **202 Accepted**. Request a path with the wrong HTTP method? That's **405 Method Not Allowed**, not a 404 — because the resource exists, you just asked for it wrong. Ask for an unsupported response format? **406 Not Acceptable**.
+| Package | What it does |
+|---|---|
+| [Pipeline](src/Flow/Pipeline/) | Linear stage chain — output of one becomes input of the next |
+| [Continuum](src/Flow/Continuum/) | Middleware pattern — each stage calls `$next` to continue |
+| [Conveyor](src/Flow/Conveyor/) | Command bus — dispatches DTOs to handlers with before/after middleware |
+| [River](src/Flow/River/) | PSR-7 stream implementations |
+| [Sequence](src/Flow/Sequence/) | Lazy and eager ordered iterables — `Cursor` (single-pass) and `Series` (multi-pass) |
 
-This isn't pedantry. Status codes are part of your API's contract. They tell clients, proxies, caches, and monitoring systems exactly what happened — without parsing a response body or guessing from context. When a load balancer sees a spike in 503s it knows the service is overloaded. When a client receives a 201 it knows something was created. When a cache sees a 304 it knows it can reuse what it has.
+### HTTP and CLI
 
-Arcanum's `StatusCode` enum provides a type-safe representation of every standard HTTP status code, and the framework enforces their correct use. `HttpException` carries the precise status code with it. Renderers choose the right code based on what actually happened. The router distinguishes "nothing here" from "something here, wrong method." This precision flows from the framework into your application code, so your APIs communicate clearly by default.
+| Package | What it does |
+|---|---|
+| [Hyper](src/Hyper/) | PSR-7 messages, PSR-15 handling, response renderers, StatusCode enum |
+| [Rune](src/Rune/README.md) | CLI transport: input parsing, output formatting, built-in commands |
+| [Atlas](src/Atlas/README.md) | Convention-based CQRS router for HTTP and CLI |
+| [Ignition](src/Ignition/README.md) | Bootstrap kernels: HyperKernel, RuneKernel, bootstrapper chain |
+| [Shodo](src/Shodo/README.md) | Template engine, formatters (HTML, JSON, CSV, Markdown, plain text), compiler directives |
+| [Htmx](src/Htmx/README.md) | First-class htmx 4 support: rendering modes, event projection, CSRF, auth redirects |
 
-With that spirit, welcome to Arcanum.
+### Persistence and State
+
+| Package | What it does |
+|---|---|
+| [Forge](src/Forge/README.md) | SQL-as-methods, connection management, model generation, migrations |
+| [Vault](src/Vault/README.md) | PSR-16 caching: File, Array, Null, APCu, Redis drivers |
+| [Session](src/Session/README.md) | HTTP sessions, CSRF middleware, configurable drivers |
+
+### Identity and Access
+
+| Package | What it does |
+|---|---|
+| [Auth](src/Auth/README.md) | Authentication guards, authorization attributes, CLI auth |
+
+### Validation, Observability, Throttling
+
+| Package | What it does |
+|---|---|
+| [Validation](src/Validation/README.md) | Attribute-based DTO validation with 11 built-in rules |
+| [Glitch](src/Glitch/README.md) | Error handling, HttpException, StatusCode enum, ArcanumException |
+| [Quill](src/Quill/README.md) | Multi-channel PSR-3 logging over Monolog |
+| [Echo](src/Echo/README.md) | PSR-14 event dispatcher |
+| [Throttle](src/Throttle/README.md) | Rate limiting: token bucket and sliding window strategies |
+| [Hourglass](src/Hourglass/README.md) | Clock interface (PSR-20), FrozenClock, Stopwatch, Interval |
+| [Testing](src/Testing/README.md) | Test harness: TestKernel, Factory, HTTP and CLI test surfaces |
+
+---
+
+## Documentation
+
+| Resource | What it covers |
+|---|---|
+| [COMPENDIUM.md](COMPENDIUM.md) | The guided tour — what Arcanum is, how the pieces fit, conventions, CLI surface |
+| [Starter App](https://github.com/arcanum-org/arcanum) | Getting started, directory structure, examples |
+| [PLAN.md](PLAN.md) | What's been built, what's coming, design decisions |
+| Package READMEs | Deep dives — linked in the table above |
+
+---
+
+## Status
+
+Arcanum is under active development, approaching a 1.0-alpha release.
+
+- **PHP 8.4+** required
+- **PHPStan level 9** — strict static analysis across the entire codebase
+- **2700+ tests** with strict coverage — every test class declares exactly what it covers
+- **AI-assisted, not vibe-coded.** AI agents have contributed significantly to this codebase, but every line passes the same static analysis, test coverage, and code review standards. Structure and rigor first.
+
+```bash
+composer check    # cs-fix, cs-check, phpstan, phpunit — all at once
+```
