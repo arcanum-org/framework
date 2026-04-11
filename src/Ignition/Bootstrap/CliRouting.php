@@ -188,6 +188,15 @@ class CliRouting implements Bootstrapper
         $namespace = $config->get('app.namespace');
         $namespace = is_string($namespace) ? $namespace : 'App';
 
+        // Pre-compute shared values used across many commands.
+        /** @var Kernel $kernel */
+        $kernel = $container->get(Kernel::class);
+        $rootDirectory = $kernel->rootDirectory();
+        $sourceDirectory = $this->resolveSourceDirectory($container, $namespace);
+        $domainRoot = $rootDirectory . DIRECTORY_SEPARATOR . Strings::namespacePath($namespace);
+        $frameworkCacheDirectory = $kernel->filesDirectory() . DIRECTORY_SEPARATOR . 'cache';
+
+        // Registry — maps command names to class-strings.
         $container->factory(BuiltInRegistry::class, function () use ($container) {
             $registry = new BuiltInRegistry($container);
             $registry->register('list', ListCommand::class);
@@ -212,77 +221,76 @@ class CliRouting implements Bootstrapper
             return $registry;
         });
 
-        // Register the built-in command classes.
+        // Commands with only class dependencies — auto-wired.
         $container->service(HelpCommand::class);
+        $container->service(CacheStatusCommand::class);
+        $container->service(LogoutCommand::class);
 
-        $container->factory(ListCommand::class, function () use ($container, $namespace) {
-            $sourceDir = $this->resolveSourceDirectory($container, $namespace);
+        // Commands needing $rootDirectory only.
+        foreach ([MakeKeyCommand::class, MigrateCreateCommand::class] as $class) {
+            $container->service($class);
+            $container->specify($class, '$rootDirectory', $rootDirectory);
+        }
 
-            /** @var CliRouteMap|null $routeMap */
-            $routeMap = $container->has(CliRouteMap::class)
-                ? $container->get(CliRouteMap::class)
-                : null;
+        // Commands needing $rootDirectory + $rootNamespace.
+        foreach ([MakeCommandCommand::class, MakeQueryCommand::class, MakeMiddlewareCommand::class] as $class) {
+            $container->service($class);
+            $container->specify($class, '$rootDirectory', $rootDirectory);
+            $container->specify($class, '$rootNamespace', $namespace);
+        }
 
-            /** @var BuiltInRegistry|null $builtInRegistry */
-            $builtInRegistry = $container->has(BuiltInRegistry::class)
-                ? $container->get(BuiltInRegistry::class)
-                : null;
+        // Commands needing $sourceDirectory + $rootNamespace.
+        foreach ([ListCommand::class, ValidateHandlersCommand::class] as $class) {
+            $container->service($class);
+            $container->specify($class, '$sourceDirectory', $sourceDirectory);
+            $container->specify($class, '$rootNamespace', $namespace);
+        }
 
-            return new ListCommand(
-                sourceDirectory: $sourceDir,
-                rootNamespace: $namespace,
-                routeMap: $routeMap,
-                builtInRegistry: $builtInRegistry,
-            );
-        });
+        // Commands needing $domainRoot + $domainNamespace.
+        foreach ([ForgeModelsCommand::class, ValidateModelsCommand::class, DbStatusCommand::class] as $class) {
+            $container->service($class);
+            $container->specify($class, '$domainRoot', $domainRoot);
+            $container->specify($class, '$domainNamespace', $namespace);
+        }
 
-        $container->factory(ValidateHandlersCommand::class, function () use ($container, $namespace) {
-            return new ValidateHandlersCommand(
-                sourceDirectory: $this->resolveSourceDirectory($container, $namespace),
-                rootNamespace: $namespace,
-            );
-        });
+        // Migration commands — $rootDirectory only (ConnectionManager is nullable, auto-resolved).
+        foreach ([MigrateCommand::class, MigrateRollbackCommand::class, MigrateStatusCommand::class] as $class) {
+            $container->service($class);
+            $container->specify($class, '$rootDirectory', $rootDirectory);
+        }
 
-        $container->factory(MakeKeyCommand::class, function () use ($container) {
-            /** @var Kernel $kernel */
-            $kernel = $container->get(Kernel::class);
-            return new MakeKeyCommand(rootDirectory: $kernel->rootDirectory());
-        });
+        // MakePageCommand — extra page config on top of the generator pattern.
+        $container->service(MakePageCommand::class);
+        $container->specify(MakePageCommand::class, '$rootDirectory', $rootDirectory);
+        $container->specify(MakePageCommand::class, '$rootNamespace', $namespace);
+        /** @var mixed $pagesNs */
+        $pagesNs = $config->get('app.pages_namespace');
+        /** @var mixed $pagesDir */
+        $pagesDir = $config->get('app.pages_directory');
+        $container->specify(MakePageCommand::class, '$pagesNamespace', is_string($pagesNs) ? $pagesNs : '');
+        $container->specify(MakePageCommand::class, '$pagesDirectory', is_string($pagesDir) ? $pagesDir : '');
 
-        $container->factory(CacheClearCommand::class, function () use ($container) {
+        // CacheClearCommand — TemplateCache fallback for CLI (Formats bootstrap is HTTP-only).
+        $container->factory(CacheClearCommand::class, function () use ($container, $frameworkCacheDirectory) {
+            if (!$container->has(TemplateCache::class)) {
+                $container->instance(TemplateCache::class, new TemplateCache(
+                    $frameworkCacheDirectory . DIRECTORY_SEPARATOR . 'templates',
+                ));
+            }
+
+            /** @var TemplateCache $templateCache */
+            $templateCache = $container->get(TemplateCache::class);
+
+            /** @var CacheManager|null $cacheManager */
             $cacheManager = $container->has(CacheManager::class)
                 ? $container->get(CacheManager::class)
                 : null;
 
+            /** @var ConfigurationCache|null $configCache */
             $configCache = $container->has(ConfigurationCache::class)
                 ? $container->get(ConfigurationCache::class)
                 : null;
 
-            // TemplateCache is normally registered by Bootstrap\Formats,
-            // which only runs in HTTP contexts. Build one directly from
-            // the kernel's files directory so cache:clear can purge the
-            // templates cache from CLI without needing the formatter
-            // bootstrap chain.
-            if ($container->has(TemplateCache::class)) {
-                /** @var TemplateCache $templateCache */
-                $templateCache = $container->get(TemplateCache::class);
-            } else {
-                /** @var Kernel $kernel */
-                $kernel = $container->get(Kernel::class);
-                $templateCache = new TemplateCache(
-                    $kernel->filesDirectory()
-                        . DIRECTORY_SEPARATOR . 'cache'
-                        . DIRECTORY_SEPARATOR . 'templates',
-                );
-            }
-
-            /** @var Kernel $kernel */
-            $kernel = $container->get(Kernel::class);
-            $frameworkCacheDirectory = $kernel->filesDirectory()
-                . DIRECTORY_SEPARATOR . 'cache';
-
-            /** @var CacheManager|null $cacheManager */
-            /** @var ConfigurationCache|null $configCache */
             return new CacheClearCommand(
                 $cacheManager,
                 $configCache,
@@ -291,87 +299,8 @@ class CliRouting implements Bootstrapper
             );
         });
 
-        $container->factory(CacheStatusCommand::class, function () use ($container) {
-            /** @var CacheManager|null $cacheManager */
-            $cacheManager = $container->has(CacheManager::class)
-                ? $container->get(CacheManager::class)
-                : null;
-            return new CacheStatusCommand($cacheManager);
-        });
-
-        // Generator commands — all share rootDirectory and rootNamespace.
-        $container->factory(MakeCommandCommand::class, function () use ($container, $namespace) {
-            /** @var Kernel $kernel */
-            $kernel = $container->get(Kernel::class);
-            return new MakeCommandCommand(
-                rootDirectory: $kernel->rootDirectory(),
-                rootNamespace: $namespace,
-            );
-        });
-
-        $container->factory(MakeQueryCommand::class, function () use ($container, $namespace) {
-            /** @var Kernel $kernel */
-            $kernel = $container->get(Kernel::class);
-            return new MakeQueryCommand(
-                rootDirectory: $kernel->rootDirectory(),
-                rootNamespace: $namespace,
-            );
-        });
-
-        $container->factory(MakePageCommand::class, function () use ($container, $namespace, $config) {
-            /** @var Kernel $kernel */
-            $kernel = $container->get(Kernel::class);
-
-            /** @var mixed $pagesNs */
-            $pagesNs = $config->get('app.pages_namespace');
-            /** @var mixed $pagesDir */
-            $pagesDir = $config->get('app.pages_directory');
-
-            return new MakePageCommand(
-                rootDirectory: $kernel->rootDirectory(),
-                rootNamespace: $namespace,
-                pagesNamespace: is_string($pagesNs) ? $pagesNs : '',
-                pagesDirectory: is_string($pagesDir) ? $pagesDir : '',
-            );
-        });
-
-        $container->factory(MakeMiddlewareCommand::class, function () use ($container, $namespace) {
-            /** @var Kernel $kernel */
-            $kernel = $container->get(Kernel::class);
-            return new MakeMiddlewareCommand(
-                rootDirectory: $kernel->rootDirectory(),
-                rootNamespace: $namespace,
-            );
-        });
-
-        $container->factory(ForgeModelsCommand::class, function () use ($container, $namespace) {
-            /** @var Kernel $kernel */
-            $kernel = $container->get(Kernel::class);
-            $domainRoot = $kernel->rootDirectory()
-                . DIRECTORY_SEPARATOR . Strings::namespacePath($namespace);
-            return new ForgeModelsCommand(
-                domainRoot: $domainRoot,
-                domainNamespace: $namespace,
-            );
-        });
-
-        $container->factory(ValidateModelsCommand::class, function () use ($container, $namespace) {
-            /** @var Kernel $kernel */
-            $kernel = $container->get(Kernel::class);
-            $domainRoot = $kernel->rootDirectory()
-                . DIRECTORY_SEPARATOR . Strings::namespacePath($namespace);
-            return new ValidateModelsCommand(
-                domainRoot: $domainRoot,
-                domainNamespace: $namespace,
-            );
-        });
-
+        // LoginCommand — Closure credentialsResolver requires factory logic.
         $container->factory(LoginCommand::class, function () use ($container, $config) {
-            /** @var CliSession|null $session */
-            $session = $container->has(CliSession::class)
-                ? $container->get(CliSession::class)
-                : null;
-
             $credentialsResolver = $config->get('auth.resolvers.credentials');
             $credentialsResolverFn = $credentialsResolver instanceof \Closure
                 ? $credentialsResolver
@@ -379,103 +308,21 @@ class CliRouting implements Bootstrapper
 
             /** @var mixed $fields */
             $fields = $config->get('auth.login.fields');
-            $ttl = $config->asInt('auth.login.ttl', 86400);
 
             /** @var Output $output */
             $output = $container->get(Output::class);
 
+            /** @var CliSession $session */
+            $session = $container->get(CliSession::class);
+
             return new LoginCommand(
                 prompter: new Prompter($output),
-                session: $session ?? new CliSession(
-                    encryptor: new \Arcanum\Toolkit\Encryption\SodiumEncryptor(
-                        new \Arcanum\Toolkit\Encryption\EncryptionKey(random_bytes(32)),
-                    ),
-                    path: sys_get_temp_dir() . '/.arcanum-cli-session',
-                ),
+                session: $session,
                 credentialsResolver: $credentialsResolverFn,
                 fields: is_array($fields)
                     ? array_values(array_filter($fields, 'is_string'))
                     : ['email', 'password'],
-                ttl: $ttl,
-            );
-        });
-
-        $container->factory(LogoutCommand::class, function () use ($container) {
-            /** @var CliSession|null $session */
-            $session = $container->has(CliSession::class)
-                ? $container->get(CliSession::class)
-                : null;
-
-            return new LogoutCommand(
-                session: $session ?? new CliSession(
-                    encryptor: new \Arcanum\Toolkit\Encryption\SodiumEncryptor(
-                        new \Arcanum\Toolkit\Encryption\EncryptionKey(random_bytes(32)),
-                    ),
-                    path: sys_get_temp_dir() . '/.arcanum-cli-session',
-                ),
-            );
-        });
-
-        $container->factory(DbStatusCommand::class, function () use ($container, $namespace) {
-            /** @var ConnectionManager|null $connections */
-            $connections = $container->has(ConnectionManager::class)
-                ? $container->get(ConnectionManager::class)
-                : null;
-            /** @var Kernel $kernel */
-            $kernel = $container->get(Kernel::class);
-            $domainRoot = $kernel->rootDirectory()
-                . DIRECTORY_SEPARATOR . Strings::namespacePath($namespace);
-            return new DbStatusCommand(
-                connections: $connections,
-                domainRoot: $domainRoot,
-            );
-        });
-
-        // Migration commands — all share connections + rootDirectory.
-        $container->factory(MigrateCommand::class, function () use ($container) {
-            /** @var ConnectionManager|null $connections */
-            $connections = $container->has(ConnectionManager::class)
-                ? $container->get(ConnectionManager::class)
-                : null;
-            /** @var Kernel $kernel */
-            $kernel = $container->get(Kernel::class);
-            return new MigrateCommand(
-                connections: $connections,
-                rootDirectory: $kernel->rootDirectory(),
-            );
-        });
-
-        $container->factory(MigrateRollbackCommand::class, function () use ($container) {
-            /** @var ConnectionManager|null $connections */
-            $connections = $container->has(ConnectionManager::class)
-                ? $container->get(ConnectionManager::class)
-                : null;
-            /** @var Kernel $kernel */
-            $kernel = $container->get(Kernel::class);
-            return new MigrateRollbackCommand(
-                connections: $connections,
-                rootDirectory: $kernel->rootDirectory(),
-            );
-        });
-
-        $container->factory(MigrateStatusCommand::class, function () use ($container) {
-            /** @var ConnectionManager|null $connections */
-            $connections = $container->has(ConnectionManager::class)
-                ? $container->get(ConnectionManager::class)
-                : null;
-            /** @var Kernel $kernel */
-            $kernel = $container->get(Kernel::class);
-            return new MigrateStatusCommand(
-                connections: $connections,
-                rootDirectory: $kernel->rootDirectory(),
-            );
-        });
-
-        $container->factory(MigrateCreateCommand::class, function () use ($container) {
-            /** @var Kernel $kernel */
-            $kernel = $container->get(Kernel::class);
-            return new MigrateCreateCommand(
-                rootDirectory: $kernel->rootDirectory(),
+                ttl: $config->asInt('auth.login.ttl', 86400),
             );
         });
     }
