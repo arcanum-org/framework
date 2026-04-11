@@ -96,7 +96,7 @@ The fix: split the god object, move resolution upstream, and put every template 
 
 ##### htmx v4 compatibility
 - [x] **Address `HX-Trigger-After-Swap` and `HX-Trigger-After-Settle` removal.** htmx v4 removed these response headers. Dropped `BroadcastAfterSwap` and `BroadcastAfterSettle` interfaces, simplified `HtmxEventTriggerMiddleware` and `HtmxResponse` to route all events through `HX-Trigger`. No v4 replacement for timing variants — all events fire immediately.
-- [ ] **Update `hx-target-422` references to `hx-status:422`.** The `response-targets` extension is superseded by the built-in `hx-status` attribute in v4. Update Htmx README, starter app templates, and any framework code that references the extension.
+- [x] **Update `hx-target-422` references to `hx-status:422`.** Verified: no references to the old `response-targets` extension exist in framework code, README, or starter app. PLAN.md already uses v4 `hx-status:422` syntax.
 
 ##### Documentation
 - [ ] **Update Htmx README** with the validation error pattern, `morph:outerHTML`, `hx-status:422`, the form partial convention, and the fallback chain.
