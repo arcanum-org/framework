@@ -17,6 +17,7 @@ use Arcanum\Atlas\Route;
 use Arcanum\Flow\Conveyor\Bus;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\HyperKernel;
+use Arcanum\Ignition\Lifecycle;
 use Arcanum\Ignition\RouteDispatcher;
 use Arcanum\Test\Fixture\CapturingKernel;
 use Psr\EventDispatcher\EventDispatcherInterface;
@@ -38,6 +39,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 #[UsesClass(HttpException::class)]
 #[UsesClass(StatusCode::class)]
 #[UsesClass(\Arcanum\Hyper\Phrase::class)]
+#[UsesClass(Lifecycle::class)]
 #[UsesClass(RouteDispatcher::class)]
 #[UsesClass(MiddlewareRegistry::class)]
 #[UsesClass(Route::class)]
