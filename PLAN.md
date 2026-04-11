@@ -99,8 +99,8 @@ The fix: split the god object, move resolution upstream, and put every template 
 - [x] **Update `hx-target-422` references to `hx-status:422`.** Verified: no references to the old `response-targets` extension exist in framework code, README, or starter app. PLAN.md already uses v4 `hx-status:422` syntax.
 
 ##### Documentation
-- [ ] **Update Htmx README** with the validation error pattern, `morph:outerHTML`, `hx-status:422`, the form partial convention, and the fallback chain.
-- [ ] **Update COMPENDIUM** with the status-specific error template convention.
+- [x] **Update Htmx README** with the validation error pattern, `morph:outerHTML`, `hx-status:422`, the form partial convention, and the fallback chain. Also fixed stale `withTriggerAfterSwap` example in the response builder section.
+- [x] **Update COMPENDIUM** with the status-specific error template convention. Added to the "Naming derives behavior" section.
 
 #### Cross-cutting
 - [ ] **Run `composer check` after each commit.**
