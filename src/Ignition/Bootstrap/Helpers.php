@@ -15,6 +15,7 @@ use Arcanum\Shodo\HelperRegistry;
 use Arcanum\Shodo\HelperResolver;
 use Arcanum\Shodo\Helpers\ArrHelper;
 use Arcanum\Shodo\Helpers\FormatHelper;
+use Arcanum\Shodo\Helpers\CsrfHelper;
 use Arcanum\Shodo\Helpers\HtmlHelper;
 use Arcanum\Shodo\Helpers\RouteHelper;
 use Arcanum\Shodo\Helpers\StrHelper;
@@ -26,7 +27,7 @@ use Arcanum\Vault\PrefixedCache;
  * discovery, and the HelperResolver that formatters use at render time.
  *
  * Must run after Bootstrap\Routing (needs UrlResolver) and
- * Bootstrap\Sessions (needs ActiveSession for HtmlHelper).
+ * Bootstrap\Sessions (needs ActiveSession for CsrfHelper).
  */
 class Helpers implements Bootstrapper
 {
@@ -39,11 +40,12 @@ class Helpers implements Bootstrapper
         $global->register('Format', new FormatHelper());
         $global->register('Str', new StrHelper());
         $global->register('Arr', new ArrHelper());
+        $global->register('Html', new HtmlHelper());
 
         if ($container->has(ActiveSession::class)) {
             /** @var ActiveSession $session */
             $session = $container->get(ActiveSession::class);
-            $global->register('Html', new HtmlHelper($session));
+            $global->register('Csrf', new CsrfHelper($session));
         }
 
         if ($container->has(UrlResolver::class)) {

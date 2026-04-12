@@ -29,7 +29,7 @@ final class CsrfDirective implements CompilerDirective
     {
         return $context->replace(
             '/\{\{\s*csrf\s*\}\}/',
-            '<?= $__helpers[\'Html\']->csrf() ?>',
+            '<?= $__helpers[\'Csrf\']->field() ?>',
             $source,
         );
     }

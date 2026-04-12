@@ -126,6 +126,31 @@ The guestbook demo relies on a database and a migrated table. A fresh clone has 
 - [x] **Database configured but table missing.** When the connection exists but `guestbook_entries` doesn't (migrations haven't run), shows "Database table missing" with `php bin/arcanum migrate` instructions. `GetEntriesHandler` catches `PDOException` and returns an `error` key; `GetEntries.html` renders the guidance message.
 - [x] **Quick start docs.** Updated the starter app README's quick start section to include `php bin/arcanum migrate` as a setup step after `composer install`.
 
+### Context-specific output encoding — active
+
+Split `HtmlHelper` into a dependency-free encoding utility and a dedicated `CsrfHelper` that owns the `ActiveSession`. Add OWASP-aligned encoding methods for URL, JS, HTML attribute, and CSS contexts.
+
+#### Phase 1: Extract CsrfHelper
+- [ ] **Create `CsrfHelper`.** Moves `csrf()` and `csrfToken()` from `HtmlHelper`. Takes `ActiveSession`. Registered as `Csrf` alias. Rename `csrf()` → `field()` for clarity (`Csrf::field()`, `Csrf::token()`).
+- [ ] **Update `{{ csrf }}` directive.** Rewrite from `Html::csrf()` to `Csrf::field()` in `CsrfDirective`.
+- [ ] **Update `Bootstrap\Helpers`.** Register `CsrfHelper` as `Csrf`. Remove `ActiveSession` from `HtmlHelper` construction.
+
+#### Phase 2: Encoding helpers on HtmlHelper
+- [ ] **`Html::url($href)`** — scheme validation. Allow `http`, `https`, `mailto`, `tel`, relative paths. Reject `javascript:`, `data:`, other schemes. Returns URL string for `{{ }}` to HTML-encode.
+- [ ] **`Html::js($value)`** — JS string encoding. Whitelist alphanumeric + `,._`, everything else → `\uHHHH`.
+- [ ] **`Html::attr($value)`** — strict HTML attribute encoding. Non-alphanumeric → `&#xHH;`.
+- [ ] **`Html::css($value)`** — CSS hex encoding. Non-alphanumeric → `\HEX `.
+- [ ] **Strip `HtmlHelper` of `ActiveSession`.** Remove constructor, make methods static or keep instance with no dependencies. Keep `nonce()`, `classIf()`.
+
+#### Phase 3: Documentation
+- [ ] **Update Shodo README** — encoding context guide, helper usage examples, `Csrf` alias.
+- [ ] **Update COMPENDIUM** — new helpers, CsrfHelper.
+- [ ] **Update Htmx README** — `Html::csrfToken()` → `Csrf::token()`.
+
+#### Cross-cutting
+- [ ] **`composer check` after each commit.**
+- [ ] **Starter app references** — update any `Html::csrf()` / `Html::csrfToken()` usage to `Csrf::field()` / `Csrf::token()`.
+
 ### Welcome page — nice-to-haves (deferred)
 
 The Index redesign landed (nine-section structure, real diagnostics, CSS-only tabs, copy buttons, ASCII rune). The leftovers are explicitly optional:
@@ -141,11 +166,21 @@ The Index redesign landed (nine-section structure, real diagnostics, CSS-only ta
 
 ## Pre-1.0 Required
 
-- **Context-specific output encoding** — Shodo's `{{ }}` provides HTML entity encoding via `htmlspecialchars(ENT_QUOTES, UTF-8)`. This is correct for HTML body text and quoted HTML attributes. It is **not** correct for URL, JavaScript, or CSS contexts, each of which requires its own encoding per OWASP XSS Prevention guidelines. Today's starter app is safe because it never places user data in these contexts, but the framework provides no guard rails if an app developer does. Before 1.0, Arcanum needs:
-  - **URL sanitization helper** — `Html::url($href)` or similar that rejects `javascript:` and `data:` URI schemes. This is the most likely footgun — a handler passes a user-supplied URL to a template, the template puts it in `href="{{ $url }}"`, and HTML encoding prevents attribute breakout but not scheme injection. The helper should validate the scheme (allow `http`, `https`, `mailto`, `tel`, and relative paths; reject everything else) and HTML-encode the result. Use it in templates as `href="{{ Html::url($link) }}"`.
-  - **JavaScript encoding helper** — `Html::js($value)` for the rare case where a variable is placed in a JavaScript string context (`<script>var x = '...'</script>` or JSON embedded in a `<script>` tag). Should use `\uXXXX` Unicode encoding per OWASP.
-  - **Documentation** — clearly state that `{{ }}` is HTML encoding only, explain the five OWASP contexts, and point developers to the context-specific helpers. The Shodo README and the framework's security documentation should cover this.
-  - CSS encoding is lowest priority — inline `style` attributes with user data are rare and almost always a design mistake. Document the risk; add a helper later if demand surfaces.
+- **Context-specific output encoding** — Shodo's `{{ }}` provides HTML entity encoding via `htmlspecialchars(ENT_QUOTES, UTF-8)`. This is correct for HTML body text and quoted HTML attributes. It is **not** correct for URL, JavaScript, or CSS contexts, each of which requires its own encoding per OWASP XSS Prevention guidelines. Today's starter app is safe because it never places user data in these contexts, but the framework provides no guard rails if an app developer does. Research (April 2026) confirmed that manual encoding helpers are the industry-standard approach for regex-compiled template engines; true context-aware auto-escaping (parsing HTML structure to detect variable context) is tracked as a long-distance future item for Shodo. Before 1.0, Arcanum ships encoding helpers on `HtmlHelper`:
+
+  **URL sanitization:**
+  - `Html::url($href)` — validates the scheme (allow `http`, `https`, `mailto`, `tel`, and relative paths; reject `javascript:`, `data:`, and everything else). Returns the URL as-is for `{{ }}` to HTML-encode. The most likely real-world footgun — `href="{{ $userUrl }}"` is safe against attribute breakout but not scheme injection.
+
+  **Context-specific encoding strategies** (following OWASP XSS Prevention Cheat Sheet):
+  - `Html::js($value)` — whitelist regex, everything non-alphanumeric → `\uHHHH`. For variables in JavaScript string contexts. Recommended pattern: use `data-` attributes instead when possible, but the helper exists for cases where inline JS is unavoidable.
+  - `Html::attr($value)` — OWASP-compliant HTML attribute encoding, non-alphanumeric → `&#xHH;`. Stricter than `htmlspecialchars` for unquoted or event-handler attributes.
+  - `Html::css($value)` — everything non-alphanumeric → `\HEX ` (CSS hex escaping). For the rare case of user data in `style` attributes.
+
+  **Documentation:**
+  - Clearly state that `{{ }}` is HTML body/attribute encoding only
+  - Explain the five OWASP contexts and when each helper is needed
+  - Recommend `data-` attributes over inline JS as the primary pattern
+  - Update the Shodo README and COMPENDIUM
 
   Surfaced during a systematic OWASP XSS audit (April 2026). The three concrete escaping fixes from that audit (HtmlHelper::csrf token escaping, HtmxHelper::script attribute escaping, JsonFormatter full HEX flags) are already landed.
 
@@ -166,6 +201,7 @@ The Index redesign landed (nine-section structure, real diagnostics, CSS-only ta
 
 ## Long-Distance Future
 
+- **Shodo context-aware auto-escaping** — Today Shodo applies `htmlspecialchars` uniformly to all `{{ }}` output and relies on manual `Html::url()` / `Html::js()` / `Html::attr()` / `Html::css()` helpers for non-HTML contexts. The gold standard is context-aware auto-escaping: the compiler parses the HTML structure during compilation and automatically applies the correct encoding based on where each variable sits (body text, quoted attribute, `href`/`src` attribute, `<script>` block, `<style>` block, event handler). This eliminates the developer's responsibility to remember which helper to use — the compiler does it for them. Requires replacing Shodo's regex-based compiler with an HTML-aware tokenizer that tracks context state through the template. Major architectural change. The manual helpers shipped pre-1.0 remain useful as escape hatches for edge cases the auto-escaper can't detect, so this is additive, not a rewrite of the helper work.
 - **Shodo `Template\` namespace consolidation** — Move `TemplateAnalyzer`, `TemplateCache`, `TemplateCompiler`, `TemplateEngine`, `TemplateResolver` to `Arcanum\Shodo\Template\{Analyzer, Cache, Compiler, Engine, Resolver}`. The `Template` prefix is doing the job of a namespace. Consider also moving `CompilerContext` and `CompilerDirective` into the same subtree (or a `Shodo\Compiler\` namespace). Mechanical rename across all imports — easier the sooner it happens, before external consumers exist.
 - **Reserved-filename collision in `app/Pages/`** — Any convention-based discovery file inside `app/Pages/` collides with a potential Page URL route. Today `app/Pages/Middleware.php` is picked up by `MiddlewareDiscovery` as scoped middleware for `App\Pages\*`, which means a developer who wants to make `/middleware.html` a real page by creating `app/Pages/Middleware.php` will either silently get a middleware config file instead of a page or hit a confusing runtime error when `PageDiscovery` and `MiddlewareDiscovery` disagree about what the file is. Same problem will hit `Helpers.php` once the discovery alignment below lands. The fix has two parts:
 
