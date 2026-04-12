@@ -176,7 +176,10 @@ final class MiddlewareBusTest extends TestCase
 
         $loggerMock->expects($this->once())
             ->method('warning')
-            ->with($this->stringContains('DeleteDoSomethingHandler'));
+            ->with(
+                'Handler not found, falling back to unprefixed',
+                $this->callback(fn(array $ctx) => str_contains($ctx['prefixed'], 'DeleteDoSomethingHandler')),
+            );
 
         $bus = new MiddlewareBus(new Container(), debug: true, logger: $loggerMock);
 
@@ -184,7 +187,7 @@ final class MiddlewareBusTest extends TestCase
         $bus->dispatch(new DoSomething('test'), prefix: 'Delete');
     }
 
-    public function testFallbackDoesNotLogInProductionMode(): void
+    public function testFallbackLogsWarningInProductionMode(): void
     {
         // Arrange
         $channel = new \Arcanum\Quill\Channel(new \Monolog\Logger('test'));
@@ -195,8 +198,12 @@ final class MiddlewareBusTest extends TestCase
             ->onlyMethods(['warning'])
             ->getMock();
 
-        $loggerMock->expects($this->never())
-            ->method('warning');
+        $loggerMock->expects($this->once())
+            ->method('warning')
+            ->with(
+                'Handler not found, falling back to unprefixed',
+                $this->anything(),
+            );
 
         $bus = new MiddlewareBus(new Container(), debug: false, logger: $loggerMock);
 
@@ -337,7 +344,8 @@ final class MiddlewareBusTest extends TestCase
         // Arrange
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects($this->once())->method('warning')->with(
-            $this->stringContains('has validation rules but no ValidationGuard'),
+            'ValidationGuard missing for DTO with rules',
+            $this->callback(fn(array $ctx) => isset($ctx['dto'])),
         );
         $bus = new MiddlewareBus(new Container(), debug: false, logger: $logger);
 

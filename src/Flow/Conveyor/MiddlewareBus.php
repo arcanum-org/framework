@@ -98,13 +98,10 @@ class MiddlewareBus implements Bus
                 return $this->container->get($prefixedName);
             }
 
-            if ($this->debug && $this->logger !== null) {
-                $this->logger->warning(sprintf(
-                    'Handler "%s" not found, falling back to "%s".',
-                    $prefixedName,
-                    $this->handlerNameFor($object),
-                ));
-            }
+            $this->logger?->warning('Handler not found, falling back to unprefixed', [
+                'prefixed' => $prefixedName,
+                'fallback' => $this->handlerNameFor($object),
+            ]);
         }
 
         $handlerName = $this->handlerNameFor($object);
@@ -166,17 +163,19 @@ class MiddlewareBus implements Bus
             return;
         }
 
-        $message = sprintf(
-            'DTO "%s" has validation rules but no ValidationGuard is registered. '
-            . 'Validation will not run. Register ValidationGuard as before-middleware on the bus.',
-            get_class($object),
-        );
+        $dtoClass = get_class($object);
 
         if ($this->debug) {
-            throw new \RuntimeException($message);
+            throw new \RuntimeException(sprintf(
+                'DTO "%s" has validation rules but no ValidationGuard is registered. '
+                . 'Validation will not run. Register ValidationGuard as before-middleware on the bus.',
+                $dtoClass,
+            ));
         }
 
-        $this->logger?->warning($message);
+        $this->logger?->warning('ValidationGuard missing for DTO with rules', [
+            'dto' => $dtoClass,
+        ]);
     }
 
     /**
