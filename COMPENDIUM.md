@@ -114,12 +114,53 @@ Arcanum has opinions about the front end. They aren't required — you can swap 
 
 - **Validation** — Attribute-based validation on DTO constructor params. 11 built-in rules: `NotEmpty`, `MinLength`, `MaxLength`, `Min`, `Max`, `Email`, `Pattern`, `In`, `Url`, `Uuid`, `Callback`. `ValidationGuard` Conveyor middleware fires before handlers. Custom rules via the `Rule` interface.
 - **Glitch** — Error/exception/shutdown handling. `ExceptionHandler`, `ExceptionRenderer`, `HttpException` with the full `StatusCode` enum. `ArcanumException` interface gives every framework exception a `getTitle()` and `getSuggestion()` (RFC 9457 forward-compatible).
-- **Quill** — Multi-channel PSR-3 logger over Monolog. `ChannelLogger` for named channels.
+- **Quill** — Multi-channel PSR-3 logger over Monolog. `ChannelLogger` for named channels. `CorrelationProcessor` tags every log record with a `correlation_id` for grouping related lines within a unit of work.
 - **Echo** — PSR-14 event dispatcher. Uses Flow Pipeline internally. Stoppable propagation, mutable events.
 - **Throttle** — Rate limiting. `Throttler` interface, `TokenBucket` and `SlidingWindow` strategies, `RateLimiter`, `Quota` value object with `isAllowed()` and `headers()` (X-RateLimit-* + Retry-After).
 - **Testing** — Test harness for app developers. `TestKernel` builds a shared Cabinet container with a `FrozenClock` (pinned at `2026-01-01`), an `ArrayDriver` cache, and an `ActiveIdentity`, then exposes lazy `http()` / `cli()` surfaces that wrap real `HyperKernel` / `RuneKernel` instances bootstrapping against that same container — so cross-transport tests share state and `actingAs($identity)` set on the parent kernel is visible from both. `HttpTestSurface` translates fluent `get/post/put/patch/delete` calls into real PSR-7 `ServerRequest`s with persistent `withHeader()`; `CliTestSurface::run(argv)` returns a `CliResult` (`exitCode`, `stdout`, `stderr`) backed by a fresh `BufferedOutput` per call. Both surfaces support fixture-handler injection (`setCoreHandler` / `setRunner`) for round-trip dispatch tests. `Factory::make($class, $overrides)` produces valid DTOs by composing `Codex\Hydrator` and synthesizing values from validation attributes for any constructor parameter without an override or default — recurses into nested DTOs, throws `FactoryException` (an `ArcanumException`) on `#[Pattern]`/`#[Callback]` with a "provide an override" hint. The internal kernels use empty bootstrappers lists so they don't re-run the production chain and stomp the test bindings; future production-bootstrapper opt-in (`withDatabase()`, etc.) is a builder-shape question for later.
 - **Htmx** — First-class htmx 4 support. `HtmxAwareResponseRenderer` picks the rendering shape (full page, content section, element-by-id extraction). `HtmxRequest` decorator with typed accessors for all htmx headers. `ClientBroadcast` interface projects domain events as `HX-Trigger` headers; `EventCapture` + `HtmxEventTriggerMiddleware` wire them together. `FragmentDirective` adds `{{ fragment 'id' }}` for explicit innerHTML opt-in via the Shodo `CompilerDirective` system. `HtmxRequestMiddleware` (request context, Vary header, CSRF endpoint), `HtmxAuthRedirectMiddleware` (401/403 → `HX-Location`), `HtmxCsrfController` (JS shim), `HtmxHelper` (`Htmx::script()`, `Htmx::csrf()`). `HtmxResponse` immutable builder, `HtmxLocation` value object. Config via `config/htmx.php`.
 - **Hourglass** — Time primitives. `Clock` interface extending PSR-20, `SystemClock`, `FrozenClock` (caller-controlled pinned clock — useful for replay, batch jobs, simulations, deterministic tests). `Bootstrap\Hourglass` registers `Clock::class → SystemClock` so any class taking a `Clock` constructor argument gets the wall-clock implementation auto-wired in production; tests pass a `FrozenClock` directly. **Adopted by Vault `ArrayDriver`/`FileDriver` for TTL math, Throttle `TokenBucket`/`SlidingWindow` for window math, and Auth `CliSession` for expiry** — those packages no longer call `time()` directly. `Interval` is a small static helper (`secondsIn(\DateInterval): int`, `ofSeconds(int): \DateInterval`) used by all four Vault drivers to normalize PSR-16 `DateInterval|int|null` TTLs into seconds — eliminates duplicated epoch-anchor incantations and pins down the documented `P1M`→31d / `P1Y`→365d behavior in one place. `Stopwatch` records labeled `Instant`s across the process lifetime. Built-in marks — HTTP: `arcanum.start`, `boot.complete`, `request.received`, `handler.start`/`complete`, `render.start`/`complete`, `request.handled`, `response.sent`, `arcanum.complete`. CLI: `arcanum.start`, `boot.complete`, `command.received`, `handler.start`/`complete`, `command.handled`, `command.completed`, `arcanum.complete`. Static accessor `Stopwatch::tap()` is write-only and no-ops when uninstalled; `Stopwatch::current()` throws when uninstalled (read sites should fail loudly). Stopwatch deliberately does *not* go through Clock — they model different things. Clock answers "what time is it?" (fakeable wall-clock now), Stopwatch answers "how much time has passed?" (elapsed-time telemetry). Conflating them would mean a test that froze Clock to assert TTL behavior would also freeze Stopwatch, hiding the real elapsed time the test wants to measure.
+
+---
+
+## Framework logging
+
+The framework logs decisions, not data. Every log call uses null-safe `$this->logger?->method()` — when no logger is configured, it short-circuits with zero cost.
+
+**Correlation.** `Bootstrap\Logger` registers a `CorrelationProcessor` on every Monolog channel. The kernels generate a random 16-character hex ID at the start of each `handle()` cycle and clear it afterward. Every log line emitted during that cycle carries the same `correlation_id` in its extra data, making interleaved concurrent requests easy to trace.
+
+**One INFO line per request.** The "access log" is a single INFO entry when the request completes: method, path, status code (HTTP) or command name and exit code (CLI). Everything else is DEBUG or NOTICE.
+
+**What the framework logs:**
+
+| Component | Level | What |
+|---|---|---|
+| HyperKernel | DEBUG | Request received (method, path) |
+| HyperKernel | INFO | Request handled (method, path, status) |
+| RuneKernel | DEBUG | Command received (name) |
+| RuneKernel | INFO | Command completed (name, exit code) |
+| HttpRouter | DEBUG | Route resolved (type, DTO class, format) |
+| HttpRouter | DEBUG | Route not found (path) |
+| HttpRouter | NOTICE | Method not allowed (path, method, allowed) |
+| HttpRouter | NOTICE | Format not acceptable (format, allowed) |
+| CliRouter | DEBUG | Command resolved (type, DTO class) |
+| CliRouter | DEBUG | Command not found (input) |
+| RouteDispatcher | DEBUG | Dispatching (DTO class, handler prefix, middleware counts) |
+| AuthMiddleware | INFO | Identity resolved (guard type) |
+| AuthMiddleware | DEBUG | No identity resolved |
+| SessionMiddleware | DEBUG | Session started / loaded / saved |
+| SessionMiddleware | NOTICE | Session regenerated / invalidated |
+| RateLimiter | DEBUG | Rate check passed (key, remaining) |
+| RateLimiter | NOTICE | Rate limit exceeded (key, limit, retry-after) |
+| Migrator | INFO | Migration applied / rolled back (file, elapsed ms) |
+| Migrator | WARNING | Checksum mismatch (file, expected, actual) |
+| Migrator | ERROR | Migration failed (file, error) |
+
+**What the framework never logs:** session IDs, auth tokens, passwords, request/response bodies.
+
+**Exceptions are already handled.** Glitch `LogReporter` logs exceptions at ERROR/CRITICAL via channel routing. The kernel logs lifecycle; Glitch logs failures — no duplication.
+
+**Bring your own logger.** `Bootstrap\Logger` binds `LoggerInterface` to `QuillLogger` with a `has()` guard. If the app registers a custom PSR-3 implementation before `Bootstrap\Logger` runs, the framework respects it.
 
 ---
 
