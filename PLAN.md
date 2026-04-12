@@ -4,6 +4,22 @@
 
 ---
 
+## On Deck (needs planning and checklists)
+
+These are the highest-impact items from the backlog. Each needs to be broken into a walkable checklist before work begins.
+
+1. **Logging instrumentation** — The only pre-1.0 blocker. The framework is silent in production. Inject `?LoggerInterface` progressively across the HTTP lifecycle first (routing → dispatch → render → response), then expand to auth, cache, throttle, migrations. Log *decisions*, not *data*. Null means silent — no performance cost when logging is disabled.
+
+2. **Todo App dogfood** — Build a full Todo app using the starter app. SQLite via Forge, Vault caching, auth with sessions, Tailwind + htmx front-end. Full CRUD, task lists, completion toggling, filtering. Then write a retrospective: pain points, what worked, friction in the DX, missing features. The retrospective feeds back into new plan items. This is how we find what we can't see from the framework side.
+
+3. **Hyper README** — The only core package without a README. Document PSR-7 message classes, response renderers, exception renderers, format registry, file uploads, URI handling. Quick win, high credibility impact.
+
+4. **PSR-18 HTTP Client** — Any real app needs outgoing HTTP requests (APIs, OAuth, webhooks). Wrap an established library, implement PSR-18 `ClientInterface` and PSR-17 factories over Hyper's existing PSR-7 classes. Bootstrap registration, testing mock, logging integration.
+
+5. **Integration test coverage** — Only 2 integration tests exist today (`CqrsLifecycleTest`, `HelperResolutionTest`). Unit tests miss interaction bugs: discovery ordering, bootstrap sequencing, round-trip rendering, lifecycle event flow. TestKernel already exists — expanding coverage is cheap. Long-tail effort: every new feature should land with at least one integration test.
+
+---
+
 ## Completed Work
 
 One-line summaries. Details are in git history and the COMPENDIUM.
@@ -29,23 +45,6 @@ One-line summaries. Details are in git history and the COMPENDIUM.
 
 ---
 
-## Pre-1.0 Required
-
-- **Logging instrumentation** — The framework is too quiet. Almost nothing logs. A developer running an Arcanum app in production has no visibility into what the framework is doing unless something throws. Before 1.0, instrument the framework with PSR-3 logging via Quill at key decision points. Guiding principle: log *decisions*, not *data* — a log line should tell you *what the framework decided to do and why*, not dump request bodies or SQL results. Use appropriate levels (debug for routine decisions, info for lifecycle milestones, warning for fall-throughs and degraded states, error for caught failures). Candidate instrumentation sites:
-  - **Bootstrap chain** — which bootstrappers ran and in what order (debug). Slow bootstrappers (info with elapsed time).
-  - **Routing** — which DTO class a request resolved to, or that no route matched (debug). Wrong HTTP method → 405 (info).
-  - **Middleware** — which middleware ran for a request (debug). Middleware that short-circuited (info with reason).
-  - **Conveyor dispatch** — handler class resolved, validation/auth guard decisions (debug). Validation failure details (info).
-  - **Rendering** — which formatter and template were used, cache hit vs miss (debug). Fragment extraction fall-through (warning, already exists in HtmlFormatter).
-  - **Migrations** — each migration applied or rolled back (info). Checksum mismatch (warning).
-  - **Auth** — guard decisions: authenticated vs rejected, which guard, which identity (info). Session created/destroyed (debug).
-  - **Cache** — Vault store hits/misses at debug level. Framework cache rebuilds (config, templates, pages, middleware, helpers) at info.
-  - **Throttle** — rate limit decisions: allowed vs rejected, remaining quota (debug). Limit exceeded (info with client identifier).
-  - **Lifecycle events** — RequestReceived, RequestHandled, RequestFailed, ResponseSent, CommandReceived, CommandHandled, CommandFailed, CommandCompleted. Log at debug with timing from Stopwatch marks.
-  - **Exceptions** — Glitch already handles rendering, but the decision of *which* renderer was chosen and what status code was returned should log at info.
-
-  Implementation approach: inject `?LoggerInterface` as a nullable constructor parameter (same pattern HtmlFormatter already uses). Null means silent — no performance cost when logging is disabled. The starter app's `config/log.php` configures Quill channels; framework packages log to a `framework` channel by default. This is a long-tail effort — instrument progressively, not all at once. Start with the HTTP lifecycle (routing → dispatch → render → response) since that's the most visible path.
-
 ## Long-Distance Future
 
 - **Shodo context-aware auto-escaping** — Replace regex-based compiler with an HTML-aware tokenizer that detects variable context (body text, attribute, href, script, style, event handler) and applies the correct encoding automatically. The manual helpers shipped pre-1.0 remain useful as escape hatches. Major architectural change.
@@ -55,18 +54,14 @@ One-line summaries. Details are in git history and the COMPENDIUM.
 - **`cache:clear --store=NAME` accepts framework cache names** — Extend to recognize `templates`, `config`, `pages`, `middleware` and route to the right `Clearable`.
 - **Shodo verbatim directive** — `{{ skip }}...{{ resume }}` to prevent template compilation inside code examples. Pre-pass: capture, placeholder, compile, restore.
 - **FastCGI / post-response work patterns** — Document the contract, consider `DeferredWork` abstraction, handle non-FCGI SAPIs (RoadRunner, FrankenPHP, Swoole).
-- **Hyper README** — the only core package without a README.
 - **RFC 9457 Problem Details** — `application/problem+json` error responses. Forward-compatible with `ArcanumException`.
-- **PSR-18 HTTP Client** — Wrap an established library for outgoing HTTP requests. PSR-17 factories over Hyper's PSR-7 classes. Bootstrap, testing mock, logging.
 - **PSR-13 Hypermedia Links** — `LinkInterface`/`LinkProviderInterface` for handler-declared relationships. `LinkHeaderMiddleware` serializes to RFC 8288 `Link` headers. Pagination as first concrete use case.
 - **Queue/Job system** — async processing with drivers (Redis, database, SQS).
 - **`TestKernel` transactional database wrapping** — Wrap each test in a transaction, rollback at teardown.
 - **`AbstractKernel` base class** — Deduplicate constructor, directory accessors, bootstrap loop between HyperKernel and RuneKernel (~80 lines). Pure refactor.
-- **Integration test coverage** — Expand `tests/Integration/` beyond the current 2 files. Long-tail effort.
 - **Internationalization** — translation strings, locale detection, pluralization.
 - **Task scheduling** — `schedule:run` cron dispatcher.
 - **Mail/Notifications** — thin wrappers or Symfony Mailer integration.
-- **Todo App dogfood** — Build a full Todo app to experience the framework as an app developer. Write a retrospective. Feeds back into new plan items.
 - **Arcanum Wizard** — Interactive project scaffolding. Must wait until after the Todo App dogfood.
 
 ---
