@@ -379,13 +379,13 @@ final class HtmlFormatterTest extends TestCase
             '<form>{{ csrf }}</form>',
         );
         $helper = new class {
-            public function csrf(): string
+            public function field(): string
             {
                 return '<input type="hidden" name="_token" value="abc123">';
             }
         };
         $registry = new HelperRegistry();
-        $registry->register('Html', $helper);
+        $registry->register('Csrf', $helper);
         $resolver = new HelperResolver($registry);
         $formatter = $this->createFormatter(helpers: $resolver);
 

@@ -808,7 +808,7 @@ final class TemplateCompilerTest extends TestCase
 
         // Assert — raw output, no $__escape
         $this->assertSame(
-            '<?= $__helpers[\'Html\']->csrf() ?>',
+            '<?= $__helpers[\'Csrf\']->field() ?>',
             $result,
         );
     }
@@ -823,7 +823,7 @@ final class TemplateCompilerTest extends TestCase
 
         // Assert
         $this->assertSame(
-            '<form><?= $__helpers[\'Html\']->csrf() ?><button>Submit</button></form>',
+            '<form><?= $__helpers[\'Csrf\']->field() ?><button>Submit</button></form>',
             $result,
         );
     }

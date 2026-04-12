@@ -31,7 +31,7 @@ Your layout template needs three things in the `<head>`:
 ```html
 <head>
     {{! Htmx::script() !}}
-    <meta name="csrf-token" content="{{ Html::csrfToken() }}">
+    <meta name="csrf-token" content="{{ Csrf::token() }}">
     {{! Htmx::csrf() !}}
 </head>
 ```

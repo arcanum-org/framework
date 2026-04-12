@@ -338,11 +338,11 @@ Template helpers provide reusable functions callable from templates using static
 {{ Format::number($price, 2) }}
 {{ Route::url('App\\Domain\\Query\\Health') }}
 {{ Str::truncate($description, 100) }}
-{{! Html::csrf() !}}
+{{! Csrf::field() !}}
 {{ csrf }}
 ```
 
-The compiler rewrites `Name::method(...)` to `$__helpers['Name']->method(...)`. Escaped output (`{{ }}`) wraps the result in `$__escape`; raw output (`{{! !}}`) does not. The `{{ csrf }}` directive is shorthand for `{{! Html::csrf() !}}`.
+The compiler rewrites `Name::method(...)` to `$__helpers['Name']->method(...)`. Escaped output (`{{ }}`) wraps the result in `$__escape`; raw output (`{{! !}}`) does not. The `{{ csrf }}` directive is shorthand for `{{! Csrf::field() !}}`.
 
 ### Helper calls inside expressions
 
@@ -381,9 +381,26 @@ The lookbehind also leaves `$Format::method()` (variable static call) and partia
 | **Str** | `StrHelper` | `truncate($text, $length, $suffix)`, `lower($str)`, `upper($str)`, `title($str)`, `kebab($str)` |
 | **Arr** | `ArrHelper` | `count($items)`, `join($items, $sep)`, `first($items)`, `last($items)` |
 | **Route** | `RouteHelper` | `url($dtoClass)`, `asset($path)` — requires HTTP bootstrap |
-| **Html** | `HtmlHelper` | `csrf()`, `csrfToken()`, `nonce()`, `classIf($cond, $class)` — requires HTTP bootstrap |
+| **Html** | `HtmlHelper` | `url($href)`, `js($value)`, `attr($value)`, `css($value)`, `nonce()`, `classIf($cond, $class)` |
+| **Csrf** | `CsrfHelper` | `field()`, `token()` — requires HTTP bootstrap (ActiveSession) |
 
-Format, Str, and Arr are always available. Route and Html are registered by the HTTP bootstrap when their dependencies exist (UrlResolver, ActiveSession).
+Format, Str, Arr, and Html are always available. Route and Csrf are registered by the HTTP bootstrap when their dependencies exist (UrlResolver, ActiveSession).
+
+### Context-specific output encoding
+
+Shodo's `{{ }}` applies `htmlspecialchars()` — correct for HTML body text and quoted attributes, but not for other contexts. The `Html` helper provides the right encoding for each OWASP context:
+
+```html
+<a href="{{ Html::url($userLink) }}">Profile</a>        URL scheme validation
+<div title={{ Html::attr($title) }}>                     strict attribute encoding
+<script>var name = '{{ Html::js($name) }}';</script>     JS string encoding
+<div style="color: {{ Html::css($color) }}">              CSS value encoding
+```
+
+- **`Html::url()`** rejects `javascript:`, `data:`, and other dangerous schemes. Safe schemes: `http`, `https`, `mailto`, `tel`, plus relative paths.
+- **`Html::js()`** encodes everything non-alphanumeric as `\uHHHH`. Prefer `data-` attributes over inline JS when possible.
+- **`Html::attr()`** encodes everything non-alphanumeric as `&#xHH;`. Use for unquoted or event-handler attributes.
+- **`Html::css()`** encodes everything non-alphanumeric as `\HEX `. Avoid user data in style attributes when possible.
 
 ### App-wide helpers (`app/Helpers/Helpers.php`)
 
