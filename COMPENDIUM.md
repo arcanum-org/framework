@@ -8,7 +8,7 @@ A guided tour of what Arcanum is, what's in it, and how the pieces fit together.
 
 ## What Arcanum is
 
-Arcanum is an opinionated, batteries-included **CQRS PHP framework** for building websites and services that stay readable as they grow. The defining stance: every read is a Query, every write is a Command, each one is its own DTO with its own handler — discovered by convention, validated by attribute, dispatched through middleware. Handlers stay tiny because the framework absorbs the ceremony.
+Arcanum is an opinionated, batteries-included **CQRS PHP framework** for building websites and services that stay readable and manageable at scale. The defining stance: every read is a Query, every write is a Command, each one is its own DTO with its own handler — discovered by convention, validated by attribute, dispatched through middleware. Handlers stay tiny because the framework absorbs the ceremony.
 
 It is **not** an MVC framework and **not** an ORM. It is built for developers who want fast handlers, real SQL, and a small mental model that doesn't grow with the codebase.
 
