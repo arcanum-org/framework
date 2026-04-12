@@ -126,30 +126,9 @@ The guestbook demo relies on a database and a migrated table. A fresh clone has 
 - [x] **Database configured but table missing.** When the connection exists but `guestbook_entries` doesn't (migrations haven't run), shows "Database table missing" with `php bin/arcanum migrate` instructions. `GetEntriesHandler` catches `PDOException` and returns an `error` key; `GetEntries.html` renders the guidance message.
 - [x] **Quick start docs.** Updated the starter app README's quick start section to include `php bin/arcanum migrate` as a setup step after `composer install`.
 
-### Context-specific output encoding — active
+### Context-specific output encoding — complete
 
-Split `HtmlHelper` into a dependency-free encoding utility and a dedicated `CsrfHelper` that owns the `ActiveSession`. Add OWASP-aligned encoding methods for URL, JS, HTML attribute, and CSS contexts.
-
-#### Phase 1: Extract CsrfHelper
-- [x] **Create `CsrfHelper`.** Moves `csrf()` and `csrfToken()` from `HtmlHelper`. Takes `ActiveSession`. Registered as `Csrf` alias. Rename `csrf()` → `field()` for clarity (`Csrf::field()`, `Csrf::token()`).
-- [x] **Update `{{ csrf }}` directive.** Rewrite from `Html::csrf()` to `Csrf::field()` in `CsrfDirective`.
-- [x] **Update `Bootstrap\Helpers`.** Register `CsrfHelper` as `Csrf`. Remove `ActiveSession` from `HtmlHelper` construction. Html registered unconditionally (no dependencies).
-
-#### Phase 2: Encoding helpers on HtmlHelper
-- [x] **`Html::url($href)`** — scheme validation. Allow `http`, `https`, `mailto`, `tel`, relative paths. Reject `javascript:`, `data:`, other schemes. Returns URL string for `{{ }}` to HTML-encode.
-- [x] **`Html::js($value)`** — JS string encoding. Whitelist alphanumeric + `,._`, everything else → `\uHHHH`. Surrogate pairs for characters outside the BMP.
-- [x] **`Html::attr($value)`** — strict HTML attribute encoding. Non-alphanumeric → `&#xHH;`. Undefined HTML characters → `&#xFFFD;`.
-- [x] **`Html::css($value)`** — CSS hex encoding. Non-alphanumeric → `\HEX `.
-- [x] **Strip `HtmlHelper` of `ActiveSession`.** No constructor, no dependencies. Keeps `nonce()`, `classIf()`.
-
-#### Phase 3: Documentation
-- [x] **Update Shodo README** — encoding context guide with examples, updated helper table, `Csrf` alias.
-- [x] **Update COMPENDIUM** — built-in helpers listed in Shodo description.
-- [x] **Update Htmx README** — `Html::csrfToken()` → `Csrf::token()`.
-
-#### Cross-cutting
-- [x] **`composer check` after each commit.**
-- [ ] **Starter app references** — update any `Html::csrf()` / `Html::csrfToken()` usage to `Csrf::field()` / `Csrf::token()`.
+Split `HtmlHelper` into a dependency-free encoding utility and a dedicated `CsrfHelper` that owns the `ActiveSession`. OWASP-aligned encoding helpers on `HtmlHelper`: `Html::url()` (scheme validation), `Html::js()` (JS string encoding), `Html::attr()` (strict HTML attribute encoding), `Html::css()` (CSS hex encoding). `CsrfHelper` registered as `Csrf` alias with `field()` and `token()`. `{{ csrf }}` directive updated. Starter app updated (arcanum-org/arcanum#1). Shodo README, Htmx README, and COMPENDIUM updated.
 
 ### Welcome page — nice-to-haves (deferred)
 
@@ -166,23 +145,7 @@ The Index redesign landed (nine-section structure, real diagnostics, CSS-only ta
 
 ## Pre-1.0 Required
 
-- **Context-specific output encoding** — Shodo's `{{ }}` provides HTML entity encoding via `htmlspecialchars(ENT_QUOTES, UTF-8)`. This is correct for HTML body text and quoted HTML attributes. It is **not** correct for URL, JavaScript, or CSS contexts, each of which requires its own encoding per OWASP XSS Prevention guidelines. Today's starter app is safe because it never places user data in these contexts, but the framework provides no guard rails if an app developer does. Research (April 2026) confirmed that manual encoding helpers are the industry-standard approach for regex-compiled template engines; true context-aware auto-escaping (parsing HTML structure to detect variable context) is tracked as a long-distance future item for Shodo. Before 1.0, Arcanum ships encoding helpers on `HtmlHelper`:
-
-  **URL sanitization:**
-  - `Html::url($href)` — validates the scheme (allow `http`, `https`, `mailto`, `tel`, and relative paths; reject `javascript:`, `data:`, and everything else). Returns the URL as-is for `{{ }}` to HTML-encode. The most likely real-world footgun — `href="{{ $userUrl }}"` is safe against attribute breakout but not scheme injection.
-
-  **Context-specific encoding strategies** (following OWASP XSS Prevention Cheat Sheet):
-  - `Html::js($value)` — whitelist regex, everything non-alphanumeric → `\uHHHH`. For variables in JavaScript string contexts. Recommended pattern: use `data-` attributes instead when possible, but the helper exists for cases where inline JS is unavoidable.
-  - `Html::attr($value)` — OWASP-compliant HTML attribute encoding, non-alphanumeric → `&#xHH;`. Stricter than `htmlspecialchars` for unquoted or event-handler attributes.
-  - `Html::css($value)` — everything non-alphanumeric → `\HEX ` (CSS hex escaping). For the rare case of user data in `style` attributes.
-
-  **Documentation:**
-  - Clearly state that `{{ }}` is HTML body/attribute encoding only
-  - Explain the five OWASP contexts and when each helper is needed
-  - Recommend `data-` attributes over inline JS as the primary pattern
-  - Update the Shodo README and COMPENDIUM
-
-  Surfaced during a systematic OWASP XSS audit (April 2026). The three concrete escaping fixes from that audit (HtmlHelper::csrf token escaping, HtmxHelper::script attribute escaping, JsonFormatter full HEX flags) are already landed.
+- ~~**Context-specific output encoding**~~ — Landed. `Html::url()` (scheme validation), `Html::js()` (JS string encoding), `Html::attr()` (strict attribute encoding), `Html::css()` (CSS hex encoding) on a dependency-free `HtmlHelper`. CSRF methods split to `CsrfHelper` (`Csrf::field()`, `Csrf::token()`). True context-aware auto-escaping (HTML structure parsing) tracked as long-distance future.
 
 - **Logging instrumentation** — The framework is too quiet. Almost nothing logs. A developer running an Arcanum app in production has no visibility into what the framework is doing unless something throws. Before 1.0, instrument the framework with PSR-3 logging via Quill at key decision points. Guiding principle: log *decisions*, not *data* — a log line should tell you *what the framework decided to do and why*, not dump request bodies or SQL results. Use appropriate levels (debug for routine decisions, info for lifecycle milestones, warning for fall-throughs and degraded states, error for caught failures). Candidate instrumentation sites:
   - **Bootstrap chain** — which bootstrappers ran and in what order (debug). Slow bootstrappers (info with elapsed time).
