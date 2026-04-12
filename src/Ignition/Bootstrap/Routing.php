@@ -145,8 +145,13 @@ class Routing implements Bootstrapper
         $pages = new PageResolver(namespace: $pagesNamespace);
         $container->instance(PageResolver::class, $pages);
 
-        $container->factory(Router::class, function () use ($resolver, $routeMap, $pages, $defaultFormat) {
-            return new HttpRouter($resolver, $routeMap, $pages, $defaultFormat);
+        $container->factory(Router::class, function () use ($container, $resolver, $routeMap, $pages, $defaultFormat) {
+            $logger = $container->has(\Psr\Log\LoggerInterface::class)
+                ? $container->get(\Psr\Log\LoggerInterface::class)
+                : null;
+
+            /** @var ?\Psr\Log\LoggerInterface $logger */
+            return new HttpRouter($resolver, $routeMap, $pages, $defaultFormat, $logger);
         });
 
         $container->instance(UrlResolver::class, new UrlResolver(
