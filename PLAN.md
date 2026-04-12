@@ -131,24 +131,24 @@ The guestbook demo relies on a database and a migrated table. A fresh clone has 
 Split `HtmlHelper` into a dependency-free encoding utility and a dedicated `CsrfHelper` that owns the `ActiveSession`. Add OWASP-aligned encoding methods for URL, JS, HTML attribute, and CSS contexts.
 
 #### Phase 1: Extract CsrfHelper
-- [ ] **Create `CsrfHelper`.** Moves `csrf()` and `csrfToken()` from `HtmlHelper`. Takes `ActiveSession`. Registered as `Csrf` alias. Rename `csrf()` → `field()` for clarity (`Csrf::field()`, `Csrf::token()`).
-- [ ] **Update `{{ csrf }}` directive.** Rewrite from `Html::csrf()` to `Csrf::field()` in `CsrfDirective`.
-- [ ] **Update `Bootstrap\Helpers`.** Register `CsrfHelper` as `Csrf`. Remove `ActiveSession` from `HtmlHelper` construction.
+- [x] **Create `CsrfHelper`.** Moves `csrf()` and `csrfToken()` from `HtmlHelper`. Takes `ActiveSession`. Registered as `Csrf` alias. Rename `csrf()` → `field()` for clarity (`Csrf::field()`, `Csrf::token()`).
+- [x] **Update `{{ csrf }}` directive.** Rewrite from `Html::csrf()` to `Csrf::field()` in `CsrfDirective`.
+- [x] **Update `Bootstrap\Helpers`.** Register `CsrfHelper` as `Csrf`. Remove `ActiveSession` from `HtmlHelper` construction. Html registered unconditionally (no dependencies).
 
 #### Phase 2: Encoding helpers on HtmlHelper
-- [ ] **`Html::url($href)`** — scheme validation. Allow `http`, `https`, `mailto`, `tel`, relative paths. Reject `javascript:`, `data:`, other schemes. Returns URL string for `{{ }}` to HTML-encode.
-- [ ] **`Html::js($value)`** — JS string encoding. Whitelist alphanumeric + `,._`, everything else → `\uHHHH`.
-- [ ] **`Html::attr($value)`** — strict HTML attribute encoding. Non-alphanumeric → `&#xHH;`.
-- [ ] **`Html::css($value)`** — CSS hex encoding. Non-alphanumeric → `\HEX `.
-- [ ] **Strip `HtmlHelper` of `ActiveSession`.** Remove constructor, make methods static or keep instance with no dependencies. Keep `nonce()`, `classIf()`.
+- [x] **`Html::url($href)`** — scheme validation. Allow `http`, `https`, `mailto`, `tel`, relative paths. Reject `javascript:`, `data:`, other schemes. Returns URL string for `{{ }}` to HTML-encode.
+- [x] **`Html::js($value)`** — JS string encoding. Whitelist alphanumeric + `,._`, everything else → `\uHHHH`. Surrogate pairs for characters outside the BMP.
+- [x] **`Html::attr($value)`** — strict HTML attribute encoding. Non-alphanumeric → `&#xHH;`. Undefined HTML characters → `&#xFFFD;`.
+- [x] **`Html::css($value)`** — CSS hex encoding. Non-alphanumeric → `\HEX `.
+- [x] **Strip `HtmlHelper` of `ActiveSession`.** No constructor, no dependencies. Keeps `nonce()`, `classIf()`.
 
 #### Phase 3: Documentation
-- [ ] **Update Shodo README** — encoding context guide, helper usage examples, `Csrf` alias.
-- [ ] **Update COMPENDIUM** — new helpers, CsrfHelper.
-- [ ] **Update Htmx README** — `Html::csrfToken()` → `Csrf::token()`.
+- [x] **Update Shodo README** — encoding context guide with examples, updated helper table, `Csrf` alias.
+- [x] **Update COMPENDIUM** — built-in helpers listed in Shodo description.
+- [x] **Update Htmx README** — `Html::csrfToken()` → `Csrf::token()`.
 
 #### Cross-cutting
-- [ ] **`composer check` after each commit.**
+- [x] **`composer check` after each commit.**
 - [ ] **Starter app references** — update any `Html::csrf()` / `Html::csrfToken()` usage to `Csrf::field()` / `Csrf::token()`.
 
 ### Welcome page — nice-to-haves (deferred)
