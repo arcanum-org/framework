@@ -15,10 +15,13 @@ use Arcanum\Hyper\Event\ResponseSent;
 use Arcanum\Hourglass\Stopwatch;
 use Arcanum\Hyper\HttpMiddleware;
 use Arcanum\Hyper\StatusCode;
+use Arcanum\Quill\CorrelationProcessor;
+use Arcanum\Toolkit\Random;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * A HyperKernel is the initial entry point for an HTTP application.
@@ -201,6 +204,13 @@ class HyperKernel implements Kernel, RequestHandlerInterface
      */
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
+        $logger = $this->resolveLogger();
+        $this->beginCorrelation();
+
+        $method = $request->getMethod();
+        $path = $request->getUri()->getPath();
+        $logger?->debug('Request received', ['method' => $method, 'path' => $path]);
+
         try {
             $request = $this->prepareRequest($request);
 
@@ -216,6 +226,8 @@ class HyperKernel implements Kernel, RequestHandlerInterface
                 new CallableHandler(fn() => $this->handleException($e)),
             );
             $this->lastResponse = $response;
+            $this->logRequestHandled($logger, $method, $path, $response);
+            $this->endCorrelation();
             return $response;
         }
 
@@ -250,6 +262,8 @@ class HyperKernel implements Kernel, RequestHandlerInterface
         }
 
         $this->lastResponse = $response;
+        $this->logRequestHandled($logger, $method, $path, $response);
+        $this->endCorrelation();
 
         return $response;
     }
@@ -444,5 +458,46 @@ class HyperKernel implements Kernel, RequestHandlerInterface
         }
 
         Stopwatch::tap('arcanum.complete');
+    }
+
+    private function resolveLogger(): ?LoggerInterface
+    {
+        if ($this->container->has(LoggerInterface::class)) {
+            /** @var LoggerInterface */
+            return $this->container->get(LoggerInterface::class);
+        }
+
+        return null;
+    }
+
+    private function beginCorrelation(): void
+    {
+        if ($this->container->has(CorrelationProcessor::class)) {
+            /** @var CorrelationProcessor $processor */
+            $processor = $this->container->get(CorrelationProcessor::class);
+            $processor->setCorrelationId(Random::hex(8));
+        }
+    }
+
+    private function endCorrelation(): void
+    {
+        if ($this->container->has(CorrelationProcessor::class)) {
+            /** @var CorrelationProcessor $processor */
+            $processor = $this->container->get(CorrelationProcessor::class);
+            $processor->clearCorrelationId();
+        }
+    }
+
+    private function logRequestHandled(
+        ?LoggerInterface $logger,
+        string $method,
+        string $path,
+        ResponseInterface $response,
+    ): void {
+        $logger?->info('Request handled', [
+            'method' => $method,
+            'path' => $path,
+            'status' => $response->getStatusCode(),
+        ]);
     }
 }

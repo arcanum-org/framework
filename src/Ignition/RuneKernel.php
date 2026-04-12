@@ -16,6 +16,7 @@ use Arcanum\Flow\Conveyor\AcceptedDTO;
 use Arcanum\Flow\Conveyor\Query;
 use Arcanum\Flow\Conveyor\QueryResult;
 use Arcanum\Hourglass\Stopwatch;
+use Arcanum\Quill\CorrelationProcessor;
 use Arcanum\Rune\CliExceptionWriter;
 use Arcanum\Rune\BuiltInRegistry;
 use Arcanum\Rune\Event\CommandCompleted;
@@ -27,6 +28,8 @@ use Arcanum\Rune\HelpWriter;
 use Arcanum\Rune\Input;
 use Arcanum\Rune\Output;
 use Arcanum\Shodo\CliFormatRegistry;
+use Arcanum\Toolkit\Random;
+use Psr\Log\LoggerInterface;
 
 /**
  * The CLI entry point — parallel to HyperKernel for HTTP.
@@ -159,6 +162,9 @@ class RuneKernel implements Kernel
      */
     public function handle(array $argv): int
     {
+        $logger = $this->resolveLogger();
+        $this->beginCorrelation();
+
         $input = Input::fromArgv($argv);
 
         /** @var Output $output */
@@ -166,8 +172,12 @@ class RuneKernel implements Kernel
 
         if ($input->command() === '') {
             $this->splash($output);
+            $this->endCorrelation();
             return ExitCode::Success->value;
         }
+
+        $commandName = $input->command();
+        $logger?->debug('Command received', ['command' => $commandName]);
 
         Stopwatch::tap('command.received');
         $this->lifecycle->dispatch(new CommandReceived($input));
@@ -182,8 +192,14 @@ class RuneKernel implements Kernel
             $exitCode = $this->handleException($e, $output);
         }
 
+        $logger?->info('Command completed', [
+            'command' => $commandName,
+            'exit_code' => $exitCode,
+        ]);
+
         $this->lastInput = $input;
         $this->lastExitCode = $exitCode;
+        $this->endCorrelation();
 
         return $exitCode;
     }
@@ -310,6 +326,34 @@ class RuneKernel implements Kernel
         }
 
         Stopwatch::tap('arcanum.complete');
+    }
+
+    private function resolveLogger(): ?LoggerInterface
+    {
+        if ($this->container->has(LoggerInterface::class)) {
+            /** @var LoggerInterface */
+            return $this->container->get(LoggerInterface::class);
+        }
+
+        return null;
+    }
+
+    private function beginCorrelation(): void
+    {
+        if ($this->container->has(CorrelationProcessor::class)) {
+            /** @var CorrelationProcessor $processor */
+            $processor = $this->container->get(CorrelationProcessor::class);
+            $processor->setCorrelationId(Random::hex(8));
+        }
+    }
+
+    private function endCorrelation(): void
+    {
+        if ($this->container->has(CorrelationProcessor::class)) {
+            /** @var CorrelationProcessor $processor */
+            $processor = $this->container->get(CorrelationProcessor::class);
+            $processor->clearCorrelationId();
+        }
     }
 
     private function splash(Output $output): void
