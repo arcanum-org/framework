@@ -22,7 +22,7 @@ One-line summaries. Details are in git history and the COMPENDIUM.
 ## Welcome page — nice-to-haves (deferred)
 
 - [ ] **Diagnostic rows link to configuration docs** — blocked on docs site existing.
-- [ ] **Syntax highlighting in code blocks** — Prism.js, highlight.js, or shiki from CDN. Must respect dark mode, no Node toolchain.
+- [x] **Syntax highlighting in code blocks** — highlight.js from CDN with custom Arcanum-branded theme (warm copper keywords, forest green strings, amber literals, slate blue class/function names). Dark mode via `.dark` CSS scoping, no theme-swap JS needed.
 - [ ] **`?debug=1` bootstrap visualization** — easter egg.
 - [ ] **Placeholder URL cleanup** — replace `example.com` references with real docs URLs.
 - [ ] **Replace custom copy-to-clipboard JS with htmx** — or at least move JS out of inline handlers.
