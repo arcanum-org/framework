@@ -1,6 +1,13 @@
-# Arcanum
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="art/rune-dark.svg">
+    <img src="art/rune-light.svg" alt="Arcanum" width="80">
+  </picture>
+</p>
 
-**A CQRS PHP framework that stays readable and manageable at scale.**
+<h1 align="center">Arcanum</h1>
+
+<p align="center"><strong>A CQRS PHP framework that stays readable and manageable at scale.</strong></p>
 
 ---
 
