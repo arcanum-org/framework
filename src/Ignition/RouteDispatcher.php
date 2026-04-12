@@ -13,6 +13,7 @@ use Arcanum\Flow\Pipeline\Pipeline;
 use Arcanum\Hyper\HttpMiddleware;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * Composes per-route middleware with the existing command bus.
@@ -31,6 +32,7 @@ final class RouteDispatcher
         private readonly ContainerInterface $container,
         private readonly MiddlewareRegistry $middlewareRegistry,
         private readonly Bus $bus,
+        private readonly ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -52,6 +54,13 @@ final class RouteDispatcher
     {
         $this->resolvedDtoClass = $route->dtoClass;
         $mw = $this->middlewareRegistry->for($route->dtoClass);
+
+        $this->logger?->debug('Dispatching', [
+            'dto' => $route->dtoClass,
+            'handler_prefix' => $route->handlerPrefix,
+            'before_middleware' => count($mw->before),
+            'after_middleware' => count($mw->after),
+        ]);
 
         if ($mw->before === [] && $mw->after === []) {
             return $this->bus->dispatch($dto, prefix: $route->handlerPrefix);

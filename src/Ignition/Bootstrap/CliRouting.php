@@ -119,8 +119,13 @@ class CliRouting implements Bootstrapper
 
         $container->instance(CliRouteMap::class, $routeMap);
 
-        $container->factory(Router::class, function () use ($resolver, $routeMap) {
-            return new CliRouter($resolver, $routeMap);
+        $container->factory(Router::class, function () use ($container, $resolver, $routeMap) {
+            $logger = $container->has(\Psr\Log\LoggerInterface::class)
+                ? $container->get(\Psr\Log\LoggerInterface::class)
+                : null;
+
+            /** @var ?\Psr\Log\LoggerInterface $logger */
+            return new CliRouter($resolver, $routeMap, logger: $logger);
         });
     }
 

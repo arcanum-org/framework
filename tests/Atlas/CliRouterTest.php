@@ -14,6 +14,7 @@ use Arcanum\Toolkit\Strings;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
+use Psr\Log\LoggerInterface;
 
 #[CoversClass(CliRouter::class)]
 #[UsesClass(CliRouteMap::class)]
@@ -480,5 +481,69 @@ final class CliRouterTest extends TestCase
         // Assert
         $this->assertTrue($route->isHelp);
         $this->assertSame('Arcanum\\Test\\Fixture\\Contact\\Command\\Submit', $route->dtoClass);
+    }
+
+    // ---------------------------------------------------------------
+    // Logging
+    // ---------------------------------------------------------------
+
+    public function testLogsConventionRouteResolved(): void
+    {
+        // Arrange
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('debug')
+            ->with('Command resolved', [
+                'type' => 'convention',
+                'dto' => 'Arcanum\\Test\\Fixture\\Shop\\Query\\Products',
+            ]);
+
+        $router = new CliRouter(
+            new ConventionResolver(rootNamespace: 'Arcanum\\Test\\Fixture'),
+            logger: $logger,
+        );
+
+        $input = new Input('query:shop:products');
+
+        // Act
+        $router->resolve($input);
+    }
+
+    public function testLogsCommandNotFound(): void
+    {
+        // Arrange
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('debug')
+            ->with('Command not found', [
+                'input' => 'query:nonexistent:thing',
+            ]);
+
+        $router = new CliRouter(
+            new ConventionResolver(rootNamespace: 'Arcanum\\Test\\Fixture'),
+            logger: $logger,
+        );
+
+        $input = new Input('query:nonexistent:thing');
+
+        // Act & Assert
+        $this->expectException(UnresolvableRoute::class);
+        $router->resolve($input);
+    }
+
+    public function testWorksWithNullLogger(): void
+    {
+        // Arrange — no logger passed (null by default)
+        $router = new CliRouter(
+            new ConventionResolver(rootNamespace: 'Arcanum\\Test\\Fixture'),
+        );
+
+        $input = new Input('query:shop:products');
+
+        // Act
+        $route = $router->resolve($input);
+
+        // Assert — resolves normally without a logger
+        $this->assertSame('Arcanum\\Test\\Fixture\\Shop\\Query\\Products', $route->dtoClass);
     }
 }

@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use Psr\Log\LoggerInterface;
 
 #[CoversClass(AuthMiddleware::class)]
 #[UsesClass(ActiveIdentity::class)]
@@ -266,5 +267,54 @@ final class AuthMiddlewareTest extends TestCase
         // Assert — no identity resolved, no attribute set
         $this->assertNotNull($capturedRequest);
         $this->assertNull($capturedRequest->getAttribute('auth.token_authenticated'));
+    }
+
+    // -----------------------------------------------------------
+    // Logger instrumentation
+    // -----------------------------------------------------------
+
+    public function testLogsIdentityResolved(): void
+    {
+        // Arrange
+        $identity = new SimpleIdentity('user-1');
+        $guard = $this->createStub(Guard::class);
+        $guard->method('resolve')->willReturn($identity);
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('info')
+            ->with('Identity resolved', $this->callback(function (array $context): bool {
+                return isset($context['guard']) && is_string($context['guard']);
+            }));
+
+        $active = new ActiveIdentity();
+        $middleware = new AuthMiddleware($guard, $active, $logger);
+
+        $handler = $this->createStub(RequestHandlerInterface::class);
+        $handler->method('handle')->willReturn($this->createStub(ResponseInterface::class));
+
+        // Act
+        $middleware->process($this->createStub(ServerRequestInterface::class), $handler);
+    }
+
+    public function testLogsNoIdentityResolved(): void
+    {
+        // Arrange
+        $guard = $this->createStub(Guard::class);
+        $guard->method('resolve')->willReturn(null);
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('debug')
+            ->with('No identity resolved');
+
+        $active = new ActiveIdentity();
+        $middleware = new AuthMiddleware($guard, $active, $logger);
+
+        $handler = $this->createStub(RequestHandlerInterface::class);
+        $handler->method('handle')->willReturn($this->createStub(ResponseInterface::class));
+
+        // Act
+        $middleware->process($this->createStub(ServerRequestInterface::class), $handler);
     }
 }

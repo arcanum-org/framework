@@ -8,6 +8,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * PSR-15 middleware that manages the session lifecycle.
@@ -27,6 +28,7 @@ final class SessionMiddleware implements MiddlewareInterface
         private readonly SessionDriver $driver,
         private readonly SessionConfig $config,
         private readonly ActiveSession $registry,
+        private readonly ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -38,6 +40,9 @@ final class SessionMiddleware implements MiddlewareInterface
         // Resolve or generate session ID.
         $originalId = is_string($cookieValue) ? SessionId::fromString($cookieValue) : null;
         $id = $originalId ?? SessionId::generate();
+
+        $isNew = $originalId === null;
+        $this->logger?->debug($isNew ? 'Session started' : 'Session loaded');
 
         // Load session data from driver.
         $rawCookie = is_string($cookieValue) ? $cookieValue : '';
@@ -76,13 +81,16 @@ final class SessionMiddleware implements MiddlewareInterface
         // If the session was invalidated, destroy the old session data.
         if ($session->wasInvalidated() && $originalId !== null) {
             $this->driver->destroy($originalId->value);
+            $this->logger?->notice('Session invalidated');
         } elseif ($session->wasRegenerated() && $originalId !== null) {
             // Regenerated — destroy old ID, keep data under new ID.
             $this->driver->destroy($originalId->value);
+            $this->logger?->notice('Session regenerated');
         }
 
         // Persist session data under the (possibly new) ID.
         $this->driver->write($session->id()->value, $session->toArray(), max(1, $this->config->lifetime));
+        $this->logger?->debug('Session saved');
 
         // Set the session cookie.
         $cookieHeader = $this->buildCookieHeader($session);

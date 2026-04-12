@@ -8,6 +8,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * PSR-15 middleware that resolves the authenticated Identity.
@@ -24,6 +25,7 @@ final class AuthMiddleware implements MiddlewareInterface
     public function __construct(
         private readonly Guard $guard,
         private readonly ActiveIdentity $activeIdentity,
+        private readonly ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -33,13 +35,35 @@ final class AuthMiddleware implements MiddlewareInterface
 
         if ($identity !== null) {
             $this->activeIdentity->set($identity);
+            $this->logger?->info('Identity resolved', [
+                'guard' => $this->resolvedGuardType(),
+            ]);
 
             if ($this->isTokenAuthenticated()) {
                 $request = $request->withAttribute('auth.token_authenticated', true);
             }
+        } else {
+            $this->logger?->debug('No identity resolved');
         }
 
         return $handler->handle($request);
+    }
+
+    private function resolvedGuardType(): string
+    {
+        if ($this->guard instanceof CompositeGuard) {
+            $last = $this->guard->lastResolvedGuard();
+            return $last !== null ? $this->guardName($last) : 'composite';
+        }
+
+        return $this->guardName($this->guard);
+    }
+
+    private function guardName(Guard $guard): string
+    {
+        $class = get_class($guard);
+        $short = substr(strrchr($class, '\\') ?: $class, 1);
+        return str_replace('Guard', '', $short) ?: $short;
     }
 
     private function isTokenAuthenticated(): bool
