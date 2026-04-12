@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Arcanum\Forge\Migration;
 
 use Arcanum\Forge\Connection;
+use Psr\Log\LoggerInterface;
 
 /**
  * Orchestrates database migrations: running, rolling back, and reporting status.
@@ -28,6 +29,7 @@ final class Migrator
         private readonly Connection $connection,
         private readonly MigrationRepository $repository,
         private readonly string $migrationsPath,
+        private readonly ?LoggerInterface $logger = null,
     ) {
         $this->parser = new MigrationParser();
     }
@@ -48,6 +50,7 @@ final class Migrator
         // Checksum validation — halt on any mismatch.
         $checksumError = $this->validateChecksums($files, $applied);
         if ($checksumError !== null) {
+            $this->logger?->warning('Checksum mismatch', ['error' => $checksumError]);
             return new MigrationResult([], [$checksumError]);
         }
 
@@ -65,11 +68,20 @@ final class Migrator
             try {
                 $this->executeMigration($file, 'up');
             } catch (MigrationFailed $e) {
+                $this->logger?->error('Migration failed', [
+                    'file' => $file->filename,
+                    'error' => $e->getMessage(),
+                ]);
                 return new MigrationResult($ran, [$e->getMessage()]);
             }
 
             $elapsedMs = (hrtime(true) - $start) / 1_000_000;
             $ran[] = $file->filename;
+
+            $this->logger?->info('Migration applied', [
+                'file' => $file->filename,
+                'elapsed_ms' => round($elapsedMs, 2),
+            ]);
 
             if ($onMigrate !== null) {
                 $onMigrate($file, $elapsedMs);
@@ -121,11 +133,20 @@ final class Migrator
             try {
                 $this->executeRollback($file);
             } catch (MigrationFailed $e) {
+                $this->logger?->error('Migration failed', [
+                    'file' => $file->filename,
+                    'error' => $e->getMessage(),
+                ]);
                 return new MigrationResult($ran, [$e->getMessage()]);
             }
 
             $elapsedMs = (hrtime(true) - $start) / 1_000_000;
             $ran[] = $file->filename;
+
+            $this->logger?->info('Migration rolled back', [
+                'file' => $file->filename,
+                'elapsed_ms' => round($elapsedMs, 2),
+            ]);
 
             if ($onRollback !== null) {
                 $onRollback($file, $elapsedMs);

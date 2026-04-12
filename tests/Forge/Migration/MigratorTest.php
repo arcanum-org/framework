@@ -16,6 +16,7 @@ use Arcanum\Forge\Migration\MigrationFailed;
 use Arcanum\Forge\PdoConnection;
 use Arcanum\Forge\WriteResult;
 use Arcanum\Flow\Sequence\Cursor;
+use Psr\Log\LoggerInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -407,5 +408,96 @@ final class MigratorTest extends TestCase
         $this->assertNotNull($countRow);
         /** @var array{c: int|string} $countRow */
         $this->assertSame(0, (int) $countRow['c']);
+    }
+
+    // ------------------------------------------------------------------
+    // Logging
+    // ------------------------------------------------------------------
+
+    public function testMigrateLogsMigrationApplied(): void
+    {
+        // Arrange
+        $this->writeMigration(
+            '20260410120000_create_items.sql',
+            'CREATE TABLE items (id INTEGER PRIMARY KEY)',
+        );
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('info')
+            ->with('Migration applied', $this->callback(
+                fn(array $ctx) => $ctx['file'] === '20260410120000_create_items.sql'
+                    && isset($ctx['elapsed_ms']),
+            ));
+
+        $repo = new MigrationRepository($this->connection, 'sqlite');
+        $migrator = new Migrator($this->connection, $repo, $this->migrationsDir, $logger);
+
+        // Act
+        $migrator->migrate();
+    }
+
+    public function testRollbackLogsMigrationRolledBack(): void
+    {
+        // Arrange
+        $this->writeMigration(
+            '20260410120000_create_items.sql',
+            'CREATE TABLE items (id INTEGER PRIMARY KEY)',
+            'DROP TABLE items',
+        );
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('info')
+            ->with($this->logicalOr('Migration applied', 'Migration rolled back'), $this->anything());
+
+        $repo = new MigrationRepository($this->connection, 'sqlite');
+        $migrator = new Migrator($this->connection, $repo, $this->migrationsDir, $logger);
+        $migrator->migrate();
+
+        // Reset expectations for the rollback
+        $logger2 = $this->createMock(LoggerInterface::class);
+        $logger2->expects($this->once())
+            ->method('info')
+            ->with('Migration rolled back', $this->callback(
+                fn(array $ctx) => $ctx['file'] === '20260410120000_create_items.sql'
+                    && isset($ctx['elapsed_ms']),
+            ));
+
+        $migrator2 = new Migrator($this->connection, $repo, $this->migrationsDir, $logger2);
+
+        // Act
+        $migrator2->rollback();
+    }
+
+    public function testMigrateLogsChecksumWarning(): void
+    {
+        // Arrange — apply a migration, then modify the file
+        $this->writeMigration(
+            '20260410120000_create_items.sql',
+            'CREATE TABLE items (id INTEGER PRIMARY KEY)',
+        );
+
+        $repo = new MigrationRepository($this->connection, 'sqlite');
+        $migrator = new Migrator($this->connection, $repo, $this->migrationsDir);
+        $migrator->migrate();
+
+        // Modify the file after applying
+        $this->writeMigration(
+            '20260410120000_create_items.sql',
+            'CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)',
+        );
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('warning')
+            ->with('Checksum mismatch', $this->callback(
+                fn(array $ctx) => str_contains($ctx['error'], '20260410120000_create_items.sql'),
+            ));
+
+        $migrator2 = new Migrator($this->connection, $repo, $this->migrationsDir, $logger);
+
+        // Act
+        $migrator2->migrate();
     }
 }
