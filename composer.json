@@ -24,8 +24,17 @@
         {
             "name": "Stephen Young",
             "email": "young.steveo@gmail.com"
+        },
+        {
+            "name": "Claude (Anthropic)",
+            "homepage": "https://claude.ai"
         }
     ],
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
+    },
     "minimum-stability": "stable",
     "require": {
         "php": ">=8.4",
