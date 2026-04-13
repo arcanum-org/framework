@@ -492,7 +492,8 @@ final class MigratorTest extends TestCase
         $logger->expects($this->once())
             ->method('warning')
             ->with('Checksum mismatch', $this->callback(
-                fn(array $ctx) => str_contains($ctx['error'], '20260410120000_create_items.sql'),
+                fn(array $ctx) => $ctx['file'] === '20260410120000_create_items.sql'
+                    && isset($ctx['expected'], $ctx['actual']),
             ));
 
         $migrator2 = new Migrator($this->connection, $repo, $this->migrationsDir, $logger);

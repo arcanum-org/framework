@@ -113,7 +113,7 @@ $processor->clearCorrelationId();
 // → no correlation_id added after clearing
 ```
 
-In the framework, `Bootstrap\Logger` registers a single `CorrelationProcessor` and pushes it onto every Monolog channel. The kernels (`HyperKernel`, `RuneKernel`) set and clear the ID at the start and end of each `handle()` cycle, so all log lines from a single request or command share the same correlation ID.
+In the framework, `Bootstrap\Logger` registers a single `CorrelationProcessor` and pushes it onto every Monolog channel. The kernels (`HyperKernel`, `RuneKernel`) set and clear the ID at the start and end of each `handle()` cycle, so all log lines from a single request or command share the same correlation ID. Note: correlation IDs require Quill/Monolog — apps that bind a custom `LoggerInterface` before `Bootstrap\Logger` runs will need to handle correlation in their own logger implementation.
 
 ## At a glance
 

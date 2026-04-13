@@ -127,7 +127,7 @@ Arcanum has opinions about the front end. They aren't required — you can swap 
 
 The framework logs decisions, not data. Every log call uses null-safe `$this->logger?->method()` — when no logger is configured, it short-circuits with zero cost.
 
-**Correlation.** `Bootstrap\Logger` registers a `CorrelationProcessor` on every Monolog channel. The kernels generate a random 16-character hex ID at the start of each `handle()` cycle and clear it afterward. Every log line emitted during that cycle carries the same `correlation_id` in its extra data, making interleaved concurrent requests easy to trace.
+**Correlation.** `Bootstrap\Logger` registers a `CorrelationProcessor` on every Monolog channel. The kernels generate a random 16-character hex ID at the start of each `handle()` cycle and clear it afterward. Every log line emitted during that cycle carries the same `correlation_id` in its extra data, making interleaved concurrent requests easy to trace. Note: correlation IDs are a Monolog processor feature — apps that bind a custom non-Monolog `LoggerInterface` before `Bootstrap\Logger` runs will need to implement their own correlation mechanism.
 
 **One INFO line per request.** The "access log" is a single INFO entry when the request completes: method, path, status code (HTTP) or command name and exit code (CLI). Everything else is DEBUG or NOTICE.
 

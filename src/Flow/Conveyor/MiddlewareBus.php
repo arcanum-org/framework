@@ -19,8 +19,7 @@ class MiddlewareBus implements Bus
     private bool $hasValidationGuard = false;
 
     /**
-     * @param bool $debug When true, log a warning when a prefixed handler
-     *                    is not found and the bus falls back to the unprefixed handler.
+     * @param bool $debug Reserved for future use.
      */
     public function __construct(
         protected ContainerInterface $container,

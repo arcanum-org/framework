@@ -62,7 +62,8 @@ final class AuthMiddleware implements MiddlewareInterface
     private function guardName(Guard $guard): string
     {
         $class = get_class($guard);
-        $short = substr(strrchr($class, '\\') ?: $class, 1);
+        $pos = strrpos($class, '\\');
+        $short = $pos !== false ? substr($class, $pos + 1) : $class;
         return str_replace('Guard', '', $short) ?: $short;
     }
 

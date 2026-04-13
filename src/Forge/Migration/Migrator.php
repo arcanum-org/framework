@@ -48,10 +48,14 @@ final class Migrator
         $applied = $this->repository->applied();
 
         // Checksum validation — halt on any mismatch.
-        $checksumError = $this->validateChecksums($files, $applied);
-        if ($checksumError !== null) {
-            $this->logger?->warning('Checksum mismatch', ['error' => $checksumError]);
-            return new MigrationResult([], [$checksumError]);
+        $checksumMismatch = $this->validateChecksums($files, $applied);
+        if ($checksumMismatch !== null) {
+            $this->logger?->warning('Checksum mismatch', [
+                'file' => $checksumMismatch['file'],
+                'expected' => $checksumMismatch['expected'],
+                'actual' => $checksumMismatch['actual'],
+            ]);
+            return new MigrationResult([], [$checksumMismatch['error']]);
         }
 
         $pending = $this->filterPending($files, $applied);
@@ -229,8 +233,9 @@ final class Migrator
      *
      * @param list<MigrationFile>                  $files
      * @param array<string, AppliedMigration>      $applied
+     * @return array{file: string, expected: string, actual: string, error: string}|null
      */
-    private function validateChecksums(array $files, array $applied): ?string
+    private function validateChecksums(array $files, array $applied): ?array
     {
         $filesByVersion = [];
         foreach ($files as $file) {
@@ -244,14 +249,19 @@ final class Migrator
 
             $file = $filesByVersion[$record->version];
             if ($file->checksum !== $record->checksum) {
-                return sprintf(
-                    'Migration "%s" has been modified after it was applied '
-                        . '(expected checksum %s, got %s). '
-                        . 'Applied migrations must not be edited.',
-                    $record->filename,
-                    $record->checksum,
-                    $file->checksum,
-                );
+                return [
+                    'file' => $record->filename,
+                    'expected' => $record->checksum,
+                    'actual' => $file->checksum,
+                    'error' => sprintf(
+                        'Migration "%s" has been modified after it was applied '
+                            . '(expected checksum %s, got %s). '
+                            . 'Applied migrations must not be edited.',
+                        $record->filename,
+                        $record->checksum,
+                        $file->checksum,
+                    ),
+                ];
             }
         }
 
