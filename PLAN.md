@@ -121,8 +121,8 @@ The only core package without a README. Hyper is the biggest package — PSR-7 m
 
 #### Checklist
 
-- [ ] **Hyper README — request journey and PSR-7** — Sections 1–7: overview, "you probably won't import this" framing, request flow diagram with Server callout, PSR-7 messages, URI, status codes, file uploads. Cross-link to Shodo, Glitch, Echo READMEs where referenced. Enough for a reader to understand how requests arrive and what they look like inside the framework.
-- [ ] **Hyper README — rendering and middleware** — Sections 8–14: response renderers, exception renderers (including ValidationExceptionRenderer decorator), format registry, middleware chain, lifecycle events, server + adapter, #[HttpOnly]. Cross-link to related package READMEs. Completes the "response side" of the journey.
+- [x] **Hyper README — request journey and PSR-7** — Sections 1–7: overview, "you probably won't import this" framing, request flow diagram with Server callout, PSR-7 messages, URI, status codes, file uploads. Cross-link to Shodo, Glitch, Echo READMEs where referenced. Enough for a reader to understand how requests arrive and what they look like inside the framework.
+- [x] **Hyper README — rendering and middleware** — Sections 8–14: response renderers, exception renderers (including ValidationExceptionRenderer decorator), format registry, middleware chain, lifecycle events, server + adapter, #[HttpOnly]. Cross-link to related package READMEs. Completes the "response side" of the journey.
 
 ### PSR-18 HTTP Client
 
