@@ -107,7 +107,9 @@ class Routing implements Bootstrapper
         if (!is_dir($absolutePagesDir) && $container->has(\Psr\Log\LoggerInterface::class)) {
             /** @var \Psr\Log\LoggerInterface $logger */
             $logger = $container->get(\Psr\Log\LoggerInterface::class);
-            $logger->debug("Pages directory does not exist: {$absolutePagesDir}. No pages will be discovered.");
+            $logger->debug('Pages directory does not exist', [
+                'path' => $absolutePagesDir,
+            ]);
         }
 
         // Page cache configuration.
@@ -145,8 +147,13 @@ class Routing implements Bootstrapper
         $pages = new PageResolver(namespace: $pagesNamespace);
         $container->instance(PageResolver::class, $pages);
 
-        $container->factory(Router::class, function () use ($resolver, $routeMap, $pages, $defaultFormat) {
-            return new HttpRouter($resolver, $routeMap, $pages, $defaultFormat);
+        $container->factory(Router::class, function () use ($container, $resolver, $routeMap, $pages, $defaultFormat) {
+            $logger = $container->has(\Psr\Log\LoggerInterface::class)
+                ? $container->get(\Psr\Log\LoggerInterface::class)
+                : null;
+
+            /** @var ?\Psr\Log\LoggerInterface $logger */
+            return new HttpRouter($resolver, $routeMap, $pages, $defaultFormat, $logger);
         });
 
         $container->instance(UrlResolver::class, new UrlResolver(

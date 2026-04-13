@@ -12,6 +12,7 @@ use Arcanum\Vault\ArrayDriver;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
+use Psr\Log\LoggerInterface;
 
 #[CoversClass(RateLimiter::class)]
 #[UsesClass(Quota::class)]
@@ -50,5 +51,45 @@ final class RateLimiterTest extends TestCase
         $quota = $limiter->attempt('test', 5, 60);
 
         $this->assertFalse($quota->isAllowed());
+    }
+
+    public function testLogsRateCheckPassed(): void
+    {
+        // Arrange
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('debug')
+            ->with('Rate check passed', [
+                'key' => 'user-ip',
+                'remaining' => 4,
+            ]);
+
+        $limiter = new RateLimiter(new ArrayDriver(), new TokenBucket(), $logger);
+
+        // Act
+        $limiter->attempt('user-ip', 5, 60);
+    }
+
+    public function testLogsRateLimitExceeded(): void
+    {
+        // Arrange
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('notice')
+            ->with('Rate limit exceeded', $this->callback(function (array $context): bool {
+                return $context['key'] === 'user-ip'
+                    && $context['limit'] === 3
+                    && isset($context['retry_after']);
+            }));
+
+        $limiter = new RateLimiter(new ArrayDriver(), new TokenBucket(), $logger);
+
+        // Exhaust the limit
+        $limiter->attempt('user-ip', 3, 60);
+        $limiter->attempt('user-ip', 3, 60);
+        $limiter->attempt('user-ip', 3, 60);
+
+        // Act — this attempt should be rejected
+        $limiter->attempt('user-ip', 3, 60);
     }
 }

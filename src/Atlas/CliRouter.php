@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Arcanum\Atlas;
 
 use Arcanum\Rune\Input;
+use Psr\Log\LoggerInterface;
 
 /**
  * Maps CLI input to Routes using the convention system.
@@ -31,6 +32,7 @@ final class CliRouter implements Router
         private readonly ConventionResolver $resolver,
         private readonly CliRouteMap|null $routeMap = null,
         private readonly string $defaultFormat = 'cli',
+        private readonly ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -54,6 +56,10 @@ final class CliRouter implements Router
         // Custom routes take priority — check full command name first.
         if ($this->routeMap !== null && $this->routeMap->has($command)) {
             $route = $this->routeMap->resolve($command, $format);
+            $this->logger?->debug('Command resolved', [
+                'type' => 'custom',
+                'dto' => $route->dtoClass,
+            ]);
             return $input->hasFlag('help') ? $route->withHelp() : $route;
         }
 
@@ -100,9 +106,16 @@ final class CliRouter implements Router
         );
 
         if (class_exists($route->dtoClass) || class_exists($route->dtoClass . 'Handler')) {
+            $this->logger?->debug('Command resolved', [
+                'type' => 'convention',
+                'dto' => $route->dtoClass,
+            ]);
             return $input->hasFlag('help') ? $route->withHelp() : $route;
         }
 
+        $this->logger?->debug('Command not found', [
+            'input' => $command,
+        ]);
         throw $this->buildNotFoundError($command, $typeNamespace, $path, $format);
     }
 

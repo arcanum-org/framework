@@ -12,6 +12,7 @@ use Arcanum\Quill\ChannelLogger;
 use Arcanum\Quill\Channel;
 use Arcanum\Quill\Handler;
 use Arcanum\Quill\Logger as QuillLogger;
+use Arcanum\Quill\CorrelationProcessor;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -27,6 +28,7 @@ use Psr\Log\LoggerInterface;
 #[UsesClass(\Arcanum\Gather\Registry::class)]
 #[UsesClass(QuillLogger::class)]
 #[UsesClass(Channel::class)]
+#[UsesClass(CorrelationProcessor::class)]
 final class LoggerTest extends TestCase
 {
     private string $filesDir;
@@ -262,6 +264,72 @@ final class LoggerTest extends TestCase
         // Assert — info goes to file handler, not error_log handler
         $logger->info('dual handler test');
         $this->assertTrue(file_exists($this->filesDir . '/logs/app.log'));
+    }
+
+    public function testBindsLoggerInterfaceToQuillLogger(): void
+    {
+        // Arrange
+        $container = $this->buildContainer($this->defaultLogConfig());
+        $bootstrapper = new Logger();
+
+        // Act
+        $bootstrapper->bootstrap($container);
+
+        // Assert
+        $this->assertTrue($container->has(LoggerInterface::class));
+        $this->assertInstanceOf(LoggerInterface::class, $container->get(LoggerInterface::class));
+    }
+
+    public function testRespectsExistingLoggerInterfaceBinding(): void
+    {
+        // Arrange
+        $container = $this->buildContainer($this->defaultLogConfig());
+        $customLogger = $this->createStub(LoggerInterface::class);
+        $container->instance(LoggerInterface::class, $customLogger);
+        $bootstrapper = new Logger();
+
+        // Act
+        $bootstrapper->bootstrap($container);
+
+        // Assert — should still be the custom logger, not QuillLogger
+        $this->assertSame($customLogger, $container->get(LoggerInterface::class));
+    }
+
+    public function testRegistersCorrelationProcessor(): void
+    {
+        // Arrange
+        $container = $this->buildContainer($this->defaultLogConfig());
+        $bootstrapper = new Logger();
+
+        // Act
+        $bootstrapper->bootstrap($container);
+
+        // Assert
+        $this->assertTrue($container->has(CorrelationProcessor::class));
+        $this->assertInstanceOf(CorrelationProcessor::class, $container->get(CorrelationProcessor::class));
+    }
+
+    public function testCorrelationIdAppearsInLogOutput(): void
+    {
+        // Arrange
+        $container = $this->buildContainer($this->defaultLogConfig());
+        $bootstrapper = new Logger();
+        $bootstrapper->bootstrap($container);
+
+        /** @var CorrelationProcessor $processor */
+        $processor = $container->get(CorrelationProcessor::class);
+        $processor->setCorrelationId('test-corr-123');
+
+        /** @var QuillLogger $logger */
+        $logger = $container->get(QuillLogger::class);
+
+        // Act
+        $logger->info('correlation test');
+
+        // Assert — the log file should contain the correlation ID
+        $logContent = file_get_contents($this->filesDir . '/logs/default.log');
+        $this->assertIsString($logContent);
+        $this->assertStringContainsString('test-corr-123', $logContent);
     }
 
     public function testSyslogHandler(): void

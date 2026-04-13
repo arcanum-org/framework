@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Arcanum\Forge\Migration;
 
 use Arcanum\Forge\Connection;
+use Psr\Log\LoggerInterface;
 
 /**
  * Orchestrates database migrations: running, rolling back, and reporting status.
@@ -28,6 +29,7 @@ final class Migrator
         private readonly Connection $connection,
         private readonly MigrationRepository $repository,
         private readonly string $migrationsPath,
+        private readonly ?LoggerInterface $logger = null,
     ) {
         $this->parser = new MigrationParser();
     }
@@ -46,9 +48,14 @@ final class Migrator
         $applied = $this->repository->applied();
 
         // Checksum validation — halt on any mismatch.
-        $checksumError = $this->validateChecksums($files, $applied);
-        if ($checksumError !== null) {
-            return new MigrationResult([], [$checksumError]);
+        $checksumMismatch = $this->validateChecksums($files, $applied);
+        if ($checksumMismatch !== null) {
+            $this->logger?->warning('Checksum mismatch', [
+                'file' => $checksumMismatch['file'],
+                'expected' => $checksumMismatch['expected'],
+                'actual' => $checksumMismatch['actual'],
+            ]);
+            return new MigrationResult([], [$checksumMismatch['error']]);
         }
 
         $pending = $this->filterPending($files, $applied);
@@ -65,11 +72,20 @@ final class Migrator
             try {
                 $this->executeMigration($file, 'up');
             } catch (MigrationFailed $e) {
+                $this->logger?->error('Migration failed', [
+                    'file' => $file->filename,
+                    'error' => $e->getMessage(),
+                ]);
                 return new MigrationResult($ran, [$e->getMessage()]);
             }
 
             $elapsedMs = (hrtime(true) - $start) / 1_000_000;
             $ran[] = $file->filename;
+
+            $this->logger?->info('Migration applied', [
+                'file' => $file->filename,
+                'elapsed_ms' => round($elapsedMs, 2),
+            ]);
 
             if ($onMigrate !== null) {
                 $onMigrate($file, $elapsedMs);
@@ -121,11 +137,20 @@ final class Migrator
             try {
                 $this->executeRollback($file);
             } catch (MigrationFailed $e) {
+                $this->logger?->error('Migration failed', [
+                    'file' => $file->filename,
+                    'error' => $e->getMessage(),
+                ]);
                 return new MigrationResult($ran, [$e->getMessage()]);
             }
 
             $elapsedMs = (hrtime(true) - $start) / 1_000_000;
             $ran[] = $file->filename;
+
+            $this->logger?->info('Migration rolled back', [
+                'file' => $file->filename,
+                'elapsed_ms' => round($elapsedMs, 2),
+            ]);
 
             if ($onRollback !== null) {
                 $onRollback($file, $elapsedMs);
@@ -208,8 +233,9 @@ final class Migrator
      *
      * @param list<MigrationFile>                  $files
      * @param array<string, AppliedMigration>      $applied
+     * @return array{file: string, expected: string, actual: string, error: string}|null
      */
-    private function validateChecksums(array $files, array $applied): ?string
+    private function validateChecksums(array $files, array $applied): ?array
     {
         $filesByVersion = [];
         foreach ($files as $file) {
@@ -223,14 +249,19 @@ final class Migrator
 
             $file = $filesByVersion[$record->version];
             if ($file->checksum !== $record->checksum) {
-                return sprintf(
-                    'Migration "%s" has been modified after it was applied '
-                        . '(expected checksum %s, got %s). '
-                        . 'Applied migrations must not be edited.',
-                    $record->filename,
-                    $record->checksum,
-                    $file->checksum,
-                );
+                return [
+                    'file' => $record->filename,
+                    'expected' => $record->checksum,
+                    'actual' => $file->checksum,
+                    'error' => sprintf(
+                        'Migration "%s" has been modified after it was applied '
+                            . '(expected checksum %s, got %s). '
+                            . 'Applied migrations must not be edited.',
+                        $record->filename,
+                        $record->checksum,
+                        $file->checksum,
+                    ),
+                ];
             }
         }
 

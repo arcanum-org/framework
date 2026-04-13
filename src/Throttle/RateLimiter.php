@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arcanum\Throttle;
 
+use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
 
 /**
@@ -18,6 +19,7 @@ final class RateLimiter
     public function __construct(
         private readonly CacheInterface $cache,
         private readonly Throttler $throttler = new TokenBucket(),
+        private readonly ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -29,6 +31,21 @@ final class RateLimiter
      */
     public function attempt(string $key, int $limit, int $windowSeconds): Quota
     {
-        return $this->throttler->attempt($this->cache, $key, $limit, $windowSeconds);
+        $quota = $this->throttler->attempt($this->cache, $key, $limit, $windowSeconds);
+
+        if (!$quota->isAllowed()) {
+            $this->logger?->notice('Rate limit exceeded', [
+                'key' => $key,
+                'limit' => $limit,
+                'retry_after' => $quota->retryAfter,
+            ]);
+        } else {
+            $this->logger?->debug('Rate check passed', [
+                'key' => $key,
+                'remaining' => $quota->remaining,
+            ]);
+        }
+
+        return $quota;
     }
 }

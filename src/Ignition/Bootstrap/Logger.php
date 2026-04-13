@@ -9,6 +9,7 @@ use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Quill\Handler;
 use Arcanum\Quill\Logger as QuillLogger;
 use Arcanum\Quill\Channel;
+use Arcanum\Quill\CorrelationProcessor;
 use Monolog\Handler\ErrorLogHandler;
 use Monolog\Handler\HandlerInterface;
 use Psr\Log\LoggerInterface;
@@ -93,8 +94,18 @@ class Logger implements Bootstrapper
          */
         $filesDirectory = $kernel->filesDirectory();
 
-        $container->factory(QuillLogger::class, fn() => $this->makeQuillLogger((array)$logConfig, $filesDirectory));
+        $processor = new CorrelationProcessor();
+        $container->instance(CorrelationProcessor::class, $processor);
+
+        $container->factory(
+            QuillLogger::class,
+            fn() => $this->makeQuillLogger((array)$logConfig, $filesDirectory, $processor),
+        );
         $container->service(\Arcanum\Quill\ChannelLogger::class, QuillLogger::class);
+
+        if (!$container->has(LoggerInterface::class)) {
+            $container->service(LoggerInterface::class, QuillLogger::class);
+        }
     }
 
     /**
@@ -150,12 +161,17 @@ class Logger implements Bootstrapper
      * @param string[] $handlerNames
      * @param array<string, HandlerInterface> $handlers
      */
-    private function makeChannel(string $name, array $handlerNames, array $handlers): Channel
-    {
+    private function makeChannel(
+        string $name,
+        array $handlerNames,
+        array $handlers,
+        CorrelationProcessor $processor,
+    ): Channel {
         $monologger = new \Monolog\Logger($name);
         foreach ($handlerNames as $handlerName) {
             $monologger->pushHandler($handlers[$handlerName]);
         }
+        $monologger->pushProcessor($processor);
         return new Channel($monologger);
     }
 
@@ -167,8 +183,11 @@ class Logger implements Bootstrapper
      *   channels: array<string,string[]>
      * } $logConfig
      */
-    private function makeQuillLogger(array $logConfig, string $filesDirectory): LoggerInterface
-    {
+    private function makeQuillLogger(
+        array $logConfig,
+        string $filesDirectory,
+        CorrelationProcessor $processor,
+    ): LoggerInterface {
         $handlers = [];
 
         // Build the configured handlers
@@ -179,7 +198,7 @@ class Logger implements Bootstrapper
         // Build the configured channels
         $channels = [];
         foreach ($logConfig['channels'] as $channelName => $channelHandlers) {
-            $channels[] = $this->makeChannel($channelName, $channelHandlers, $handlers);
+            $channels[] = $this->makeChannel($channelName, $channelHandlers, $handlers, $processor);
         }
 
         return new QuillLogger(...$channels);

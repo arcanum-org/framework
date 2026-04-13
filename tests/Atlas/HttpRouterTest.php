@@ -20,6 +20,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\UriInterface;
+use Psr\Log\LoggerInterface;
 
 #[CoversClass(HttpRouter::class)]
 #[UsesClass(AllowedFormats::class)]
@@ -893,5 +894,112 @@ final class HttpRouterTest extends TestCase
         // Act & Assert
         $this->expectException(HttpException::class);
         $router->resolve($request);
+    }
+
+    // -----------------------------------------------------------
+    // Logging
+    // -----------------------------------------------------------
+
+    public function testLogsConventionRouteResolution(): void
+    {
+        // Arrange
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('debug')
+            ->with('Route resolved', $this->callback(
+                fn(array $ctx) => $ctx['type'] === 'convention'
+                    && str_contains($ctx['dto'], 'Products'),
+            ));
+
+        $router = new HttpRouter(
+            new ConventionResolver(self::ROOT_NS),
+            logger: $logger,
+        );
+
+        // Act
+        $router->resolve($this->stubRequest('GET', '/shop/products'));
+    }
+
+    public function testLogsRouteNotFound(): void
+    {
+        // Arrange
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('debug')
+            ->with('Route not found', $this->callback(
+                fn(array $ctx) => $ctx['path'] === '/nonexistent',
+            ));
+
+        $router = new HttpRouter(
+            new ConventionResolver(self::ROOT_NS),
+            logger: $logger,
+        );
+
+        // Act & Assert
+        try {
+            $router->resolve($this->stubRequest('GET', '/nonexistent'));
+        } catch (HttpException) {
+            // Expected
+        }
+    }
+
+    public function testLogsMethodNotAllowed(): void
+    {
+        // Arrange — Reports\Query\Summary exists, no Command\Summary
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('notice')
+            ->with('Method not allowed', $this->callback(
+                fn(array $ctx) => $ctx['method'] === 'PUT'
+                    && $ctx['path'] === '/reports/summary',
+            ));
+
+        $router = new HttpRouter(
+            new ConventionResolver(self::ROOT_NS),
+            logger: $logger,
+        );
+
+        // Act & Assert
+        try {
+            $router->resolve($this->stubRequest('PUT', '/reports/summary'));
+        } catch (MethodNotAllowed) {
+            // Expected
+        }
+    }
+
+    public function testLogsFormatNotAcceptable(): void
+    {
+        // Arrange — Shop\Query\Inventory has #[AllowedFormats('json')]
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('notice')
+            ->with('Format not acceptable', $this->callback(
+                fn(array $ctx) => $ctx['format'] === 'csv'
+                    && $ctx['allowed'] === ['json'],
+            ));
+
+        $router = new HttpRouter(
+            new ConventionResolver(self::ROOT_NS),
+            logger: $logger,
+        );
+
+        // Act & Assert
+        try {
+            $router->resolve($this->stubRequest('GET', '/shop/inventory.csv'));
+        } catch (HttpException) {
+            // Expected
+        }
+    }
+
+    public function testWorksWithNullLogger(): void
+    {
+        // Arrange — no logger, should resolve without error
+        $router = new HttpRouter(new ConventionResolver(self::ROOT_NS));
+
+        // Act
+        $route = $router->resolve($this->stubRequest('GET', '/shop/products'));
+
+        // Assert
+        $this->assertSame('json', $route->format);
     }
 }

@@ -80,7 +80,11 @@ class Auth implements Bootstrapper
                 $guard = $container->get(Guard::class);
                 /** @var ActiveIdentity $activeIdentity */
                 $activeIdentity = $container->get(ActiveIdentity::class);
-                return new AuthMiddleware($guard, $activeIdentity);
+                $logger = $container->has(\Psr\Log\LoggerInterface::class)
+                    ? $container->get(\Psr\Log\LoggerInterface::class)
+                    : null;
+                /** @var ?\Psr\Log\LoggerInterface $logger */
+                return new AuthMiddleware($guard, $activeIdentity, $logger);
             },
         );
     }

@@ -19,6 +19,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use Psr\Log\LoggerInterface;
 
 #[CoversClass(RouteDispatcher::class)]
 #[UsesClass(MiddlewareRegistry::class)]
@@ -193,5 +194,34 @@ final class RouteDispatcherTest extends TestCase
         // Verify the wrapped stack is callable and produces the response
         $result = $wrapped->handle($request);
         $this->assertSame($response, $result);
+    }
+
+    public function testDispatchLogsDispatchingDetails(): void
+    {
+        // Arrange
+        $dto = new \stdClass();
+        $result = new \stdClass();
+        $route = new Route(dtoClass: 'App\\Query\\Status', handlerPrefix: 'Get');
+
+        $bus = $this->createStub(Bus::class);
+        $bus->method('dispatch')->willReturn($result);
+
+        $registry = new MiddlewareRegistry();
+        $container = $this->createStub(ContainerInterface::class);
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('debug')
+            ->with('Dispatching', [
+                'dto' => 'App\\Query\\Status',
+                'handler_prefix' => 'Get',
+                'before_middleware' => 0,
+                'after_middleware' => 0,
+            ]);
+
+        $dispatcher = new RouteDispatcher($container, $registry, $bus, $logger);
+
+        // Act
+        $dispatcher->dispatch($dto, $route);
     }
 }

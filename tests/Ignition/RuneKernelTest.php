@@ -34,6 +34,7 @@ use Arcanum\Shodo\Formatters\KeyValueFormatter;
 use Arcanum\Shodo\Formatters\TableFormatter;
 use Arcanum\Toolkit\Strings;
 use Psr\EventDispatcher\EventDispatcherInterface;
+use Psr\Log\LoggerInterface;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -56,6 +57,9 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(CommandHandled::class)]
 #[UsesClass(CommandReceived::class)]
 #[UsesClass(TableFormatter::class)]
+#[UsesClass(\Arcanum\Toolkit\Random::class)]
+#[UsesClass(\Arcanum\Toolkit\Hex::class)]
+#[UsesClass(\Arcanum\Quill\CorrelationProcessor::class)]
 final class RuneKernelTest extends TestCase
 {
     // ---------------------------------------------------------------
@@ -625,6 +629,8 @@ final class RuneKernelTest extends TestCase
         ExceptionHandler|null $exceptionHandler = null,
         EventDispatcherInterface|null $eventDispatcher = null,
         bool $withFormatRegistry = false,
+        LoggerInterface|null $logger = null,
+        \Arcanum\Quill\CorrelationProcessor|null $correlationProcessor = null,
     ): Application {
         $router = new CliRouter(new ConventionResolver(rootNamespace: $routeFixtureNamespace));
         $hydrator = new Hydrator();
@@ -658,6 +664,8 @@ final class RuneKernelTest extends TestCase
                 ExceptionHandler::class => $exceptionHandler !== null,
                 EventDispatcherInterface::class => $eventDispatcher !== null,
                 CliFormatRegistry::class => $formatRegistry !== null,
+                LoggerInterface::class => $logger !== null,
+                \Arcanum\Quill\CorrelationProcessor::class => $correlationProcessor !== null,
                 default => false,
             },
         );
@@ -671,6 +679,9 @@ final class RuneKernelTest extends TestCase
                 ExceptionHandler::class => $exceptionHandler ?? throw new \RuntimeException('No handler'),
                 EventDispatcherInterface::class => $eventDispatcher ?? throw new \RuntimeException('No dispatcher'),
                 CliFormatRegistry::class => $formatRegistry ?? throw new \RuntimeException('No registry'),
+                LoggerInterface::class => $logger ?? throw new \RuntimeException('No logger'),
+                \Arcanum\Quill\CorrelationProcessor::class =>
+                    $correlationProcessor ?? throw new \RuntimeException('No processor'),
                 default => throw new \RuntimeException("Unexpected service: $id"),
             },
         );
@@ -688,5 +699,92 @@ final class RuneKernelTest extends TestCase
 
         $kernel->bootstrap($container);
         return $kernel;
+    }
+
+    // ---------------------------------------------------------------
+    // Lifecycle logging
+    // ---------------------------------------------------------------
+
+    public function testHandleLogsCommandReceivedAndCompleted(): void
+    {
+        // Arrange
+        $bus = $this->createStub(Bus::class);
+        $bus->method('dispatch')->willReturn(new EmptyDTO());
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('debug')
+            ->with('Command received', ['command' => 'query:shop:products']);
+        $logger->expects($this->once())
+            ->method('info')
+            ->with('Command completed', $this->callback(
+                fn(array $ctx) => $ctx['command'] === 'query:shop:products'
+                    && $ctx['exit_code'] === 0,
+            ));
+
+        $container = $this->containerWith(bus: $bus, logger: $logger);
+        $kernel = $this->bootstrapKernel($container);
+
+        // Act
+        $kernel->handle(['bin/arcanum', 'query:shop:products']);
+    }
+
+    public function testHandleLogsCompletedOnFailure(): void
+    {
+        // Arrange — route to a command that throws
+        $bus = $this->createStub(Bus::class);
+        $bus->method('dispatch')->willThrowException(new \RuntimeException('Boom'));
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('debug');
+        $logger->expects($this->once())
+            ->method('info')
+            ->with('Command completed', $this->callback(
+                fn(array $ctx) => $ctx['exit_code'] === ExitCode::Failure->value,
+            ));
+
+        $container = $this->containerWith(bus: $bus, logger: $logger);
+        $kernel = $this->bootstrapKernel($container);
+
+        // Act
+        $kernel->handle(['bin/arcanum', 'query:shop:products']);
+    }
+
+    public function testHandleSetsAndClearsCorrelationId(): void
+    {
+        // Arrange
+        $bus = $this->createStub(Bus::class);
+        $bus->method('dispatch')->willReturn(new EmptyDTO());
+
+        $processor = new \Arcanum\Quill\CorrelationProcessor();
+
+        $container = $this->containerWith(bus: $bus, correlationProcessor: $processor);
+        $kernel = $this->bootstrapKernel($container);
+
+        // Act
+        $exitCode = $kernel->handle(['bin/arcanum', 'query:shop:products']);
+
+        // Assert — correlation ID was set during handle and cleared afterward
+        $this->assertSame(0, $exitCode);
+        $this->assertNull(
+            (new \ReflectionProperty($processor, 'correlationId'))->getValue($processor),
+            'Correlation ID should be cleared after handle()',
+        );
+    }
+
+    public function testHandleNoCommandSkipsLogging(): void
+    {
+        // Arrange — empty command shows splash, should not log
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->never())->method('debug');
+        $logger->expects($this->never())->method('info');
+
+        $stdout = $this->createStream();
+        $output = new ConsoleOutput($stdout, $this->createStream(), ansi: false);
+        $container = $this->containerWith(output: $output, logger: $logger);
+        $kernel = $this->bootstrapKernel($container);
+
+        // Act
+        $kernel->handle(['bin/arcanum']);
     }
 }

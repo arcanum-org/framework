@@ -25,6 +25,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use Psr\Log\LoggerInterface;
 
 #[CoversClass(SessionMiddleware::class)]
 #[UsesClass(Session::class)]
@@ -218,5 +219,69 @@ final class SessionMiddlewareTest extends TestCase
         $data = $driver->read($sessionId);
 
         $this->assertSame(['msg' => 'Hello'], $data['_flash']);
+    }
+
+    // -----------------------------------------------------------
+    // Logger instrumentation
+    // -----------------------------------------------------------
+
+    public function testLogsNewSessionStartedAndSaved(): void
+    {
+        // Arrange
+        $driver = new CacheSessionDriver(new ArrayDriver());
+        $config = new SessionConfig();
+        $registry = new ActiveSession();
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $messages = [];
+        $logger->expects($this->exactly(2))
+            ->method('debug')
+            ->willReturnCallback(function (string $message) use (&$messages): void {
+                $messages[] = $message;
+            });
+
+        $middleware = new SessionMiddleware($driver, $config, $registry, $logger);
+
+        // Act
+        $middleware->process(
+            $this->stubRequest(),
+            $this->stubHandler($this->stubResponse()),
+        );
+
+        // Assert
+        $this->assertSame('Session started', $messages[0]);
+        $this->assertSame('Session saved', $messages[1]);
+    }
+
+    public function testLogsExistingSessionLoaded(): void
+    {
+        // Arrange
+        $cache = new ArrayDriver();
+        $driver = new CacheSessionDriver($cache);
+        $config = new SessionConfig();
+        $registry = new ActiveSession();
+
+        $sessionId = SessionId::generate();
+        $data = ['_identity' => '', '_csrf' => str_repeat('ab', 32), '_flash' => []];
+        $driver->write($sessionId->value, $data, 3600);
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $messages = [];
+        $logger->expects($this->exactly(2))
+            ->method('debug')
+            ->willReturnCallback(function (string $message) use (&$messages): void {
+                $messages[] = $message;
+            });
+
+        $middleware = new SessionMiddleware($driver, $config, $registry, $logger);
+
+        // Act
+        $middleware->process(
+            $this->stubRequest(['arcanum_session' => $sessionId->value]),
+            $this->stubHandler($this->stubResponse()),
+        );
+
+        // Assert
+        $this->assertSame('Session loaded', $messages[0]);
     }
 }

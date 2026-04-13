@@ -29,6 +29,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use Psr\Log\LoggerInterface;
 
 #[CoversClass(HyperKernel::class)]
 #[UsesClass(CallableHandler::class)]
@@ -43,6 +44,9 @@ use Psr\Http\Server\RequestHandlerInterface;
 #[UsesClass(RouteDispatcher::class)]
 #[UsesClass(MiddlewareRegistry::class)]
 #[UsesClass(Route::class)]
+#[UsesClass(\Arcanum\Toolkit\Random::class)]
+#[UsesClass(\Arcanum\Toolkit\Hex::class)]
+#[UsesClass(\Arcanum\Quill\CorrelationProcessor::class)]
 final class HyperKernelTest extends TestCase
 {
     // -----------------------------------------------------------
@@ -166,6 +170,8 @@ final class HyperKernelTest extends TestCase
             [ExceptionHandler::class, false],
             [ExceptionRenderer::class, true],
             [EventDispatcherInterface::class, false],
+            [LoggerInterface::class, false],
+            [\Arcanum\Quill\CorrelationProcessor::class, false],
         ]);
         $container->method('get')->willReturnCallback(
             fn(string $id) => $id === ExceptionRenderer::class ? $renderer : $bootstrapper
@@ -200,6 +206,8 @@ final class HyperKernelTest extends TestCase
             [ExceptionHandler::class, true],
             [ExceptionRenderer::class, true],
             [EventDispatcherInterface::class, false],
+            [LoggerInterface::class, false],
+            [\Arcanum\Quill\CorrelationProcessor::class, false],
         ]);
         $container->method('get')->willReturnCallback(
             fn(string $id) => match ($id) {
@@ -632,6 +640,8 @@ final class HyperKernelTest extends TestCase
             [ExceptionHandler::class, false],
             [ExceptionRenderer::class, true],
             [EventDispatcherInterface::class, false],
+            [LoggerInterface::class, false],
+            [\Arcanum\Quill\CorrelationProcessor::class, false],
         ]);
 
         $class = get_class($middleware);
@@ -687,6 +697,8 @@ final class HyperKernelTest extends TestCase
             [ExceptionHandler::class, false],
             [ExceptionRenderer::class, true],
             [EventDispatcherInterface::class, false],
+            [LoggerInterface::class, false],
+            [\Arcanum\Quill\CorrelationProcessor::class, false],
         ]);
 
         $class = get_class($middleware);
@@ -753,6 +765,8 @@ final class HyperKernelTest extends TestCase
             [\Arcanum\Gather\Configuration::class, true],
             [EventDispatcherInterface::class, false],
             [RouteDispatcher::class, false],
+            [LoggerInterface::class, false],
+            [\Arcanum\Quill\CorrelationProcessor::class, false],
         ]);
         $container->method('get')->willReturnCallback(
             fn(string $id) => match ($id) {
@@ -833,6 +847,8 @@ final class HyperKernelTest extends TestCase
             [\Arcanum\Gather\Configuration::class, true],
             [EventDispatcherInterface::class, false],
             [RouteDispatcher::class, true],
+            [LoggerInterface::class, false],
+            [\Arcanum\Quill\CorrelationProcessor::class, false],
         ]);
         $container->method('get')->willReturnCallback(
             fn(string $id) => match ($id) {
@@ -896,6 +912,8 @@ final class HyperKernelTest extends TestCase
             [\Arcanum\Gather\Configuration::class, true],
             [EventDispatcherInterface::class, false],
             [RouteDispatcher::class, false],
+            [LoggerInterface::class, false],
+            [\Arcanum\Quill\CorrelationProcessor::class, false],
         ]);
         $container->method('get')->willReturnCallback(
             fn(string $id) => match ($id) {
@@ -970,6 +988,8 @@ final class HyperKernelTest extends TestCase
             [ExceptionHandler::class, true],
             [ExceptionRenderer::class, true],
             [EventDispatcherInterface::class, false],
+            [LoggerInterface::class, false],
+            [\Arcanum\Quill\CorrelationProcessor::class, false],
         ]);
 
         $class = get_class($middleware);
@@ -991,5 +1011,149 @@ final class HyperKernelTest extends TestCase
 
         // Assert — the rendered error response was returned, not bubbled
         $this->assertSame($errorResponse, $response);
+    }
+
+    // -----------------------------------------------------------
+    // Lifecycle logging
+    // -----------------------------------------------------------
+
+    public function testHandleLogsRequestReceivedAndHandled(): void
+    {
+        // Arrange
+        $kernel = new CapturingKernel('/app');
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('debug')
+            ->with('Request received', $this->callback(
+                fn(array $ctx) => $ctx['method'] === 'GET' && $ctx['path'] === '/test',
+            ));
+        $logger->expects($this->once())
+            ->method('info')
+            ->with('Request handled', $this->callback(
+                fn(array $ctx) => $ctx['method'] === 'GET'
+                    && $ctx['path'] === '/test'
+                    && $ctx['status'] === 200,
+            ));
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturnCallback(
+            fn(string $id) => $id === LoggerInterface::class,
+        );
+        $container->method('get')->willReturnCallback(
+            fn(string $id) => $id === LoggerInterface::class ? $logger : $bootstrapper,
+        );
+        $kernel->bootstrap($container);
+
+        $uri = $this->createStub(\Psr\Http\Message\UriInterface::class);
+        $uri->method('getPath')->willReturn('/test');
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getMethod')->willReturn('GET');
+        $request->method('getUri')->willReturn($uri);
+
+        // Act
+        $kernel->handle($request);
+    }
+
+    public function testHandleLogsOnExceptionPath(): void
+    {
+        // Arrange — default handleRequest throws, so the error path is taken.
+        // The INFO log should still fire with the error response status.
+        $kernel = new HyperKernel('/app');
+
+        $errorResponse = $this->createStub(ResponseInterface::class);
+        $errorResponse->method('getStatusCode')->willReturn(404);
+
+        $renderer = $this->createStub(ExceptionRenderer::class);
+        $renderer->method('render')->willReturn($errorResponse);
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('debug');
+        $logger->expects($this->once())
+            ->method('info')
+            ->with('Request handled', $this->callback(
+                fn(array $ctx) => $ctx['status'] === 404,
+            ));
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturnCallback(
+            fn(string $id) => match ($id) {
+                LoggerInterface::class, ExceptionRenderer::class => true,
+                default => false,
+            },
+        );
+        $container->method('get')->willReturnCallback(
+            fn(string $id) => match ($id) {
+                LoggerInterface::class => $logger,
+                ExceptionRenderer::class => $renderer,
+                default => $bootstrapper,
+            },
+        );
+        $kernel->bootstrap($container);
+
+        $uri = $this->createStub(\Psr\Http\Message\UriInterface::class);
+        $uri->method('getPath')->willReturn('/not-found');
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getMethod')->willReturn('GET');
+        $request->method('getUri')->willReturn($uri);
+
+        // Act
+        $kernel->handle($request);
+    }
+
+    public function testHandleWorksWithoutLogger(): void
+    {
+        // Arrange — no logger in container, handle should still work
+        $kernel = new CapturingKernel('/app');
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturn(false);
+        $container->method('get')->willReturn($bootstrapper);
+        $kernel->bootstrap($container);
+
+        // Act
+        $kernel->handle($this->createStub(ServerRequestInterface::class));
+
+        // Assert — request was handled normally
+        $this->assertNotNull($kernel->capturedRequest);
+    }
+
+    public function testHandleSetsAndClearsCorrelationId(): void
+    {
+        // Arrange
+        $kernel = new CapturingKernel('/app');
+
+        $processor = new \Arcanum\Quill\CorrelationProcessor();
+
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturnCallback(
+            fn(string $id) => $id === \Arcanum\Quill\CorrelationProcessor::class,
+        );
+        $container->method('get')->willReturnCallback(
+            fn(string $id) => match ($id) {
+                \Arcanum\Quill\CorrelationProcessor::class => $processor,
+                default => $bootstrapper,
+            },
+        );
+        $kernel->bootstrap($container);
+
+        // Act
+        $kernel->handle($this->createStub(ServerRequestInterface::class));
+
+        // Assert — correlation ID was set during handle and cleared afterward
+        $this->assertNotNull($kernel->capturedRequest);
+        $this->assertNull(
+            (new \ReflectionProperty($processor, 'correlationId'))->getValue($processor),
+            'Correlation ID should be cleared after handle()',
+        );
     }
 }

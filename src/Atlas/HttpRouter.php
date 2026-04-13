@@ -8,6 +8,7 @@ use Arcanum\Atlas\Attribute\AllowedFormats;
 use Arcanum\Glitch\HttpException;
 use Arcanum\Hyper\StatusCode;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Log\LoggerInterface;
 
 final class HttpRouter implements Router
 {
@@ -25,6 +26,7 @@ final class HttpRouter implements Router
         private readonly RouteMap|null $routeMap = null,
         private readonly PageResolver|null $pages = null,
         private readonly string $defaultFormat = 'json',
+        private readonly ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -91,11 +93,22 @@ final class HttpRouter implements Router
             );
             $this->assertFormatAllowed($route);
 
+            $this->logger?->debug('Route resolved', [
+                'type' => 'custom',
+                'dto' => $route->dtoClass,
+                'format' => $route->format,
+            ]);
+
             return $route;
         }
 
         if ($this->pages !== null && $this->pages->has($cleanPath)) {
             if ($method !== 'GET') {
+                $this->logger?->notice('Method not allowed', [
+                    'path' => $cleanPath,
+                    'method' => $method,
+                    'allowed' => self::QUERY_METHODS,
+                ]);
                 throw new MethodNotAllowed(self::QUERY_METHODS);
             }
 
@@ -104,6 +117,12 @@ final class HttpRouter implements Router
                 $hasExtension ? $extensionFormat : null,
             );
             $this->assertFormatAllowed($route);
+
+            $this->logger?->debug('Route resolved', [
+                'type' => 'page',
+                'dto' => $route->dtoClass,
+                'format' => $route->format,
+            ]);
 
             return $route;
         }
@@ -117,12 +136,24 @@ final class HttpRouter implements Router
         if (class_exists($route->dtoClass)) {
             $this->assertFormatAllowed($route);
 
+            $this->logger?->debug('Route resolved', [
+                'type' => 'convention',
+                'dto' => $route->dtoClass,
+                'format' => $route->format,
+            ]);
+
             return $route;
         }
 
         // If the DTO class doesn't exist but the handler does, allow it —
         // the kernel will create a dynamic Command or Query DTO.
         if (class_exists($route->dtoClass . 'Handler')) {
+            $this->logger?->debug('Route resolved', [
+                'type' => 'convention',
+                'dto' => $route->dtoClass,
+                'format' => $route->format,
+            ]);
+
             return $route;
         }
 
@@ -150,6 +181,10 @@ final class HttpRouter implements Router
         $allowed = $attrs[0]->newInstance();
 
         if (!in_array($route->format, $allowed->formats, true)) {
+            $this->logger?->notice('Format not acceptable', [
+                'format' => $route->format,
+                'allowed' => $allowed->formats,
+            ]);
             throw new HttpException(
                 StatusCode::NotAcceptable,
                 sprintf(
@@ -185,8 +220,15 @@ final class HttpRouter implements Router
         );
 
         if (class_exists($alternateRoute->dtoClass) || class_exists($alternateRoute->dtoClass . 'Handler')) {
+            $this->logger?->notice('Method not allowed', [
+                'path' => $path,
+                'method' => $method,
+                'allowed' => $alternateMethods,
+            ]);
             throw new MethodNotAllowed($alternateMethods);
         }
+
+        $this->logger?->debug('Route not found', ['path' => $path]);
 
         throw (new HttpException(
             StatusCode::NotFound,

@@ -95,6 +95,26 @@ return [
 
 Standard PSR-3 calls (`$logger->info(...)`) always route to the `default` channel. Use `$logger->channel('name')` to target a specific channel.
 
+## Correlation processor
+
+`CorrelationProcessor` is a Monolog processor that tags every log record with a `correlation_id` for grouping related log lines within a unit of work (HTTP request, CLI command, queued job).
+
+```php
+use Arcanum\Quill\CorrelationProcessor;
+
+$processor = new CorrelationProcessor();
+$processor->setCorrelationId('abc123');
+
+// Every log record now includes correlation_id in its extra data
+$logger->info('Something happened');
+// → extra: { correlation_id: "abc123" }
+
+$processor->clearCorrelationId();
+// → no correlation_id added after clearing
+```
+
+In the framework, `Bootstrap\Logger` registers a single `CorrelationProcessor` and pushes it onto every Monolog channel. The kernels (`HyperKernel`, `RuneKernel`) set and clear the ID at the start and end of each `handle()` cycle, so all log lines from a single request or command share the same correlation ID. Note: correlation IDs require Quill/Monolog — apps that bind a custom `LoggerInterface` before `Bootstrap\Logger` runs will need to handle correlation in their own logger implementation.
+
 ## At a glance
 
 ```
