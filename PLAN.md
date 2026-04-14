@@ -61,7 +61,7 @@ Parchment uses `Symfony\Component\Filesystem\Filesystem` in `Reader`, `Writer`, 
 
 ##### Checklist
 
-- [ ] **Add `symfony/filesystem` to `composer.json` `require`** — Add `"symfony/filesystem": "^6.3 || ^7.0"` (matching the existing `symfony/finder` version constraint). Run `composer update` to verify resolution. No code changes needed.
+- [x] **Add `symfony/filesystem` to `composer.json` `require`** — Add `"symfony/filesystem": "^6.3 || ^7.0"` (matching the existing `symfony/finder` version constraint). Run `composer update` to verify resolution. No code changes needed.
 
 #### `ExceptionHandler` not registered (retro 1.8)
 

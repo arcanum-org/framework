@@ -35,7 +35,6 @@ final class ExceptionsTest extends TestCase
 
     /**
      * Build a stub Application that returns specific handlers.
-     * Returns null from get() for unregistered handler interfaces.
      *
      * @param array<string, mixed> $appConfig
      */
@@ -49,13 +48,21 @@ final class ExceptionsTest extends TestCase
         $config = new Configuration(['app' => array_merge(['environment' => $environment], $appConfig)]);
 
         $app = $this->createStub(Application::class);
+        $app->method('has')->willReturnCallback(
+            fn(string $id) => match ($id) {
+                ErrorHandler::class => $errorHandler !== null,
+                ExceptionHandler::class => $exceptionHandler !== null,
+                ShutdownHandler::class => $shutdownHandler !== null,
+                default => false,
+            }
+        );
         $app->method('get')->willReturnCallback(
             fn(string $id) => match ($id) {
                 Configuration::class => $config,
-                ErrorHandler::class => $errorHandler,
-                ExceptionHandler::class => $exceptionHandler,
-                ShutdownHandler::class => $shutdownHandler,
-                default => null,
+                ErrorHandler::class => $errorHandler ?? throw new \RuntimeException('Not registered'),
+                ExceptionHandler::class => $exceptionHandler ?? throw new \RuntimeException('Not registered'),
+                ShutdownHandler::class => $shutdownHandler ?? throw new \RuntimeException('Not registered'),
+                default => throw new \RuntimeException("Not registered: $id"),
             }
         );
 
@@ -203,6 +210,47 @@ final class ExceptionsTest extends TestCase
         /** @var Configuration $config */
         $config = $app->get(Configuration::class);
         $this->assertFalse($config->get('app.verbose_errors'));
+    }
+
+    // -----------------------------------------------------------
+    // Default handler registration
+    // -----------------------------------------------------------
+
+    public function testRegistersDefaultHandlersWhenNoneExist(): void
+    {
+        // Arrange — real container, no pre-registered handlers
+        $container = new Container();
+        $config = new Configuration(['app' => ['environment' => 'testing']]);
+        $container->instance(Configuration::class, $config);
+
+        $bootstrapper = new Exceptions();
+
+        // Act
+        $bootstrapper->bootstrap($container);
+
+        // Assert — all three interfaces resolve
+        $this->assertTrue($container->has(ExceptionHandler::class));
+        $this->assertTrue($container->has(ErrorHandler::class));
+        $this->assertTrue($container->has(ShutdownHandler::class));
+    }
+
+    public function testPreRegisteredHandlerWinsOverDefault(): void
+    {
+        // Arrange — app registers its own handler before bootstrap
+        $container = new Container();
+        $config = new Configuration(['app' => ['environment' => 'testing']]);
+        $container->instance(Configuration::class, $config);
+
+        $appHandler = $this->createStub(ExceptionHandler::class);
+        $container->instance(ExceptionHandler::class, $appHandler);
+
+        $bootstrapper = new Exceptions();
+
+        // Act
+        $bootstrapper->bootstrap($container);
+
+        // Assert — app handler was not overwritten
+        $this->assertSame($appHandler, $container->get(ExceptionHandler::class));
     }
 
     // -----------------------------------------------------------
