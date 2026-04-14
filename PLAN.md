@@ -73,8 +73,8 @@ Two problems in `Bootstrap\Exceptions`: (1) the three `handle*()` methods use `$
 
 ##### Checklist
 
-- [ ] **Fix `has()` guards in `Bootstrap\Exceptions`** — Replace bare `$container->get()` calls with `$container->has()` + `$container->get()` in `handleError()`, `handleException()`, and `handleShutdown()`. Wrap `handleShutdown()` body in try-catch — shutdown handlers must never throw. Match the pattern `Lifecycle::report()` already uses correctly.
-- [ ] **Register `Glitch\Handler` as default** — In `Bootstrap\Exceptions::bootstrap()`, register `Glitch\Handler` as the default implementation for `ExceptionHandler`, `ErrorHandler`, and `ShutdownHandler` with `has()` guards. Apps can override before bootstrap (guard skips) or after (Cabinet re-registration overwrites). Tests: from-scratch container with no app handler → `Glitch\Handler` is resolved; container with pre-registered app handler → app handler wins; container with post-registered app handler → app handler wins.
+- [x] **Fix `has()` guards in `Bootstrap\Exceptions`** — Replace bare `$container->get()` calls with `$container->has()` + `$container->get()` in `handleError()`, `handleException()`, and `handleShutdown()`. Wrap `handleShutdown()` body in try-catch — shutdown handlers must never throw. Match the pattern `Lifecycle::report()` already uses correctly.
+- [x] **Register `Glitch\Handler` as default** — In `Bootstrap\Exceptions::bootstrap()`, register `Glitch\Handler` as the default implementation for `ExceptionHandler`, `ErrorHandler`, and `ShutdownHandler` with `has()` guards. Apps can override before bootstrap (guard skips) or after (Cabinet re-registration overwrites). Tests: from-scratch container with no app handler → `Glitch\Handler` is resolved; container with pre-registered app handler → app handler wins; container with post-registered app handler → app handler wins.
 
 #### `migrate:create` timestamp collision (retro 1.2)
 

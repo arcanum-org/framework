@@ -41,15 +41,15 @@ final class MigrationRepositoryTest extends TestCase
     public function testRecordAndRetrieveAppliedMigration(): void
     {
         // Act
-        $this->repository->record('20260409120000', '20260409120000_create_users.sql', 'abc123');
+        $this->repository->record('20260409120000000', '20260409120000000_create_users.sql', 'abc123');
 
         // Assert
         $applied = $this->repository->applied();
         $this->assertCount(1, $applied);
         $first = reset($applied);
         $this->assertInstanceOf(AppliedMigration::class, $first);
-        $this->assertSame('20260409120000', $first->version);
-        $this->assertSame('20260409120000_create_users.sql', $first->filename);
+        $this->assertSame('20260409120000000', $first->version);
+        $this->assertSame('20260409120000000_create_users.sql', $first->filename);
         $this->assertSame('abc123', $first->checksum);
         $this->assertNotEmpty($first->appliedAt);
     }
@@ -57,9 +57,9 @@ final class MigrationRepositoryTest extends TestCase
     public function testAppliedReturnsSortedByVersion(): void
     {
         // Arrange — insert out of order
-        $this->repository->record('20260409130000', 'b.sql', 'bbb');
-        $this->repository->record('20260409120000', 'a.sql', 'aaa');
-        $this->repository->record('20260409140000', 'c.sql', 'ccc');
+        $this->repository->record('20260409130000000', 'b.sql', 'bbb');
+        $this->repository->record('20260409120000000', 'a.sql', 'aaa');
+        $this->repository->record('20260409140000000', 'c.sql', 'ccc');
 
         // Act
         $applied = $this->repository->applied();
@@ -69,23 +69,23 @@ final class MigrationRepositoryTest extends TestCase
             static fn (AppliedMigration $m) => $m->version,
             array_values($applied),
         );
-        $this->assertSame(['20260409120000', '20260409130000', '20260409140000'], $versions);
+        $this->assertSame(['20260409120000000', '20260409130000000', '20260409140000000'], $versions);
     }
 
     public function testRemoveDeletesMigrationRecord(): void
     {
         // Arrange
-        $this->repository->record('20260409120000', 'a.sql', 'aaa');
-        $this->repository->record('20260409130000', 'b.sql', 'bbb');
+        $this->repository->record('20260409120000000', 'a.sql', 'aaa');
+        $this->repository->record('20260409130000000', 'b.sql', 'bbb');
 
         // Act
-        $this->repository->remove('20260409120000');
+        $this->repository->remove('20260409120000000');
 
         // Assert
         $applied = $this->repository->applied();
         $this->assertCount(1, $applied);
-        $this->assertArrayNotHasKey('20260409120000', $applied);
-        $this->assertArrayHasKey('20260409130000', $applied);
+        $this->assertArrayNotHasKey('20260409120000000', $applied);
+        $this->assertArrayHasKey('20260409130000000', $applied);
     }
 
     public function testAppliedReturnsEmptyWhenNoMigrations(): void

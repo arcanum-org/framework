@@ -35,16 +35,16 @@ final class MigrationParserTest extends TestCase
     {
         // Arrange
         $parser = new MigrationParser();
-        $path = $this->fixtureDir . '/20260409120000_create_users.sql';
-        $contents = $this->readFixture('20260409120000_create_users.sql');
+        $path = $this->fixtureDir . '/20260409120000000_create_users.sql';
+        $contents = $this->readFixture('20260409120000000_create_users.sql');
 
         // Act
         $result = $parser->parse($path, $contents);
 
         // Assert
-        $this->assertSame('20260409120000', $result->version);
+        $this->assertSame('20260409120000000', $result->version);
         $this->assertSame('create_users', $result->name);
-        $this->assertSame('20260409120000_create_users.sql', $result->filename);
+        $this->assertSame('20260409120000000_create_users.sql', $result->filename);
         $this->assertStringContainsString('CREATE TABLE users', $result->upSql);
         $this->assertStringContainsString('DROP TABLE users', $result->downSql);
         $this->assertTrue($result->transactional);
@@ -55,7 +55,7 @@ final class MigrationParserTest extends TestCase
     {
         // Arrange
         $parser = new MigrationParser();
-        $path = $this->fixtureDir . '/20260409130000_no_transaction.sql';
+        $path = $this->fixtureDir . '/20260409130000000_no_transaction.sql';
         $contents = $this->readFixture(basename($path));
 
         // Act
@@ -86,7 +86,7 @@ final class MigrationParserTest extends TestCase
     {
         // Arrange
         $parser = new MigrationParser();
-        $path = $this->fixtureDir . '/20260409140000_no_markers.sql';
+        $path = $this->fixtureDir . '/20260409140000000_no_markers.sql';
         $contents = $this->readFixture(basename($path));
 
         // Act & Assert
@@ -99,7 +99,7 @@ final class MigrationParserTest extends TestCase
     {
         // Arrange
         $parser = new MigrationParser();
-        $path = $this->fixtureDir . '/20260409150000_missing_down.sql';
+        $path = $this->fixtureDir . '/20260409150000000_missing_down.sql';
         $contents = $this->readFixture(basename($path));
 
         // Act & Assert
@@ -112,7 +112,7 @@ final class MigrationParserTest extends TestCase
     {
         // Arrange
         $parser = new MigrationParser();
-        $path = $this->fixtureDir . '/20260409120000_create_users.sql';
+        $path = $this->fixtureDir . '/20260409120000000_create_users.sql';
         $contents = $this->readFixture(basename($path));
 
         // Act
@@ -127,7 +127,7 @@ final class MigrationParserTest extends TestCase
     {
         // Arrange
         $parser = new MigrationParser();
-        $path = '/tmp/20260409160000_test.sql';
+        $path = '/tmp/20260409160000000_test.sql';
         $original = "-- @migrate up\nSELECT 1;\n\n-- @migrate down\nSELECT 2;\n";
         $modified = "-- @migrate up\nSELECT 99;\n\n-- @migrate down\nSELECT 2;\n";
 
@@ -143,7 +143,7 @@ final class MigrationParserTest extends TestCase
     {
         // Arrange
         $parser = new MigrationParser();
-        $path = '/tmp/20260409170000_seed_data.sql';
+        $path = '/tmp/20260409170000000_seed_data.sql';
         $contents = "-- @migrate up\nINSERT INTO config (key, value) VALUES ('ver', '1');\n\n-- @migrate down\n";
 
         // Act

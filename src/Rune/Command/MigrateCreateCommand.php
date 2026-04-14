@@ -51,7 +51,7 @@ final class MigrateCreateCommand implements BuiltInCommand
             $this->fileSystem->mkdir($migrationsDir, 0755);
         }
 
-        $version = date('YmdHis');
+        $version = (new \DateTimeImmutable())->format('YmdHisv');
         $filename = $version . '_' . $name . '.sql';
         $path = $migrationsDir . DIRECTORY_SEPARATOR . $filename;
 
