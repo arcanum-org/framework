@@ -201,6 +201,12 @@ class CliRouting implements Bootstrapper
         $domainRoot = $rootDirectory . DIRECTORY_SEPARATOR . Strings::namespacePath($namespace);
         $frameworkCacheDirectory = $kernel->filesDirectory() . DIRECTORY_SEPARATOR . 'cache';
 
+        /** @var mixed $migrationsPath */
+        $migrationsPath = $config->get('database.migrations_path');
+        $migrationsPath = is_string($migrationsPath) && $migrationsPath !== ''
+            ? $rootDirectory . DIRECTORY_SEPARATOR . $migrationsPath
+            : '';
+
         // Registry — maps command names to class-strings.
         $container->factory(BuiltInRegistry::class, function () use ($container) {
             $registry = new BuiltInRegistry($container);
@@ -232,10 +238,8 @@ class CliRouting implements Bootstrapper
         $container->service(LogoutCommand::class);
 
         // Commands needing $rootDirectory only.
-        foreach ([MakeKeyCommand::class, MigrateCreateCommand::class] as $class) {
-            $container->service($class);
-            $container->specify($class, '$rootDirectory', $rootDirectory);
-        }
+        $container->service(MakeKeyCommand::class);
+        $container->specify(MakeKeyCommand::class, '$rootDirectory', $rootDirectory);
 
         // Commands needing $rootDirectory + $rootNamespace.
         foreach ([MakeCommandCommand::class, MakeQueryCommand::class, MakeMiddlewareCommand::class] as $class) {
@@ -258,10 +262,18 @@ class CliRouting implements Bootstrapper
             $container->specify($class, '$domainNamespace', $namespace);
         }
 
-        // Migration commands — $rootDirectory only (ConnectionManager is nullable, auto-resolved).
-        foreach ([MigrateCommand::class, MigrateRollbackCommand::class, MigrateStatusCommand::class] as $class) {
+        // Migration commands — $rootDirectory + optional $migrationsPath from config.
+        foreach (
+            [
+            MigrateCommand::class,
+            MigrateRollbackCommand::class,
+            MigrateStatusCommand::class,
+            MigrateCreateCommand::class,
+            ] as $class
+        ) {
             $container->service($class);
             $container->specify($class, '$rootDirectory', $rootDirectory);
+            $container->specify($class, '$migrationsPath', $migrationsPath);
         }
 
         // MakePageCommand — extra page config on top of the generator pattern.

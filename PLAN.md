@@ -84,10 +84,10 @@ Migrations use second-resolution timestamps (`YmdHis`, 14 digits) as version ide
 
 ##### Checklist
 
-- [ ] **Millisecond timestamps in `MigrateCreateCommand`** — Replace `date('YmdHis')` with `(new \DateTimeImmutable())->format('YmdHisv')` for 17-digit millisecond-resolution versions. Update the output message.
-- [ ] **Update `MigrationParser` regex** — Change `FILENAME_PATTERN` from `\d{14}` to `\d{17}`.
-- [ ] **Update `MigrationRepository` schema** — Change `VARCHAR(14)` to `VARCHAR(17)` in MySQL and PostgreSQL table creation SQL. SQLite uses `TEXT`, no change needed.
-- [ ] **Update tests** — Adjust all migration tests that assert on filename format or version length.
+- [x] **Millisecond timestamps in `MigrateCreateCommand`** — Replace `date('YmdHis')` with `(new \DateTimeImmutable())->format('YmdHisv')` for 17-digit millisecond-resolution versions. Update the output message.
+- [x] **Update `MigrationParser` regex** — Change `FILENAME_PATTERN` from `\d{14}` to `\d{17}`.
+- [x] **Update `MigrationRepository` schema** — Change `VARCHAR(14)` to `VARCHAR(17)` in MySQL and PostgreSQL table creation SQL. SQLite uses `TEXT`, no change needed.
+- [x] **Update tests** — Adjust all migration tests that assert on filename format or version length.
 
 #### Move migrations to `database/migrations/` (retro 8.3, orchestrator observation)
 

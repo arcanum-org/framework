@@ -22,6 +22,7 @@ final class MigrateCreateCommand implements BuiltInCommand
 {
     public function __construct(
         private readonly string $rootDirectory,
+        private readonly string $migrationsPath = '',
         private readonly Writer $writer = new Writer(),
         private readonly FileSystem $fileSystem = new FileSystem(),
     ) {
@@ -45,7 +46,9 @@ final class MigrateCreateCommand implements BuiltInCommand
             return ExitCode::Invalid->value;
         }
 
-        $migrationsDir = $this->rootDirectory . DIRECTORY_SEPARATOR . 'migrations';
+        $migrationsDir = $this->migrationsPath !== ''
+            ? $this->migrationsPath
+            : $this->rootDirectory . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'migrations';
 
         if (!is_dir($migrationsDir)) {
             $this->fileSystem->mkdir($migrationsDir, 0755);
