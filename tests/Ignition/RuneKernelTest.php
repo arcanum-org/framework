@@ -197,10 +197,11 @@ final class RuneKernelTest extends TestCase
         // Act
         $kernel->bootstrap($container);
 
-        // Assert — only early bootstrappers ran
+        // Assert — early bootstrappers + CliRouting only, no Security/Database/Auth
         $this->assertContains(Bootstrap\Hourglass::class, $resolved);
         $this->assertContains(Bootstrap\Environment::class, $resolved);
         $this->assertContains(Bootstrap\Configuration::class, $resolved);
+        $this->assertContains(Bootstrap\CliRouting::class, $resolved);
         $this->assertNotContains(Bootstrap\Security::class, $resolved);
         $this->assertNotContains(Bootstrap\Database::class, $resolved);
         $this->assertNotContains(Bootstrap\Auth::class, $resolved);
@@ -227,8 +228,9 @@ final class RuneKernelTest extends TestCase
         // Act
         $kernel->bootstrap($container);
 
-        // Assert — only 3 early bootstrappers, not the full 10
-        $this->assertCount(3, $resolved);
+        // Assert — 3 early + CliRouting = 4
+        $this->assertCount(4, $resolved);
+        $this->assertNotContains(Bootstrap\Security::class, $resolved);
     }
 
     public function testHelpCommandGetsMinimalBootstrap(): void
@@ -252,8 +254,8 @@ final class RuneKernelTest extends TestCase
         // Act
         $kernel->bootstrap($container);
 
-        // Assert
-        $this->assertCount(3, $resolved);
+        // Assert — 3 early + CliRouting = 4
+        $this->assertCount(4, $resolved);
     }
 
     public function testNormalCommandGetsFullBootstrap(): void

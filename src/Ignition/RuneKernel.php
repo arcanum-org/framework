@@ -100,16 +100,20 @@ class RuneKernel implements Kernel
     ];
 
     /**
-     * Framework defaults for commands that need only the early
-     * bootstrappers (Environment + Configuration). App config
-     * from `config/bootstrap.php` merges over these.
+     * Framework defaults for commands that need minimal bootstrap.
+     *
+     * CliRouting is included because it registers the BuiltInRegistry
+     * and command services. It's safe under minimal bootstrap — all
+     * heavy command factories are lazy and only resolve when invoked.
+     *
+     * App config from `config/bootstrap.php` merges over these.
      *
      * @var array<string, class-string<Bootstrapper>[]>
      */
     private const CLI_BOOTSTRAP_DEFAULTS = [
-        'make:key' => [],
-        'list' => [],
-        'help' => [],
+        'make:key' => [Bootstrap\CliRouting::class],
+        'list' => [Bootstrap\CliRouting::class],
+        'help' => [Bootstrap\CliRouting::class],
     ];
 
     public function __construct(
