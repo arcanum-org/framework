@@ -31,6 +31,9 @@ final class TestRuneKernel extends RuneKernel
     /** @var class-string<\Arcanum\Ignition\Bootstrapper>[] */
     protected array $bootstrappers = [];
 
+    /** @var class-string<\Arcanum\Ignition\Bootstrapper>[] */
+    protected array $earlyBootstrappers = [];
+
     /** @var (callable(Input, Output): int)|null */
     private $runner = null;
 

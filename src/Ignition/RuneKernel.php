@@ -29,6 +29,7 @@ use Arcanum\Rune\Input;
 use Arcanum\Rune\Output;
 use Arcanum\Shodo\CliFormatRegistry;
 use Arcanum\Toolkit\Random;
+use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -84,6 +85,33 @@ class RuneKernel implements Kernel
         Bootstrap\Exceptions::class,
     ];
 
+    /**
+     * Bootstrappers that always run, regardless of per-command config.
+     *
+     * These provide the minimum context to read configuration and
+     * determine which command is being invoked.
+     *
+     * @var class-string<Bootstrapper>[]
+     */
+    protected array $earlyBootstrappers = [
+        Bootstrap\Hourglass::class,
+        Bootstrap\Environment::class,
+        Bootstrap\Configuration::class,
+    ];
+
+    /**
+     * Framework defaults for commands that need only the early
+     * bootstrappers (Environment + Configuration). App config
+     * from `config/bootstrap.php` merges over these.
+     *
+     * @var array<string, class-string<Bootstrapper>[]>
+     */
+    private const CLI_BOOTSTRAP_DEFAULTS = [
+        'make:key' => [],
+        'list' => [],
+        'help' => [],
+    ];
+
     public function __construct(
         private readonly string $rootDirectory,
         private string $configDirectory = '',
@@ -131,17 +159,30 @@ class RuneKernel implements Kernel
         $this->container = $container;
         $container->instance(Transport::class, Transport::Cli);
 
-        foreach ($this->bootstrappers as $name) {
-            try {
-                /** @var Bootstrapper $bootstrapper */
-                $bootstrapper = $container->get($name);
-                $bootstrapper->bootstrap($container);
-            } catch (\Throwable $e) {
-                throw new \RuntimeException(sprintf(
-                    'Failed during %s bootstrap: %s. Bootstrappers may be in the wrong order.',
-                    $name,
-                    $e->getMessage(),
-                ), 0, $e);
+        // Phase 1: Always run early bootstrappers (timing, env, config).
+        foreach ($this->earlyBootstrappers as $name) {
+            $this->runBootstrapper($container, $name);
+        }
+
+        // Phase 2: Check for per-command bootstrap overrides.
+        $commandName = $this->resolveCommandName();
+        $commandBootstrappers = $this->resolveCommandBootstrappers($container, $commandName);
+
+        if ($commandBootstrappers !== null) {
+            // Per-command list found — run only those (skipping early ones).
+            $alreadyRan = array_flip($this->earlyBootstrappers);
+            foreach ($commandBootstrappers as $name) {
+                if (!isset($alreadyRan[$name])) {
+                    $this->runBootstrapper($container, $name);
+                }
+            }
+        } else {
+            // No per-command list — run remaining default bootstrappers.
+            $alreadyRan = array_flip($this->earlyBootstrappers);
+            foreach ($this->bootstrappers as $name) {
+                if (!isset($alreadyRan[$name])) {
+                    $this->runBootstrapper($container, $name);
+                }
             }
         }
 
@@ -354,6 +395,79 @@ class RuneKernel implements Kernel
             $processor = $this->container->get(CorrelationProcessor::class);
             $processor->clearCorrelationId();
         }
+    }
+
+    /**
+     * Run a single bootstrapper with error wrapping.
+     *
+     * @param class-string<Bootstrapper> $name
+     */
+    private function runBootstrapper(Application $container, string $name): void
+    {
+        try {
+            /** @var Bootstrapper $bootstrapper */
+            $bootstrapper = $container->get($name);
+            $bootstrapper->bootstrap($container);
+        } catch (\Throwable $e) {
+            throw new \RuntimeException(sprintf(
+                'Failed during %s bootstrap: %s. Bootstrappers may be in the wrong order.',
+                $name,
+                $e->getMessage(),
+            ), 0, $e);
+        }
+    }
+
+    /**
+     * Extract the command name from CLI argv.
+     *
+     * Uses $_SERVER['argv'] which PHP always populates in CLI mode.
+     * Returns empty string when no command is given (splash screen).
+     */
+    private function resolveCommandName(): string
+    {
+        /** @var list<string> $argv */
+        $argv = $_SERVER['argv'] ?? [];
+
+        // Skip the script name ($argv[0]), return the command ($argv[1]).
+        return $argv[1] ?? '';
+    }
+
+    /**
+     * Look up per-command bootstrapper overrides.
+     *
+     * Checks framework defaults (make:key, list, help) merged with
+     * app config from `config/bootstrap.php` under the `cli` key.
+     * Returns null when no override exists (use the full default chain).
+     *
+     * @return class-string<Bootstrapper>[]|null
+     */
+    private function resolveCommandBootstrappers(Application $container, string $commandName): ?array
+    {
+        if ($commandName === '') {
+            return null;
+        }
+
+        $overrides = self::CLI_BOOTSTRAP_DEFAULTS;
+
+        if ($container->has(Configuration::class)) {
+            /** @var Configuration $config */
+            $config = $container->get(Configuration::class);
+
+            /** @var mixed $appOverrides */
+            $appOverrides = $config->get('bootstrap.cli');
+
+            if (is_array($appOverrides)) {
+                /** @var array<string, class-string<Bootstrapper>[]> $appOverrides */
+                $overrides = array_merge($overrides, $appOverrides);
+            }
+        }
+
+        if (array_key_exists($commandName, $overrides)) {
+            /** @var class-string<Bootstrapper>[] */
+            return $overrides[$commandName];
+        }
+
+        return null;
     }
 
     private function splash(Output $output): void

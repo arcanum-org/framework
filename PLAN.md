@@ -4,26 +4,22 @@
 
 ---
 
-## On Deck (needs planning and checklists)
+## On Deck
 
-These are the highest-impact items from the backlog. Each needs to be broken into a walkable checklist before work begins.
+Ordered by dependency — foundations first, then the features that build on them.
 
 1. **Dogfood: critical bug fixes** — details in checklist below.
-2. **Dogfood: auth config reform** — details in checklist below.
-3. **Dogfood: CommandResult & flash messages** — details in checklist below.
-4. **Dogfood: auth exceptions & redirect** — details in checklist below.
-5. **Dogfood: routing & handler resolution** — details in checklist below.
-6. **Dogfood: bootstrap self-wiring** — details in checklist below.
-7. **Dogfood: investigation fixes** — details in checklist below.
+2. **Dogfood: routing & handler resolution** — details in checklist below.
+3. **Dogfood: auth config reform** — details in checklist below.
+4. **Dogfood: bootstrap self-wiring** — details in checklist below.
+5. **Dogfood: investigation fixes** — details in checklist below. (Handler naming table blocked on #2.)
+6. **Dogfood: CommandResult & flash messages** — details in checklist below. (Reverse routing blocked on #2.)
+7. **Dogfood: auth exceptions & redirect** — details in checklist below.
 8. **Dogfood: unify CLI dispatch & colon routing** — details in checklist below.
-9. **Dogfood: starter app update** — details in checklist below.
-10. **Dogfood: documentation** — details in checklist below.
-11. **Logging instrumentation** — details in checklist below.
-12. **Todo App dogfood** — details in checklist below.
-
-13. **Hyper README** — details in checklist below.
-14. **PSR-18 HTTP Client** — details in checklist below.
-15. **Integration test coverage** — details in checklist below.
+9. **PSR-18 HTTP Client** — details in checklist below.
+10. **Dogfood: starter app update** — details in checklist below. (Needs 1–8.)
+11. **Dogfood: documentation** — details in checklist below. (Needs code changes from 1–8.)
+12. **Integration test coverage** — details in checklist below. (Better after 1–8.)
 
 ---
 
@@ -106,7 +102,34 @@ Migrations currently live at `migrations/` in the project root. Both builds expe
 - [ ] **Update starter app** — Move `migrations/` to `database/migrations/`. Add the `migrations_path` key to `config/database.php` (commented out, showing the default).
 - [ ] **Update COMPENDIUM.md and Forge README** — Reflect the new default `database/migrations/` path and the config option in all documentation.
 
-### Auth config reform (retro 4.1, orchestrator observation)
+### Dogfood: routing & handler resolution (retro 1.7, 1.5)
+
+Two bugs in the routing and handler resolution pipeline, both surfaced by the dogfood.
+
+#### Convention routing path doubling (retro 1.7)
+
+When a domain name matches the DTO class name, `UrlResolver::resolveConvention()` produces doubled paths. `App\Domain\TaskLists\Query\TaskLists` → `/task-lists/task-lists` instead of `/task-lists`. The reverse resolver strips the `Query`/`Command` type segment but leaves both the domain segment and the identically-named class segment. Build B had to fall back to custom routes for everything.
+
+**Fix:** In `UrlResolver::resolveConvention()`, after removing the type segment, check if the last remaining segment equals the segment immediately before the type (the domain). If they match, drop the duplicate. Must also handle deeper nesting: `App\Domain\Shop\Products\Query\Products` → `/shop/products`, not `/shop/products/products`.
+
+#### Handler resolution misreports dependency failures (retro 1.5, 1.6)
+
+`MiddlewareBus::handlerFor()` has two problems:
+
+1. **Line 95: `has()` for prefixed handlers.** Uses `Container::has()` to check for prefixed handlers (e.g., `PostTaskListsHandler`). `has()` only checks explicit providers — returns false for classes that exist and would auto-wire fine via Codex. This breaks the prefixed handler pattern for custom routes. Changing `has()` globally is wrong — most call sites intentionally mean "explicitly registered." Fix: use `class_exists()` instead of `has()` at this specific call site.
+
+2. **Line 110: `catch (\Throwable)` is too broad.** The unprefixed handler fallback catches `\Throwable` and wraps it as `HandlerNotFound`. When the handler class exists but a dependency fails to resolve (e.g., Codex throws `UnresolvableClass` because `Identity` can't be satisfied), the catch misreports it as "Handler Not Found" — a misleading 500 instead of the real error. Cabinet throws `ServiceNotFound` when a class truly doesn't exist; Codex throws `Unresolvable` when a dependency can't be satisfied. The catch should only catch `ServiceNotFound`.
+
+##### Checklist
+
+- [ ] **Fix `UrlResolver::resolveConvention()` path doubling** — After removing the `Query`/`Command` type segment from the namespace segments, check if the last segment duplicates the segment that preceded the type. If so, remove the duplicate. Test cases: `Domain\TaskLists\Query\TaskLists` → `/task-lists`, `Domain\Shop\Products\Query\Products` → `/shop/products`, `Domain\Shop\Query\FeaturedProducts` → `/shop/featured-products` (no duplication, unchanged), `Domain\Shop\Query\Shop` → `/shop` (edge case: DTO name matches domain two levels up).
+- [ ] **Fix `handlerFor()` prefixed lookup** — Replace `$this->container->has($prefixedName)` with `class_exists($prefixedName)` at the prefixed handler check. This correctly discovers handlers that exist and autoload, regardless of explicit container registration. Test: prefixed handler class exists but is not registered → found and auto-wired. Prefixed handler class does not exist → falls through to unprefixed.
+- [ ] **Narrow `handlerFor()` catch to `ServiceNotFound`** — Replace `catch (\Throwable $e)` with `catch (ServiceNotFound $e)` at the unprefixed handler fallback. Dependency resolution failures (`Unresolvable` from Codex, `AuthenticationException` from the auth work) propagate to the kernel as-is, producing accurate error responses instead of misleading "Handler Not Found" errors.
+- [ ] **Tests** — UrlResolver tests for collapsed paths (single-segment domain = class name, deeper nesting, no-duplication cases). MiddlewareBus tests: prefixed handler found via auto-wiring, dependency failure propagates instead of becoming HandlerNotFound.
+- [ ] **Document root path (`/`) convention limitation** — Atlas convention routing can't produce an empty path — `GET /` always needs a custom route. Both dogfood builds hit this. Document in the Atlas README and the from-scratch guide that `'/' => DtoClass::class` in `config/routes.php` is required.
+- [ ] **Update COMPENDIUM.md** — Document the path collapsing behavior and the root path limitation in the routing conventions section.
+
+### Dogfood: auth config reform (retro 4.1, orchestrator observation)
 
 `config/auth.php` contains closures with actual application logic — database queries, password verification, identity construction. Configuration should be declarative (strings, scalars, arrays); the system that consumes the config should do the work. The closures also can't access the container, which forced both dogfood builds to drop to raw PDO instead of using Forge models for identity resolution.
 
@@ -135,96 +158,7 @@ Guards receive the `IdentityProvider` instead of raw `Closure` arguments. `Sessi
 - [ ] **`make:provider` CLI command** — Scaffold an `IdentityProvider` implementation with stub methods and the correct `use` imports. Register as a built-in command (DTO + Handler). Add to `config/bootstrap.php` defaults (minimal bootstrap — no database needed for scaffolding).
 - [ ] **Update Auth README** — Document the new `IdentityProvider` interface, the config format change, and show a complete example provider using Forge models. Remove any references to resolver closures.
 
-### CommandResult & flash messages (retro 5.1, 5.2, 4.3, 4.4, 9.3)
-
-The single biggest DX friction from the dogfood. Command handlers today return `void` (204), a DTO (201), or `null` (202) — no redirects, no custom status codes, no way to say "success, now go to `/dashboard`." Both builds fought this: Build A used htmx client-side redirects (requires JS, no fallback), Build B returned raw `ResponseInterface` objects with 5+ imports and kernel-level special-case logic. Neither felt like the intended pattern because there wasn't one.
-
-**The deeper problem:** Arcanum has no controllers — the handler IS the endpoint. Unlike MediatR/.NET where a controller interprets command results into HTTP, Arcanum's rendering pipeline must bridge handler returns to transport-specific responses. The framework was already doing this implicitly (void→204, DTO→201); it just didn't go far enough.
-
-**Design principles (informed by Wolverine, Ecotone, and the CQRS consensus):**
-
-- **Handlers express transport-agnostic intent; kernels interpret it.** A handler says "redirect here" or "resource created at this URL." The HTTP kernel produces a 303 or 201+Location. The CLI kernel prints a message or ignores it. The handler never touches PSR-7.
-- **Metadata only, no payloads.** `CommandResult` carries location URLs and status intent, never business data. That's the query side's job. Commands tell you *where* to find the result, not *what* the result is.
-- **Flash messages are side effects, not outcomes.** They flow through Echo events, not return values. A `FlashMessageListener` stores them in the session (HTTP) or prints them (CLI). This composes with command chaining — inner commands dispatch flashes too, all collected by the same listener.
-- **One canonical return type.** Middleware normalizes all command returns into `CommandResult`. Existing `void`/`null`/DTO conventions are upscaled, not replaced — no existing handlers break.
-
-**Normalization table:**
-
-| Handler returns | Normalized to | HTTP | CLI |
-|---|---|---|---|
-| `void` | `CommandResult::empty()` | 204 No Content | exit 0, no output |
-| `null` | `CommandResult::accepted()` | 202 Accepted | exit 0, "Accepted" |
-| Query DTO | `CommandResult::created(reverse_route($dto))` | 201 + Location header | exit 0, path printed |
-| `CommandResult` | pass through | per factory method | per factory method |
-
-**Reverse routing for DTO returns:** When a command handler returns a Query DTO, the middleware reverse-routes the DTO class through Atlas to produce the Location URL. Parameterized routes (e.g., `GetOrder` with `$id`) extract constructor values from the DTO instance to fill URL segments. Atlas's `UrlResolver` gains a `reverseRoute(object $dto): string` method for this.
-
-**Command chaining:** When a handler dispatches an inner command through the bus, the inner `CommandResult` is returned to the calling handler — not to the transport. Only the outermost handler's return reaches the kernel. Flash messages from inner commands fire as events regardless of nesting depth.
-
-#### Checklist
-
-- [ ] **`CommandResult` value object** — Define in `Flow\Conveyor`. Immutable, four static factory methods: `empty()`, `accepted()`, `created(string $location)`, `redirect(string $location, StatusCode $status = StatusCode::SeeOther)`. No payload, no business data. `location()` accessor returns the URL or null. `status()` accessor returns the intended status code. Mirrors `QueryResult` in naming.
-- [ ] **`MiddlewareBus` normalization** — After the handler returns, normalize the result into `CommandResult`. `void` → `empty()`, `null` → `accepted()`, DTO instance → `created(reverse_route($dto))`, `CommandResult` → pass through. Remove the existing ad-hoc return type interpretation (EmptyDTO 204, AcceptedDTO 202, etc.) and consolidate into `CommandResult`. Update `EmptyDTO` and `AcceptedDTO` references if they exist as special types.
-- [ ] **Atlas reverse routing** — Add `UrlResolver::reverseRoute(object $dto): string` (or similar). Given a DTO instance, resolve its class to a URL path via the convention router, extracting constructor parameter values to fill parameterized segments. Throw a clear error if the DTO class can't be reverse-routed (no convention match and no custom route). Tests for simple paths, parameterized paths, and custom routes.
-- [ ] **HyperKernel interpretation** — When the command pipeline returns a `CommandResult`, render the appropriate HTTP response: `empty()` → 204 empty body, `accepted()` → 202 empty body, `created($url)` → 201 + `Location` header + empty body, `redirect($url)` → 303 (or specified status) + `Location` header + empty body. No template rendering — these are metadata responses.
-- [ ] **RuneKernel interpretation** — When the command pipeline returns a `CommandResult`, produce CLI-appropriate output: `empty()` → exit 0 + no output, `accepted()` → exit 0 + "Accepted" message, `created($url)` → exit 0 + "Created: $url" message, `redirect($url)` → exit 0 + no output (redirect is meaningless in CLI). The URL is informational, not actionable.
-- [ ] **`FlashMessage` event** — Define in `Session` package. Constructor: `string $level` (`success`, `error`, `warning`, `info`), `string $message`. Immutable value object implementing a marker interface or extending a base event class compatible with Echo.
-- [ ] **`FlashMessageListener` (HTTP)** — Listens for `FlashMessage` events and stores them in the session under a known key. On the next request, the messages are available and cleared after reading. Lives in `Session` package.
-- [ ] **`FlashHelper` template helper** — `Flash::messages()` returns pending flash messages for the current request (reads and clears from session). `Flash::has()` checks if any exist. Register in `Bootstrap\Helpers` or via `HelperDiscovery`. Templates render flashes in the layout.
-- [ ] **`CliFlashListener`** — Listens for `FlashMessage` events and writes them to stdout immediately. Lives in `Rune` package.
-- [ ] **`StringStream` convenience** — Add `Stream::fromString(string $content): Stream` factory method on `Flow\River\Stream`. Eliminates the `LazyResource::for('php://temp')` + write + rewind ceremony. Used internally by response building and available to app developers. Addresses retro 5.2.
-- [ ] **Tests** — Unit tests for `CommandResult` (factory methods, accessors). Integration tests for the full normalization pipeline: void handler → 204, null handler → 202, DTO-returning handler → 201 + Location, `CommandResult::redirect()` → 303. Flash message round-trip: dispatch event → session storage → template helper → cleared. CLI equivalents.
-- [ ] **Update COMPENDIUM.md** — Document `CommandResult` as the canonical command return type, the normalization table, flash messages via Echo events, and the transport interpretation. Update the "shape of an Arcanum app" section to show the `CommandResult` flow.
-
-### Auth exceptions & redirect (retro 1.6, 5.4, 3.3)
-
-`#[RequiresAuth]` on a DTO produces a 500 instead of a 401 when no user is authenticated. The root cause: `ActiveIdentity::get()` throws a bare `RuntimeException`, and there may be code paths where handler construction (which resolves `Identity` from the container) precedes `AuthorizationGuard`. Even when the guard does run first, it throws `HttpException(401)` — an HTTP concept that doesn't make sense when the same guard runs in a CLI context through Rune.
-
-Additionally, auth redirects only work for htmx requests (`HtmxAuthRedirectMiddleware`). Regular browser GETs to protected endpoints produce an error page instead of a redirect to login. Both builds had to implement their own redirect logic at the kernel level.
-
-**Fix:** Transport-agnostic auth exceptions in the `Auth` package, interpreted per-transport by each kernel. A framework-level `AuthRedirectMiddleware` for HTTP browser requests, with `HtmxAuthRedirectMiddleware` layering htmx-specific behavior on top.
-
-#### Checklist
-
-- [ ] **`AuthenticationException` and `AuthorizationException`** — Define in `Auth` package. Both extend `ArcanumException` (carry `getTitle()` and `getSuggestion()`). `AuthenticationException`: "Authentication required" / "Log in to continue." `AuthorizationException`: "Insufficient permissions" / suggestion varies by context (role name, policy class). These are transport-agnostic — no HTTP status codes, no CLI exit codes.
-- [ ] **`ActiveIdentity::get()` throws `AuthenticationException`** — Replace the bare `RuntimeException` with `AuthenticationException`. This is the safety net: if any code path resolves `Identity` from the container without an authenticated user, it produces a meaningful auth error instead of a generic 500.
-- [ ] **`AuthorizationGuard` throws auth exceptions** — Replace `HttpException(401)` with `AuthenticationException` for `#[RequiresAuth]` failures. Replace `HttpException(403)` with `AuthorizationException` for `#[RequiresRole]` and `#[RequiresPolicy]` failures. The guard is a Conveyor middleware shared by both transports — it must not depend on HTTP concepts.
-- [ ] **HyperKernel exception mapping** — Map `AuthenticationException` → 401 and `AuthorizationException` → 403 in the HTTP exception rendering pipeline. Ensure error templates (`errors/401.html`, `errors/403.html`) work through the standard Shodo resolution chain.
-- [ ] **RuneKernel exception mapping** — Map `AuthenticationException` → "You must be logged in. Run `login` to authenticate." + exit 1. Map `AuthorizationException` → "Insufficient permissions." + exit 1. The CLI exception writer produces a helpful message, not an HTTP status code.
-- [ ] **`AuthRedirectMiddleware` (HTTP, framework-level)** — PSR-15 middleware that catches `AuthenticationException` and `AuthorizationException` during the request lifecycle. For browser requests (non-API, non-htmx): redirect to the login URL with a 302. Login URL read from `config/auth.php` under an `auth.redirect` key (defaulting to `/login`). For API requests (Accept: application/json): let the exception propagate to produce a JSON 401/403 response. Register in `Bootstrap\Auth` for HTTP kernels.
-- [ ] **Refactor `HtmxAuthRedirectMiddleware`** — Layer htmx-specific behavior on top of `AuthRedirectMiddleware`. For htmx requests: respond with `HX-Location` header instead of a 302 redirect. Can be a decorator or subclass of the general middleware.
-- [ ] **Generalize DTO-specific exception templates** — The status-specific template resolution chain (`{Dto}.{status}.{format}`) currently only triggers for `ValidationException` (422). Generalize so that any exception thrown during handler dispatch checks for DTO-specific templates first. The renderer knows the DTO class from the dispatch context — if `Login.401.html` exists, use it; if not, fall back to `errors/401.html`, then the framework default. Same resolution chain, broader trigger. This lets `AuthenticationException` render `Login.401.html` with form re-render and error feedback instead of going straight to the generic error page. Solves the dogfood pattern of abusing `ValidationException` for non-validation errors.
-- [ ] **Tests** — Unit tests for both exception classes. AuthorizationGuard tests updated to assert `AuthenticationException`/`AuthorizationException` instead of `HttpException`. Integration test: unauthenticated browser GET to `#[RequiresAuth]` endpoint → 302 redirect to login. Integration test: unauthenticated htmx request → HX-Location header. Integration test: unauthenticated API request → 401 JSON. CLI test: unauthenticated command → helpful error message + exit 1. Integration test: `AuthenticationException` during login → `Login.401.html` rendered with error.
-- [ ] **Update COMPENDIUM.md and Auth README** — Document the transport-agnostic exception model, the redirect middleware, the `auth.redirect` config key, and the generalized DTO-specific exception template resolution. Remove references to `HttpException` for auth failures.
-
-### Routing & handler resolution (retro 1.7, 1.5)
-
-Two bugs in the routing and handler resolution pipeline, both surfaced by the dogfood.
-
-#### Convention routing path doubling (retro 1.7)
-
-When a domain name matches the DTO class name, `UrlResolver::resolveConvention()` produces doubled paths. `App\Domain\TaskLists\Query\TaskLists` → `/task-lists/task-lists` instead of `/task-lists`. The reverse resolver strips the `Query`/`Command` type segment but leaves both the domain segment and the identically-named class segment. Build B had to fall back to custom routes for everything.
-
-**Fix:** In `UrlResolver::resolveConvention()`, after removing the type segment, check if the last remaining segment equals the segment immediately before the type (the domain). If they match, drop the duplicate. Must also handle deeper nesting: `App\Domain\Shop\Products\Query\Products` → `/shop/products`, not `/shop/products/products`.
-
-#### Handler resolution misreports dependency failures (retro 1.5, 1.6)
-
-`MiddlewareBus::handlerFor()` has two problems:
-
-1. **Line 95: `has()` for prefixed handlers.** Uses `Container::has()` to check for prefixed handlers (e.g., `PostTaskListsHandler`). `has()` only checks explicit providers — returns false for classes that exist and would auto-wire fine via Codex. This breaks the prefixed handler pattern for custom routes. Changing `has()` globally is wrong — most call sites intentionally mean "explicitly registered." Fix: use `class_exists()` instead of `has()` at this specific call site.
-
-2. **Line 110: `catch (\Throwable)` is too broad.** The unprefixed handler fallback catches `\Throwable` and wraps it as `HandlerNotFound`. When the handler class exists but a dependency fails to resolve (e.g., Codex throws `UnresolvableClass` because `Identity` can't be satisfied), the catch misreports it as "Handler Not Found" — a misleading 500 instead of the real error. Cabinet throws `ServiceNotFound` when a class truly doesn't exist; Codex throws `Unresolvable` when a dependency can't be satisfied. The catch should only catch `ServiceNotFound`.
-
-##### Checklist
-
-- [ ] **Fix `UrlResolver::resolveConvention()` path doubling** — After removing the `Query`/`Command` type segment from the namespace segments, check if the last segment duplicates the segment that preceded the type. If so, remove the duplicate. Test cases: `Domain\TaskLists\Query\TaskLists` → `/task-lists`, `Domain\Shop\Products\Query\Products` → `/shop/products`, `Domain\Shop\Query\FeaturedProducts` → `/shop/featured-products` (no duplication, unchanged), `Domain\Shop\Query\Shop` → `/shop` (edge case: DTO name matches domain two levels up).
-- [ ] **Fix `handlerFor()` prefixed lookup** — Replace `$this->container->has($prefixedName)` with `class_exists($prefixedName)` at the prefixed handler check. This correctly discovers handlers that exist and autoload, regardless of explicit container registration. Test: prefixed handler class exists but is not registered → found and auto-wired. Prefixed handler class does not exist → falls through to unprefixed.
-- [ ] **Narrow `handlerFor()` catch to `ServiceNotFound`** — Replace `catch (\Throwable $e)` with `catch (ServiceNotFound $e)` at the unprefixed handler fallback. Dependency resolution failures (`Unresolvable` from Codex, `AuthenticationException` from the auth work) propagate to the kernel as-is, producing accurate error responses instead of misleading "Handler Not Found" errors.
-- [ ] **Tests** — UrlResolver tests for collapsed paths (single-segment domain = class name, deeper nesting, no-duplication cases). MiddlewareBus tests: prefixed handler found via auto-wiring, dependency failure propagates instead of becoming HandlerNotFound.
-- [ ] **Document root path (`/`) convention limitation** — Atlas convention routing can't produce an empty path — `GET /` always needs a custom route. Both dogfood builds hit this. Document in the Atlas README and the from-scratch guide that `'/' => DtoClass::class` in `config/routes.php` is required.
-- [ ] **Update COMPENDIUM.md** — Document the path collapsing behavior and the root path limitation in the routing conventions section.
-
-### Bootstrap self-wiring (retro 3.1, 3.2, 3.4)
+### Dogfood: bootstrap self-wiring (retro 3.1, 3.2, 3.4)
 
 Build B hit 12 errors before a single page rendered. The gap between "clone the starter" and "start from scratch" is a cliff because the starter's `bootstrap/http.php` and `bootstrap/cli.php` files contain ~170 lines of infrastructure wiring that every app needs — container self-registration, kernel binding, bus registration, server adapter, event dispatcher, exception renderers. Most of this is framework infrastructure with no app-specific variation.
 
@@ -258,7 +192,7 @@ Everything else is framework defaults with `has()` guards — apps override what
 - [ ] **Test: from-scratch bootstrap** — Integration test: create a minimal bootstrap file (container + kernel binding + specs only), verify the kernel bootstraps without errors, verify `Bus`, `ServerAdapter`, `EventDispatcherInterface`, `ContainerInterface` are all resolvable from the container. This is the regression test for "12 errors before a page renders."
 - [ ] **Update COMPENDIUM.md** — Document what the framework auto-registers (container, bus, server adapter, event dispatcher, exception handlers) vs. what the app must provide (kernel binding, directory specs, exception renderer preferences). Update the "shape of an Arcanum app" section.
 
-### Investigation fixes (retro 2.1, 2.2, 2.3, 2.5)
+### Dogfood: investigation fixes (retro 2.1, 2.2, 2.3, 2.5)
 
 Items from the retrospective's "possible bugs / inconclusive" section, now investigated and resolved.
 
@@ -302,7 +236,69 @@ The starter README's command routing table shows `DELETE → DeleteSubmitHandler
 
 - [ ] **Clarify handler naming table in starter README** — After the `handlerFor()` `class_exists()` fix lands, rewrite the table to show full class names relative to a concrete DTO example. Make clear that the unprefixed `{DtoName}Handler` is the default and the prefixed variants (`Post{DtoName}Handler`, `Delete{DtoName}Handler`, etc.) are optional overrides for per-method dispatch on the same DTO.
 
-### Unify CLI dispatch & colon routing (retro 8.5, orchestrator observation)
+### Dogfood: CommandResult & flash messages (retro 5.1, 5.2, 4.3, 4.4, 9.3)
+
+The single biggest DX friction from the dogfood. Command handlers today return `void` (204), a DTO (201), or `null` (202) — no redirects, no custom status codes, no way to say "success, now go to `/dashboard`." Both builds fought this: Build A used htmx client-side redirects (requires JS, no fallback), Build B returned raw `ResponseInterface` objects with 5+ imports and kernel-level special-case logic. Neither felt like the intended pattern because there wasn't one.
+
+**The deeper problem:** Arcanum has no controllers — the handler IS the endpoint. Unlike MediatR/.NET where a controller interprets command results into HTTP, Arcanum's rendering pipeline must bridge handler returns to transport-specific responses. The framework was already doing this implicitly (void→204, DTO→201); it just didn't go far enough.
+
+**Design principles (informed by Wolverine, Ecotone, and the CQRS consensus):**
+
+- **Handlers express transport-agnostic intent; kernels interpret it.** A handler says "redirect here" or "resource created at this URL." The HTTP kernel produces a 303 or 201+Location. The CLI kernel prints a message or ignores it. The handler never touches PSR-7.
+- **Metadata only, no payloads.** `CommandResult` carries location URLs and status intent, never business data. That's the query side's job. Commands tell you *where* to find the result, not *what* the result is.
+- **Flash messages are side effects, not outcomes.** They flow through Echo events, not return values. A `FlashMessageListener` stores them in the session (HTTP) or prints them (CLI). This composes with command chaining — inner commands dispatch flashes too, all collected by the same listener.
+- **One canonical return type.** Middleware normalizes all command returns into `CommandResult`. Existing `void`/`null`/DTO conventions are upscaled, not replaced — no existing handlers break.
+
+**Normalization table:**
+
+| Handler returns | Normalized to | HTTP | CLI |
+|---|---|---|---|
+| `void` | `CommandResult::empty()` | 204 No Content | exit 0, no output |
+| `null` | `CommandResult::accepted()` | 202 Accepted | exit 0, "Accepted" |
+| Query DTO | `CommandResult::created(reverse_route($dto))` | 201 + Location header | exit 0, path printed |
+| `CommandResult` | pass through | per factory method | per factory method |
+
+**Reverse routing for DTO returns:** When a command handler returns a Query DTO, the middleware reverse-routes the DTO class through Atlas to produce the Location URL. Parameterized routes (e.g., `GetOrder` with `$id`) extract constructor values from the DTO instance to fill URL segments. Atlas's `UrlResolver` gains a `reverseRoute(object $dto): string` method for this.
+
+**Command chaining:** When a handler dispatches an inner command through the bus, the inner `CommandResult` is returned to the calling handler — not to the transport. Only the outermost handler's return reaches the kernel. Flash messages from inner commands fire as events regardless of nesting depth.
+
+#### Checklist
+
+- [ ] **`CommandResult` value object** — Define in `Flow\Conveyor`. Immutable, four static factory methods: `empty()`, `accepted()`, `created(string $location)`, `redirect(string $location, StatusCode $status = StatusCode::SeeOther)`. No payload, no business data. `location()` accessor returns the URL or null. `status()` accessor returns the intended status code. Mirrors `QueryResult` in naming.
+- [ ] **`MiddlewareBus` normalization** — After the handler returns, normalize the result into `CommandResult`. `void` → `empty()`, `null` → `accepted()`, DTO instance → `created(reverse_route($dto))`, `CommandResult` → pass through. Remove the existing ad-hoc return type interpretation (EmptyDTO 204, AcceptedDTO 202, etc.) and consolidate into `CommandResult`. Update `EmptyDTO` and `AcceptedDTO` references if they exist as special types.
+- [ ] **Atlas reverse routing** — Add `UrlResolver::reverseRoute(object $dto): string` (or similar). Given a DTO instance, resolve its class to a URL path via the convention router, extracting constructor parameter values to fill parameterized segments. Throw a clear error if the DTO class can't be reverse-routed (no convention match and no custom route). Tests for simple paths, parameterized paths, and custom routes.
+- [ ] **HyperKernel interpretation** — When the command pipeline returns a `CommandResult`, render the appropriate HTTP response: `empty()` → 204 empty body, `accepted()` → 202 empty body, `created($url)` → 201 + `Location` header + empty body, `redirect($url)` → 303 (or specified status) + `Location` header + empty body. No template rendering — these are metadata responses.
+- [ ] **RuneKernel interpretation** — When the command pipeline returns a `CommandResult`, produce CLI-appropriate output: `empty()` → exit 0 + no output, `accepted()` → exit 0 + "Accepted" message, `created($url)` → exit 0 + "Created: $url" message, `redirect($url)` → exit 0 + no output (redirect is meaningless in CLI). The URL is informational, not actionable.
+- [ ] **`FlashMessage` event** — Define in `Session` package. Constructor: `string $level` (`success`, `error`, `warning`, `info`), `string $message`. Immutable value object implementing a marker interface or extending a base event class compatible with Echo.
+- [ ] **`FlashMessageListener` (HTTP)** — Listens for `FlashMessage` events and stores them in the session under a known key. On the next request, the messages are available and cleared after reading. Lives in `Session` package.
+- [ ] **`FlashHelper` template helper** — `Flash::messages()` returns pending flash messages for the current request (reads and clears from session). `Flash::has()` checks if any exist. Register in `Bootstrap\Helpers` or via `HelperDiscovery`. Templates render flashes in the layout.
+- [ ] **`CliFlashListener`** — Listens for `FlashMessage` events and writes them to stdout immediately. Lives in `Rune` package.
+- [ ] **`StringStream` convenience** — Add `Stream::fromString(string $content): Stream` factory method on `Flow\River\Stream`. Eliminates the `LazyResource::for('php://temp')` + write + rewind ceremony. Used internally by response building and available to app developers. Addresses retro 5.2.
+- [ ] **Tests** — Unit tests for `CommandResult` (factory methods, accessors). Integration tests for the full normalization pipeline: void handler → 204, null handler → 202, DTO-returning handler → 201 + Location, `CommandResult::redirect()` → 303. Flash message round-trip: dispatch event → session storage → template helper → cleared. CLI equivalents.
+- [ ] **Update COMPENDIUM.md** — Document `CommandResult` as the canonical command return type, the normalization table, flash messages via Echo events, and the transport interpretation. Update the "shape of an Arcanum app" section to show the `CommandResult` flow.
+
+### Dogfood: auth exceptions & redirect (retro 1.6, 5.4, 3.3)
+
+`#[RequiresAuth]` on a DTO produces a 500 instead of a 401 when no user is authenticated. The root cause: `ActiveIdentity::get()` throws a bare `RuntimeException`, and there may be code paths where handler construction (which resolves `Identity` from the container) precedes `AuthorizationGuard`. Even when the guard does run first, it throws `HttpException(401)` — an HTTP concept that doesn't make sense when the same guard runs in a CLI context through Rune.
+
+Additionally, auth redirects only work for htmx requests (`HtmxAuthRedirectMiddleware`). Regular browser GETs to protected endpoints produce an error page instead of a redirect to login. Both builds had to implement their own redirect logic at the kernel level.
+
+**Fix:** Transport-agnostic auth exceptions in the `Auth` package, interpreted per-transport by each kernel. A framework-level `AuthRedirectMiddleware` for HTTP browser requests, with `HtmxAuthRedirectMiddleware` layering htmx-specific behavior on top.
+
+#### Checklist
+
+- [ ] **`AuthenticationException` and `AuthorizationException`** — Define in `Auth` package. Both extend `ArcanumException` (carry `getTitle()` and `getSuggestion()`). `AuthenticationException`: "Authentication required" / "Log in to continue." `AuthorizationException`: "Insufficient permissions" / suggestion varies by context (role name, policy class). These are transport-agnostic — no HTTP status codes, no CLI exit codes.
+- [ ] **`ActiveIdentity::get()` throws `AuthenticationException`** — Replace the bare `RuntimeException` with `AuthenticationException`. This is the safety net: if any code path resolves `Identity` from the container without an authenticated user, it produces a meaningful auth error instead of a generic 500.
+- [ ] **`AuthorizationGuard` throws auth exceptions** — Replace `HttpException(401)` with `AuthenticationException` for `#[RequiresAuth]` failures. Replace `HttpException(403)` with `AuthorizationException` for `#[RequiresRole]` and `#[RequiresPolicy]` failures. The guard is a Conveyor middleware shared by both transports — it must not depend on HTTP concepts.
+- [ ] **HyperKernel exception mapping** — Map `AuthenticationException` → 401 and `AuthorizationException` → 403 in the HTTP exception rendering pipeline. Ensure error templates (`errors/401.html`, `errors/403.html`) work through the standard Shodo resolution chain.
+- [ ] **RuneKernel exception mapping** — Map `AuthenticationException` → "You must be logged in. Run `login` to authenticate." + exit 1. Map `AuthorizationException` → "Insufficient permissions." + exit 1. The CLI exception writer produces a helpful message, not an HTTP status code.
+- [ ] **`AuthRedirectMiddleware` (HTTP, framework-level)** — PSR-15 middleware that catches `AuthenticationException` and `AuthorizationException` during the request lifecycle. For browser requests (non-API, non-htmx): redirect to the login URL with a 302. Login URL read from `config/auth.php` under an `auth.redirect` key (defaulting to `/login`). For API requests (Accept: application/json): let the exception propagate to produce a JSON 401/403 response. Register in `Bootstrap\Auth` for HTTP kernels.
+- [ ] **Refactor `HtmxAuthRedirectMiddleware`** — Layer htmx-specific behavior on top of `AuthRedirectMiddleware`. For htmx requests: respond with `HX-Location` header instead of a 302 redirect. Can be a decorator or subclass of the general middleware.
+- [ ] **Generalize DTO-specific exception templates** — The status-specific template resolution chain (`{Dto}.{status}.{format}`) currently only triggers for `ValidationException` (422). Generalize so that any exception thrown during handler dispatch checks for DTO-specific templates first. The renderer knows the DTO class from the dispatch context — if `Login.401.html` exists, use it; if not, fall back to `errors/401.html`, then the framework default. Same resolution chain, broader trigger. This lets `AuthenticationException` render `Login.401.html` with form re-render and error feedback instead of going straight to the generic error page. Solves the dogfood pattern of abusing `ValidationException` for non-validation errors.
+- [ ] **Tests** — Unit tests for both exception classes. AuthorizationGuard tests updated to assert `AuthenticationException`/`AuthorizationException` instead of `HttpException`. Integration test: unauthenticated browser GET to `#[RequiresAuth]` endpoint → 302 redirect to login. Integration test: unauthenticated htmx request → HX-Location header. Integration test: unauthenticated API request → 401 JSON. CLI test: unauthenticated command → helpful error message + exit 1. Integration test: `AuthenticationException` during login → `Login.401.html` rendered with error.
+- [ ] **Update COMPENDIUM.md and Auth README** — Document the transport-agnostic exception model, the redirect middleware, the `auth.redirect` config key, and the generalized DTO-specific exception template resolution. Remove references to `HttpException` for auth failures.
+
+### Dogfood: unify CLI dispatch & colon routing (retro 8.5, orchestrator observation)
 
 Two related problems uncovered during the dogfood:
 
@@ -356,7 +352,33 @@ Domain → colon prefix. DTO name → kebab-case suffix. Same namespace, same ha
 - [ ] **Tests** — `help <name>` works for every built-in command. `list` shows all commands (built-in and app) with colon-separated names and descriptions. Built-in commands dispatch through the standard Conveyor pipeline. App commands accessible via colon syntax. Existing command behavior is unchanged.
 - [ ] **Update COMPENDIUM.md and Rune README** — Document the unified CLI dispatch model: one DTO + Handler pattern for all CLI actions (framework and app), colon-separated naming convention derived from namespaces, `BuiltInRegistry` for framework commands. Remove references to `BuiltInCommand`. Update the CLI surface table with colon names. Update the app directory structure example to show how domains map to CLI names.
 
-### Starter app update
+### PSR-18 HTTP Client
+
+Any real app needs outgoing HTTP requests (APIs, OAuth, webhooks). Wrap an established library behind PSR-18 `ClientInterface` and provide PSR-17 factories over Hyper's existing PSR-7 classes. Ship a test mock so apps can assert outgoing calls without hitting the network.
+
+**Architecture decisions:**
+
+- **PSR-17 factories over Hyper classes.** `RequestFactory` composes `Message` + `Request` + `URI`. `ResponseFactory` composes `Message` + `Response`. `UriFactory` delegates to `new URI($string)`. `StreamFactory` needs a PSR-7 `StreamInterface` implementation — River's `Stream` has every required method but doesn't declare `implements StreamInterface`. **Decision: extend River\Stream to implement the interface.** One `implements` addition makes all of River PSR-7 compatible with no adapter overhead.
+- **PSR-18 client wraps Guzzle, but Guzzle is optional.** Guzzle is currently a dev/transitive dependency, not a production one. The framework must not force every app to install Guzzle. Instead: `composer.json` adds Guzzle as a `suggest`, `Bootstrap\HttpClient` checks `class_exists(GuzzleHttp\Client::class)` before registering. Apps that need outgoing HTTP do `composer require guzzlehttp/guzzle`. Apps that don't pay nothing. The wrapper maps Guzzle exceptions to PSR-18 `NetworkException`/`RequestException`.
+- **Convenience methods alongside PSR-18.** `sendRequest(RequestInterface)` is the PSR-18 contract. The wrapper also provides `get($url, $headers)`, `post($url, $body, $headers)`, etc. that build the request internally — less verbose for common cases.
+- **TestClient for app testing.** Records outgoing requests, returns pre-configured responses. Registered in the container during tests. Same pattern as `FrozenClock` and `ArrayDriver` — deterministic, no side effects.
+- **Lives at `src/Hyper/Client/`** as a sub-namespace of Hyper, since it builds on the same PSR-7 classes.
+
+**Security:**
+
+- **TLS verification must default to on.** The Guzzle wrapper must never disable SSL verification by default. If `config/http.php` exposes a `verify` option, it defaults to `true`. The README warns against disabling in production.
+- **Sensitive header scrubbing in logs.** When logging integration lands, outgoing request logging must strip `Authorization`, `Cookie`, `X-Api-Key`, and other sensitive headers from log context by default. Configurable blacklist.
+
+#### Checklist
+
+- [ ] **River\Stream — implement `StreamInterface`** — Add `implements StreamInterface` to `Flow\River\Stream`. It already has every method; this is a declaration, not a rewrite. Adjust any signature mismatches. Update River tests. This unblocks PSR-17 StreamFactory.
+- [ ] **PSR-17 factories** — `RequestFactory`, `ResponseFactory`, `UriFactory`, `StreamFactory` over Hyper's existing PSR-7 classes. Add `psr/http-factory` as a direct dependency. Tests for each factory.
+- [ ] **PSR-18 client** — `HttpClient implements ClientInterface` wrapping Guzzle. Constructor takes Guzzle `ClientInterface` (or builds a default if Guzzle is installed). Convenience methods: `get()`, `post()`, `put()`, `patch()`, `delete()`. Maps Guzzle exceptions to PSR-18 `NetworkException`/`RequestException`. Add `psr/http-client` as a direct dependency; add `guzzlehttp/guzzle` as a `suggest`. Config via `config/http.php` (base_uri, timeout, headers, verify defaults to `true`). Tests with Guzzle mock handler.
+- [ ] **TestClient** — `TestClient implements ClientInterface` for app tests. `addResponse(ResponseInterface)` queues responses. `assertSent(callable)` checks recorded requests. `assertNothingSent()`. Register in container when `TestKernel` is used. Tests.
+- [ ] **Bootstrap registration** — `Bootstrap\HttpClient` registers factories and client in the container. PSR-17 interfaces bound to Hyper factories. PSR-18 `ClientInterface` bound to the Guzzle wrapper only if `class_exists(GuzzleHttp\Client::class)` — skip gracefully otherwise. `has()` guards so apps can bring their own. Sensitive header scrubbing list for future logging integration (`Authorization`, `Cookie`, `X-Api-Key`).
+- [ ] **README** — What it does, when to use it, sending requests (PSR-18 and convenience methods), handling responses, testing with TestClient, configuration, TLS verification warning, swapping implementations.
+
+### Dogfood: starter app update
 
 After the dogfood framework changes land, the starter app needs a comprehensive update pass to absorb them. This is not a feature-by-feature migration — it's a single coordinated update that brings the starter in line with the new framework APIs.
 
@@ -374,7 +396,7 @@ After the dogfood framework changes land, the starter app needs a comprehensive 
 - [ ] **Fix `.env.example` and Quick Start** — The starter README Quick Start says `composer install` then `php bin/arcanum migrate` — but doesn't mention copying `.env.example` to `.env` first. Add the copy step. Change `.env.example` from `APP_KEY=base64:` (confusing empty value) to `APP_KEY=` with a comment saying "Run `php bin/arcanum make:key --write` to generate."
 - [ ] **Smoke test** — Start the app from a fresh clone, follow the README Quick Start, verify: `.env` copy + `make:key --write` works from a blank slate, migrations run from `database/migrations/`, login/logout flow works with redirects, CSRF works on standalone htmx buttons, `list` shows all commands with colon names, `help migrate:create` shows parameters.
 
-### Documentation (retro 6.1–6.8)
+### Dogfood: documentation (retro 6.1–6.8)
 
 Documentation gaps surfaced by the dogfood. Many are blocked on or significantly easier after the framework changes above land. These should be written after the code changes are complete, not before — documenting the "before" state wastes effort.
 
@@ -418,141 +440,6 @@ The Testing package README covers `TestKernel`, `Factory`, and `HttpTestSurface`
 - [ ] **Pages routing and handling** — Document how `app/Pages/*.html` works: `PageDiscovery` scans for templates, virtual DTO class names, `isPage()` check, `Page` DTO construction. The convention is discoverable via the starter but invisible from scratch. Lives in the Atlas README.
 - [ ] **Domain boundary guidance** — When to create separate domains vs. group things together. Rules of thumb: entities that share a lifecycle belong together, cross-domain reads are a smell that domains are too granular. Document the current cross-domain options (import directly, duplicate SQL, dispatch query) with tradeoffs. Lives in the COMPENDIUM or a dedicated guide.
 
----
-
-### Logging instrumentation
-
-Pre-1.0 blocker. The framework is silent in production — no request lifecycle, no routing decisions, no auth outcomes. Fix this by injecting `?LoggerInterface $logger = null` progressively across the stack, starting with the HTTP lifecycle and expanding outward.
-
-**Principles:**
-
-- **Log decisions, not data.** "Route resolved via convention" yes; request body, session contents, SQL results no. **Never log:** session IDs, auth tokens, passwords, request/response bodies. Rate-limit keys (typically IPs) are the app's responsibility to hash or truncate for GDPR — the framework logs the key it's given.
-- **Null means silent.** `$this->logger?->method()` short-circuits when no logger is configured — zero allocation, zero cost.
-- **One INFO line per request.** The "access log" is a single INFO entry when the request completes (method, path, status code). Everything else is DEBUG or NOTICE.
-- **Correlate with a correlation ID.** Generate a short random ID at the start of `handle()` and include it as `'correlation_id'` in every log record's extra data via a Monolog processor. Without this, interleaved DEBUG lines from concurrent requests are useless. Implement as a `CorrelationProcessor` registered in Bootstrap\Logger so it applies to all channels automatically.
-- **Exceptions are already handled.** Glitch `LogReporter` already logs exceptions at ERROR/CRITICAL via channel routing. Don't duplicate — the kernel logs lifecycle, Glitch logs failures.
-- **Apps can bring their own logger.** The `LoggerInterface` binding uses a `has()` guard — if the app registered a custom PSR-3 implementation before Bootstrap\Logger runs, the framework respects it.
-- **All code changes must pass `composer check`.** Every item must pass cs-fix, cs-check, phpstan, and phpunit before commit.
-
-**Log levels:**
-
-| Level | When | Examples |
-|-------|------|---------|
-| DEBUG | Resolution/lookup details, dev troubleshooting | Route resolved, session loaded, no identity, dispatching handler, command resolved |
-| INFO | Lifecycle milestones, the "access log" | Request handled (status), command completed (exit code), migration applied, identity resolved |
-| NOTICE | Noteworthy but expected conditions | Rate limit exceeded, session regenerated/invalidated, 405 method not allowed, 406 not acceptable |
-| WARNING | Integrity issues | Migration checksum mismatch |
-| ERROR | Runtime failures | Migration execution failed |
-
-**Architecture notes:**
-
-- **Factory-registered classes** (HttpRouter, AuthMiddleware): constructed with `new` in bootstrap closures, but the closures execute lazily at request time — after Logger bootstraps. Update each factory to resolve and pass the logger from the container.
-- **PSR-15 middleware** (SessionMiddleware): resolved from the container by `HttpMiddleware` at dispatch time. Adding `?LoggerInterface` to the constructor is sufficient — Codex auto-wires it.
-- **Conveyor Progressions** (AuthorizationGuard, ValidationGuard): constructed with `new` in Routing/CliRouting bootstrappers before Logger runs. Their rejections surface as exceptions that Glitch already reports. Skip — low logging value, high wiring cost.
-- **Kernels** (HyperKernel, RuneKernel): constructed before the container exists. Resolve the logger lazily from the container after bootstrap.
-
-#### Checklist
-
-- [x] **Bootstrap\Logger — bind `LoggerInterface` + correlation processor** — Add `$container->service(LoggerInterface::class, QuillLogger::class)` with a `has()` guard so apps can bring their own PSR-3 implementation. Register a `CorrelationProcessor` (generic Monolog processor) that adds `'correlation_id'` to every log record's extra (generated once per kernel handle cycle). This is the prerequisite for all Codex auto-wiring of `?LoggerInterface` params and for correlating log lines across concurrent requests.
-- [x] **HyperKernel + RuneKernel — lifecycle logging** — Resolve logger from container after bootstrap. Generate request/command ID and set on processor. HyperKernel: DEBUG `Request received` (method, path) at handle start; INFO `Request handled` (method, path, status) after response built. RuneKernel: DEBUG `Command received` (name) at handle start; INFO `Command completed` (name, exit code) after dispatch. Tests with mock logger via `expects()`.
-- [x] **HttpRouter — route resolution logging** — Add `?LoggerInterface $logger = null` to constructor. Update factory in Bootstrap\Routing to pass logger from container. DEBUG `Route resolved` (type: custom/page/convention, DTO class, format). DEBUG `Route not found` before 404. NOTICE `Method not allowed` (path, method, allowed methods) before 405. NOTICE `Format not acceptable` (format, allowed) before 406. Tests for each log path + null logger.
-- [x] **RouteDispatcher — dispatch logging** — Add `?LoggerInterface $logger = null` to constructor. DEBUG `Dispatching` (DTO class, handler prefix, before/after middleware count). Tests with mock logger.
-- [x] **CliRouter — command routing logging** — Add `?LoggerInterface $logger = null` to constructor. Update factory in Bootstrap\CliRouting to pass logger. DEBUG `Command resolved` (type, DTO class). DEBUG `Command not found` (input name, suggestions if any). Tests.
-- [x] **AuthMiddleware — authentication logging** — Add `?LoggerInterface $logger = null` to constructor. Update factory in Bootstrap\Auth to pass logger. INFO `Identity resolved` (guard type: session/token/composite — never identity details, never tokens). DEBUG `No identity resolved` (unauthenticated, not an error). Tests.
-- [x] **SessionMiddleware — session lifecycle logging** — Add `?LoggerInterface $logger = null` to constructor (Codex auto-wires, no factory change needed). DEBUG `Session started` (new vs loaded — never log session ID). DEBUG `Session saved`. NOTICE `Session regenerated`. NOTICE `Session invalidated`. Tests.
-- [x] **RateLimiter — throttle logging** — Add `?LoggerInterface $logger = null` to constructor. NOTICE `Rate limit exceeded` (key, limit, retry-after). DEBUG `Rate check passed` (key, remaining). Tests.
-- [x] **Migrator — migration logging** — Add `?LoggerInterface $logger = null` to constructor. INFO `Migration applied` (filename, direction, elapsed ms). INFO `Migration rolled back` (filename, elapsed ms). WARNING `Checksum mismatch` (filename, expected, actual). ERROR `Migration failed` (filename, error). Tests.
-- [x] **Harmonize existing log sites** — Review and align the three existing logging patterns: MiddlewareBus (debug-gated `->warning()`), TemplateEngine (null-safe `?->warning()`), Bootstrap\Routing (`has()` + explicit get). Standardize on null-safe `?->` with consistent context keys. Note: the starter app's `RequestLogger` listener becomes redundant once kernel lifecycle logging lands — document this in the starter app's README or remove the listener.
-- [x] **COMPENDIUM.md + Quill README — document logging** — Add a "Framework logging" section to the COMPENDIUM describing what the framework logs, at what levels, the request ID correlation mechanism, and how to bring your own PSR-3 logger. Update the Quill README if needed.
-
-### Todo App dogfood
-
-Two parallel builds of the same Todo app, each from a different starting point. The Todo app is the vehicle; the journals and retrospective are the deliverables. **No framework changes unless there's a complete blocker** — record friction, don't fix it mid-flight.
-
-**The Todo app (same features both times):**
-
-- SQLite via Forge — `users`, `task_lists`, `tasks` tables via migrations
-- Session auth — login page, session guard, `#[RequiresAuth]` on todo routes
-- Task list CRUD — create, delete lists
-- Task CRUD — add, toggle completion, delete tasks
-- htmx front-end — no full page reloads for task operations, `ClientBroadcast` for count refresh
-- Filter tasks — all / active / completed via htmx
-- Vault caching — task counts per list, invalidated on mutations
-- Tailwind styling, validation feedback on forms
-
-**What to record in each `JOURNAL.md`:**
-
-- Every step taken, in order
-- Rough time per step
-- Pain points — unclear docs, missing features, confusing conventions, boilerplate
-- Wins — things that "just worked," elegant patterns, small mental model
-- Blockers — framework bugs, missing functionality, workarounds needed
-- Missing scaffolding — `make:*` commands that should exist but don't (e.g., `make:seed`, `make:event`, `make:model`)
-- Config mysteries — settings that were hard to discover or required reading framework source
-- Error messages — which ones helped, which ones didn't
-- Testing DX — was `TestKernel` / `HttpTestSurface` / `Factory` obvious? Did `actingAs()` work? What was missing?
-- CSRF experience — did `CsrfMiddleware` + `{{ csrf }}` + htmx JS shim "just work" or require debugging?
-
-#### Checklist
-
-- [ ] **Build A: clone starter** — Clone `../arcanum/` into `../todo-from-starter/`. Strip the guestbook domain, welcome page helpers, and demo-specific code. Keep the infrastructure (kernels, config, layout, bootstrap, migrations setup). Record every step in `JOURNAL.md`.
-- [ ] **Build A: build the todo app** — Schema, auth, Forge models, commands, queries, htmx templates, filtering, caching. Note the data seeding problem: migrations are SQL-only, so seeding a user with `password_hash()` requires a workaround (pre-computed hash in SQL, PHP seed script, or custom CLI command). Journal whatever solution you use and whether the framework should ship a seeder mechanism. Write a few tests using `TestKernel` / `HttpTestSurface` / `Factory` to exercise the Testing package's DX. Commit working features incrementally. Continue journaling: every pain point, every win, every workaround, every "I had to read framework source to figure this out."
-- [ ] **Build B: from scratch** — New directory `../todo-from-scratch/`. `composer init`, `composer require arcanum-org/framework` (first test: is the package discoverable? is it on Packagist? does the README explain installation?). Create `public/index.php`, `bin/arcanum`, config files, kernels, `.env`, directory structure — everything from zero. Journal every step, especially: which config files were needed and how you discovered the required keys, what happened when a config file was missing (helpful error or cryptic crash?), which bootstrappers were required and in what order.
-- [ ] **Build B: build the todo app** — Same features as Build A, including tests with the Testing package. Journal everything, especially: which steps were harder without the starter's scaffolding, which conventions took trial-and-error to discover, which error messages pointed to the fix vs. which were opaque.
-- [ ] **Retrospective** — Compare both journals. Write `RETROSPECTIVE.md` (in this repo) covering: (1) framework features that worked well, (2) framework features that were hard to use or missing, (3) DX gaps — missing docs, unclear conventions, missing scaffolding, unhelpful errors, (4) ecosystem gaps — what a new user can't figure out without reading framework internals, (5) Testing package DX — was the test harness usable, what was missing. Extract concrete items and add to PLAN.md.
-
-### Hyper README
-
-The only core package without a README. Hyper is the biggest package — PSR-7 messages, URI handling, file uploads, response renderers, exception renderers, format registry, middleware chain, lifecycle events, server adapter. The audience is a junior developer exploring the framework to learn; lead with "what happens when an HTTP request arrives" and work outward from there.
-
-#### Sections to cover
-
-1. **What Hyper does** — one paragraph: PSR-7 HTTP messages, response rendering, middleware chain, lifecycle events. Hyper handles the HTTP boundary so the rest of the framework stays transport-agnostic.
-2. **"You probably won't import this"** — Set expectations immediately: in most Arcanum apps, handlers never touch Hyper directly. You return a DTO, and the rendering pipeline produces the HTTP response. Hyper matters when you're writing middleware, custom renderers, or debugging the request lifecycle. This prevents a junior dev from thinking they need to construct Response objects in handlers.
-3. **The request journey** — visual flow from raw PHP superglobals → `Server` → `ServerRequest` → middleware → handler → `ResponseRenderer` → `Response` → sent to client. Anchor the reader before diving into classes. Call out `Server` explicitly — it's what `public/index.php` actually uses to parse the request.
-4. **PSR-7 messages** — Request, ServerRequest, Response, Message, Headers. Show how to read headers, query params, parsed body. Explain the immutable `with*()` pattern for anyone who hasn't seen PSR-7 before.
-5. **URI** — URI class parses and builds URIs. Show `new URI('https://...')`, the `with*()` methods for each component. Mention the component value objects (Scheme, Host, Path, etc.) exist but most code just uses `URI` directly.
-6. **Status codes** — The `StatusCode` enum and why Arcanum uses it instead of raw integers. Show `StatusCode::NotFound`, `$status->reason()`. Link to the COMPENDIUM's "HTTP status codes are part of the API" philosophy.
-7. **File uploads** — `UploadedFile`, `UploadedFiles::fromSuperGlobal()`. Show how to access files in a handler. Mention the `Error` enum for upload error codes.
-8. **Response renderers** — The 6 renderers (Json, Html, PlainText, Markdown, Csv, Empty). How `FormatRegistry` maps URL extensions to renderers. How template-based renderers compose `TemplateResolver` + `TemplateEngine` (link to Shodo README). The status-specific template resolution chain. Show a handler returning data and the renderer turning it into a response.
-9. **Exception renderers** — `JsonExceptionResponseRenderer`, `HtmlExceptionResponseRenderer`, `ValidationExceptionRenderer` (decorator that adds 422-specific handling). How exceptions become proper error responses. Debug vs production mode. The htmx fragment fallback for error templates. Link to Glitch README.
-10. **Format registry** — How `FormatRegistry` works, how 406 Not Acceptable happens, how to register custom formats in `config/formats.php`.
-11. **Middleware** — `HttpMiddleware` builds a PSR-15 middleware chain. Show the onion model. `CallableHandler` wraps closures as handlers. The `Options` middleware auto-responds to OPTIONS with the `Allow` header.
-12. **Lifecycle events** — `RequestReceived` (mutable — listeners can enrich the request), `RequestHandled` / `RequestFailed` / `ResponseSent` (read-only). Show a listener example. Link to Echo README.
-13. **Server and ServerAdapter** — `Server` composes the `PHPServerAdapter` to build PSR-7 objects from `$_SERVER`, `$_GET`, `$_POST`, `$_FILES`, `$_COOKIE`. Explain why the adapter exists (testability — swap for a mock in tests). This is the bridge between PHP's superglobals and the PSR-7 world.
-14. **#[HttpOnly] attribute** — marks DTOs as HTTP-only, rejected in CLI by TransportGuard.
-
-#### Checklist
-
-- [x] **Hyper README — request journey and PSR-7** — Sections 1–7: overview, "you probably won't import this" framing, request flow diagram with Server callout, PSR-7 messages, URI, status codes, file uploads. Cross-link to Shodo, Glitch, Echo READMEs where referenced. Enough for a reader to understand how requests arrive and what they look like inside the framework.
-- [x] **Hyper README — rendering and middleware** — Sections 8–14: response renderers, exception renderers (including ValidationExceptionRenderer decorator), format registry, middleware chain, lifecycle events, server + adapter, #[HttpOnly]. Cross-link to related package READMEs. Completes the "response side" of the journey.
-
-### PSR-18 HTTP Client
-
-Any real app needs outgoing HTTP requests (APIs, OAuth, webhooks). Wrap an established library behind PSR-18 `ClientInterface` and provide PSR-17 factories over Hyper's existing PSR-7 classes. Ship a test mock so apps can assert outgoing calls without hitting the network.
-
-**Architecture decisions:**
-
-- **PSR-17 factories over Hyper classes.** `RequestFactory` composes `Message` + `Request` + `URI`. `ResponseFactory` composes `Message` + `Response`. `UriFactory` delegates to `new URI($string)`. `StreamFactory` needs a PSR-7 `StreamInterface` implementation — River's `Stream` has every required method but doesn't declare `implements StreamInterface`. **Decision: extend River\Stream to implement the interface.** One `implements` addition makes all of River PSR-7 compatible with no adapter overhead.
-- **PSR-18 client wraps Guzzle, but Guzzle is optional.** Guzzle is currently a dev/transitive dependency, not a production one. The framework must not force every app to install Guzzle. Instead: `composer.json` adds Guzzle as a `suggest`, `Bootstrap\HttpClient` checks `class_exists(GuzzleHttp\Client::class)` before registering. Apps that need outgoing HTTP do `composer require guzzlehttp/guzzle`. Apps that don't pay nothing. The wrapper maps Guzzle exceptions to PSR-18 `NetworkException`/`RequestException`.
-- **Convenience methods alongside PSR-18.** `sendRequest(RequestInterface)` is the PSR-18 contract. The wrapper also provides `get($url, $headers)`, `post($url, $body, $headers)`, etc. that build the request internally — less verbose for common cases.
-- **TestClient for app testing.** Records outgoing requests, returns pre-configured responses. Registered in the container during tests. Same pattern as `FrozenClock` and `ArrayDriver` — deterministic, no side effects.
-- **Lives at `src/Hyper/Client/`** as a sub-namespace of Hyper, since it builds on the same PSR-7 classes.
-
-**Security:**
-
-- **TLS verification must default to on.** The Guzzle wrapper must never disable SSL verification by default. If `config/http.php` exposes a `verify` option, it defaults to `true`. The README warns against disabling in production.
-- **Sensitive header scrubbing in logs.** When logging integration lands, outgoing request logging must strip `Authorization`, `Cookie`, `X-Api-Key`, and other sensitive headers from log context by default. Configurable blacklist.
-
-#### Checklist
-
-- [ ] **River\Stream — implement `StreamInterface`** — Add `implements StreamInterface` to `Flow\River\Stream`. It already has every method; this is a declaration, not a rewrite. Adjust any signature mismatches. Update River tests. This unblocks PSR-17 StreamFactory.
-- [ ] **PSR-17 factories** — `RequestFactory`, `ResponseFactory`, `UriFactory`, `StreamFactory` over Hyper's existing PSR-7 classes. Add `psr/http-factory` as a direct dependency. Tests for each factory.
-- [ ] **PSR-18 client** — `HttpClient implements ClientInterface` wrapping Guzzle. Constructor takes Guzzle `ClientInterface` (or builds a default if Guzzle is installed). Convenience methods: `get()`, `post()`, `put()`, `patch()`, `delete()`. Maps Guzzle exceptions to PSR-18 `NetworkException`/`RequestException`. Add `psr/http-client` as a direct dependency; add `guzzlehttp/guzzle` as a `suggest`. Config via `config/http.php` (base_uri, timeout, headers, verify defaults to `true`). Tests with Guzzle mock handler.
-- [ ] **TestClient** — `TestClient implements ClientInterface` for app tests. `addResponse(ResponseInterface)` queues responses. `assertSent(callable)` checks recorded requests. `assertNothingSent()`. Register in container when `TestKernel` is used. Tests.
-- [ ] **Bootstrap registration** — `Bootstrap\HttpClient` registers factories and client in the container. PSR-17 interfaces bound to Hyper factories. PSR-18 `ClientInterface` bound to the Guzzle wrapper only if `class_exists(GuzzleHttp\Client::class)` — skip gracefully otherwise. `has()` guards so apps can bring their own. Sensitive header scrubbing list for future logging integration (`Authorization`, `Cookie`, `X-Api-Key`).
-- [ ] **README** — What it does, when to use it, sending requests (PSR-18 and convenience methods), handling responses, testing with TestClient, configuration, TLS verification warning, swapping implementations.
-
 ### Integration test coverage
 
 Only 2 integration tests exist today (`CqrsLifecycleTest`, `HelperResolutionTest`). Unit tests miss interaction bugs: discovery ordering, bootstrap sequencing, round-trip rendering, lifecycle event flow. `TestKernel` already provides `HttpTestSurface` and `CliTestSurface` — expanding coverage is cheap. This is also a long-tail principle: every new feature should land with at least one integration test.
@@ -591,6 +478,9 @@ Only 2 integration tests exist today (`CqrsLifecycleTest`, `HelperResolutionTest
 
 One-line summaries. Details are in git history and the COMPENDIUM.
 
+- **Logging instrumentation** — `?LoggerInterface` across the stack: Bootstrap\Logger binding + `CorrelationProcessor`, HyperKernel/RuneKernel lifecycle, HttpRouter/CliRouter route resolution, RouteDispatcher, AuthMiddleware, SessionMiddleware, RateLimiter, Migrator. Harmonized all log sites to null-safe `?->`. One INFO line per request; everything else DEBUG/NOTICE.
+- **Hyper README** — Full package reference: request journey, PSR-7 messages, URI, status codes, file uploads, response renderers, exception renderers, format registry, middleware chain, lifecycle events, server + adapter, `#[HttpOnly]`.
+- **Todo App dogfood** — Two parallel builds (clone-starter, from-scratch) of the same Todo app. Journals and `RETROSPECTIVE.md` delivered. 10 work streams extracted into this plan.
 - **htmx package** — First-class htmx 4 support: `HtmxAwareResponseRenderer`, `HtmxRequest`, `ClientBroadcast`, `FragmentDirective`, CSRF JS shim, auth-redirect middleware. See `src/Htmx/README.md`.
 - **Validation error handling & status-specific templates** — 500→422 fix, `{Dto}.{status}.{format}` resolution chain, co-located and app-wide error templates, htmx fragment fallback, underscore partial convention.
 - **Rendering pipeline refactor** — Extracted `TemplateEngine` from HtmlFormatter god object (5 phases). Formatters compose engine, renderers compose resolver, fallback formatters replaced with bundled templates (-909 lines). One rendering path for everything.

@@ -15,6 +15,7 @@ use Arcanum\Flow\Conveyor\EmptyDTO;
 use Arcanum\Flow\Conveyor\AcceptedDTO;
 use Arcanum\Flow\Conveyor\QueryResult;
 use Arcanum\Glitch\ExceptionHandler;
+use Arcanum\Ignition\Bootstrap;
 use Arcanum\Ignition\Bootstrapper;
 use Arcanum\Ignition\Lifecycle;
 use Arcanum\Ignition\RuneKernel;
@@ -60,8 +61,23 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(\Arcanum\Toolkit\Random::class)]
 #[UsesClass(\Arcanum\Toolkit\Hex::class)]
 #[UsesClass(\Arcanum\Quill\CorrelationProcessor::class)]
+#[UsesClass(\Arcanum\Gather\Configuration::class)]
 final class RuneKernelTest extends TestCase
 {
+    private mixed $originalArgv = null;
+
+    protected function setUp(): void
+    {
+        $this->originalArgv = $_SERVER['argv'] ?? null;
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->originalArgv !== null) {
+            $_SERVER['argv'] = $this->originalArgv;
+        }
+    }
+
     // ---------------------------------------------------------------
     // Constructor & directory accessors
     // ---------------------------------------------------------------
@@ -154,6 +170,239 @@ final class RuneKernelTest extends TestCase
         // Act
         $kernel->bootstrap($container);
         $kernel->bootstrap($container);
+    }
+
+    // ---------------------------------------------------------------
+    // Per-command bootstrap
+    // ---------------------------------------------------------------
+
+    public function testMakeKeyCommandGetsMinimalBootstrap(): void
+    {
+        // Arrange — simulate `php arcanum make:key`
+        $_SERVER['argv'] = ['bin/arcanum', 'make:key'];
+
+        $resolved = [];
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $container = $this->createStub(Application::class);
+        $container->method('get')->willReturnCallback(
+            function (string $id) use ($bootstrapper, &$resolved) {
+                $resolved[] = $id;
+                return $bootstrapper;
+            },
+        );
+
+        $kernel = new RuneKernel('/app');
+
+        // Act
+        $kernel->bootstrap($container);
+
+        // Assert — only early bootstrappers ran
+        $this->assertContains(Bootstrap\Hourglass::class, $resolved);
+        $this->assertContains(Bootstrap\Environment::class, $resolved);
+        $this->assertContains(Bootstrap\Configuration::class, $resolved);
+        $this->assertNotContains(Bootstrap\Security::class, $resolved);
+        $this->assertNotContains(Bootstrap\Database::class, $resolved);
+        $this->assertNotContains(Bootstrap\Auth::class, $resolved);
+    }
+
+    public function testListCommandGetsMinimalBootstrap(): void
+    {
+        // Arrange — simulate `php arcanum list`
+        $_SERVER['argv'] = ['bin/arcanum', 'list'];
+
+        $resolved = [];
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $container = $this->createStub(Application::class);
+        $container->method('get')->willReturnCallback(
+            function (string $id) use ($bootstrapper, &$resolved) {
+                $resolved[] = $id;
+                return $bootstrapper;
+            },
+        );
+
+        $kernel = new RuneKernel('/app');
+
+        // Act
+        $kernel->bootstrap($container);
+
+        // Assert — only 3 early bootstrappers, not the full 10
+        $this->assertCount(3, $resolved);
+    }
+
+    public function testHelpCommandGetsMinimalBootstrap(): void
+    {
+        // Arrange — simulate `php arcanum help`
+        $_SERVER['argv'] = ['bin/arcanum', 'help'];
+
+        $resolved = [];
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $container = $this->createStub(Application::class);
+        $container->method('get')->willReturnCallback(
+            function (string $id) use ($bootstrapper, &$resolved) {
+                $resolved[] = $id;
+                return $bootstrapper;
+            },
+        );
+
+        $kernel = new RuneKernel('/app');
+
+        // Act
+        $kernel->bootstrap($container);
+
+        // Assert
+        $this->assertCount(3, $resolved);
+    }
+
+    public function testNormalCommandGetsFullBootstrap(): void
+    {
+        // Arrange — simulate `php arcanum migrate`
+        $_SERVER['argv'] = ['bin/arcanum', 'migrate'];
+
+        $resolved = [];
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $container = $this->createStub(Application::class);
+        $container->method('get')->willReturnCallback(
+            function (string $id) use ($bootstrapper, &$resolved) {
+                $resolved[] = $id;
+                return $bootstrapper;
+            },
+        );
+
+        $kernel = new RuneKernel('/app');
+
+        // Act
+        $kernel->bootstrap($container);
+
+        // Assert — all 10 bootstrappers ran
+        $this->assertCount(10, $resolved);
+        $this->assertContains(Bootstrap\Security::class, $resolved);
+        $this->assertContains(Bootstrap\Database::class, $resolved);
+    }
+
+    public function testEmptyCommandGetsFullBootstrap(): void
+    {
+        // Arrange — simulate `php arcanum` (splash screen)
+        $_SERVER['argv'] = ['bin/arcanum'];
+
+        $resolved = [];
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $container = $this->createStub(Application::class);
+        $container->method('get')->willReturnCallback(
+            function (string $id) use ($bootstrapper, &$resolved) {
+                $resolved[] = $id;
+                return $bootstrapper;
+            },
+        );
+
+        $kernel = new RuneKernel('/app');
+
+        // Act
+        $kernel->bootstrap($container);
+
+        // Assert — full bootstrap for the splash screen
+        $this->assertCount(10, $resolved);
+    }
+
+    public function testAppConfigOverridesFrameworkDefaults(): void
+    {
+        // Arrange — simulate `php arcanum make:key`, but app config adds Security
+        $_SERVER['argv'] = ['bin/arcanum', 'make:key'];
+
+        $resolved = [];
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $config = new \Arcanum\Gather\Configuration([
+            'bootstrap' => [
+                'cli' => [
+                    'make:key' => [Bootstrap\Security::class],
+                ],
+            ],
+        ]);
+
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturnCallback(
+            fn(string $id): bool => match ($id) {
+                \Arcanum\Gather\Configuration::class => true,
+                default => false,
+            },
+        );
+        $container->method('get')->willReturnCallback(
+            function (string $id) use ($bootstrapper, $config, &$resolved) {
+                if ($id === \Arcanum\Gather\Configuration::class) {
+                    return $config;
+                }
+                $resolved[] = $id;
+                return $bootstrapper;
+            },
+        );
+
+        $kernel = new RuneKernel('/app');
+
+        // Act
+        $kernel->bootstrap($container);
+
+        // Assert — early bootstrappers + Security from app override
+        $this->assertContains(Bootstrap\Hourglass::class, $resolved);
+        $this->assertContains(Bootstrap\Environment::class, $resolved);
+        $this->assertContains(Bootstrap\Configuration::class, $resolved);
+        $this->assertContains(Bootstrap\Security::class, $resolved);
+        $this->assertCount(4, $resolved);
+    }
+
+    public function testEarlyBootstrappersNotDuplicatedInPerCommandList(): void
+    {
+        // Arrange — app config lists Environment in the per-command list; it should not run twice
+        $_SERVER['argv'] = ['bin/arcanum', 'custom:thing'];
+
+        $resolved = [];
+        $bootstrapper = $this->createStub(Bootstrapper::class);
+
+        $config = new \Arcanum\Gather\Configuration([
+            'bootstrap' => [
+                'cli' => [
+                    'custom:thing' => [
+                        Bootstrap\Environment::class,
+                        Bootstrap\Security::class,
+                    ],
+                ],
+            ],
+        ]);
+
+        $container = $this->createStub(Application::class);
+        $container->method('has')->willReturnCallback(
+            fn(string $id): bool => match ($id) {
+                \Arcanum\Gather\Configuration::class => true,
+                default => false,
+            },
+        );
+        $container->method('get')->willReturnCallback(
+            function (string $id) use ($bootstrapper, $config, &$resolved) {
+                if ($id === \Arcanum\Gather\Configuration::class) {
+                    return $config;
+                }
+                $resolved[] = $id;
+                return $bootstrapper;
+            },
+        );
+
+        $kernel = new RuneKernel('/app');
+
+        // Act
+        $kernel->bootstrap($container);
+
+        // Assert — Environment runs once (early), Security runs once (custom list)
+        $environmentCount = count(array_filter(
+            $resolved,
+            fn(string $id) => $id === Bootstrap\Environment::class,
+        ));
+        $this->assertSame(1, $environmentCount);
+        $this->assertContains(Bootstrap\Security::class, $resolved);
+        $this->assertCount(4, $resolved); // Hourglass, Environment, Configuration, Security
     }
 
     // ---------------------------------------------------------------
@@ -691,10 +940,12 @@ final class RuneKernelTest extends TestCase
 
     private function bootstrapKernel(Application $container): RuneKernel
     {
-        // Use an empty bootstrapper list so tests don't need real config files.
+        // Use empty bootstrapper lists so tests don't need real config files.
         $kernel = new class ('/app') extends RuneKernel {
             /** @var class-string<Bootstrapper>[] */
             protected array $bootstrappers = [];
+            /** @var class-string<Bootstrapper>[] */
+            protected array $earlyBootstrappers = [];
         };
 
         $kernel->bootstrap($container);
