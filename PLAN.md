@@ -37,10 +37,10 @@ The config key is `cli` (not `commands`) to avoid confusion with CQRS Commands i
 
 ##### Checklist
 
-- [ ] **`config/bootstrap.php` support in RuneKernel** — After running `Environment` + `Configuration`, parse argv to resolve the command name. Check `config/bootstrap.php` under the `cli` key for a matching entry. If found, run only those bootstrappers (deduplicating Environment + Configuration). If absent, run the full default `$bootstrappers` list. Framework ships internal defaults: `make:key`, `list`, and `help` map to empty arrays (Environment + Configuration only). App config merges over framework defaults.
-- [ ] **Update `MakeKeyCommand` and built-in commands** — Verify `make:key`, `list`, and `help` work with the minimal bootstrap (no Security, no Database, no Auth). Adjust if any have hidden dependencies.
-- [ ] **Test: `make:key` with no APP_KEY** — Integration test: empty `.env` (no APP_KEY), run `make:key` via RuneKernel, assert it produces a valid key without throwing. Test `--write` flag writes to `.env`. Test that a normal app command still gets the full bootstrap.
-- [ ] **Starter app: add `config/bootstrap.php`** — Ship the config file in the starter with the framework defaults commented out as documentation, paralleling how other config files show available options.
+- [x] **`config/bootstrap.php` support in RuneKernel** — After running `Environment` + `Configuration`, parse argv to resolve the command name. Check `config/bootstrap.php` under the `cli` key for a matching entry. If found, run only those bootstrappers (deduplicating Environment + Configuration). If absent, run the full default `$bootstrappers` list. Framework ships internal defaults: `make:key`, `list`, and `help` map to empty arrays (Environment + Configuration only). App config merges over framework defaults.
+- [x] **Update `MakeKeyCommand` and built-in commands** — Verify `make:key`, `list`, and `help` work with the minimal bootstrap (no Security, no Database, no Auth). Adjust if any have hidden dependencies.
+- [x] **Test: `make:key` with no APP_KEY** — Integration test: empty `.env` (no APP_KEY), run `make:key` via RuneKernel, assert it produces a valid key without throwing. Test `--write` flag writes to `.env`. Test that a normal app command still gets the full bootstrap.
+- [ ] **Starter app: add `config/bootstrap.php`** — Ship the config file in the starter with the framework defaults commented out as documentation, paralleling how other config files show available options. *(Starter app repo — deferred to starter app update stream.)*
 
 #### Parsed body for non-POST methods (retro 1.3)
 

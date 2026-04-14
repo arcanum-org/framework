@@ -19,6 +19,7 @@ use Arcanum\Hyper\StatusCode;
 use Arcanum\Hyper\Phrase;
 use Arcanum\Hyper\RequestMethod;
 use Arcanum\Hyper\Version;
+use Arcanum\Flow\River\CachingStream;
 use Arcanum\Flow\River\EmptyStream;
 use Arcanum\Flow\River\Stream;
 use Arcanum\Flow\River\LazyResource;
@@ -46,6 +47,7 @@ use Arcanum\Hyper\URI\UserInfo;
 #[UsesClass(Phrase::class)]
 #[UsesClass(RequestMethod::class)]
 #[UsesClass(Version::class)]
+#[UsesClass(CachingStream::class)]
 #[UsesClass(EmptyStream::class)]
 #[UsesClass(Stream::class)]
 #[UsesClass(LazyResource::class)]
@@ -63,6 +65,8 @@ use Arcanum\Hyper\URI\UserInfo;
 #[UsesClass(Query::class)]
 #[UsesClass(Scheme::class)]
 #[UsesClass(UserInfo::class)]
+#[UsesClass(\Arcanum\Hyper\ServerRequest::class)]
+#[UsesClass(\Arcanum\Hyper\Files\UploadedFiles::class)]
 final class ServerTest extends TestCase
 {
     private function createAdapter(): MockObject&ServerAdapter
@@ -675,5 +679,264 @@ final class ServerTest extends TestCase
 
         // Assert
         $this->assertSame($originalMimetype, \ini_get('default_mimetype'));
+    }
+
+    // -----------------------------------------------------------
+    // request() — parsed body for non-POST methods
+    // -----------------------------------------------------------
+
+    public function testRequestPostUsesPostSuperglobal(): void
+    {
+        // Arrange
+        $originalServer = $_SERVER;
+        $originalPost = $_POST;
+        $originalGet = $_GET;
+        $originalCookie = $_COOKIE;
+
+        try {
+            $_SERVER['REQUEST_METHOD'] = 'POST';
+            $_SERVER['SERVER_PROTOCOL'] = 'HTTP/1.1';
+            $_SERVER['HTTP_HOST'] = 'localhost';
+            $_SERVER['REQUEST_URI'] = '/test';
+            $_POST = ['field' => 'value'];
+            $_GET = [];
+            $_COOKIE = [];
+
+            $adapter = $this->createAdapter();
+            $adapter->method('getallheaders')->willReturn([
+                'Content-Type' => 'application/x-www-form-urlencoded',
+            ]);
+
+            $server = new Server($adapter);
+
+            // Act
+            $request = $server->request();
+
+            // Assert — POST uses $_POST directly
+            $this->assertSame(['field' => 'value'], $request->getParsedBody());
+        } finally {
+            $_SERVER = $originalServer;
+            $_POST = $originalPost;
+            $_GET = $originalGet;
+            $_COOKIE = $originalCookie;
+        }
+    }
+
+    public function testRequestGetReturnsNullParsedBody(): void
+    {
+        // Arrange
+        $originalServer = $_SERVER;
+        $originalPost = $_POST;
+        $originalGet = $_GET;
+        $originalCookie = $_COOKIE;
+
+        try {
+            $_SERVER['REQUEST_METHOD'] = 'GET';
+            $_SERVER['SERVER_PROTOCOL'] = 'HTTP/1.1';
+            $_SERVER['HTTP_HOST'] = 'localhost';
+            $_SERVER['REQUEST_URI'] = '/test';
+            $_POST = [];
+            $_GET = [];
+            $_COOKIE = [];
+
+            $adapter = $this->createAdapter();
+            $adapter->method('getallheaders')->willReturn([]);
+
+            $server = new Server($adapter);
+
+            // Act
+            $request = $server->request();
+
+            // Assert — GET always returns null parsed body
+            $this->assertNull($request->getParsedBody());
+        } finally {
+            $_SERVER = $originalServer;
+            $_POST = $originalPost;
+            $_GET = $originalGet;
+            $_COOKIE = $originalCookie;
+        }
+    }
+
+    public function testRequestPutWithFormEncodedContentTypeParseBody(): void
+    {
+        // Arrange — php://input is empty in CLI, so parse_str produces []
+        $originalServer = $_SERVER;
+        $originalPost = $_POST;
+        $originalGet = $_GET;
+        $originalCookie = $_COOKIE;
+
+        try {
+            $_SERVER['REQUEST_METHOD'] = 'PUT';
+            $_SERVER['SERVER_PROTOCOL'] = 'HTTP/1.1';
+            $_SERVER['HTTP_HOST'] = 'localhost';
+            $_SERVER['REQUEST_URI'] = '/test';
+            $_POST = [];
+            $_GET = [];
+            $_COOKIE = [];
+
+            $adapter = $this->createAdapter();
+            $adapter->method('getallheaders')->willReturn([
+                'Content-Type' => 'application/x-www-form-urlencoded',
+            ]);
+
+            $server = new Server($adapter);
+
+            // Act
+            $request = $server->request();
+
+            // Assert — parsed body is an array (not null), proving the parsing code path ran
+            $this->assertIsArray($request->getParsedBody());
+        } finally {
+            $_SERVER = $originalServer;
+            $_POST = $originalPost;
+            $_GET = $originalGet;
+            $_COOKIE = $originalCookie;
+        }
+    }
+
+    public function testRequestPatchWithFormEncodedContentTypeParseBody(): void
+    {
+        // Arrange
+        $originalServer = $_SERVER;
+        $originalPost = $_POST;
+        $originalGet = $_GET;
+        $originalCookie = $_COOKIE;
+
+        try {
+            $_SERVER['REQUEST_METHOD'] = 'PATCH';
+            $_SERVER['SERVER_PROTOCOL'] = 'HTTP/1.1';
+            $_SERVER['HTTP_HOST'] = 'localhost';
+            $_SERVER['REQUEST_URI'] = '/test';
+            $_POST = [];
+            $_GET = [];
+            $_COOKIE = [];
+
+            $adapter = $this->createAdapter();
+            $adapter->method('getallheaders')->willReturn([
+                'Content-Type' => 'application/x-www-form-urlencoded',
+            ]);
+
+            $server = new Server($adapter);
+
+            // Act
+            $request = $server->request();
+
+            // Assert
+            $this->assertIsArray($request->getParsedBody());
+        } finally {
+            $_SERVER = $originalServer;
+            $_POST = $originalPost;
+            $_GET = $originalGet;
+            $_COOKIE = $originalCookie;
+        }
+    }
+
+    public function testRequestDeleteWithFormEncodedContentTypeParseBody(): void
+    {
+        // Arrange
+        $originalServer = $_SERVER;
+        $originalPost = $_POST;
+        $originalGet = $_GET;
+        $originalCookie = $_COOKIE;
+
+        try {
+            $_SERVER['REQUEST_METHOD'] = 'DELETE';
+            $_SERVER['SERVER_PROTOCOL'] = 'HTTP/1.1';
+            $_SERVER['HTTP_HOST'] = 'localhost';
+            $_SERVER['REQUEST_URI'] = '/test';
+            $_POST = [];
+            $_GET = [];
+            $_COOKIE = [];
+
+            $adapter = $this->createAdapter();
+            $adapter->method('getallheaders')->willReturn([
+                'Content-Type' => 'application/x-www-form-urlencoded',
+            ]);
+
+            $server = new Server($adapter);
+
+            // Act
+            $request = $server->request();
+
+            // Assert
+            $this->assertIsArray($request->getParsedBody());
+        } finally {
+            $_SERVER = $originalServer;
+            $_POST = $originalPost;
+            $_GET = $originalGet;
+            $_COOKIE = $originalCookie;
+        }
+    }
+
+    public function testRequestPutWithJsonContentTypeReturnsNullParsedBody(): void
+    {
+        // Arrange — JSON bodies should not be auto-parsed; the stream is available for manual reading
+        $originalServer = $_SERVER;
+        $originalPost = $_POST;
+        $originalGet = $_GET;
+        $originalCookie = $_COOKIE;
+
+        try {
+            $_SERVER['REQUEST_METHOD'] = 'PUT';
+            $_SERVER['SERVER_PROTOCOL'] = 'HTTP/1.1';
+            $_SERVER['HTTP_HOST'] = 'localhost';
+            $_SERVER['REQUEST_URI'] = '/test';
+            $_POST = [];
+            $_GET = [];
+            $_COOKIE = [];
+
+            $adapter = $this->createAdapter();
+            $adapter->method('getallheaders')->willReturn([
+                'Content-Type' => 'application/json',
+            ]);
+
+            $server = new Server($adapter);
+
+            // Act
+            $request = $server->request();
+
+            // Assert — null, not parsed
+            $this->assertNull($request->getParsedBody());
+        } finally {
+            $_SERVER = $originalServer;
+            $_POST = $originalPost;
+            $_GET = $originalGet;
+            $_COOKIE = $originalCookie;
+        }
+    }
+
+    public function testRequestPutWithNoContentTypeReturnsNullParsedBody(): void
+    {
+        // Arrange
+        $originalServer = $_SERVER;
+        $originalPost = $_POST;
+        $originalGet = $_GET;
+        $originalCookie = $_COOKIE;
+
+        try {
+            $_SERVER['REQUEST_METHOD'] = 'PUT';
+            $_SERVER['SERVER_PROTOCOL'] = 'HTTP/1.1';
+            $_SERVER['HTTP_HOST'] = 'localhost';
+            $_SERVER['REQUEST_URI'] = '/test';
+            $_POST = [];
+            $_GET = [];
+            $_COOKIE = [];
+
+            $adapter = $this->createAdapter();
+            $adapter->method('getallheaders')->willReturn([]);
+
+            $server = new Server($adapter);
+
+            // Act
+            $request = $server->request();
+
+            // Assert
+            $this->assertNull($request->getParsedBody());
+        } finally {
+            $_SERVER = $originalServer;
+            $_POST = $originalPost;
+            $_GET = $originalGet;
+            $_COOKIE = $originalCookie;
+        }
     }
 }

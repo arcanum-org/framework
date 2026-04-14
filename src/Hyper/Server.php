@@ -62,10 +62,24 @@ class Server
             }
         }
 
+        // PSR-7: POST + form content types MUST return $_POST.
+        // For all other methods, we MAY return deserialized body content.
+        $parsedBody = null;
+
+        if ($method === RequestMethod::POST) {
+            $parsedBody = $_POST;
+        } elseif ($method !== RequestMethod::GET) {
+            $contentType = $serverRequest->getHeaderLine('Content-Type');
+            if (str_contains($contentType, 'application/x-www-form-urlencoded')) {
+                parse_str((string) $body, $parsedBody);
+                $body->rewind();
+            }
+        }
+
         return $serverRequest
             ->withCookieParams($cookies)
             ->withQueryParams($_GET)
-            ->withParsedBody($_POST)
+            ->withParsedBody($parsedBody)
             ->withUploadedFiles(UploadedFiles::fromSuperGlobal()->toArray());
     }
 
