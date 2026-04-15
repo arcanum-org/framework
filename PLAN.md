@@ -127,7 +127,7 @@ When a domain name matches the DTO class name, convention routing produces "doub
 - [x] **Narrow `handlerFor()` catch to `ServiceNotFound`** — Replace `catch (\Throwable $e)` with `catch (ServiceNotFound $e)` at the unprefixed handler fallback. Dependency resolution failures (`Unresolvable` from Codex, `AuthenticationException` from the auth work) propagate to the kernel as-is, producing accurate error responses instead of misleading "Handler Not Found" errors.
 - [x] **Tests** — UrlResolver: added test asserting non-collapsed behavior (working-as-designed). MiddlewareBus: added tests for prefixed handler auto-wiring and dependency failure propagation.
 - [x] **Document root path (`/`) convention limitation** — Atlas convention routing can't produce an empty path — `GET /` always needs a custom route. Both dogfood builds hit this. Document in the Atlas README and the from-scratch guide that `'/' => DtoClass::class` in `config/routes.php` is required.
-- [ ] **Update COMPENDIUM.md** — Document the convention routing behavior (domain = class name produces doubled path, use custom routes for clean URLs) and the root path limitation in the routing conventions section.
+- [x] **Update COMPENDIUM.md** — Document the convention routing behavior (domain = class name produces doubled path, use custom routes for clean URLs) and the root path limitation in the routing conventions section.
 
 ### Dogfood: auth config reform (retro 4.1, orchestrator observation)
 

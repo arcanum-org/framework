@@ -177,6 +177,13 @@ Arcanum's small mental model comes from a handful of conventions that show up ev
 - `_guestbook-form.html` — files starting with `_` are **partials**: include-only templates skipped by `PageDiscovery`, reachable via `{{ include }}`. Works in `app/Pages/`, `app/Templates/`, or any template directory.
 - `AddEntry.422.html` — **status-specific template** co-located with the DTO. Resolution chain: co-located `{Dto}.{status}.{format}` → app-wide `app/Templates/errors/{status}.{format}` → framework default. Works for any status code and format (`PlaceOrder.201.html`, `Health.500.json`). Error templates receive `$code`, `$title`, `$message`, `$errors` (validation), `$suggestion` (ArcanumException). For htmx requests, error templates render as fragments (no layout).
 
+### Convention routing edges
+
+Convention routing handles the common case — but two patterns need a one-line custom route in `config/routes.php`:
+
+- **Root path (`/`):** Conventions need at least one path segment, so `GET /` requires a custom route or `app/Pages/Index.html` (which `PageDiscovery` maps to `/` automatically).
+- **Domain name = DTO name:** `App\Domain\TaskLists\Query\TaskLists` maps to `/task-lists/task-lists` (not `/task-lists`). This is correct — `/task-lists` is the root-level `App\Domain\Query\TaskLists`, a different class. For the clean URL, add a custom route: `'/task-lists' => ['class' => TaskLists::class, 'methods' => ['GET']]`.
+
 ### What's inside `{{ }}`
 
 Shodo templates have one rule for what's inside the delimiters, distinguished by the first character:
