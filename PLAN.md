@@ -179,18 +179,18 @@ Everything else is framework defaults with `has()` guards — apps override what
 
 #### Checklist
 
-- [ ] **Container self-registration** — In `Container::__construct()`, register the container instance under both `Arcanum\Cabinet\Application` and `Psr\Container\ContainerInterface`. Every app needs this, no variation, no reason for it to be manual. Tests: `$container->get(Application::class)` and `$container->get(ContainerInterface::class)` both return the container instance immediately after construction.
-- [ ] **Kernel pre-bootstrap wiring in `bootstrap()`** — At the top of `Kernel::bootstrap()` (the shared base, before the bootstrapper loop), register framework infrastructure with `has()` guards so apps can override before or after. Registrations:
+- [x] **Container self-registration** — In `Container::__construct()`, register the container instance under both `Arcanum\Cabinet\Application` and `Psr\Container\ContainerInterface`. Every app needs this, no variation, no reason for it to be manual. Tests: `$container->get(Application::class)` and `$container->get(ContainerInterface::class)` both return the container instance immediately after construction.
+- [x] **Kernel pre-bootstrap wiring in `bootstrap()`** — At the top of `Kernel::bootstrap()` (the shared base, before the bootstrapper loop), register framework infrastructure with `has()` guards so apps can override before or after. Registrations:
   - `Bus::class` → `MiddlewareBus::class` (both kernels). Read `$debug` from the `app.debug` config key (available after `Configuration` bootstrapper) or specify it as a deferred factory.
   - `EventDispatcherInterface` → Echo `Dispatcher` with a new `Provider` (both kernels). Currently only wired in the starter's HTTP bootstrap; CLI needs it too for lifecycle events and the planned `FlashMessage` events.
-- [ ] **HyperKernel-specific wiring in `bootstrap()`** — After the shared kernel wiring, `HyperKernel::bootstrap()` registers HTTP-specific services with `has()` guards:
+- [x] **HyperKernel-specific wiring in `bootstrap()`** — After the shared kernel wiring, `HyperKernel::bootstrap()` registers HTTP-specific services with `has()` guards:
   - `ServerAdapter::class` → `PHPServerAdapter::class`
   - `EmptyResponseRenderer::class` (used by the kernel for command 204 responses)
   - `Server::class` with `PHPServerAdapter` via `serviceWith()` or equivalent
 - [ ] **Slim down starter `bootstrap/http.php`** — Remove container self-registration (now in constructor), Bus registration, ServerAdapter, EmptyResponseRenderer, EventDispatcher (all now framework defaults). What remains: kernel binding + primitive specs, exception renderer choice + debug flags, app-specific event listeners, app-specific helpers. Should shrink from ~170 lines to ~60.
 - [ ] **Slim down starter `bootstrap/cli.php`** — Remove container self-registration, Bus registration (all now framework defaults). What remains: kernel binding + primitive specs, exception renderer. Should shrink from ~88 lines to ~30.
-- [ ] **Test: from-scratch bootstrap** — Integration test: create a minimal bootstrap file (container + kernel binding + specs only), verify the kernel bootstraps without errors, verify `Bus`, `ServerAdapter`, `EventDispatcherInterface`, `ContainerInterface` are all resolvable from the container. This is the regression test for "12 errors before a page renders."
-- [ ] **Update COMPENDIUM.md** — Document what the framework auto-registers (container, bus, server adapter, event dispatcher, exception handlers) vs. what the app must provide (kernel binding, directory specs, exception renderer preferences). Update the "shape of an Arcanum app" section.
+- [x] **Test: from-scratch bootstrap** — Integration test: create a minimal bootstrap file (container + kernel binding + specs only), verify the kernel bootstraps without errors, verify `Bus`, `ServerAdapter`, `EventDispatcherInterface`, `ContainerInterface` are all resolvable from the container. This is the regression test for "12 errors before a page renders."
+- [x] **Update COMPENDIUM.md** — Document what the framework auto-registers (container, bus, server adapter, event dispatcher, exception handlers) vs. what the app must provide (kernel binding, directory specs, exception renderer preferences). Update the "shape of an Arcanum app" section.
 
 ### Dogfood: investigation fixes (retro 2.1, 2.2, 2.3, 2.5)
 

@@ -5,18 +5,28 @@ declare(strict_types=1);
 namespace Arcanum\Ignition;
 
 use Arcanum\Cabinet\Application;
+use Arcanum\Echo\Dispatcher;
+use Arcanum\Echo\Provider;
+use Arcanum\Flow\Conveyor\Bus;
+use Arcanum\Flow\Conveyor\MiddlewareBus;
+use Arcanum\Gather\Configuration;
 use Arcanum\Glitch\ExceptionRenderer;
 use Arcanum\Glitch\HttpException;
 use Arcanum\Hyper\CallableHandler;
+use Arcanum\Hyper\EmptyResponseRenderer;
 use Arcanum\Hyper\Event\RequestFailed;
 use Arcanum\Hyper\Event\RequestHandled;
 use Arcanum\Hyper\Event\RequestReceived;
 use Arcanum\Hyper\Event\ResponseSent;
 use Arcanum\Hourglass\Stopwatch;
 use Arcanum\Hyper\HttpMiddleware;
+use Arcanum\Hyper\PHPServerAdapter;
+use Arcanum\Hyper\Server;
+use Arcanum\Hyper\ServerAdapter;
 use Arcanum\Hyper\StatusCode;
 use Arcanum\Quill\CorrelationProcessor;
 use Arcanum\Toolkit\Random;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -152,6 +162,40 @@ class HyperKernel implements Kernel, RequestHandlerInterface
 
         $this->container = $container;
         $container->instance(Transport::class, Transport::Http);
+
+        // Framework defaults — apps can override before or after bootstrap.
+        if (!$container->has(Bus::class)) {
+            $container->factory(Bus::class, function (Application $c): MiddlewareBus {
+                /** @var Configuration|null $config */
+                $config = $c->has(Configuration::class) ? $c->get(Configuration::class) : null;
+                /** @var LoggerInterface|null $logger */
+                $logger = $c->has(LoggerInterface::class) ? $c->get(LoggerInterface::class) : null;
+                return new MiddlewareBus(
+                    container: $c,
+                    debug: $config?->get('app.debug') === true,
+                    logger: $logger,
+                );
+            });
+        }
+
+        if (!$container->has(EventDispatcherInterface::class)) {
+            $container->instance(
+                EventDispatcherInterface::class,
+                new Dispatcher(new Provider()),
+            );
+        }
+
+        if (!$container->has(ServerAdapter::class)) {
+            $container->service(ServerAdapter::class, PHPServerAdapter::class);
+        }
+
+        if (!$container->has(Server::class)) {
+            $container->service(Server::class);
+        }
+
+        if (!$container->has(EmptyResponseRenderer::class)) {
+            $container->service(EmptyResponseRenderer::class);
+        }
 
         foreach ($this->bootstrappers as $name) {
             try {

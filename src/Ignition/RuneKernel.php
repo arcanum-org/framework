@@ -27,9 +27,13 @@ use Arcanum\Rune\ExitCode;
 use Arcanum\Rune\HelpWriter;
 use Arcanum\Rune\Input;
 use Arcanum\Rune\Output;
+use Arcanum\Echo\Dispatcher;
+use Arcanum\Echo\Provider;
+use Arcanum\Flow\Conveyor\MiddlewareBus;
 use Arcanum\Shodo\CliFormatRegistry;
 use Arcanum\Toolkit\Random;
 use Psr\Container\ContainerInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -162,6 +166,28 @@ class RuneKernel implements Kernel
 
         $this->container = $container;
         $container->instance(Transport::class, Transport::Cli);
+
+        // Framework defaults — apps can override before or after bootstrap.
+        if (!$container->has(Bus::class)) {
+            $container->factory(Bus::class, function (Application $c): MiddlewareBus {
+                /** @var Configuration|null $config */
+                $config = $c->has(Configuration::class) ? $c->get(Configuration::class) : null;
+                /** @var LoggerInterface|null $logger */
+                $logger = $c->has(LoggerInterface::class) ? $c->get(LoggerInterface::class) : null;
+                return new MiddlewareBus(
+                    container: $c,
+                    debug: $config?->get('app.debug') === true,
+                    logger: $logger,
+                );
+            });
+        }
+
+        if (!$container->has(EventDispatcherInterface::class)) {
+            $container->instance(
+                EventDispatcherInterface::class,
+                new Dispatcher(new Provider()),
+            );
+        }
 
         // Phase 1: Always run early bootstrappers (timing, env, config).
         foreach ($this->earlyBootstrappers as $name) {

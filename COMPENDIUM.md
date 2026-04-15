@@ -56,6 +56,34 @@ app/
 └── Cli/Kernel.php
 ```
 
+### What the framework auto-registers
+
+A minimal bootstrap file is five lines: create a `Container`, bind your `Kernel` class, specify the three directory paths, return the container. Everything else is framework defaults with `has()` guards — the app can override any of them before or after bootstrap.
+
+**At container construction:**
+
+| Service | Bound to | Why |
+|---|---|---|
+| `Application` | the container itself | Every class can typehint the container interface |
+| `ContainerInterface` (PSR-11) | the container itself | PSR-11 compatibility |
+
+**During kernel `bootstrap()` (both HTTP and CLI):**
+
+| Service | Bound to | Override by |
+|---|---|---|
+| `Bus` | `MiddlewareBus` (deferred factory, reads `app.debug`) | Register `Bus::class` before bootstrap |
+| `EventDispatcherInterface` (PSR-14) | Echo `Dispatcher` with a fresh `Provider` | Register `EventDispatcherInterface::class` before bootstrap |
+
+**HyperKernel only (HTTP-specific):**
+
+| Service | Bound to | Override by |
+|---|---|---|
+| `ServerAdapter` | `PHPServerAdapter` | Register `ServerAdapter::class` before bootstrap |
+| `Server` | `Server` (auto-wired from `ServerAdapter`) | Register `Server::class` before bootstrap |
+| `EmptyResponseRenderer` | `EmptyResponseRenderer` (for command 204 responses) | Register `EmptyResponseRenderer::class` before bootstrap |
+
+**What the app must provide:** the kernel class binding (`$container->instance(Kernel::class, $kernel)`) and the three directory specs (`$rootDirectory`, `$configDirectory`, `$filesDirectory`). Everything else — bus, event dispatcher, server adapter, exception handlers — is framework infrastructure that works out of the box.
+
 ---
 
 ## Front-end defaults
