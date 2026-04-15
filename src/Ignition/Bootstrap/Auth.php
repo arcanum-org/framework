@@ -11,6 +11,7 @@ use Arcanum\Auth\CliSession;
 use Arcanum\Auth\CompositeGuard;
 use Arcanum\Auth\Guard;
 use Arcanum\Auth\Identity;
+use Arcanum\Auth\IdentityProvider;
 use Arcanum\Auth\SessionGuard;
 use Arcanum\Auth\TokenGuard;
 use Arcanum\Cabinet\Application;
@@ -91,18 +92,10 @@ class Auth implements Bootstrapper
 
     private function registerCliResolver(Application $container, Configuration $config): void
     {
-        $tokenResolver = $config->get('auth.resolvers.token');
-        $tokenResolverFn = $tokenResolver instanceof \Closure
-            ? $tokenResolver
-            : fn(string $token) => null;
-
-        $identityResolver = $config->get('auth.resolvers.identity');
-        $identityResolverFn = $identityResolver instanceof \Closure
-            ? $identityResolver
-            : null;
-
         /** @var ActiveIdentity $activeIdentity */
         $activeIdentity = $container->get(ActiveIdentity::class);
+
+        $provider = $this->resolveProvider($container, $config);
 
         // Register CliSession if Encryptor is available.
         $session = null;
@@ -123,9 +116,8 @@ class Auth implements Bootstrapper
             CliAuthResolver::class,
             new CliAuthResolver(
                 activeIdentity: $activeIdentity,
-                tokenResolver: $tokenResolverFn,
+                provider: $provider,
                 session: $session,
-                identityResolver: $identityResolverFn,
             ),
         );
     }
@@ -134,7 +126,7 @@ class Auth implements Bootstrapper
     {
         return match ($name) {
             'session' => $this->buildSessionGuard($container, $config),
-            'token' => $this->buildTokenGuard($config),
+            'token' => $this->buildTokenGuard($container, $config),
             default => throw new \RuntimeException(
                 sprintf('Unknown auth guard "%s". Available guards: session, token.', $name),
             ),
@@ -146,21 +138,34 @@ class Auth implements Bootstrapper
         /** @var ActiveSession $session */
         $session = $container->get(ActiveSession::class);
 
-        $resolver = $config->get('auth.resolvers.identity');
-        $resolverFn = $resolver instanceof \Closure
-            ? $resolver
-            : fn(string $id) => null;
-
-        return new SessionGuard($session, $resolverFn);
+        return new SessionGuard($session, $this->resolveProvider($container, $config));
     }
 
-    private function buildTokenGuard(Configuration $config): TokenGuard
+    private function buildTokenGuard(Application $container, Configuration $config): TokenGuard
     {
-        $resolver = $config->get('auth.resolvers.token');
-        $resolverFn = $resolver instanceof \Closure
-            ? $resolver
-            : fn(string $token) => null;
+        return new TokenGuard($this->resolveProvider($container, $config));
+    }
 
-        return new TokenGuard($resolverFn);
+    private function resolveProvider(Application $container, Configuration $config): IdentityProvider
+    {
+        if ($container->has(IdentityProvider::class)) {
+            /** @var IdentityProvider */
+            return $container->get(IdentityProvider::class);
+        }
+
+        /** @var class-string<IdentityProvider>|null $providerClass */
+        $providerClass = $config->get('auth.provider');
+
+        if ($providerClass !== null) {
+            /** @var IdentityProvider */
+            $provider = $container->get($providerClass);
+            $container->instance(IdentityProvider::class, $provider);
+            return $provider;
+        }
+
+        throw new \RuntimeException(
+            'No IdentityProvider configured. Set the "provider" key in config/auth.php '
+            . 'to a class implementing Arcanum\Auth\IdentityProvider.',
+        );
     }
 }

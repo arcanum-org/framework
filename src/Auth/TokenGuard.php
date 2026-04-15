@@ -10,20 +10,17 @@ use Psr\Http\Message\ServerRequestInterface;
  * Resolves identity from a Bearer token in the Authorization header.
  *
  * Extracts the token from "Authorization: Bearer <token>" and calls
- * the app-provided resolver to validate it and return the Identity.
- * The resolver handles token lookup, validation, and expiry — the
+ * the IdentityProvider to validate it and return the Identity.
+ * The provider handles token lookup, validation, and expiry — the
  * guard only extracts and delegates.
  *
  * Returns null if no Authorization header, not a Bearer scheme,
- * or the resolver can't validate the token.
+ * or the provider can't validate the token.
  */
 final class TokenGuard implements Guard
 {
-    /**
-     * @param \Closure(string): (Identity|null) $resolver
-     */
     public function __construct(
-        private readonly \Closure $resolver,
+        private readonly IdentityProvider $provider,
     ) {
     }
 
@@ -41,6 +38,6 @@ final class TokenGuard implements Guard
             return null;
         }
 
-        return ($this->resolver)($token);
+        return $this->provider->findByToken($token);
     }
 }

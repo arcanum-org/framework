@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Auth;
 
+use Arcanum\Auth\Identity;
+use Arcanum\Auth\IdentityProvider;
 use Arcanum\Auth\SessionGuard;
 use Arcanum\Auth\SimpleIdentity;
 use Arcanum\Session\ActiveSession;
@@ -34,6 +36,30 @@ final class SessionGuardTest extends TestCase
         return $this->createStub(ServerRequestInterface::class);
     }
 
+    private function stubProvider(Identity|null $returnValue = null): IdentityProvider
+    {
+        return new class ($returnValue) implements IdentityProvider {
+            public function __construct(private readonly Identity|null $identity)
+            {
+            }
+
+            public function findById(string $id): Identity|null
+            {
+                return $this->identity;
+            }
+
+            public function findByToken(string $token): Identity|null
+            {
+                return null;
+            }
+
+            public function findByCredentials(string ...$credentials): Identity|null
+            {
+                return null;
+            }
+        };
+    }
+
     public function testResolvesIdentityFromSession(): void
     {
         $activeSession = new ActiveSession();
@@ -42,7 +68,7 @@ final class SessionGuardTest extends TestCase
 
         $guard = new SessionGuard(
             $activeSession,
-            fn(string $id) => new SimpleIdentity($id, ['admin']),
+            $this->stubProvider(new SimpleIdentity('user-5', ['admin'])),
         );
 
         $identity = $guard->resolve($this->stubRequest());
@@ -59,7 +85,7 @@ final class SessionGuardTest extends TestCase
 
         $guard = new SessionGuard(
             $activeSession,
-            fn(string $id) => new SimpleIdentity($id),
+            $this->stubProvider(new SimpleIdentity('unused')),
         );
 
         $this->assertNull($guard->resolve($this->stubRequest()));
@@ -71,13 +97,13 @@ final class SessionGuardTest extends TestCase
 
         $guard = new SessionGuard(
             $activeSession,
-            fn(string $id) => new SimpleIdentity($id),
+            $this->stubProvider(new SimpleIdentity('unused')),
         );
 
         $this->assertNull($guard->resolve($this->stubRequest()));
     }
 
-    public function testReturnsNullWhenResolverReturnsNull(): void
+    public function testReturnsNullWhenProviderReturnsNull(): void
     {
         $activeSession = new ActiveSession();
         $session = new Session(SessionId::generate(), ['_identity' => 'user-deleted']);
@@ -85,7 +111,7 @@ final class SessionGuardTest extends TestCase
 
         $guard = new SessionGuard(
             $activeSession,
-            fn(string $id) => null,
+            $this->stubProvider(null),
         );
 
         $this->assertNull($guard->resolve($this->stubRequest()));

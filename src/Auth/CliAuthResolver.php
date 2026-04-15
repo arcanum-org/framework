@@ -10,9 +10,9 @@ use Arcanum\Rune\Input;
  * Resolves an Identity from CLI arguments, session, or environment.
  *
  * Priority chain:
- *   1. --token flag → call token resolver
- *   2. CliSession → if stored and not expired, call identity resolver
- *   3. ARCANUM_TOKEN env var → call token resolver
+ *   1. --token flag → call provider's findByToken()
+ *   2. CliSession → if stored and not expired, call provider's findById()
+ *   3. ARCANUM_TOKEN env var → call provider's findByToken()
  *
  * The --token option always takes precedence. A stored CLI session
  * (from `login` command) is checked next. The environment variable
@@ -20,15 +20,10 @@ use Arcanum\Rune\Input;
  */
 final class CliAuthResolver
 {
-    /**
-     * @param \Closure(string): (Identity|null) $tokenResolver
-     * @param (\Closure(string): (Identity|null))|null $identityResolver
-     */
     public function __construct(
         private readonly ActiveIdentity $activeIdentity,
-        private readonly \Closure $tokenResolver,
+        private readonly IdentityProvider $provider,
         private readonly CliSession|null $session = null,
-        private readonly \Closure|null $identityResolver = null,
     ) {
     }
 
@@ -43,11 +38,11 @@ final class CliAuthResolver
         }
 
         // 2. Stored CLI session
-        if ($this->session !== null && $this->identityResolver !== null) {
+        if ($this->session !== null) {
             $identityId = $this->session->load();
 
             if ($identityId !== null) {
-                $identity = ($this->identityResolver)($identityId);
+                $identity = $this->provider->findById($identityId);
 
                 if ($identity !== null) {
                     $this->activeIdentity->set($identity);
@@ -67,7 +62,7 @@ final class CliAuthResolver
 
     private function resolveFromToken(string $token): void
     {
-        $identity = ($this->tokenResolver)($token);
+        $identity = $this->provider->findByToken($token);
 
         if ($identity !== null) {
             $this->activeIdentity->set($identity);

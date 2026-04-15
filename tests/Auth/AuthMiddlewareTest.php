@@ -8,6 +8,8 @@ use Arcanum\Auth\ActiveIdentity;
 use Arcanum\Auth\AuthMiddleware;
 use Arcanum\Auth\CompositeGuard;
 use Arcanum\Auth\Guard;
+use Arcanum\Auth\Identity;
+use Arcanum\Auth\IdentityProvider;
 use Arcanum\Auth\SessionGuard;
 use Arcanum\Auth\SimpleIdentity;
 use Arcanum\Auth\TokenGuard;
@@ -84,6 +86,30 @@ final class AuthMiddlewareTest extends TestCase
     // Token authentication request attribute
     // -----------------------------------------------------------
 
+    private function tokenProvider(Identity|null $returnValue): IdentityProvider
+    {
+        return new class ($returnValue) implements IdentityProvider {
+            public function __construct(private readonly Identity|null $identity)
+            {
+            }
+
+            public function findById(string $id): Identity|null
+            {
+                return null;
+            }
+
+            public function findByToken(string $token): Identity|null
+            {
+                return $this->identity;
+            }
+
+            public function findByCredentials(string ...$credentials): Identity|null
+            {
+                return null;
+            }
+        };
+    }
+
     /**
      * Build a request stub that supports withAttribute() by tracking
      * attributes in an array and returning a new stub with getAttribute().
@@ -138,7 +164,7 @@ final class AuthMiddlewareTest extends TestCase
     public function testSetsTokenAuthAttributeForTokenGuard(): void
     {
         // Arrange
-        $guard = new TokenGuard(fn(string $token) => new SimpleIdentity('user-1'));
+        $guard = new TokenGuard($this->tokenProvider(new SimpleIdentity('user-1')));
         $middleware = new AuthMiddleware($guard, new ActiveIdentity());
 
         $request = $this->requestWithAttributeSupport(['Authorization' => 'Bearer valid-token']);
@@ -192,7 +218,7 @@ final class AuthMiddlewareTest extends TestCase
         $sessionGuard = $this->createStub(Guard::class);
         $sessionGuard->method('resolve')->willReturn(null);
 
-        $tokenGuard = new TokenGuard(fn(string $token) => new SimpleIdentity('user-1'));
+        $tokenGuard = new TokenGuard($this->tokenProvider(new SimpleIdentity('user-1')));
         $composite = new CompositeGuard($sessionGuard, $tokenGuard);
         $middleware = new AuthMiddleware($composite, new ActiveIdentity());
 
@@ -221,7 +247,7 @@ final class AuthMiddlewareTest extends TestCase
         $sessionGuard = $this->createStub(Guard::class);
         $sessionGuard->method('resolve')->willReturn(new SimpleIdentity('user-1'));
 
-        $tokenGuard = new TokenGuard(fn(string $token) => null);
+        $tokenGuard = new TokenGuard($this->tokenProvider(null));
         $composite = new CompositeGuard($sessionGuard, $tokenGuard);
         $middleware = new AuthMiddleware($composite, new ActiveIdentity());
 
@@ -247,7 +273,7 @@ final class AuthMiddlewareTest extends TestCase
     public function testDoesNotSetAttributeWhenNoIdentityResolved(): void
     {
         // Arrange — token guard returns null (invalid token)
-        $guard = new TokenGuard(fn(string $token) => null);
+        $guard = new TokenGuard($this->tokenProvider(null));
         $middleware = new AuthMiddleware($guard, new ActiveIdentity());
 
         $request = $this->requestWithAttributeSupport(['Authorization' => 'Bearer invalid-token']);

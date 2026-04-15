@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Arcanum\Rune\Command;
 
 use Arcanum\Auth\CliSession;
-use Arcanum\Auth\Identity;
+use Arcanum\Auth\IdentityProvider;
 use Arcanum\Rune\Attribute\Description;
 use Arcanum\Rune\BuiltInCommand;
 use Arcanum\Rune\ExitCode;
@@ -17,7 +17,7 @@ use Arcanum\Rune\Prompter;
  * Interactive login for CLI sessions.
  *
  * Prompts for credentials (configurable fields), validates via the app's
- * credentials resolver, and stores the identity in an encrypted session
+ * IdentityProvider, and stores the identity in an encrypted session
  * file for subsequent commands.
  *
  * Usage: php arcanum login
@@ -27,12 +27,11 @@ final class LoginCommand implements BuiltInCommand
 {
     /**
      * @param list<string> $fields Field names to prompt for.
-     * @param \Closure $credentialsResolver Receives field values positionally, returns Identity|null.
      */
     public function __construct(
         private readonly Prompter $prompter,
         private readonly CliSession $session,
-        private readonly \Closure $credentialsResolver,
+        private readonly IdentityProvider $provider,
         private readonly array $fields = ['email', 'password'],
         private readonly int $ttl = 86400,
     ) {
@@ -50,8 +49,7 @@ final class LoginCommand implements BuiltInCommand
                 : $this->prompter->ask($label);
         }
 
-        /** @var Identity|null $identity */
-        $identity = ($this->credentialsResolver)(...$values);
+        $identity = $this->provider->findByCredentials(...$values);
 
         if ($identity === null) {
             $output->errorLine('Login failed. Invalid credentials.');

@@ -6,6 +6,7 @@ namespace Arcanum\Test\Rune\Command;
 
 use Arcanum\Auth\CliSession;
 use Arcanum\Auth\Identity;
+use Arcanum\Auth\IdentityProvider;
 use Arcanum\Auth\SimpleIdentity;
 use Arcanum\Rune\Command\LoginCommand;
 use Arcanum\Rune\ExitCode;
@@ -21,6 +22,30 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(Input::class)]
 final class LoginCommandTest extends TestCase
 {
+    private function stubProvider(\Closure $resolver): IdentityProvider
+    {
+        return new class ($resolver) implements IdentityProvider {
+            public function __construct(private readonly \Closure $resolver)
+            {
+            }
+
+            public function findById(string $id): Identity|null
+            {
+                return null;
+            }
+
+            public function findByToken(string $token): Identity|null
+            {
+                return null;
+            }
+
+            public function findByCredentials(string ...$credentials): Identity|null
+            {
+                return ($this->resolver)(...$credentials);
+            }
+        };
+    }
+
     public function testSuccessfulLoginStoresSessionAndPrintsConfirmation(): void
     {
         // Arrange
@@ -45,7 +70,7 @@ final class LoginCommandTest extends TestCase
         $command = new LoginCommand(
             prompter: $prompter,
             session: $session,
-            credentialsResolver: fn(string $email, string $name) => $identity,
+            provider: $this->stubProvider(fn(string $email, string $name) => $identity),
             fields: ['email', 'name'],
             ttl: 3600,
         );
@@ -78,7 +103,7 @@ final class LoginCommandTest extends TestCase
         $command = new LoginCommand(
             prompter: $prompter,
             session: $session,
-            credentialsResolver: fn(string $email, string $password) => null,
+            provider: $this->stubProvider(fn(string $email, string $password) => null),
         );
 
         // Act
@@ -114,7 +139,7 @@ final class LoginCommandTest extends TestCase
         $command = new LoginCommand(
             prompter: $prompter,
             session: $session,
-            credentialsResolver: fn(string $email, string $password) => $identity,
+            provider: $this->stubProvider(fn(string $email, string $password) => $identity),
             fields: ['email', 'password'],
         );
 
@@ -147,7 +172,7 @@ final class LoginCommandTest extends TestCase
         $command = new LoginCommand(
             prompter: $prompter,
             session: $session,
-            credentialsResolver: fn() => new SimpleIdentity('1'),
+            provider: $this->stubProvider(fn() => new SimpleIdentity('1')),
             fields: ['username', 'code'],
         );
 
