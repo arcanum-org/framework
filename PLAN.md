@@ -190,7 +190,7 @@ Everything else is framework defaults with `has()` guards — apps override what
 - [ ] **Slim down starter `bootstrap/http.php`** — Remove container self-registration (now in constructor), Bus registration, ServerAdapter, EmptyResponseRenderer, EventDispatcher (all now framework defaults). What remains: kernel binding + primitive specs, exception renderer choice + debug flags, app-specific event listeners, app-specific helpers. Should shrink from ~170 lines to ~60.
 - [ ] **Slim down starter `bootstrap/cli.php`** — Remove container self-registration, Bus registration (all now framework defaults). What remains: kernel binding + primitive specs, exception renderer. Should shrink from ~88 lines to ~30.
 - [x] **Test: from-scratch bootstrap** — Integration test: create a minimal bootstrap file (container + kernel binding + specs only), verify the kernel bootstraps without errors, verify `Bus`, `ServerAdapter`, `EventDispatcherInterface`, `ContainerInterface` are all resolvable from the container. This is the regression test for "12 errors before a page renders."
-- [ ] **Update COMPENDIUM.md** — Document what the framework auto-registers (container, bus, server adapter, event dispatcher, exception handlers) vs. what the app must provide (kernel binding, directory specs, exception renderer preferences). Update the "shape of an Arcanum app" section.
+- [x] **Update COMPENDIUM.md** — Document what the framework auto-registers (container, bus, server adapter, event dispatcher, exception handlers) vs. what the app must provide (kernel binding, directory specs, exception renderer preferences). Update the "shape of an Arcanum app" section.
 
 ### Dogfood: investigation fixes (retro 2.1, 2.2, 2.3, 2.5)
 
