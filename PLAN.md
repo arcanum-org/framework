@@ -180,10 +180,10 @@ Everything else is framework defaults with `has()` guards — apps override what
 #### Checklist
 
 - [x] **Container self-registration** — In `Container::__construct()`, register the container instance under both `Arcanum\Cabinet\Application` and `Psr\Container\ContainerInterface`. Every app needs this, no variation, no reason for it to be manual. Tests: `$container->get(Application::class)` and `$container->get(ContainerInterface::class)` both return the container instance immediately after construction.
-- [ ] **Kernel pre-bootstrap wiring in `bootstrap()`** — At the top of `Kernel::bootstrap()` (the shared base, before the bootstrapper loop), register framework infrastructure with `has()` guards so apps can override before or after. Registrations:
+- [x] **Kernel pre-bootstrap wiring in `bootstrap()`** — At the top of `Kernel::bootstrap()` (the shared base, before the bootstrapper loop), register framework infrastructure with `has()` guards so apps can override before or after. Registrations:
   - `Bus::class` → `MiddlewareBus::class` (both kernels). Read `$debug` from the `app.debug` config key (available after `Configuration` bootstrapper) or specify it as a deferred factory.
   - `EventDispatcherInterface` → Echo `Dispatcher` with a new `Provider` (both kernels). Currently only wired in the starter's HTTP bootstrap; CLI needs it too for lifecycle events and the planned `FlashMessage` events.
-- [ ] **HyperKernel-specific wiring in `bootstrap()`** — After the shared kernel wiring, `HyperKernel::bootstrap()` registers HTTP-specific services with `has()` guards:
+- [x] **HyperKernel-specific wiring in `bootstrap()`** — After the shared kernel wiring, `HyperKernel::bootstrap()` registers HTTP-specific services with `has()` guards:
   - `ServerAdapter::class` → `PHPServerAdapter::class`
   - `EmptyResponseRenderer::class` (used by the kernel for command 204 responses)
   - `Server::class` with `PHPServerAdapter` via `serviceWith()` or equivalent

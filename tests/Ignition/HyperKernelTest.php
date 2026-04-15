@@ -111,6 +111,7 @@ final class HyperKernelTest extends TestCase
         $bootstrapper->expects($this->exactly(16))->method('bootstrap');
 
         $container = $this->createStub(Application::class);
+        $container->method('has')->willReturn(false);
         $container->method('get')->willReturn($bootstrapper);
 
         // Act
@@ -126,6 +127,7 @@ final class HyperKernelTest extends TestCase
         $bootstrapper->expects($this->exactly(16))->method('bootstrap');
 
         $container = $this->createStub(Application::class);
+        $container->method('has')->willReturn(false);
         $container->method('get')->willReturn($bootstrapper);
 
         // Act
@@ -166,13 +168,9 @@ final class HyperKernelTest extends TestCase
         $bootstrapper = $this->createStub(Bootstrapper::class);
 
         $container = $this->createStub(Application::class);
-        $container->method('has')->willReturnMap([
-            [ExceptionHandler::class, false],
-            [ExceptionRenderer::class, true],
-            [EventDispatcherInterface::class, false],
-            [LoggerInterface::class, false],
-            [\Arcanum\Quill\CorrelationProcessor::class, false],
-        ]);
+        $container->method('has')->willReturnCallback(
+            fn(string $id) => $id === ExceptionRenderer::class,
+        );
         $container->method('get')->willReturnCallback(
             fn(string $id) => $id === ExceptionRenderer::class ? $renderer : $bootstrapper
         );
@@ -202,13 +200,9 @@ final class HyperKernelTest extends TestCase
         $bootstrapper = $this->createStub(Bootstrapper::class);
 
         $container = $this->createStub(Application::class);
-        $container->method('has')->willReturnMap([
-            [ExceptionHandler::class, true],
-            [ExceptionRenderer::class, true],
-            [EventDispatcherInterface::class, false],
-            [LoggerInterface::class, false],
-            [\Arcanum\Quill\CorrelationProcessor::class, false],
-        ]);
+        $container->method('has')->willReturnCallback(
+            fn(string $id) => in_array($id, [ExceptionHandler::class, ExceptionRenderer::class], true),
+        );
         $container->method('get')->willReturnCallback(
             fn(string $id) => match ($id) {
                 ExceptionHandler::class => $handler,
@@ -636,13 +630,9 @@ final class HyperKernelTest extends TestCase
         $bootstrapper = $this->createStub(Bootstrapper::class);
 
         $container = $this->createStub(Application::class);
-        $container->method('has')->willReturnMap([
-            [ExceptionHandler::class, false],
-            [ExceptionRenderer::class, true],
-            [EventDispatcherInterface::class, false],
-            [LoggerInterface::class, false],
-            [\Arcanum\Quill\CorrelationProcessor::class, false],
-        ]);
+        $container->method('has')->willReturnCallback(
+            fn(string $id) => $id === ExceptionRenderer::class,
+        );
 
         $class = get_class($middleware);
         $container->method('get')->willReturnCallback(
@@ -693,13 +683,9 @@ final class HyperKernelTest extends TestCase
         $bootstrapper = $this->createStub(Bootstrapper::class);
 
         $container = $this->createStub(Application::class);
-        $container->method('has')->willReturnMap([
-            [ExceptionHandler::class, false],
-            [ExceptionRenderer::class, true],
-            [EventDispatcherInterface::class, false],
-            [LoggerInterface::class, false],
-            [\Arcanum\Quill\CorrelationProcessor::class, false],
-        ]);
+        $container->method('has')->willReturnCallback(
+            fn(string $id) => $id === ExceptionRenderer::class,
+        );
 
         $class = get_class($middleware);
         $container->method('get')->willReturnCallback(
@@ -758,16 +744,13 @@ final class HyperKernelTest extends TestCase
         $bootstrapper = $this->createStub(Bootstrapper::class);
 
         $container = $this->createStub(Application::class);
-        $container->method('has')->willReturnMap([
-            [ExceptionHandler::class, false],
-            [ExceptionRenderer::class, true],
-            [\Arcanum\Hyper\HtmlExceptionResponseRenderer::class, true],
-            [\Arcanum\Gather\Configuration::class, true],
-            [EventDispatcherInterface::class, false],
-            [RouteDispatcher::class, false],
-            [LoggerInterface::class, false],
-            [\Arcanum\Quill\CorrelationProcessor::class, false],
-        ]);
+        $container->method('has')->willReturnCallback(
+            fn(string $id) => in_array($id, [
+                ExceptionRenderer::class,
+                \Arcanum\Hyper\HtmlExceptionResponseRenderer::class,
+                \Arcanum\Gather\Configuration::class,
+            ], true),
+        );
         $container->method('get')->willReturnCallback(
             fn(string $id) => match ($id) {
                 ExceptionRenderer::class => $jsonRenderer,
@@ -840,16 +823,13 @@ final class HyperKernelTest extends TestCase
         $bootstrapper = $this->createStub(Bootstrapper::class);
 
         $container = $this->createStub(Application::class);
-        $container->method('has')->willReturnMap([
-            [ExceptionHandler::class, false],
-            [ExceptionRenderer::class, false],
-            [\Arcanum\Hyper\HtmlExceptionResponseRenderer::class, true],
-            [\Arcanum\Gather\Configuration::class, true],
-            [EventDispatcherInterface::class, false],
-            [RouteDispatcher::class, true],
-            [LoggerInterface::class, false],
-            [\Arcanum\Quill\CorrelationProcessor::class, false],
-        ]);
+        $container->method('has')->willReturnCallback(
+            fn(string $id) => in_array($id, [
+                \Arcanum\Hyper\HtmlExceptionResponseRenderer::class,
+                \Arcanum\Gather\Configuration::class,
+                RouteDispatcher::class,
+            ], true),
+        );
         $container->method('get')->willReturnCallback(
             fn(string $id) => match ($id) {
                 \Arcanum\Hyper\HtmlExceptionResponseRenderer::class => $htmlRenderer,
@@ -905,16 +885,12 @@ final class HyperKernelTest extends TestCase
         $bootstrapper = $this->createStub(Bootstrapper::class);
 
         $container = $this->createStub(Application::class);
-        $container->method('has')->willReturnMap([
-            [ExceptionHandler::class, false],
-            [ExceptionRenderer::class, false],
-            [\Arcanum\Hyper\HtmlExceptionResponseRenderer::class, true],
-            [\Arcanum\Gather\Configuration::class, true],
-            [EventDispatcherInterface::class, false],
-            [RouteDispatcher::class, false],
-            [LoggerInterface::class, false],
-            [\Arcanum\Quill\CorrelationProcessor::class, false],
-        ]);
+        $container->method('has')->willReturnCallback(
+            fn(string $id) => in_array($id, [
+                \Arcanum\Hyper\HtmlExceptionResponseRenderer::class,
+                \Arcanum\Gather\Configuration::class,
+            ], true),
+        );
         $container->method('get')->willReturnCallback(
             fn(string $id) => match ($id) {
                 \Arcanum\Hyper\HtmlExceptionResponseRenderer::class => $htmlRenderer,
@@ -984,13 +960,9 @@ final class HyperKernelTest extends TestCase
         $bootstrapper = $this->createStub(Bootstrapper::class);
 
         $container = $this->createStub(Application::class);
-        $container->method('has')->willReturnMap([
-            [ExceptionHandler::class, true],
-            [ExceptionRenderer::class, true],
-            [EventDispatcherInterface::class, false],
-            [LoggerInterface::class, false],
-            [\Arcanum\Quill\CorrelationProcessor::class, false],
-        ]);
+        $container->method('has')->willReturnCallback(
+            fn(string $id) => in_array($id, [ExceptionHandler::class, ExceptionRenderer::class], true),
+        );
 
         $class = get_class($middleware);
         $container->method('get')->willReturnCallback(
