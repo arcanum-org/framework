@@ -151,7 +151,7 @@ Guards receive the `IdentityProvider` instead of raw `Closure` arguments. `Sessi
 
 ##### Checklist
 
-- [ ] **`IdentityProvider` interface** — Define in `src/Auth/`. Three methods: `findById(string $id): ?Identity`, `findByToken(string $token): ?Identity`, `findByCredentials(string ...$credentials): ?Identity`. Document the contract: each method returns `null` for "not found / invalid," never throws for normal lookup failures.
+- [x] **`IdentityProvider` interface** — Define in `src/Auth/`. Three methods: `findById(string $id): ?Identity`, `findByToken(string $token): ?Identity`, `findByCredentials(string ...$credentials): ?Identity`. Document the contract: each method returns `null` for "not found / invalid," never throws for normal lookup failures.
 - [ ] **Update guards to accept `IdentityProvider`** — `SessionGuard` constructor takes `IdentityProvider` instead of `Closure`, calls `findById()`. `TokenGuard` takes `IdentityProvider`, calls `findByToken()`. `CliAuthResolver` takes `IdentityProvider`, calls `findByCredentials()`. Update all guard tests.
 - [ ] **Update `Bootstrap\Auth`** — Read `provider` key from `config/auth.php` as a class-string. Resolve from the container (Codex auto-wires dependencies). Pass the resolved `IdentityProvider` to guard constructors. Throw a clear error if the provider class doesn't exist or doesn't implement the interface.
 - [ ] **Update `config/auth.php` format** — Remove the `resolvers` key and its closures. Add `provider` key (class-string). Keep `guard`, `login.fields`, and `login.ttl` as-is (already scalars). Update the starter app's config file.
