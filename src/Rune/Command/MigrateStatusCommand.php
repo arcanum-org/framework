@@ -24,6 +24,7 @@ final class MigrateStatusCommand implements BuiltInCommand
     public function __construct(
         private readonly ConnectionManager|null $connections = null,
         private readonly string $rootDirectory = '',
+        private readonly string $migrationsPath = '',
     ) {
     }
 
@@ -40,7 +41,9 @@ final class MigrateStatusCommand implements BuiltInCommand
         $driver = $this->connections->driverName($resolvedName);
 
         $repository = new MigrationRepository($connection, $driver);
-        $migrationsPath = $this->rootDirectory . DIRECTORY_SEPARATOR . 'migrations';
+        $migrationsPath = $this->migrationsPath !== ''
+            ? $this->migrationsPath
+            : $this->rootDirectory . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'migrations';
         $migrator = new Migrator($connection, $repository, $migrationsPath);
 
         $status = $migrator->status();

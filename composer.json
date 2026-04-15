@@ -44,6 +44,7 @@
         "psr/http-server-handler": "^1.0",
         "psr/http-server-middleware": "^1.0",
         "vlucas/phpdotenv": "^5.5",
+        "symfony/filesystem": "^6.3 || ^7.0",
         "symfony/finder": "^6.3 || ^7.0",
         "monolog/monolog": "^3.4",
         "voku/portable-ascii": "^2.0",

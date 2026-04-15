@@ -25,7 +25,7 @@ namespace Arcanum\Forge\Migration;
  */
 final class MigrationParser
 {
-    private const FILENAME_PATTERN = '/^(\d{14})_(.+)\.sql$/';
+    private const FILENAME_PATTERN = '/^(\d{17})_(.+)\.sql$/';
 
     private const UP_MARKER = '-- @migrate up';
 
@@ -48,7 +48,7 @@ final class MigrationParser
         if (!preg_match(self::FILENAME_PATTERN, $filename, $matches)) {
             throw new InvalidMigrationFile(sprintf(
                 'Migration filename "%s" does not match the expected format '
-                    . '{YmdHis}_{name}.sql (e.g. 20260409120000_create_users.sql).',
+                    . '{YmdHisv}_{name}.sql (e.g. 20260409120000123_create_users.sql).',
                 $filename,
             ));
         }

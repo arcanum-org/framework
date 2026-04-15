@@ -37,7 +37,7 @@ final class MigrationRepository
                 SQL,
             'mysql' => <<<'SQL'
                 CREATE TABLE IF NOT EXISTS arcanum_migrations (
-                    version VARCHAR(14) NOT NULL PRIMARY KEY,
+                    version VARCHAR(17) NOT NULL PRIMARY KEY,
                     filename VARCHAR(255) NOT NULL,
                     checksum VARCHAR(32) NOT NULL,
                     applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -45,7 +45,7 @@ final class MigrationRepository
                 SQL,
             'pgsql' => <<<'SQL'
                 CREATE TABLE IF NOT EXISTS arcanum_migrations (
-                    version VARCHAR(14) NOT NULL PRIMARY KEY,
+                    version VARCHAR(17) NOT NULL PRIMARY KEY,
                     filename VARCHAR(255) NOT NULL,
                     checksum VARCHAR(32) NOT NULL,
                     applied_at TIMESTAMP NOT NULL DEFAULT NOW()

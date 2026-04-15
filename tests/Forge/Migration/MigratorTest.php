@@ -88,7 +88,7 @@ final class MigratorTest extends TestCase
     {
         // Arrange
         $this->writeMigration(
-            '20260409120000_create_users.sql',
+            '20260409120000000_create_users.sql',
             'CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL);',
             'DROP TABLE users;',
         );
@@ -99,7 +99,7 @@ final class MigratorTest extends TestCase
 
         // Assert
         $this->assertFalse($result->hasErrors());
-        $this->assertSame(['20260409120000_create_users.sql'], $result->ran);
+        $this->assertSame(['20260409120000000_create_users.sql'], $result->ran);
 
         // Verify the table actually exists
         $rows = $this->connection->query('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = \'users\'');
@@ -112,12 +112,12 @@ final class MigratorTest extends TestCase
     {
         // Arrange — write files out of order
         $this->writeMigration(
-            '20260409130000_create_posts.sql',
+            '20260409130000000_create_posts.sql',
             'CREATE TABLE posts (id INTEGER PRIMARY KEY);',
             'DROP TABLE posts;',
         );
         $this->writeMigration(
-            '20260409120000_create_users.sql',
+            '20260409120000000_create_users.sql',
             'CREATE TABLE users (id INTEGER PRIMARY KEY);',
             'DROP TABLE users;',
         );
@@ -130,19 +130,19 @@ final class MigratorTest extends TestCase
         });
 
         // Assert — users before posts
-        $this->assertSame(['20260409120000', '20260409130000'], $order);
+        $this->assertSame(['20260409120000000', '20260409130000000'], $order);
     }
 
     public function testMigrateSkipsAlreadyApplied(): void
     {
         // Arrange
         $this->writeMigration(
-            '20260409120000_create_users.sql',
+            '20260409120000000_create_users.sql',
             'CREATE TABLE users (id INTEGER PRIMARY KEY);',
             'DROP TABLE users;',
         );
         $this->writeMigration(
-            '20260409130000_create_posts.sql',
+            '20260409130000000_create_posts.sql',
             'CREATE TABLE posts (id INTEGER PRIMARY KEY);',
             'DROP TABLE posts;',
         );
@@ -151,14 +151,14 @@ final class MigratorTest extends TestCase
 
         // Act — add a third, run again
         $this->writeMigration(
-            '20260409140000_create_tags.sql',
+            '20260409140000000_create_tags.sql',
             'CREATE TABLE tags (id INTEGER PRIMARY KEY);',
             'DROP TABLE tags;',
         );
         $result = $migrator->migrate();
 
         // Assert — only the new one ran
-        $this->assertSame(['20260409140000_create_tags.sql'], $result->ran);
+        $this->assertSame(['20260409140000000_create_tags.sql'], $result->ran);
     }
 
     public function testMigrateReturnsEmptyWhenNothingPending(): void
@@ -178,7 +178,7 @@ final class MigratorTest extends TestCase
     {
         // Arrange — apply a migration, then modify the file
         $this->writeMigration(
-            '20260409120000_create_users.sql',
+            '20260409120000000_create_users.sql',
             'CREATE TABLE users (id INTEGER PRIMARY KEY);',
             'DROP TABLE users;',
         );
@@ -187,14 +187,14 @@ final class MigratorTest extends TestCase
 
         // Modify the applied file
         $this->writeMigration(
-            '20260409120000_create_users.sql',
+            '20260409120000000_create_users.sql',
             'CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT);',
             'DROP TABLE users;',
         );
 
         // Add a new pending migration
         $this->writeMigration(
-            '20260409130000_create_posts.sql',
+            '20260409130000000_create_posts.sql',
             'CREATE TABLE posts (id INTEGER PRIMARY KEY);',
             'DROP TABLE posts;',
         );
@@ -212,17 +212,17 @@ final class MigratorTest extends TestCase
     {
         // Arrange
         $this->writeMigration(
-            '20260409120000_good.sql',
+            '20260409120000000_good.sql',
             'CREATE TABLE good (id INTEGER PRIMARY KEY);',
             'DROP TABLE good;',
         );
         $this->writeMigration(
-            '20260409130000_bad.sql',
+            '20260409130000000_bad.sql',
             'INVALID SQL STATEMENT;',
             'SELECT 1;',
         );
         $this->writeMigration(
-            '20260409140000_never.sql',
+            '20260409140000000_never.sql',
             'CREATE TABLE never (id INTEGER PRIMARY KEY);',
             'DROP TABLE never;',
         );
@@ -233,7 +233,7 @@ final class MigratorTest extends TestCase
 
         // Assert — first ran, second failed, third never ran
         $this->assertTrue($result->hasErrors());
-        $this->assertSame(['20260409120000_good.sql'], $result->ran);
+        $this->assertSame(['20260409120000000_good.sql'], $result->ran);
     }
 
     // ------------------------------------------------------------------
@@ -244,7 +244,7 @@ final class MigratorTest extends TestCase
     {
         // Arrange
         $this->writeMigration(
-            '20260409120000_create_users.sql',
+            '20260409120000000_create_users.sql',
             'CREATE TABLE users (id INTEGER PRIMARY KEY);',
             'DROP TABLE users;',
         );
@@ -256,7 +256,7 @@ final class MigratorTest extends TestCase
 
         // Assert
         $this->assertFalse($result->hasErrors());
-        $this->assertSame(['20260409120000_create_users.sql'], $result->ran);
+        $this->assertSame(['20260409120000000_create_users.sql'], $result->ran);
 
         // Verify table is gone
         $rows = $this->connection->query('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = \'users\'');
@@ -267,12 +267,12 @@ final class MigratorTest extends TestCase
     {
         // Arrange
         $this->writeMigration(
-            '20260409120000_create_users.sql',
+            '20260409120000000_create_users.sql',
             'CREATE TABLE users (id INTEGER PRIMARY KEY);',
             'DROP TABLE users;',
         );
         $this->writeMigration(
-            '20260409130000_create_posts.sql',
+            '20260409130000000_create_posts.sql',
             'CREATE TABLE posts (id INTEGER PRIMARY KEY);',
             'DROP TABLE posts;',
         );
@@ -285,8 +285,8 @@ final class MigratorTest extends TestCase
         // Assert — both rolled back, most recent first
         $this->assertFalse($result->hasErrors());
         $this->assertSame([
-            '20260409130000_create_posts.sql',
-            '20260409120000_create_users.sql',
+            '20260409130000000_create_posts.sql',
+            '20260409120000000_create_users.sql',
         ], $result->ran);
     }
 
@@ -294,14 +294,14 @@ final class MigratorTest extends TestCase
     {
         // Arrange — apply then delete the file
         $this->writeMigration(
-            '20260409120000_create_users.sql',
+            '20260409120000000_create_users.sql',
             'CREATE TABLE users (id INTEGER PRIMARY KEY);',
             'DROP TABLE users;',
         );
         $migrator = $this->createMigrator();
         $migrator->migrate();
 
-        unlink($this->migrationsDir . '/20260409120000_create_users.sql');
+        unlink($this->migrationsDir . '/20260409120000000_create_users.sql');
 
         // Act
         $result = $migrator->rollback();
@@ -332,12 +332,12 @@ final class MigratorTest extends TestCase
     {
         // Arrange
         $this->writeMigration(
-            '20260409120000_create_users.sql',
+            '20260409120000000_create_users.sql',
             'CREATE TABLE users (id INTEGER PRIMARY KEY);',
             'DROP TABLE users;',
         );
         $this->writeMigration(
-            '20260409130000_create_posts.sql',
+            '20260409130000000_create_posts.sql',
             'CREATE TABLE posts (id INTEGER PRIMARY KEY);',
             'DROP TABLE posts;',
         );
@@ -346,7 +346,7 @@ final class MigratorTest extends TestCase
 
         // Add a new pending file
         $this->writeMigration(
-            '20260409140000_create_tags.sql',
+            '20260409140000000_create_tags.sql',
             'CREATE TABLE tags (id INTEGER PRIMARY KEY);',
             'DROP TABLE tags;',
         );
@@ -357,7 +357,7 @@ final class MigratorTest extends TestCase
         // Assert
         $this->assertCount(2, $status->applied);
         $this->assertCount(1, $status->pending);
-        $this->assertSame('20260409140000', $status->pending[0]->version);
+        $this->assertSame('20260409140000000', $status->pending[0]->version);
     }
 
     // ------------------------------------------------------------------
@@ -386,7 +386,7 @@ final class MigratorTest extends TestCase
     {
         // Arrange
         $this->writeMigration(
-            '20260409120000_create_users.sql',
+            '20260409120000000_create_users.sql',
             'CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL);',
             'DROP TABLE users;',
         );
@@ -418,7 +418,7 @@ final class MigratorTest extends TestCase
     {
         // Arrange
         $this->writeMigration(
-            '20260410120000_create_items.sql',
+            '20260410120000000_create_items.sql',
             'CREATE TABLE items (id INTEGER PRIMARY KEY)',
         );
 
@@ -426,7 +426,7 @@ final class MigratorTest extends TestCase
         $logger->expects($this->once())
             ->method('info')
             ->with('Migration applied', $this->callback(
-                fn(array $ctx) => $ctx['file'] === '20260410120000_create_items.sql'
+                fn(array $ctx) => $ctx['file'] === '20260410120000000_create_items.sql'
                     && isset($ctx['elapsed_ms']),
             ));
 
@@ -441,7 +441,7 @@ final class MigratorTest extends TestCase
     {
         // Arrange
         $this->writeMigration(
-            '20260410120000_create_items.sql',
+            '20260410120000000_create_items.sql',
             'CREATE TABLE items (id INTEGER PRIMARY KEY)',
             'DROP TABLE items',
         );
@@ -460,7 +460,7 @@ final class MigratorTest extends TestCase
         $logger2->expects($this->once())
             ->method('info')
             ->with('Migration rolled back', $this->callback(
-                fn(array $ctx) => $ctx['file'] === '20260410120000_create_items.sql'
+                fn(array $ctx) => $ctx['file'] === '20260410120000000_create_items.sql'
                     && isset($ctx['elapsed_ms']),
             ));
 
@@ -474,7 +474,7 @@ final class MigratorTest extends TestCase
     {
         // Arrange — apply a migration, then modify the file
         $this->writeMigration(
-            '20260410120000_create_items.sql',
+            '20260410120000000_create_items.sql',
             'CREATE TABLE items (id INTEGER PRIMARY KEY)',
         );
 
@@ -484,7 +484,7 @@ final class MigratorTest extends TestCase
 
         // Modify the file after applying
         $this->writeMigration(
-            '20260410120000_create_items.sql',
+            '20260410120000000_create_items.sql',
             'CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)',
         );
 
@@ -492,7 +492,7 @@ final class MigratorTest extends TestCase
         $logger->expects($this->once())
             ->method('warning')
             ->with('Checksum mismatch', $this->callback(
-                fn(array $ctx) => $ctx['file'] === '20260410120000_create_items.sql'
+                fn(array $ctx) => $ctx['file'] === '20260410120000000_create_items.sql'
                     && isset($ctx['expected'], $ctx['actual']),
             ));
 

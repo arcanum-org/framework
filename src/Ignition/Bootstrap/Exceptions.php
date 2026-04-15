@@ -32,6 +32,19 @@ class Exceptions implements Bootstrapper, ErrorHandler, ExceptionHandler, Shutdo
         self::$reservedMemory = str_repeat('A', 32768);
         self::$container = $container;
 
+        // Register default Glitch handlers when no app-specific ones exist.
+        // Same has() guard pattern as Bootstrap\Logger — apps override by
+        // registering their own implementation before or after bootstrap.
+        if (!$container->has(ExceptionHandler::class)) {
+            $container->service(ExceptionHandler::class, \Arcanum\Glitch\Handler::class);
+        }
+        if (!$container->has(ErrorHandler::class)) {
+            $container->service(ErrorHandler::class, \Arcanum\Glitch\Handler::class);
+        }
+        if (!$container->has(ShutdownHandler::class)) {
+            $container->service(ShutdownHandler::class, \Arcanum\Glitch\Handler::class);
+        }
+
         // Report all PHP errors.
         \error_reporting(-1);
 
@@ -62,13 +75,12 @@ class Exceptions implements Bootstrapper, ErrorHandler, ExceptionHandler, Shutdo
     public function handleError(int $errno, string $errstr, string $errfile, int $errline): bool
     {
         try {
-            /** @var ErrorHandler|null $handler */
-            $handler = self::$container?->get(ErrorHandler::class);
-
-            if ($handler === null) {
-                // if there is no error handler, we let the default error handler handle the error
+            if (self::$container === null || !self::$container->has(ErrorHandler::class)) {
                 return false;
             }
+
+            /** @var ErrorHandler $handler */
+            $handler = self::$container->get(ErrorHandler::class);
 
             return $handler->handleError($errno, $errstr, $errfile, $errline);
         } catch (\Throwable $ex) {
@@ -79,40 +91,37 @@ class Exceptions implements Bootstrapper, ErrorHandler, ExceptionHandler, Shutdo
 
     public function handleException(Throwable $ex): void
     {
-        // Free the reserved memory.
         self::$reservedMemory = null;
 
         try {
-            /** @var ExceptionHandler|null $handler */
-            $handler = self::$container?->get(ExceptionHandler::class);
-
-            if ($handler === null) {
-                // if there is no exception handler, we at least try to log the exception to
-                // the default PHP logger
+            if (self::$container === null || !self::$container->has(ExceptionHandler::class)) {
                 \error_log($ex->getMessage());
                 return;
             }
 
+            /** @var ExceptionHandler $handler */
+            $handler = self::$container->get(ExceptionHandler::class);
             $handler->handleException($ex);
         } catch (Throwable $e) {
-            // if the exception handler throws an exception, we at least try to log it to
-            // the default PHP logger
             \error_log($e->getMessage());
         }
     }
 
     public function handleShutdown(): void
     {
-        // Free the reserved memory.
         self::$reservedMemory = null;
 
-        /** @var ShutdownHandler|null $handler */
-        $handler = self::$container?->get(ShutdownHandler::class);
+        try {
+            if (self::$container === null || !self::$container->has(ShutdownHandler::class)) {
+                return;
+            }
 
-        if ($handler === null) {
-            return;
+            /** @var ShutdownHandler $handler */
+            $handler = self::$container->get(ShutdownHandler::class);
+            $handler->handleShutdown();
+        } catch (\Throwable) {
+            // Shutdown handlers must never throw — swallow to prevent
+            // cascading failures during process teardown.
         }
-
-        $handler->handleShutdown();
     }
 }

@@ -25,6 +25,7 @@ final class MigrateCommand implements BuiltInCommand
     public function __construct(
         private readonly ConnectionManager|null $connections = null,
         private readonly string $rootDirectory = '',
+        private readonly string $migrationsPath = '',
     ) {
     }
 
@@ -41,7 +42,9 @@ final class MigrateCommand implements BuiltInCommand
         $driver = $this->connections->driverName($resolvedName);
 
         $repository = new MigrationRepository($connection, $driver);
-        $migrationsPath = $this->rootDirectory . DIRECTORY_SEPARATOR . 'migrations';
+        $migrationsPath = $this->migrationsPath !== ''
+            ? $this->migrationsPath
+            : $this->rootDirectory . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'migrations';
         $migrator = new Migrator($connection, $repository, $migrationsPath);
 
         $result = $migrator->migrate(function (MigrationFile $file, float $elapsedMs) use ($output): void {
