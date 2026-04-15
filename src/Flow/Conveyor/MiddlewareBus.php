@@ -6,6 +6,7 @@ namespace Arcanum\Flow\Conveyor;
 
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
+use Arcanum\Cabinet\ServiceNotFound;
 use Arcanum\Flow\Continuum\Continuum;
 use Arcanum\Flow\Continuum\Continuation;
 use Arcanum\Flow\Continuum\Progression;
@@ -108,7 +109,7 @@ class MiddlewareBus implements Bus
         try {
             /** @var callable */
             return $this->container->get($handlerName);
-        } catch (\Throwable $e) {
+        } catch (ServiceNotFound $e) {
             throw new HandlerNotFound(
                 get_class($object),
                 $handlerName,

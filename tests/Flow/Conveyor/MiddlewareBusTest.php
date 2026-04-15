@@ -12,6 +12,8 @@ use Arcanum\Flow\Conveyor\Command;
 use Arcanum\Flow\Conveyor\MiddlewareBus;
 use Arcanum\Flow\Conveyor\EmptyDTO;
 use Arcanum\Cabinet\Container;
+use Arcanum\Codex\Error\Unresolvable;
+use Arcanum\Test\Flow\Conveyor\Fixture\BrokenDep;
 use Arcanum\Test\Flow\Conveyor\Fixture\DoSomething;
 use Arcanum\Test\Flow\Conveyor\Fixture\DoSomethingHandler;
 use Arcanum\Test\Flow\Conveyor\Fixture\DoSomethingResult;
@@ -53,6 +55,7 @@ use Psr\Log\LoggerInterface;
 #[UsesClass(\Arcanum\Quill\Channel::class)]
 #[UsesClass(EmptyDTO::class)]
 #[UsesClass(AcceptedDTO::class)]
+#[UsesClass(\Arcanum\Cabinet\ServiceNotFound::class)]
 #[UsesClass(\Arcanum\Toolkit\Strings::class)]
 final class MiddlewareBusTest extends TestCase
 {
@@ -336,6 +339,22 @@ final class MiddlewareBusTest extends TestCase
 
         // Assert — no return type → treated as void → EmptyDTO
         $this->assertInstanceOf(EmptyDTO::class, $result);
+    }
+
+    // ---------------------------------------------------------------
+    // Dependency failure propagation (not swallowed as HandlerNotFound)
+    // ---------------------------------------------------------------
+
+    public function testDependencyFailurePropagatesInsteadOfHandlerNotFound(): void
+    {
+        // Arrange — BrokenDepHandler exists but requires LoggerInterface,
+        // which is not registered. The old catch(\Throwable) would wrap this
+        // as HandlerNotFound; now it propagates as the real resolution error.
+        $bus = new MiddlewareBus(new Container());
+
+        // Act & Assert — should throw an Unresolvable error, NOT HandlerNotFound
+        $this->expectException(Unresolvable::class);
+        $bus->dispatch(new BrokenDep());
     }
 
     // -----------------------------------------------------------
