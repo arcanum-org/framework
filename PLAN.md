@@ -155,8 +155,8 @@ Guards receive the `IdentityProvider` instead of raw `Closure` arguments. `Sessi
 - [x] **Update guards to accept `IdentityProvider`** — `SessionGuard` constructor takes `IdentityProvider` instead of `Closure`, calls `findById()`. `TokenGuard` takes `IdentityProvider`, calls `findByToken()`. `CliAuthResolver` takes `IdentityProvider`, calls `findByCredentials()`. Update all guard tests.
 - [x] **Update `Bootstrap\Auth`** — Read `provider` key from `config/auth.php` as a class-string. Resolve from the container (Codex auto-wires dependencies). Pass the resolved `IdentityProvider` to guard constructors. Throw a clear error if the provider class doesn't exist or doesn't implement the interface.
 - [ ] **Update `config/auth.php` format** — Remove the `resolvers` key and its closures. Add `provider` key (class-string). Keep `guard`, `login.fields`, and `login.ttl` as-is (already scalars). Update the starter app's config file.
-- [ ] **`make:provider` CLI command** — Scaffold an `IdentityProvider` implementation with stub methods and the correct `use` imports. Register as a built-in command (DTO + Handler). Add to `config/bootstrap.php` defaults (minimal bootstrap — no database needed for scaffolding).
-- [ ] **Update Auth README** — Document the new `IdentityProvider` interface, the config format change, and show a complete example provider using Forge models. Remove any references to resolver closures.
+- ~~**`make:provider` CLI command**~~ — Skipped. Apps only need one provider; the Auth README shows a complete example.
+- [x] **Update Auth README** — Document the new `IdentityProvider` interface, the config format change, and show a complete example provider using Forge models. Remove any references to resolver closures.
 
 ### Dogfood: bootstrap self-wiring (retro 3.1, 3.2, 3.4)
 
