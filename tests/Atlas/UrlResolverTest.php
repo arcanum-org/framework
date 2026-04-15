@@ -141,6 +141,20 @@ final class UrlResolverTest extends TestCase
         $this->assertSame('/index', $result);
     }
 
+    public function testDomainMatchingClassNameProducesFullPath(): void
+    {
+        // Arrange — TaskLists\Query\TaskLists produces /task-lists/task-lists (not collapsed).
+        // Convention routing is symmetric: the forward resolver maps /task-lists/task-lists
+        // to this class. Devs wanting /task-lists use a custom route in config/routes.php.
+        $resolver = new UrlResolver('App\\Domain');
+
+        // Act
+        $result = $resolver->resolve('App\\Domain\\TaskLists\\Query\\TaskLists');
+
+        // Assert
+        $this->assertSame('/task-lists/task-lists', $result);
+    }
+
     public function testThrowsForUnknownNamespace(): void
     {
         // Arrange
