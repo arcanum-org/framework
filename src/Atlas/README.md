@@ -413,6 +413,25 @@ app/
 
 This is useful for Conveyor-level concerns (validation, audit logging) that should run for every dispatch but aren't HTTP-specific.
 
+## When to use custom routes
+
+Convention routing maps path segments to namespaces — it needs at least one segment to work with. Two common cases require custom routes:
+
+**Root path (`/`):** Convention routing can't produce an empty path, so `GET /` always needs a custom route (or a page — `app/Pages/Index.html` maps to `/` automatically via `PageDiscovery`).
+
+**Domain name matches DTO name:** When a domain's "list all" query has the same name as the domain, convention routing produces a doubled path. `App\Domain\TaskLists\Query\TaskLists` maps to `/task-lists/task-lists`, not `/task-lists`. This is correct — `/task-lists` maps to the root-level `App\Domain\Query\TaskLists`, a different class. If you want the clean URL, add one line to `config/routes.php`:
+
+```php
+'custom' => [
+    '/task-lists' => [
+        'class' => 'App\\Domain\\TaskLists\\Query\\TaskLists',
+        'methods' => ['GET'],
+    ],
+],
+```
+
+Both cases are one-liners. Convention handles the rest.
+
 ## Custom routes
 
 Custom routes are explicit path → class mappings that bypass convention-based resolution. Use them for paths that don't fit the convention system:
