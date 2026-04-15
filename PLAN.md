@@ -97,9 +97,9 @@ Migrations currently live at `migrations/` in the project root. Both builds expe
 
 ##### Checklist
 
-- [ ] **Configurable migrations path** — Add a `migrations_path` key to `config/database.php`, defaulting to `database/migrations`. Update `MigrateCommand`, `MigrateCreateCommand`, `MigrateRollbackCommand`, and `MigrateStatusCommand` to read the path from config instead of hardcoding it. `MigrateCreateCommand` should create the directory if it doesn't exist. Update output messages to reflect the configured path.
-- [ ] **Update tests** — Adjust any tests that reference the `migrations/` path.
-- [ ] **Update starter app** — Move `migrations/` to `database/migrations/`. Add the `migrations_path` key to `config/database.php` (commented out, showing the default).
+- [x] **Configurable migrations path** — Add a `migrations_path` key to `config/database.php`, defaulting to `database/migrations`. Update `MigrateCommand`, `MigrateCreateCommand`, `MigrateRollbackCommand`, and `MigrateStatusCommand` to read the path from config instead of hardcoding it. `MigrateCreateCommand` should create the directory if it doesn't exist. Update output messages to reflect the configured path.
+- [x] **Update tests** — No tests referenced the hardcoded `migrations/` path directly; migration commands use constructor injection.
+- [ ] **Update starter app** — Move `migrations/` to `database/migrations/`. Add the `migrations_path` key to `config/database.php` (commented out, showing the default). *(Starter app repo — deferred to starter app update stream.)*
 - [ ] **Update COMPENDIUM.md and Forge README** — Reflect the new default `database/migrations/` path and the config option in all documentation.
 
 ### Dogfood: routing & handler resolution (retro 1.7, 1.5)
