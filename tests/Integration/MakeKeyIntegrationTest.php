@@ -30,6 +30,10 @@ final class MakeKeyIntegrationTest extends TestCase
         $this->originalArgv = $_SERVER['argv'] ?? null;
         $this->originalAppKey = $_ENV['APP_KEY'] ?? null;
 
+        // Clear APP_KEY so tests start with a clean environment.
+        unset($_ENV['APP_KEY']);
+        putenv('APP_KEY');
+
         // Create a minimal app directory structure.
         $this->tempDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'arcanum_test_' . bin2hex(random_bytes(4));
         mkdir($this->tempDir . DIRECTORY_SEPARATOR . 'config', 0755, true);
