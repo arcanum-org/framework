@@ -52,8 +52,8 @@ PSR-7 compliance verified: the spec says for POST + form content types the metho
 
 ##### Checklist
 
-- [ ] **`Server::request()` — parse body for non-POST methods** — After building the headers and body stream, check: if method is not GET and not POST, and `Content-Type` contains `application/x-www-form-urlencoded`, call `parse_str((string) $body, $parsedBody)` and `$body->rewind()`. Use `$parsedBody` in `withParsedBody()`. For non-POST methods with no recognized content type, pass `null`. POST continues using `$_POST`. Verify `CachingStream` supports `rewind()` after `__toString()`.
-- [ ] **Tests: parsed body for PUT/PATCH/DELETE** — Unit tests on `Server::request()` covering: PUT with url-encoded body parses correctly, PATCH with url-encoded body parses correctly, DELETE with url-encoded body parses correctly, POST still uses `$_POST`, GET returns null parsed body, non-POST with `application/json` content type returns null (not parsed — stream is available for manual reading), non-POST with no content type returns null.
+- [x] **`Server::request()` — parse body for non-POST methods** — After building the headers and body stream, check: if method is not GET and not POST, and `Content-Type` contains `application/x-www-form-urlencoded`, call `parse_str((string) $body, $parsedBody)` and `$body->rewind()`. Use `$parsedBody` in `withParsedBody()`. For non-POST methods with no recognized content type, pass `null`. POST continues using `$_POST`. Verify `CachingStream` supports `rewind()` after `__toString()`.
+- [x] **Tests: parsed body for PUT/PATCH/DELETE** — Unit tests on `Server::request()` covering: PUT with url-encoded body parses correctly, PATCH with url-encoded body parses correctly, DELETE with url-encoded body parses correctly, POST still uses `$_POST`, GET returns null parsed body, non-POST with `application/json` content type returns null (not parsed — stream is available for manual reading), non-POST with no content type returns null.
 
 #### Missing `symfony/filesystem` dependency (retro 1.4)
 
