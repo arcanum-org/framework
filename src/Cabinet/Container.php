@@ -65,6 +65,10 @@ class Container implements Application, Specifier
         $this->resolver = $resolver ?? Resolver::forContainer($this);
         $this->middleware = $middleware ?? new ContinuationCollection();
         $this->decorators = $decorators ?? new PipelayerSystem();
+
+        // Self-register so any class can typehint Application or ContainerInterface.
+        $this->instance(Application::class, $this);
+        $this->instance(\Psr\Container\ContainerInterface::class, $this);
     }
 
     /**

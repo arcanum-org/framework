@@ -1222,4 +1222,18 @@ final class ContainerTest extends TestCase
 
         $container->get(Fixture\CircularA::class);
     }
+
+    public function testSelfRegistersAsApplication(): void
+    {
+        $container = new Container();
+
+        $this->assertSame($container, $container->get(\Arcanum\Cabinet\Application::class));
+    }
+
+    public function testSelfRegistersAsContainerInterface(): void
+    {
+        $container = new Container();
+
+        $this->assertSame($container, $container->get(\Psr\Container\ContainerInterface::class));
+    }
 }
