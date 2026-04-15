@@ -57,20 +57,8 @@ final class UrlResolver
 
         $typeIndex = $this->findTypeIndex($segments);
 
-        // The segment immediately before the type is the domain name.
-        // If the last segment after the type matches this domain, the forward
-        // resolver produced it from a single-segment path — collapse the duplicate.
-        // e.g., TaskLists\Query\TaskLists → ['TaskLists'] not ['TaskLists', 'TaskLists']
-        // Also handles deeper nesting: Shop\Products\Query\Products → ['Shop', 'Products']
-        $domainSegment = $typeIndex > 0 ? $segments[$typeIndex - 1] : null;
-
         // Remove the type namespace segment (Query/Command)
         array_splice($segments, $typeIndex, 1);
-
-        // Collapse trailing duplicate of the domain segment.
-        if ($domainSegment !== null && count($segments) >= 2 && end($segments) === $domainSegment) {
-            array_pop($segments);
-        }
 
         return '/' . implode('/', array_map(
             static fn(string $segment): string => Strings::kebab($segment),

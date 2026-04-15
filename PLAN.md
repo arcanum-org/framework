@@ -106,11 +106,11 @@ Migrations currently live at `migrations/` in the project root. Both builds expe
 
 Two bugs in the routing and handler resolution pipeline, both surfaced by the dogfood.
 
-#### Convention routing path doubling (retro 1.7)
+#### Convention routing path doubling (retro 1.7) — resolved as working-as-designed
 
-When a domain name matches the DTO class name, `UrlResolver::resolveConvention()` produces doubled paths. `App\Domain\TaskLists\Query\TaskLists` → `/task-lists/task-lists` instead of `/task-lists`. The reverse resolver strips the `Query`/`Command` type segment but leaves both the domain segment and the identically-named class segment. Build B had to fall back to custom routes for everything.
+When a domain name matches the DTO class name, convention routing produces "doubled" paths: `App\Domain\TaskLists\Query\TaskLists` → `/task-lists/task-lists`. Both builds found this surprising and fell back to custom routes.
 
-**Fix:** In `UrlResolver::resolveConvention()`, after removing the type segment, check if the last remaining segment equals the segment immediately before the type (the domain). If they match, drop the duplicate. Must also handle deeper nesting: `App\Domain\Shop\Products\Query\Products` → `/shop/products`, not `/shop/products/products`.
+**Decision:** This is correct behavior, not a bug. The forward resolver maps `/task-lists` to root-level `App\Domain\Query\TaskLists` and `/task-lists/task-lists` to domain-level `App\Domain\TaskLists\Query\TaskLists`. Collapsing the reverse direction breaks the round-trip (the generated URL would route to a different class). Devs wanting clean URLs like `/task-lists` use a custom route in `config/routes.php` — a one-liner. Document this clearly rather than adding magic path collapsing.
 
 #### Handler resolution misreports dependency failures (retro 1.5, 1.6)
 
@@ -122,12 +122,12 @@ When a domain name matches the DTO class name, `UrlResolver::resolveConvention()
 
 ##### Checklist
 
-- [x] **Fix `UrlResolver::resolveConvention()` path doubling** — After removing the `Query`/`Command` type segment from the namespace segments, check if the last segment duplicates the segment that preceded the type. If so, remove the duplicate. Test cases: `Domain\TaskLists\Query\TaskLists` → `/task-lists`, `Domain\Shop\Products\Query\Products` → `/shop/products`, `Domain\Shop\Query\FeaturedProducts` → `/shop/featured-products` (no duplication, unchanged), `Domain\Shop\Query\Shop` → `/shop` (edge case: DTO name matches domain two levels up).
+- [x] ~~**Fix `UrlResolver::resolveConvention()` path doubling**~~ — Resolved as working-as-designed. The doubled path is the correct convention URL; collapsing breaks the forward/reverse round-trip. Added a test confirming the behavior. Documentation items below cover communicating this to devs.
 - [ ] **Fix `handlerFor()` prefixed lookup** — Replace `$this->container->has($prefixedName)` with `class_exists($prefixedName)` at the prefixed handler check. This correctly discovers handlers that exist and autoload, regardless of explicit container registration. Test: prefixed handler class exists but is not registered → found and auto-wired. Prefixed handler class does not exist → falls through to unprefixed.
 - [ ] **Narrow `handlerFor()` catch to `ServiceNotFound`** — Replace `catch (\Throwable $e)` with `catch (ServiceNotFound $e)` at the unprefixed handler fallback. Dependency resolution failures (`Unresolvable` from Codex, `AuthenticationException` from the auth work) propagate to the kernel as-is, producing accurate error responses instead of misleading "Handler Not Found" errors.
 - [ ] **Tests** — UrlResolver tests for collapsed paths (single-segment domain = class name, deeper nesting, no-duplication cases). MiddlewareBus tests: prefixed handler found via auto-wiring, dependency failure propagates instead of becoming HandlerNotFound.
 - [ ] **Document root path (`/`) convention limitation** — Atlas convention routing can't produce an empty path — `GET /` always needs a custom route. Both dogfood builds hit this. Document in the Atlas README and the from-scratch guide that `'/' => DtoClass::class` in `config/routes.php` is required.
-- [ ] **Update COMPENDIUM.md** — Document the path collapsing behavior and the root path limitation in the routing conventions section.
+- [ ] **Update COMPENDIUM.md** — Document the convention routing behavior (domain = class name produces doubled path, use custom routes for clean URLs) and the root path limitation in the routing conventions section.
 
 ### Dogfood: auth config reform (retro 4.1, orchestrator observation)
 

@@ -141,64 +141,18 @@ final class UrlResolverTest extends TestCase
         $this->assertSame('/index', $result);
     }
 
-    public function testCollapsesPathWhenDomainMatchesClassName(): void
+    public function testDomainMatchingClassNameProducesFullPath(): void
     {
-        // Arrange — TaskLists\Query\TaskLists should produce /task-lists, not /task-lists/task-lists
+        // Arrange — TaskLists\Query\TaskLists produces /task-lists/task-lists (not collapsed).
+        // Convention routing is symmetric: the forward resolver maps /task-lists/task-lists
+        // to this class. Devs wanting /task-lists use a custom route in config/routes.php.
         $resolver = new UrlResolver('App\\Domain');
 
         // Act
         $result = $resolver->resolve('App\\Domain\\TaskLists\\Query\\TaskLists');
 
         // Assert
-        $this->assertSame('/task-lists', $result);
-    }
-
-    public function testCollapsesPathInDeepNesting(): void
-    {
-        // Arrange — Shop\Products\Query\Products should produce /shop/products
-        $resolver = new UrlResolver('App\\Domain');
-
-        // Act
-        $result = $resolver->resolve('App\\Domain\\Shop\\Products\\Query\\Products');
-
-        // Assert
-        $this->assertSame('/shop/products', $result);
-    }
-
-    public function testNoCollapseWhenClassNameDiffersFromDomain(): void
-    {
-        // Arrange — Shop\Query\FeaturedProducts should stay /shop/featured-products
-        $resolver = new UrlResolver('App\\Domain');
-
-        // Act
-        $result = $resolver->resolve('App\\Domain\\Shop\\Query\\FeaturedProducts');
-
-        // Assert
-        $this->assertSame('/shop/featured-products', $result);
-    }
-
-    public function testCollapseEdgeCaseDtoNameMatchesDomainTwoLevelsUp(): void
-    {
-        // Arrange — Shop\Query\Shop → DTO name matches top-level domain, should collapse to /shop
-        $resolver = new UrlResolver('App\\Domain');
-
-        // Act
-        $result = $resolver->resolve('App\\Domain\\Shop\\Query\\Shop');
-
-        // Assert
-        $this->assertSame('/shop', $result);
-    }
-
-    public function testCollapsesCommandPath(): void
-    {
-        // Arrange — Tasks\Command\Tasks should produce /tasks, not /tasks/tasks
-        $resolver = new UrlResolver('App\\Domain');
-
-        // Act
-        $result = $resolver->resolve('App\\Domain\\Tasks\\Command\\Tasks');
-
-        // Assert
-        $this->assertSame('/tasks', $result);
+        $this->assertSame('/task-lists/task-lists', $result);
     }
 
     public function testThrowsForUnknownNamespace(): void
