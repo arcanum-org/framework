@@ -142,6 +142,21 @@ final class MiddlewareBusTest extends TestCase
         $this->assertSame('post:test', $result->name);
     }
 
+    public function testDispatchWithPrefixAutoWiresUnregisteredHandler(): void
+    {
+        // Arrange — PostDoSomethingHandler exists as a class but is NOT registered
+        // in the container. The old has() check would miss it; class_exists() finds it.
+        $container = new Container();
+        $bus = new MiddlewareBus($container);
+
+        // Act
+        $result = $bus->dispatch(new DoSomething('test'), prefix: 'Post');
+
+        // Assert — auto-wired PostDoSomethingHandler prepends "post:"
+        $this->assertInstanceOf(DoSomethingResult::class, $result);
+        $this->assertSame('post:test', $result->name);
+    }
+
     // ---------------------------------------------------------------
     // Prefix falling back to unprefixed handler
     // ---------------------------------------------------------------

@@ -92,7 +92,7 @@ class MiddlewareBus implements Bus
     {
         if ($prefix !== '') {
             $prefixedName = $this->handlerNameFor($object, $prefix);
-            if ($this->container->has($prefixedName)) {
+            if (class_exists($prefixedName)) {
                 /** @var callable */
                 return $this->container->get($prefixedName);
             }
