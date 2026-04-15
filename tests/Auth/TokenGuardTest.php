@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arcanum\Test\Auth;
 
+use Arcanum\Auth\Identity;
+use Arcanum\Auth\IdentityProvider;
 use Arcanum\Auth\SimpleIdentity;
 use Arcanum\Auth\TokenGuard;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -26,10 +28,34 @@ final class TokenGuardTest extends TestCase
         return $request;
     }
 
+    private function stubProvider(Identity|null $returnValue = null): IdentityProvider
+    {
+        return new class ($returnValue) implements IdentityProvider {
+            public function __construct(private readonly Identity|null $identity)
+            {
+            }
+
+            public function findById(string $id): Identity|null
+            {
+                return null;
+            }
+
+            public function findByToken(string $token): Identity|null
+            {
+                return $this->identity;
+            }
+
+            public function findByCredentials(string ...$credentials): Identity|null
+            {
+                return null;
+            }
+        };
+    }
+
     public function testResolvesIdentityFromBearerToken(): void
     {
         $guard = new TokenGuard(
-            fn(string $token) => new SimpleIdentity('user-from-token', ['api']),
+            $this->stubProvider(new SimpleIdentity('user-from-token', ['api'])),
         );
 
         $identity = $guard->resolve($this->stubRequest('Bearer valid-token-123'));
@@ -40,28 +66,28 @@ final class TokenGuardTest extends TestCase
 
     public function testReturnsNullWhenNoAuthorizationHeader(): void
     {
-        $guard = new TokenGuard(fn(string $token) => new SimpleIdentity('x'));
+        $guard = new TokenGuard($this->stubProvider(new SimpleIdentity('x')));
 
         $this->assertNull($guard->resolve($this->stubRequest()));
     }
 
     public function testReturnsNullWhenNotBearerScheme(): void
     {
-        $guard = new TokenGuard(fn(string $token) => new SimpleIdentity('x'));
+        $guard = new TokenGuard($this->stubProvider(new SimpleIdentity('x')));
 
         $this->assertNull($guard->resolve($this->stubRequest('Basic dXNlcjpwYXNz')));
     }
 
     public function testReturnsNullWhenBearerTokenIsEmpty(): void
     {
-        $guard = new TokenGuard(fn(string $token) => new SimpleIdentity('x'));
+        $guard = new TokenGuard($this->stubProvider(new SimpleIdentity('x')));
 
         $this->assertNull($guard->resolve($this->stubRequest('Bearer ')));
     }
 
-    public function testReturnsNullWhenResolverReturnsNull(): void
+    public function testReturnsNullWhenProviderReturnsNull(): void
     {
-        $guard = new TokenGuard(fn(string $token) => null);
+        $guard = new TokenGuard($this->stubProvider(null));
 
         $this->assertNull($guard->resolve($this->stubRequest('Bearer expired-token')));
     }

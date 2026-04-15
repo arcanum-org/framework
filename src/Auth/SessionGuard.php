@@ -11,21 +11,16 @@ use Psr\Http\Message\ServerRequestInterface;
  * Resolves identity from the session.
  *
  * Reads the identity ID stored in the session by a previous login,
- * then calls the app-provided resolver to look up the full Identity.
- * The resolver is the bridge to the app's user storage — database,
- * cache, config file, whatever.
+ * then calls the IdentityProvider to look up the full Identity.
  *
- * Returns null if the session has no identity or the resolver
+ * Returns null if the session has no identity or the provider
  * can't find the user.
  */
 final class SessionGuard implements Guard
 {
-    /**
-     * @param \Closure(string): (Identity|null) $resolver
-     */
     public function __construct(
         private readonly ActiveSession $session,
-        private readonly \Closure $resolver,
+        private readonly IdentityProvider $provider,
     ) {
     }
 
@@ -41,6 +36,6 @@ final class SessionGuard implements Guard
             return null;
         }
 
-        return ($this->resolver)($identityId);
+        return $this->provider->findById($identityId);
     }
 }

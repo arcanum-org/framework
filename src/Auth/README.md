@@ -27,6 +27,77 @@ interface Identity
 
 `ActiveIdentity` is the request-scoped holder (same pattern as `ActiveSession`). Auth middleware writes, authorization guard and handlers read.
 
+## IdentityProvider
+
+The `IdentityProvider` interface is the bridge between the auth system and your user storage. Implement it once and the framework uses it everywhere — session guard, token guard, CLI auth, and the login command all go through the same provider.
+
+```php
+interface IdentityProvider
+{
+    public function findById(string $id): Identity|null;
+    public function findByToken(string $token): Identity|null;
+    public function findByCredentials(string ...$credentials): Identity|null;
+}
+```
+
+Every method returns `null` for "not found" or "invalid." Normal lookup failures (unknown ID, expired token, wrong password) are not exceptional — return `null` and let the guard handle it. Only throw for infrastructure failures (database down, etc.).
+
+### Example implementation
+
+```php
+namespace App\Auth;
+
+use App\Domain\User\Model\User;
+use Arcanum\Auth\Identity;
+use Arcanum\Auth\IdentityProvider;
+use Arcanum\Auth\SimpleIdentity;
+
+final class UserProvider implements IdentityProvider
+{
+    public function __construct(private readonly User $users)
+    {
+    }
+
+    public function findById(string $id): Identity|null
+    {
+        $row = $this->users->findById(id: (int) $id);
+
+        return $row ? new SimpleIdentity($row->id, $row->roles) : null;
+    }
+
+    public function findByToken(string $token): Identity|null
+    {
+        $row = $this->users->findByToken(token: $token);
+
+        return $row ? new SimpleIdentity($row->id, $row->roles) : null;
+    }
+
+    public function findByCredentials(string ...$credentials): Identity|null
+    {
+        [$email, $password] = $credentials;
+
+        $row = $this->users->findByEmail(email: $email);
+
+        if ($row === null || !password_verify($password, $row->password_hash)) {
+            return null;
+        }
+
+        return new SimpleIdentity($row->id, $row->roles);
+    }
+}
+```
+
+Register the provider in `config/auth.php`:
+
+```php
+return [
+    'provider' => \App\Auth\UserProvider::class,
+    // ...
+];
+```
+
+The provider is resolved from the container, so it can inject Forge models, database connections, or any other service.
+
 ## Guards
 
 Guards resolve an `Identity` from an HTTP request. They never reject — that's authorization's job.
@@ -40,42 +111,34 @@ interface Guard
 
 ### SessionGuard
 
-Reads the identity ID from the session, calls your resolver to look up the full identity:
+Reads the identity ID from the session, calls `IdentityProvider::findById()` to look up the full identity:
 
 ```php
-// config/auth.php
 return [
     'guard' => 'session',
-    'resolvers' => [
-        'identity' => fn(string $id) => User::find($id),
-    ],
+    'provider' => \App\Auth\UserProvider::class,
 ];
 ```
 
 ### TokenGuard
 
-Reads a Bearer token from the `Authorization` header:
+Reads a Bearer token from the `Authorization` header, calls `IdentityProvider::findByToken()`:
 
 ```php
 return [
     'guard' => 'token',
-    'resolvers' => [
-        'token' => fn(string $token) => ApiToken::validate($token)?->user(),
-    ],
+    'provider' => \App\Auth\UserProvider::class,
 ];
 ```
 
 ### CompositeGuard
 
-Tries session first, then token. For apps serving both HTML and API:
+Tries multiple guards in order. First non-null identity wins. For apps serving both HTML and API:
 
 ```php
 return [
-    'guard' => 'composite',
-    'resolvers' => [
-        'identity' => fn(string $id) => User::find($id),
-        'token' => fn(string $token) => ApiToken::validate($token)?->user(),
-    ],
+    'guard' => ['session', 'token'],
+    'provider' => \App\Auth\UserProvider::class,
 ];
 ```
 
@@ -157,7 +220,7 @@ The same `#[RequiresAuth]` and `#[RequiresRole]` attributes work on CLI — `Aut
 
 ### CLI Sessions
 
-The `login` command prompts for credentials (configurable fields), validates them through your app's resolver, and stores the identity in an encrypted file (`files/.cli-session`). Subsequent commands automatically pick up the stored identity without needing `--token`.
+The `login` command prompts for credentials (configurable fields), validates them through your app's `IdentityProvider::findByCredentials()`, and stores the identity in an encrypted file (`files/.cli-session`). Subsequent commands automatically pick up the stored identity without needing `--token`.
 
 Sessions are encrypted at rest using the framework's `Encryptor` (your `APP_KEY`). They contain only the identity ID and an expiry timestamp — never the raw credentials. Sessions expire after the configured TTL (default: 24 hours).
 
@@ -206,19 +269,11 @@ Same `AuthorizationGuard`, same attributes, different identity resolution.
 ```php
 // config/auth.php
 return [
-    // 'session', 'token', or 'composite'
+    // 'session', 'token', or ['session', 'token'] for composite
     'guard' => 'session',
 
-    'resolvers' => [
-        // Session guard: maps identity ID → Identity
-        'identity' => fn(string $id) => null, // Replace with your user lookup
-
-        // Token guard: maps bearer token → Identity
-        'token' => fn(string $token) => null, // Replace with your token validation
-
-        // CLI login: validates credentials, returns Identity|null
-        'credentials' => fn(string $email, string $password) => null,
-    ],
+    // Class implementing IdentityProvider — resolved from the container
+    'provider' => \App\Auth\UserProvider::class,
 
     // CLI login settings
     'login' => [
@@ -228,7 +283,7 @@ return [
 ];
 ```
 
-The `credentials` resolver receives positional arguments matching the `fields` order. Fields named `password`, `secret`, or `token` use hidden input.
+The `IdentityProvider::findByCredentials()` receives positional arguments matching the `fields` order. Fields named `password`, `secret`, or `token` use hidden input.
 
 ## Bootstrap
 
@@ -236,6 +291,7 @@ The `credentials` resolver receives positional arguments matching the `fields` o
 
 - `ActiveIdentity` as a singleton
 - `Identity` interface factory (resolves from `ActiveIdentity`)
+- `IdentityProvider` (resolved from the `provider` config key, cached in the container)
 - `Guard` (configured from `config/auth.php`) — HTTP only
 - `AuthMiddleware` — HTTP only
 - `CliSession` (encrypted file store) — CLI only

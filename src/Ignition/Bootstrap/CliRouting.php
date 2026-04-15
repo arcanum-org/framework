@@ -23,6 +23,7 @@ use Arcanum\Rune\Command\CacheStatusCommand;
 use Arcanum\Rune\Command\DbStatusCommand;
 use Arcanum\Rune\Command\ForgeModelsCommand;
 use Arcanum\Auth\CliSession;
+use Arcanum\Auth\IdentityProvider;
 use Arcanum\Rune\Command\LoginCommand;
 use Arcanum\Rune\Command\LogoutCommand;
 use Arcanum\Rune\Prompter;
@@ -316,13 +317,8 @@ class CliRouting implements Bootstrapper
             );
         });
 
-        // LoginCommand — Closure credentialsResolver requires factory logic.
+        // LoginCommand — needs factory for non-auto-wirable primitives.
         $container->factory(LoginCommand::class, function () use ($container, $config) {
-            $credentialsResolver = $config->get('auth.resolvers.credentials');
-            $credentialsResolverFn = $credentialsResolver instanceof \Closure
-                ? $credentialsResolver
-                : fn() => null;
-
             /** @var mixed $fields */
             $fields = $config->get('auth.login.fields');
 
@@ -332,10 +328,13 @@ class CliRouting implements Bootstrapper
             /** @var CliSession $session */
             $session = $container->get(CliSession::class);
 
+            /** @var IdentityProvider $provider */
+            $provider = $container->get(IdentityProvider::class);
+
             return new LoginCommand(
                 prompter: new Prompter($output),
                 session: $session,
-                credentialsResolver: $credentialsResolverFn,
+                provider: $provider,
                 fields: is_array($fields)
                     ? array_values(array_filter($fields, 'is_string'))
                     : ['email', 'password'],

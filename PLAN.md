@@ -52,8 +52,8 @@ PSR-7 compliance verified: the spec says for POST + form content types the metho
 
 ##### Checklist
 
-- [ ] **`Server::request()` — parse body for non-POST methods** — After building the headers and body stream, check: if method is not GET and not POST, and `Content-Type` contains `application/x-www-form-urlencoded`, call `parse_str((string) $body, $parsedBody)` and `$body->rewind()`. Use `$parsedBody` in `withParsedBody()`. For non-POST methods with no recognized content type, pass `null`. POST continues using `$_POST`. Verify `CachingStream` supports `rewind()` after `__toString()`.
-- [ ] **Tests: parsed body for PUT/PATCH/DELETE** — Unit tests on `Server::request()` covering: PUT with url-encoded body parses correctly, PATCH with url-encoded body parses correctly, DELETE with url-encoded body parses correctly, POST still uses `$_POST`, GET returns null parsed body, non-POST with `application/json` content type returns null (not parsed — stream is available for manual reading), non-POST with no content type returns null.
+- [x] **`Server::request()` — parse body for non-POST methods** — After building the headers and body stream, check: if method is not GET and not POST, and `Content-Type` contains `application/x-www-form-urlencoded`, call `parse_str((string) $body, $parsedBody)` and `$body->rewind()`. Use `$parsedBody` in `withParsedBody()`. For non-POST methods with no recognized content type, pass `null`. POST continues using `$_POST`. Verify `CachingStream` supports `rewind()` after `__toString()`.
+- [x] **Tests: parsed body for PUT/PATCH/DELETE** — Unit tests on `Server::request()` covering: PUT with url-encoded body parses correctly, PATCH with url-encoded body parses correctly, DELETE with url-encoded body parses correctly, POST still uses `$_POST`, GET returns null parsed body, non-POST with `application/json` content type returns null (not parsed — stream is available for manual reading), non-POST with no content type returns null.
 
 #### Missing `symfony/filesystem` dependency (retro 1.4)
 
@@ -151,12 +151,12 @@ Guards receive the `IdentityProvider` instead of raw `Closure` arguments. `Sessi
 
 ##### Checklist
 
-- [ ] **`IdentityProvider` interface** — Define in `src/Auth/`. Three methods: `findById(string $id): ?Identity`, `findByToken(string $token): ?Identity`, `findByCredentials(string ...$credentials): ?Identity`. Document the contract: each method returns `null` for "not found / invalid," never throws for normal lookup failures.
-- [ ] **Update guards to accept `IdentityProvider`** — `SessionGuard` constructor takes `IdentityProvider` instead of `Closure`, calls `findById()`. `TokenGuard` takes `IdentityProvider`, calls `findByToken()`. `CliAuthResolver` takes `IdentityProvider`, calls `findByCredentials()`. Update all guard tests.
-- [ ] **Update `Bootstrap\Auth`** — Read `provider` key from `config/auth.php` as a class-string. Resolve from the container (Codex auto-wires dependencies). Pass the resolved `IdentityProvider` to guard constructors. Throw a clear error if the provider class doesn't exist or doesn't implement the interface.
+- [x] **`IdentityProvider` interface** — Define in `src/Auth/`. Three methods: `findById(string $id): ?Identity`, `findByToken(string $token): ?Identity`, `findByCredentials(string ...$credentials): ?Identity`. Document the contract: each method returns `null` for "not found / invalid," never throws for normal lookup failures.
+- [x] **Update guards to accept `IdentityProvider`** — `SessionGuard` constructor takes `IdentityProvider` instead of `Closure`, calls `findById()`. `TokenGuard` takes `IdentityProvider`, calls `findByToken()`. `CliAuthResolver` takes `IdentityProvider`, calls `findByCredentials()`. Update all guard tests.
+- [x] **Update `Bootstrap\Auth`** — Read `provider` key from `config/auth.php` as a class-string. Resolve from the container (Codex auto-wires dependencies). Pass the resolved `IdentityProvider` to guard constructors. Throw a clear error if the provider class doesn't exist or doesn't implement the interface.
 - [ ] **Update `config/auth.php` format** — Remove the `resolvers` key and its closures. Add `provider` key (class-string). Keep `guard`, `login.fields`, and `login.ttl` as-is (already scalars). Update the starter app's config file.
-- [ ] **`make:provider` CLI command** — Scaffold an `IdentityProvider` implementation with stub methods and the correct `use` imports. Register as a built-in command (DTO + Handler). Add to `config/bootstrap.php` defaults (minimal bootstrap — no database needed for scaffolding).
-- [ ] **Update Auth README** — Document the new `IdentityProvider` interface, the config format change, and show a complete example provider using Forge models. Remove any references to resolver closures.
+- ~~**`make:provider` CLI command**~~ — Skipped. Apps only need one provider; the Auth README shows a complete example.
+- [x] **Update Auth README** — Document the new `IdentityProvider` interface, the config format change, and show a complete example provider using Forge models. Remove any references to resolver closures.
 
 ### Dogfood: bootstrap self-wiring (retro 3.1, 3.2, 3.4)
 
