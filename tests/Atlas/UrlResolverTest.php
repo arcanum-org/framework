@@ -141,6 +141,66 @@ final class UrlResolverTest extends TestCase
         $this->assertSame('/index', $result);
     }
 
+    public function testCollapsesPathWhenDomainMatchesClassName(): void
+    {
+        // Arrange — TaskLists\Query\TaskLists should produce /task-lists, not /task-lists/task-lists
+        $resolver = new UrlResolver('App\\Domain');
+
+        // Act
+        $result = $resolver->resolve('App\\Domain\\TaskLists\\Query\\TaskLists');
+
+        // Assert
+        $this->assertSame('/task-lists', $result);
+    }
+
+    public function testCollapsesPathInDeepNesting(): void
+    {
+        // Arrange — Shop\Products\Query\Products should produce /shop/products
+        $resolver = new UrlResolver('App\\Domain');
+
+        // Act
+        $result = $resolver->resolve('App\\Domain\\Shop\\Products\\Query\\Products');
+
+        // Assert
+        $this->assertSame('/shop/products', $result);
+    }
+
+    public function testNoCollapseWhenClassNameDiffersFromDomain(): void
+    {
+        // Arrange — Shop\Query\FeaturedProducts should stay /shop/featured-products
+        $resolver = new UrlResolver('App\\Domain');
+
+        // Act
+        $result = $resolver->resolve('App\\Domain\\Shop\\Query\\FeaturedProducts');
+
+        // Assert
+        $this->assertSame('/shop/featured-products', $result);
+    }
+
+    public function testCollapseEdgeCaseDtoNameMatchesDomainTwoLevelsUp(): void
+    {
+        // Arrange — Shop\Query\Shop → DTO name matches top-level domain, should collapse to /shop
+        $resolver = new UrlResolver('App\\Domain');
+
+        // Act
+        $result = $resolver->resolve('App\\Domain\\Shop\\Query\\Shop');
+
+        // Assert
+        $this->assertSame('/shop', $result);
+    }
+
+    public function testCollapsesCommandPath(): void
+    {
+        // Arrange — Tasks\Command\Tasks should produce /tasks, not /tasks/tasks
+        $resolver = new UrlResolver('App\\Domain');
+
+        // Act
+        $result = $resolver->resolve('App\\Domain\\Tasks\\Command\\Tasks');
+
+        // Assert
+        $this->assertSame('/tasks', $result);
+    }
+
     public function testThrowsForUnknownNamespace(): void
     {
         // Arrange
